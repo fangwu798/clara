@@ -1,0 +1,18 @@
+package com.clara.kernel;
+
+public enum ErrorCategory {
+    CONFIGURATION,
+    VALIDATION,
+    AUTHENTICATION,
+    AUTHORIZATION,
+    CAPABILITY,
+    RATE_LIMIT,
+    TIMEOUT,
+    CANCELLED,
+    CONFLICT,
+    RESOURCE_LIMIT,
+    CONTENT_SAFETY,
+    EXTERNAL_SERVICE,
+    UNKNOWN_SIDE_EFFECT,
+    INTERNAL
+}

@@ -1,0 +1,66 @@
+Clara
+Copyright 2026 Clara contributors
+
+This product includes design concepts derived from LangChain4j,
+Copyright 2023-2026 the LangChain4j authors, licensed under Apache License 2.0.
+
+The initial baseline is a selective Java 8 rewrite and includes no provider SDK source.
+
+Third-party runtime notices
+===========================
+
+Jackson JSON Processor
+Originally written by Tatu Saloranta and developed by a community of developers.
+
+Apache POI
+Copyright 2003-2020 The Apache Software Foundation.
+Includes portions originally based on software from BEA Systems (2000-2003),
+W3C XML Schema documents (2001-2003), chunks_parse_cmds.tbl from vsdump
+Copyright 2006-2007 Valek Filippov, and portions of the eID Applet project
+Copyright 2009-2014 FedICT, e-Contract.be BVBA, and Bart Hanssens.
+
+Apache XMLBeans
+Includes portions originally based on software Copyright 2000-2003 BEA Systems,
+source from Apache Xerces-J and Apache Axis Copyright 1999-2003 The Apache
+Software Foundation, W3C XML Schema documents Copyright 2001-2003 W3C, and
+resolver.jar from Apache XML Commons Copyright 2001-2003 ASF.
+
+Apache Commons Compress
+Copyright 2002-2019 The Apache Software Foundation.
+The org.apache.commons.compress.archivers.sevenz package derives from the LZMA
+SDK 9.20, which has been placed in the public domain.
+
+Apache Commons Codec
+Copyright 2002-2019 The Apache Software Foundation.
+The Beider-Morse package was translated with permission from original PHP source
+Copyright 2008 Alexander Beider and Stephen P. Morse.
+
+Apache Commons Collections
+Copyright 2001-2019 The Apache Software Foundation.
+
+Apache Commons Math
+Copyright 2001-2016 The Apache Software Foundation.
+Includes software developed for Orekit by CS Systemes d'Information,
+Copyright 2010-2012 CS Systemes d'Information.
+
+Apache Commons Logging
+Copyright 2003-2014 The Apache Software Foundation.
+
+Apache PDFBox
+Copyright 2002-2023 The Apache Software Foundation.
+Based on source contributed to the original PDFBox project,
+Copyright 2002-2007 www.pdfbox.org. Includes Adobe Glyph List data Copyright
+1997, 1998, 2002, 2007, 2010 Adobe Systems Incorporated; Zapf Dingbats Glyph
+List Copyright 2002, 2010 Adobe Systems Incorporated; Unicode Bidi Mirroring
+data Copyright 1991-2015 Unicode, Inc.; and portions of TwelveMonkeys ImageIO
+Copyright 2008-2016 Harald Kuhr.
+
+Apache FontBox
+Copyright 2008-2023 The Apache Software Foundation.
+Based on source contributed to the original FontBox project,
+Copyright 2006-2007 www.fontbox.org. Includes Unicode Script Property data
+Copyright 2017 Unicode, Inc.
+
+Apache POI, XMLBeans, Commons Compress, Commons Codec, Commons Collections,
+Commons Math, Commons Logging, PDFBox, FontBox, Jackson, and SparseBitSet are
+licensed under Apache License 2.0. curvesapi is licensed under BSD-3-Clause.
