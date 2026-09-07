@@ -1,5 +1,8 @@
 package com.clara.planner;
 
+/**
+ * 表示。
+ */
 public final class BudgetReservation {
     private final String reservationId;
     private final String runId;

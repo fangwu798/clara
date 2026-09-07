@@ -8,6 +8,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 计算模式的稳定哈希值。
+ */
 public final class SchemaHasher {
     public String hash(Object value) {
         StringBuilder canonical = new StringBuilder();
@@ -24,7 +27,7 @@ public final class SchemaHasher {
     }
 
     private static void append(StringBuilder target, Object value, int depth) {
-        if (depth > 100) throw new IllegalArgumentException("structured value is too deeply nested");
+        if (depth > 100) { throw new IllegalArgumentException("structured value is too deeply nested"); }
         if (value == null) { target.append('n'); return; }
         if (value instanceof String) {
             String text = (String) value;
@@ -41,7 +44,7 @@ public final class SchemaHasher {
             Map<?, ?> map = (Map<?, ?>) value;
             List<String> keys = new ArrayList<String>();
             for (Object key : map.keySet()) {
-                if (!(key instanceof String)) throw new IllegalArgumentException("map keys must be strings");
+                if (!(key instanceof String)) { throw new IllegalArgumentException("map keys must be strings"); }
                 keys.add((String) key);
             }
             Collections.sort(keys);

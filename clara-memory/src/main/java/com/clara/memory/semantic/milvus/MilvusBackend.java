@@ -5,6 +5,9 @@ import com.clara.memory.semantic.api.MemoryEntry;
 import java.io.Closeable;
 import java.util.List;
 
+/**
+ * 定义。
+ */
 public interface MilvusBackend extends Closeable {
     MilvusCollectionSpec ensureCollection(MilvusCollectionSpec expected);
 

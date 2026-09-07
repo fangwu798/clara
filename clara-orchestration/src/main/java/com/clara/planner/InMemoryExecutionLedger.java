@@ -6,6 +6,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * 提供执行账本的内存实现。
+ */
 public final class InMemoryExecutionLedger implements ExecutionLedger {
     private final Map<String, ExecutionRecord> records = new LinkedHashMap<String, ExecutionRecord>();
     public synchronized ExecutionRecord recordIntent(String key, String planId, int version, String taskId) {
@@ -26,7 +29,7 @@ public final class InMemoryExecutionLedger implements ExecutionLedger {
         return replace(current, ExecutionRecordStatus.RUNNING, current.getAttempts() + 1, null, null);
     }
     public synchronized ExecutionRecord succeed(String key, TaskExecutionResult result) {
-        if (result == null) throw new IllegalArgumentException("result must not be null");
+        if (result == null) { throw new IllegalArgumentException("result must not be null"); }
         ExecutionRecord current = required(key);
         if (current.getStatus() == ExecutionRecordStatus.SUCCEEDED) return current;
         if (current.getStatus() != ExecutionRecordStatus.RUNNING) conflict();
@@ -60,6 +63,6 @@ public final class InMemoryExecutionLedger implements ExecutionLedger {
         throw PlannerErrors.error(ErrorCodes.EXECUTION_LEDGER_CONFLICT, ErrorCategory.CONFLICT);
     }
     private static void require(String value) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException("ledger identity must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException("ledger identity must not be blank"); }
     }
 }

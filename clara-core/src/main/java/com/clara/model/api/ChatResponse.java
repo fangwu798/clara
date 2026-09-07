@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 封装对话操作的响应数据。
+ */
 public final class ChatResponse {
     private final ChatMessage message;
     private final TokenUsage tokenUsage;
@@ -12,8 +15,8 @@ public final class ChatResponse {
 
     public ChatResponse(ChatMessage message, TokenUsage tokenUsage,
             FinishReason finishReason, Map<String, String> providerMetadata) {
-        if (message == null) throw new IllegalArgumentException("message must not be null");
-        if (finishReason == null) throw new IllegalArgumentException("finishReason must not be null");
+        if (message == null) { throw new IllegalArgumentException("message must not be null"); }
+        if (finishReason == null) { throw new IllegalArgumentException("finishReason must not be null"); }
         this.message = message;
         this.tokenUsage = tokenUsage;
         this.finishReason = finishReason;

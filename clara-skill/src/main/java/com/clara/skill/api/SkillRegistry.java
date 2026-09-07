@@ -2,6 +2,9 @@ package com.clara.skill.api;
 
 import java.util.List;
 
+/**
+ * 负责注册并查找技能。
+ */
 public interface SkillRegistry {
     SkillDefinition get(String skillId, String version);
     List<SkillSummary> search(SkillQuery query);

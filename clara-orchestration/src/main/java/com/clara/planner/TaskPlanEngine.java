@@ -18,6 +18,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 校验并执行任务 DAG，统一处理依赖调度、预算预留、重试、超时和执行幂等性。
+ *
+ * <p>常规用法：注入计划校验器、预算账本和执行账本后，使用稳定的 run ID 调用 {@link #execute}；
+ * 返回结果包含各任务状态、合并后的输出及实际执行步数。应用关闭时调用 {@link #close()} 释放线程池。
+ *
+ * <p>注意：同一业务执行必须复用 run ID 和任务幂等键，否则无法复用成功结果；状态为未知的副作用不会自动重试。
+ * 任务输出键不可互相覆盖，计划总步数、并行度、预算和截止时间均受 {@link PlanLimits} 约束。
+ */
 public final class TaskPlanEngine implements Closeable {
     private final PlanValidator validator;
     private final BudgetLedger budgets;
@@ -46,7 +55,7 @@ public final class TaskPlanEngine implements Closeable {
         long deadline = deadline(validator.getLimits().getTotalTimeoutMillis());
         while (!allSucceeded(statuses)) {
             List<TaskNode> ready = readyTasks(plan, statuses, validator.getLimits().getMaxParallelism());
-            if (ready.isEmpty()) throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.VALIDATION);
+            if (ready.isEmpty()) { throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.VALIDATION); }
             final Map<String, Object> batchValues = new LinkedHashMap<String, Object>(values);
             List<Future<TaskOutcome>> futures = new ArrayList<Future<TaskOutcome>>();
             List<BudgetReservation> reservations = new ArrayList<BudgetReservation>();
@@ -88,7 +97,7 @@ public final class TaskPlanEngine implements Closeable {
                             : PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.INTERNAL);
                 }
             }
-            if (deferred != null) throw deferred;
+            if (deferred != null) { throw deferred; }
         }
         return new TaskPlanResult(plan.withStatus(PlanStatus.SUCCEEDED), PlanStatus.SUCCEEDED,
                 statuses, values, steps.get());
@@ -144,7 +153,7 @@ public final class TaskPlanEngine implements Closeable {
             return new TaskOutcome(result);
         }
         budgets.release(reservation.getReservationId());
-        if (lastFailure instanceof RuntimeException) throw (RuntimeException) lastFailure;
+        if (lastFailure instanceof RuntimeException) { throw (RuntimeException) lastFailure; }
         throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.INTERNAL);
     }
 
@@ -153,7 +162,7 @@ public final class TaskPlanEngine implements Closeable {
             final Map<String, Object> values, long totalDeadline) throws Exception {
         long remaining = Math.max(0L, totalDeadline - System.currentTimeMillis());
         long timeout = Math.min(task.getTimeoutMillis(), remaining);
-        if (timeout <= 0L) throw new UnknownSideEffectException("plan timeout");
+        if (timeout <= 0L) { throw new UnknownSideEffectException("plan timeout"); }
         Future<TaskExecutionResult> future = calls.submit(() -> task.getHandler().execute(
                 new TaskExecutionContext(plan.getPlanId(), plan.getPlanVersion(), task.getTaskId(),
                         attempt, executionKey, values)));
@@ -165,8 +174,8 @@ public final class TaskPlanEngine implements Closeable {
             throw new UnknownSideEffectException("task interrupted");
         } catch (ExecutionException failure) {
             Throwable cause = failure.getCause();
-            if (cause instanceof UnknownSideEffectException) throw (UnknownSideEffectException) cause;
-            if (cause instanceof Exception) throw (Exception) cause;
+            if (cause instanceof UnknownSideEffectException) { throw (UnknownSideEffectException) cause; }
+            if (cause instanceof Exception) { throw (Exception) cause; }
             throw new RuntimeException(cause);
         }
     }
@@ -207,6 +216,9 @@ public final class TaskPlanEngine implements Closeable {
     private static ClaraException unknown() {
         return PlannerErrors.error(ErrorCodes.EXECUTION_SIDE_EFFECT_UNKNOWN, ErrorCategory.UNKNOWN_SIDE_EFFECT);
     }
+    /**
+     * 负责创建规划器线程实例。
+     */
     private static final class PlannerThreadFactory implements ThreadFactory {
         private final AtomicInteger sequence = new AtomicInteger();
         private final String role;
@@ -217,6 +229,9 @@ public final class TaskPlanEngine implements Closeable {
             thread.setDaemon(true); return thread;
         }
     }
+    /**
+     * 表示任务的处理结果。
+     */
     private static final class TaskOutcome {
         final TaskExecutionResult result;
         TaskOutcome(TaskExecutionResult result) { this.result = result; }

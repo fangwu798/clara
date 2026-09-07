@@ -21,6 +21,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 提供OpenAI兼容嵌入模型能力。
+ */
 public final class OpenAiCompatibleEmbeddingModel implements EmbeddingModel {
     private final OpenAiCompatibleEmbeddingConfig config;
     private final ProviderHttpTransport transport;
@@ -29,8 +32,9 @@ public final class OpenAiCompatibleEmbeddingModel implements EmbeddingModel {
 
     public OpenAiCompatibleEmbeddingModel(OpenAiCompatibleEmbeddingConfig config,
             ProviderHttpTransport transport, ProviderCredentialResolver credentials) {
-        if (config == null || transport == null || credentials == null)
+        if (config == null || transport == null || credentials == null) {
             throw new IllegalArgumentException("dependencies must not be null");
+        }
         this.config = config;
         this.transport = transport;
         this.credentials = credentials;
@@ -38,7 +42,7 @@ public final class OpenAiCompatibleEmbeddingModel implements EmbeddingModel {
     }
 
     public EmbeddingResponse embed(EmbeddingRequest request) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         request.getContext().getCancellationToken()
                 .throwIfCancellationRequested(request.getContext().getTraceId());
         byte[] payload = encode(request);
@@ -83,29 +87,29 @@ public final class OpenAiCompatibleEmbeddingModel implements EmbeddingModel {
             JsonNode root = mapper.readTree(body);
             JsonNode data = root == null ? null : root.get("data");
             if (root == null || !root.isObject() || data == null || !data.isArray()
-                    || data.size() != expectedCount) throw protocolException();
+                    || data.size() != expectedCount) { throw protocolException(); }
             float[][] ordered = new float[expectedCount][];
             for (JsonNode item : data) {
                 JsonNode index = item.get("index");
                 JsonNode embedding = item.get("embedding");
                 if (index == null || !index.canConvertToInt() || embedding == null
-                        || !embedding.isArray()) throw protocolException();
+                        || !embedding.isArray()) { throw protocolException(); }
                 int position = index.intValue();
                 if (position < 0 || position >= expectedCount || ordered[position] != null
-                        || embedding.size() != config.getDimension()) throw protocolException();
+                        || embedding.size() != config.getDimension()) { throw protocolException(); }
                 float[] vector = new float[config.getDimension()];
                 for (int i = 0; i < vector.length; i++) {
                     JsonNode coordinate = embedding.get(i);
-                    if (!coordinate.isNumber()) throw protocolException();
+                    if (!coordinate.isNumber()) { throw protocolException(); }
                     float number = coordinate.floatValue();
-                    if (Float.isNaN(number) || Float.isInfinite(number)) throw protocolException();
+                    if (Float.isNaN(number) || Float.isInfinite(number)) { throw protocolException(); }
                     vector[i] = number;
                 }
                 ordered[position] = vector;
             }
             List<float[]> result = new ArrayList<float[]>(expectedCount);
             for (float[] vector : ordered) {
-                if (vector == null) throw protocolException();
+                if (vector == null) { throw protocolException(); }
                 result.add(vector);
             }
             return new EmbeddingResponse(result);

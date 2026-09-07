@@ -28,12 +28,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * 负责OpenAI兼容对话数据的编码与解码。
+ */
 final class OpenAiCompatibleChatCodec {
     private final ObjectMapper mapper;
 
     OpenAiCompatibleChatCodec() { this(new ObjectMapper()); }
     OpenAiCompatibleChatCodec(ObjectMapper mapper) {
-        if (mapper == null) throw new IllegalArgumentException("mapper must not be null");
+        if (mapper == null) { throw new IllegalArgumentException("mapper must not be null"); }
         this.mapper = mapper;
     }
 
@@ -42,7 +45,7 @@ final class OpenAiCompatibleChatCodec {
     }
 
     byte[] encode(ChatRequest request, OpenAiCompatibleChatConfig config, boolean stream) {
-        if (request == null || config == null) throw new IllegalArgumentException("values must not be null");
+        if (request == null || config == null) { throw new IllegalArgumentException("values must not be null"); }
         validateOptions(request, config.getProvider());
         Map<String, Object> root = new LinkedHashMap<String, Object>();
         root.put("model", configuredModel(request.getParameters(), config));
@@ -62,12 +65,12 @@ final class OpenAiCompatibleChatCodec {
             JsonNode root = mapper.readTree(body);
             JsonNode choices = root == null ? null : root.get("choices");
             if (root == null || !root.isObject() || choices == null || !choices.isArray()
-                    || choices.size() == 0) throw protocol(config.getProvider());
+                    || choices.size() == 0) { throw protocol(config.getProvider()); }
             JsonNode choice = choices.get(0);
             JsonNode message = choice.get("message");
-            if (message == null || !message.isObject()) throw protocol(config.getProvider());
+            if (message == null || !message.isObject()) { throw protocol(config.getProvider()); }
             String role = text(message.get("role"));
-            if (role != null && !"assistant".equals(role)) throw protocol(config.getProvider());
+            if (role != null && !"assistant".equals(role)) { throw protocol(config.getProvider()); }
             List<Content> contents = responseContents(message, config.getProvider());
             ChatMessage resultMessage = new ChatMessage(Role.ASSISTANT, contents,
                     text(message.get("name")), Collections.<String, String>emptyMap());
@@ -79,8 +82,9 @@ final class OpenAiCompatibleChatCodec {
             put(metadata, "systemFingerprint", root.get("system_fingerprint"));
             if (config.getProvider() == ModelProvider.DEEPSEEK) {
                 JsonNode reasoning = message.get("reasoning_content");
-                if (reasoning != null && !reasoning.isNull() && !reasoning.isTextual())
+                if (reasoning != null && !reasoning.isNull() && !reasoning.isTextual()) {
                     throw protocol(config.getProvider());
+                }
                 put(metadata, "reasoning", reasoning);
             }
             metadata.put("provider", config.getProvider().name());
@@ -163,15 +167,17 @@ final class OpenAiCompatibleChatCodec {
     private static String configuredModel(ModelParameters parameters,
             OpenAiCompatibleChatConfig config) {
         if (parameters != null && parameters.getModel() != null
-                && !config.getModelId().equals(parameters.getModel()))
+                && !config.getModelId().equals(parameters.getModel())) {
             throw new IllegalArgumentException("request model differs from registered model");
+        }
         return config.getModelId();
     }
 
     private static void validateOptions(ChatRequest request, ModelProvider provider) {
         if (request.getProviderOptions() == null) return;
-        if (request.getProviderOptions().getProvider() != provider)
+        if (request.getProviderOptions().getProvider() != provider) {
             throw new IllegalArgumentException("provider options do not match configured provider");
+        }
         if (provider == ModelProvider.DEEPSEEK
                 && request.getProviderOptions() instanceof DeepSeekChatOptions) return;
         throw new IllegalArgumentException("provider options type is not supported");
@@ -180,13 +186,15 @@ final class OpenAiCompatibleChatCodec {
     private static void applyProviderOptions(ChatRequest request,
             List<Map<String, Object>> messages, ModelProvider provider) {
         if (!(request.getProviderOptions() instanceof DeepSeekChatOptions)) return;
-        if (provider != ModelProvider.DEEPSEEK)
+        if (provider != ModelProvider.DEEPSEEK) {
             throw new IllegalArgumentException("DeepSeek options require DEEPSEEK provider");
+        }
         DeepSeekChatOptions options = (DeepSeekChatOptions) request.getProviderOptions();
         if (options.getPrefixCompletion() == null && options.getReasoningContent() == null) return;
         int last = request.getMessages().size() - 1;
-        if (request.getMessages().get(last).getRole() != Role.ASSISTANT)
+        if (request.getMessages().get(last).getRole() != Role.ASSISTANT) {
             throw new IllegalArgumentException("DeepSeek prefix completion requires final assistant message");
+        }
         Map<String, Object> target = messages.get(last);
         if (options.getPrefixCompletion() != null)
             target.put("prefix", options.getPrefixCompletion());
@@ -198,22 +206,22 @@ final class OpenAiCompatibleChatCodec {
         List<Content> contents = new ArrayList<Content>();
         JsonNode content = message.get("content");
         if (content != null && !content.isNull()) {
-            if (!content.isTextual()) throw protocol(provider);
+            if (!content.isTextual()) { throw protocol(provider); }
             contents.add(new TextContent(content.textValue()));
         }
         JsonNode calls = message.get("tool_calls");
         if (calls != null && !calls.isNull()) {
-            if (!calls.isArray()) throw protocol(provider);
+            if (!calls.isArray()) { throw protocol(provider); }
             for (JsonNode call : calls) {
                 JsonNode function = call.get("function");
                 String id = text(call.get("id"));
                 String name = function == null ? null : text(function.get("name"));
                 String arguments = function == null ? null : text(function.get("arguments"));
-                if (id == null || name == null || arguments == null) throw protocol(provider);
+                if (id == null || name == null || arguments == null) { throw protocol(provider); }
                 contents.add(new ToolCallContent(id, name, arguments));
             }
         }
-        if (contents.isEmpty()) throw protocol(provider);
+        if (contents.isEmpty()) { throw protocol(provider); }
         return contents;
     }
 
@@ -222,7 +230,7 @@ final class OpenAiCompatibleChatCodec {
         JsonNode input = value.get("prompt_tokens");
         JsonNode output = value.get("completion_tokens");
         if (input == null || output == null || !input.canConvertToInt() || !output.canConvertToInt()
-                || input.intValue() < 0 || output.intValue() < 0) throw protocol(provider);
+                || input.intValue() < 0 || output.intValue() < 0) { throw protocol(provider); }
         return new TokenUsage(input.intValue(), output.intValue());
     }
 

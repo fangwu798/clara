@@ -10,6 +10,15 @@ import com.clara.media.MediaUpload;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 编排异步媒体任务的提交、轮询、取消和已验证回调，并持久化每次状态迁移。
+ *
+ * <p>常规用法：调用 {@link #submit} 创建任务，定时使用 {@link #due} 找出到期任务并调用 {@link #poll}；
+ * 主动取消使用 {@link #cancel}，服务提供商回调必须先完成安全校验再调用 {@link #applyVerifiedCallback}。
+ *
+ * <p>注意：写操作必须携带当前 expected version，失败时应重新读取而不是盲目重试。提交方需提供稳定的
+ * 幂等键；只有状态机允许的迁移才会落库，成功结果引用会先通过媒体存储桥接为 Clara 资产。
+ */
 public final class DefaultMediaJobScheduler implements MediaJobScheduler {
     private final MediaJobStore store;
     private final MediaJobStateMachine stateMachine;
@@ -18,8 +27,9 @@ public final class DefaultMediaJobScheduler implements MediaJobScheduler {
 
     public DefaultMediaJobScheduler(MediaJobStore store, MediaStore mediaStore,
             MediaJobSchedulerConfig config) {
-        if (store == null || mediaStore == null || config == null)
+        if (store == null || mediaStore == null || config == null) {
             throw new IllegalArgumentException("dependencies must not be null");
+        }
         this.store = store;
         this.stateMachine = new MediaJobStateMachine(store);
         this.mediaStore = mediaStore;
@@ -28,7 +38,7 @@ public final class DefaultMediaJobScheduler implements MediaJobScheduler {
 
     public MediaJob submit(String tenantId, String jobId, String idempotencyKey, long deadlineAt,
             MediaJobProviderOperation operation, long now) {
-        if (operation == null) throw new IllegalArgumentException("operation must not be null");
+        if (operation == null) { throw new IllegalArgumentException("operation must not be null"); }
         MediaJob job = stateMachine.createScheduled(jobId, tenantId, idempotencyKey, deadlineAt, now);
         if (job.getStatus().isTerminal() || job.getProviderJobId() != null) return job;
         if (job.isSubmissionAttempted() && !operation.supportsIdempotentSubmission()) submissionUnknown();
@@ -55,7 +65,7 @@ public final class DefaultMediaJobScheduler implements MediaJobScheduler {
 
     public MediaJob poll(String tenantId, String jobId, long expectedVersion,
             MediaJobProviderOperation operation, long now) {
-        if (operation == null) throw new IllegalArgumentException("operation must not be null");
+        if (operation == null) { throw new IllegalArgumentException("operation must not be null"); }
         MediaJob current = stateMachine.get(tenantId, jobId);
         if (current.getVersion() != expectedVersion) conflict();
         if (current.getStatus().isTerminal()) return current;
@@ -84,7 +94,7 @@ public final class DefaultMediaJobScheduler implements MediaJobScheduler {
 
     public MediaJob cancel(String tenantId, String jobId, long expectedVersion,
             MediaJobProviderOperation operation, long now) {
-        if (operation == null) throw new IllegalArgumentException("operation must not be null");
+        if (operation == null) { throw new IllegalArgumentException("operation must not be null"); }
         MediaJob current = stateMachine.get(tenantId, jobId);
         if (current.getVersion() != expectedVersion) conflict();
         if (current.getStatus().isTerminal()) return current;
@@ -99,7 +109,7 @@ public final class DefaultMediaJobScheduler implements MediaJobScheduler {
 
     public MediaJob applyVerifiedCallback(String tenantId, String jobId, long expectedVersion,
             MediaProviderJobSnapshot snapshot, long now) {
-        if (snapshot == null) throw new IllegalArgumentException("snapshot must not be null");
+        if (snapshot == null) { throw new IllegalArgumentException("snapshot must not be null"); }
         MediaJob current = stateMachine.get(tenantId, jobId);
         if (current.getVersion() != expectedVersion) conflict();
         if (current.getStatus().isTerminal()) return current;

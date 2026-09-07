@@ -17,6 +17,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 提供Anthropic对话模型能力。
+ */
 public final class AnthropicChatModel implements ChatModel {
     private final AnthropicChatConfig config;
     private final ProviderHttpTransport transport;
@@ -25,15 +28,16 @@ public final class AnthropicChatModel implements ChatModel {
 
     public AnthropicChatModel(AnthropicChatConfig config, ProviderHttpTransport transport,
             ProviderCredentialResolver credentials) {
-        if (config == null || transport == null || credentials == null)
+        if (config == null || transport == null || credentials == null) {
             throw new IllegalArgumentException("dependencies must not be null");
+        }
         this.config = config;
         this.transport = transport;
         this.credentials = credentials;
     }
 
     public ChatResponse chat(ChatRequest request) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         request.getContext().getCancellationToken()
                 .throwIfCancellationRequested(request.getContext().getTraceId());
         byte[] payload = codec.encode(request, config);
@@ -48,8 +52,8 @@ public final class AnthropicChatModel implements ChatModel {
             headers.put("Accept", "application/json");
             ProviderHttpResponse response = transport.execute(new ProviderHttpRequest("POST",
                     config.getEndpoint(), headers, payload), request.getContext());
-            if (response == null) throw error(ErrorCodes.MODEL_PROTOCOL_ERROR,
-                    ErrorCategory.EXTERNAL_SERVICE, false, null);
+            if (response == null) { throw error(ErrorCodes.MODEL_PROTOCOL_ERROR,
+                    ErrorCategory.EXTERNAL_SERVICE, false, null); }
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300)
                 providerFailure(response.getStatusCode());
             return codec.decode(response.getBody(), config);

@@ -15,6 +15,15 @@ import java.util.Collections;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+/**
+ * 使用 HMAC-SHA-256 验证媒体回调，并通过 nonce 存储阻止重放攻击。
+ *
+ * <p>常规用法：配置密钥解析器、安全策略和重放存储后，对每个回调先调用 {@link #verifyAndReserve}，
+ * 验证成功后再解析和应用业务载荷。
+ *
+ * <p>注意：签名覆盖租户、任务、期望版本、密钥 ID、时间戳、nonce 和原始载荷，任何字段变化都会导致失败。
+ * 调用方应传入可信时钟；密钥按租户和 key ID 解析，重放存储容量耗尽时采用拒绝策略。
+ */
 public final class HmacSha256MediaCallbackVerifier {
     private static final byte[] DOMAIN = "clara-media-callback-v1".getBytes(StandardCharsets.US_ASCII);
     private static final int SHA256_HEX_CHARS = 64;
@@ -26,16 +35,17 @@ public final class HmacSha256MediaCallbackVerifier {
 
     public HmacSha256MediaCallbackVerifier(MediaCallbackSecretResolver secretResolver,
             MediaCallbackSecurityPolicy policy, MediaCallbackReplayStore replayStore) {
-        if (secretResolver == null || policy == null || replayStore == null)
+        if (secretResolver == null || policy == null || replayStore == null) {
             throw new IllegalArgumentException("dependencies must not be null");
+        }
         this.secretResolver = secretResolver;
         this.policy = policy;
         this.replayStore = replayStore;
     }
 
     public void verifyAndReserve(MediaJobCallbackEnvelope envelope, long now) {
-        if (envelope == null) throw new IllegalArgumentException("envelope must not be null");
-        if (now < 0L) throw new IllegalArgumentException("now must not be negative");
+        if (envelope == null) { throw new IllegalArgumentException("envelope must not be null"); }
+        if (now < 0L) { throw new IllegalArgumentException("now must not be negative"); }
         byte[] payload = envelope.getPayload();
         if (payload.length > policy.getMaxPayloadBytes()
                 || envelope.getTenantId().length() > policy.getMaxIdentityChars()
@@ -68,7 +78,7 @@ public final class HmacSha256MediaCallbackVerifier {
     }
 
     static String sign(byte[] secret, MediaJobCallbackEnvelope envelope) {
-        if (secret == null || envelope == null) throw new IllegalArgumentException("signing values are required");
+        if (secret == null || envelope == null) { throw new IllegalArgumentException("signing values are required"); }
         byte[] payload = envelope.getPayload();
         return encodeHex(hmac(secret.clone(), canonical(envelope, payload)));
     }

@@ -6,6 +6,9 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 
+/**
+ * 描述服务提供商模型。
+ */
 public final class ProviderModelDescriptor {
     private final ModelProvider provider;
     private final String modelId;
@@ -26,11 +29,11 @@ public final class ProviderModelDescriptor {
     public ProviderModelDescriptor(ModelProvider provider, String modelId, String alias,
             String apiProfile, String region, String revision,
             Set<ModelCapability> capabilities, ProviderModelMetadata metadata) {
-        if (provider == null) throw new IllegalArgumentException("provider must not be null");
-        if (isBlank(modelId)) throw new IllegalArgumentException("modelId must not be blank");
-        if (isBlank(alias)) throw new IllegalArgumentException("alias must not be blank");
-        if (capabilities == null) throw new IllegalArgumentException("capabilities must not be null");
-        if (metadata == null) throw new IllegalArgumentException("metadata must not be null");
+        if (provider == null) { throw new IllegalArgumentException("provider must not be null"); }
+        if (isBlank(modelId)) { throw new IllegalArgumentException("modelId must not be blank"); }
+        if (isBlank(alias)) { throw new IllegalArgumentException("alias must not be blank"); }
+        if (capabilities == null) { throw new IllegalArgumentException("capabilities must not be null"); }
+        if (metadata == null) { throw new IllegalArgumentException("metadata must not be null"); }
         this.provider = provider;
         this.modelId = modelId;
         this.alias = alias;

@@ -15,17 +15,21 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 传输JDK 8服务提供商HTTP消息。
+ */
 public final class Jdk8ProviderHttpTransport implements ProviderHttpTransport {
     private final Jdk8ProviderHttpTransportConfig config;
 
     public Jdk8ProviderHttpTransport(Jdk8ProviderHttpTransportConfig config) {
-        if (config == null) throw new IllegalArgumentException("config must not be null");
+        if (config == null) { throw new IllegalArgumentException("config must not be null"); }
         this.config = config;
     }
 
     public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context) {
-        if (request == null || context == null)
+        if (request == null || context == null) {
             throw new IllegalArgumentException("request and context must not be null");
+        }
         context.getCancellationToken().throwIfCancellationRequested(context.getTraceId());
         if (!config.allows(request.getEndpoint())) endpointDenied();
         byte[] body = request.getBody();

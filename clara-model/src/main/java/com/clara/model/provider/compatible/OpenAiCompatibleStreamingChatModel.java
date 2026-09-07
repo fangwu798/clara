@@ -25,6 +25,15 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+/**
+ * 调用 OpenAI 兼容的 SSE 对话接口，并将文本、推理内容和工具参数增量转换为统一流事件。
+ *
+ * <p>常规用法：注入配置、SSE 传输、租户凭据解析器和执行器后调用 {@link #chat}，通过
+ * {@link StreamObserver} 消费事件，并使用返回的 {@link StreamHandle} 查询完成状态或取消。
+ *
+ * <p>注意：请求上下文负责租户、截止时间和取消信号。工具调用数量及累计字符数必须设置上限；流必须包含合法
+ * 的完成事件，否则按协议错误处理。传入的执行器由调用方管理，本类不会关闭它。
+ */
 public final class OpenAiCompatibleStreamingChatModel implements StreamingChatModel {
     private final OpenAiCompatibleChatConfig config;
     private final ProviderSseTransport transport;
@@ -37,10 +46,12 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
     public OpenAiCompatibleStreamingChatModel(OpenAiCompatibleChatConfig config,
             ProviderSseTransport transport, ProviderCredentialResolver credentials,
             ExecutorService executor, int maxToolCalls, int maxAccumulatedChars) {
-        if (config == null || transport == null || credentials == null || executor == null)
+        if (config == null || transport == null || credentials == null || executor == null) {
             throw new IllegalArgumentException("dependencies must not be null");
-        if (maxToolCalls <= 0 || maxAccumulatedChars <= 0)
+        }
+        if (maxToolCalls <= 0 || maxAccumulatedChars <= 0) {
             throw new IllegalArgumentException("stream limits must be positive");
+        }
         this.config = config;
         this.transport = transport;
         this.credentials = credentials;
@@ -50,8 +61,9 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
     }
 
     public StreamHandle chat(final ChatRequest request, final StreamObserver observer) {
-        if (request == null || observer == null)
+        if (request == null || observer == null) {
             throw new IllegalArgumentException("request and observer must not be null");
+        }
         request.getContext().getCancellationToken()
                 .throwIfCancellationRequested(request.getContext().getTraceId());
         final byte[] payload = codec.encode(request, config, true);
@@ -69,8 +81,8 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
         char[] secret = null;
         try {
             resolved = credentials.resolve(request.getContext().getTenantId(), config.getSecretRef());
-            if (resolved == null || resolved.length == 0) throw error(
-                    ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null);
+            if (resolved == null || resolved.length == 0) { throw error(
+                    ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null); }
             secret = resolved.clone();
             Map<String, String> headers = new LinkedHashMap<String, String>();
             headers.put("Authorization", "Bearer " + new String(secret));
@@ -82,16 +94,17 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
                     config.getEndpoint(), headers, payload), request.getContext(),
                     new ProviderSseListener() {
                         public boolean onEvent(ProviderSseEvent event) {
-                            if (!"message".equals(event.getEvent())) throw protocol();
+                            if (!"message".equals(event.getEvent())) { throw protocol(); }
                             OpenAiCompatibleStreamChunk chunk = accumulator.accept(event.getData());
                             emitChunk(emitter, chunk);
                             return !chunk.isComplete();
                         }
                     });
-            if (response == null) throw protocol();
-            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300)
+            if (response == null) { throw protocol(); }
+            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 throw providerFailure(response.getStatusCode());
-            if (!accumulator.isComplete()) throw protocol();
+            }
+            if (!accumulator.isComplete()) { throw protocol(); }
         } catch (ClaraException exception) {
             emitter.error(exception.getError());
         } catch (RuntimeException exception) {
@@ -146,6 +159,9 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
                 Collections.<String, String>emptyMap()));
     }
 
+    /**
+     * 表示。
+     */
     private static final class Emitter {
         private final StreamObserver observer;
         private long sequence;
@@ -169,6 +185,9 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
         }
     }
 
+    /**
+     * 控制并观察正在执行的异步。
+     */
     private static final class AsyncHandle implements StreamHandle {
         private final ChatRequest request;
         private volatile Future<?> future;

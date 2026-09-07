@@ -3,6 +3,9 @@ package com.clara.model.api.media;
 import com.clara.kernel.InvocationContext;
 import com.clara.model.api.ProviderOptions;
 
+/**
+ * 封装音频转写操作的输入参数。
+ */
 public final class AudioTranscriptionRequest {
     private final String audioAssetId;
     private final String prompt;
@@ -17,9 +20,10 @@ public final class AudioTranscriptionRequest {
             InvocationContext context) {
         this.audioAssetId = MediaRequestValues.required(audioAssetId, "audioAssetId");
         if (temperature != null && (temperature.doubleValue() < 0 || temperature.doubleValue() > 1
-                || temperature.isNaN() || temperature.isInfinite()))
+                || temperature.isNaN() || temperature.isInfinite())) {
             throw new IllegalArgumentException("temperature must be between 0 and 1");
-        if (context == null) throw new IllegalArgumentException("context must not be null");
+        }
+        if (context == null) { throw new IllegalArgumentException("context must not be null"); }
         this.prompt = prompt;
         this.language = language;
         this.temperature = temperature;

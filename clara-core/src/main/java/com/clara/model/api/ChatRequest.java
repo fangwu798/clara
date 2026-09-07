@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 封装对话操作的输入参数。
+ */
 public final class ChatRequest {
     private final List<ChatMessage> messages;
     private final ModelParameters parameters;
@@ -26,11 +29,11 @@ public final class ChatRequest {
         if (messages == null || messages.isEmpty()) {
             throw new IllegalArgumentException("messages must not be empty");
         }
-        if (messages.contains(null)) throw new IllegalArgumentException("messages must not contain null");
-        if (context == null) throw new IllegalArgumentException("context must not be null");
+        if (messages.contains(null)) { throw new IllegalArgumentException("messages must not contain null"); }
+        if (context == null) { throw new IllegalArgumentException("context must not be null"); }
         List<ToolSpecification> safeTools = tools == null
                 ? Collections.<ToolSpecification>emptyList() : tools;
-        if (safeTools.contains(null)) throw new IllegalArgumentException("tools must not contain null");
+        if (safeTools.contains(null)) { throw new IllegalArgumentException("tools must not contain null"); }
         this.messages = Collections.unmodifiableList(new ArrayList<ChatMessage>(messages));
         this.parameters = parameters;
         this.tools = Collections.unmodifiableList(new ArrayList<ToolSpecification>(safeTools));

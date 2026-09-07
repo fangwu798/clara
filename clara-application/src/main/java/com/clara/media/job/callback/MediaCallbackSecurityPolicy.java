@@ -1,5 +1,8 @@
 package com.clara.media.job.callback;
 
+/**
+ * 定义媒体回调安全需要遵循的策略。
+ */
 public final class MediaCallbackSecurityPolicy {
     private final long maxClockSkewMillis;
     private final int maxPayloadBytes;
@@ -9,11 +12,11 @@ public final class MediaCallbackSecurityPolicy {
 
     public MediaCallbackSecurityPolicy(long maxClockSkewMillis, int maxPayloadBytes,
             int maxIdentityChars, int maxNonceChars, int maxTrackedNonces) {
-        if (maxClockSkewMillis <= 0L) throw new IllegalArgumentException("maxClockSkewMillis must be positive");
-        if (maxPayloadBytes <= 0) throw new IllegalArgumentException("maxPayloadBytes must be positive");
-        if (maxIdentityChars <= 0) throw new IllegalArgumentException("maxIdentityChars must be positive");
-        if (maxNonceChars <= 0) throw new IllegalArgumentException("maxNonceChars must be positive");
-        if (maxTrackedNonces <= 0) throw new IllegalArgumentException("maxTrackedNonces must be positive");
+        if (maxClockSkewMillis <= 0L) { throw new IllegalArgumentException("maxClockSkewMillis must be positive"); }
+        if (maxPayloadBytes <= 0) { throw new IllegalArgumentException("maxPayloadBytes must be positive"); }
+        if (maxIdentityChars <= 0) { throw new IllegalArgumentException("maxIdentityChars must be positive"); }
+        if (maxNonceChars <= 0) { throw new IllegalArgumentException("maxNonceChars must be positive"); }
+        if (maxTrackedNonces <= 0) { throw new IllegalArgumentException("maxTrackedNonces must be positive"); }
         this.maxClockSkewMillis = maxClockSkewMillis;
         this.maxPayloadBytes = maxPayloadBytes;
         this.maxIdentityChars = maxIdentityChars;

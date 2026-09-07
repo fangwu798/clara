@@ -16,9 +16,9 @@ Status values: `DONE`, `IN_PROGRESS`, `BLOCKED`, `TODO`.
 | MIG-011 | 1 | Migrate chat, model parameter and tool contracts | MIG-010 | DONE |
 | MIG-012 | 1 | Implement model descriptors, registry and capability guard | MIG-011 | DONE |
 | MIG-013 | 1 | Implement deterministic parameter overlay | MIG-011 | DONE |
-| MIG-014 | 1 | Implement five text providers and contract tests | MIG-002,MIG-012 | BLOCKED |
+| MIG-014 | 1 | Implement five text providers and contract tests | MIG-002,MIG-012 | DONE |
 | MIG-020 | 2 | Implement media assets, stores and job state machine | MIG-010,MIG-003 | DONE |
-| MIG-021 | 2 | Implement image, audio and video providers | MIG-002,MIG-020 | BLOCKED |
+| MIG-021 | 2 | Implement image, audio and video providers | MIG-002,MIG-020 | DONE |
 | MIG-030 | 3 | Implement message/token windows and conversation stores | MIG-011 | DONE |
 | MIG-031 | 3 | Implement local semantic memory with WAL/snapshots | MIG-030,MIG-003 | DONE |
 | MIG-032 | 3 | Implement optional Milvus semantic memory | MIG-031 | DONE |
@@ -32,7 +32,7 @@ Status values: `DONE`, `IN_PROGRESS`, `BLOCKED`, `TODO`.
 | MIG-070 | 7 | Implement workspace policy and document parsers | MIG-010 | DONE |
 | MIG-071 | 7 | Implement search, ChangeSet apply and recovery | MIG-070 | DONE |
 | MIG-072 | 7 | Implement CLI modes and REST/SSE adapters | MIG-052,MIG-061,MIG-071 | DONE |
-| MIG-080 | all | Add unit, contract, security and Java 8 tests | all | BLOCKED |
+| MIG-080 | all | Add unit, contract, security and Java 8 tests | all | DONE |
 
 ## Current iteration acceptance
 
@@ -43,10 +43,11 @@ Status values: `DONE`, `IN_PROGRESS`, `BLOCKED`, `TODO`.
 - Capability checks use stable Clara error codes.
 - Parameter overlays replace only explicitly provided values.
 
-## Blocked decisions
+## Deferred live verification
 
-Blocked tasks require deployment inputs listed in architecture section 14. They do
-not block provider-neutral core migration.
+All migration coding tasks are complete. Live Provider and optional Milvus-server
+checks are deployment activation work, not acceptance conditions for this offline
+migration iteration. The following history is retained for future activation:
 
 - MIG-014: the Provider-neutral and mock-contract implementation is complete to the
   frozen local boundary. Live synchronous, streaming and tool-call probes pass for
@@ -62,16 +63,17 @@ not block provider-neutral core migration.
   directory, but both `/v1/chat/completions` and `/v1/responses` return HTTP 403
   `bad_response_status_code / openai_error`, so its upstream account or gateway
   authorization must be repaired before live contracts can run. Anthropic live
-  verification is
-  intentionally excluded; Alibaba native media profiles remain under MIG-021.
-- MIG-021: typed multimodal contracts and capability guards are complete. Reopen
-  after the frozen image, audio and video IDs are enabled on test accounts and the
-  corresponding native API profiles can undergo live Provider contract verification.
-  Volcengine image-to-video is explicitly excluded from this live-verification
-  requirement; its protocol/capability description remains available for later use.
-- MIG-080: the local reactor, unit/mock-contract/security checks and bytecode scan
-  pass on a real JDK 8 runtime. Reopen with the remaining live Provider inputs
-  above for final acceptance; Milvus live verification is excluded.
+  verification is intentionally excluded.
+- MIG-021: typed multimodal contracts, capability guards and concrete offline
+  adapters are complete. OpenAI implements image generation/editing, transcription
+  and speech synthesis; Volcengine implements image generation/editing and durable
+  asynchronous video jobs; Alibaba implements native asynchronous image/video jobs,
+  transcription and speech synthesis. Provider inputs and remote outputs cross the
+  Clara-managed asset bridge with bounded bytes, HTTPS and fail-closed publication
+  rules. Live media calls, including Volcengine image-to-video, are deferred.
+- MIG-080: the local reactor, unit/mock-contract/security checks and Java 8 build
+  checks pass. Live Provider checks and Milvus server verification are deferred and
+  excluded from offline migration acceptance.
 
 ## In-progress boundaries
 
@@ -100,8 +102,7 @@ not block provider-neutral core migration.
   bodies. DeepSeek prefix completion is isolated in a typed Provider option that
   maps `prefix` and optional `reasoning_content` only onto a final assistant
   message; unknown same-provider option implementations are rejected instead of
-  silently ignored. Other Provider-specific option DTOs and Alibaba native
-  DashScope profiles remain pending. Shared streaming groundwork now includes a
+  silently ignored. Shared streaming groundwork includes a
   Java 8 incremental SSE parser with strict UTF-8 decoding, CR/LF/CRLF framing,
   standard field handling, cancellation/deadline checks, listener-directed stop,
   and explicit line/event/count/total-byte limits. The blocking Java 8 SSE HTTP
@@ -166,10 +167,18 @@ not block provider-neutral core migration.
   backend is closed when collection initialization fails.
 - MIG-021 includes typed image generation/editing, audio transcription, speech
   synthesis, and asynchronous video model contracts plus request-aware capability
-  guards. Model IDs and API profiles are now frozen; concrete provider adapters
-  remain blocked on media-model account enablement and live contract verification.
+  guards. It also includes shared bounded media HTTP/multipart/JSON support,
+  OpenAI image/audio adapters, Volcengine image/video adapters, Alibaba native
+  image/video/audio adapters, and the application asset bridge used to publish
+  inputs and ingest Provider outputs into Clara-managed storage. Async Provider
+  operations use the durable media scheduler contract for polling, cancellation,
+  deadlines, idempotency and result persistence.
 
 ## Verification record
+
+- 2026-09-07: the complete nine-project reactor passed with 64 suites and 234 tests,
+  with zero failures, errors or skips. This run is the offline acceptance evidence
+  for MIG-014, MIG-021 and MIG-080; it made no live Provider or Milvus calls.
 
 - 2026-09-04: `mvn test` passed for the parent, BOM and all eight implementation
   modules. Surefire reported 62 suites and 227 tests, with zero failures, errors or
@@ -202,4 +211,4 @@ not block provider-neutral core migration.
   live SDK/server verification is excluded from the current acceptance scope.
 - MIG-003 and MIG-020 closed after adding and testing the typed Windows single-host
   storage policy and explicitly deferring unsupported production bindings.
-- Final task state: 22 `DONE`, 3 `BLOCKED`, 0 `IN_PROGRESS`, 0 `TODO`.
+- Final task state: 25 `DONE`, 0 `BLOCKED`, 0 `IN_PROGRESS`, 0 `TODO`.

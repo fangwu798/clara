@@ -5,6 +5,9 @@ import com.clara.kernel.ClaraException;
 import com.clara.kernel.ErrorCategory;
 import java.util.Collections;
 
+/**
+ * 集中创建交互相关的领域错误。
+ */
 final class InteractionErrors {
     private InteractionErrors() { }
     static ClaraException error(String code, ErrorCategory category) {

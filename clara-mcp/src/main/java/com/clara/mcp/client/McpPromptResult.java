@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 封装MCP提示词操作的执行结果。
+ */
 public final class McpPromptResult {
     private final String description;
     private final List<ChatMessage> messages;

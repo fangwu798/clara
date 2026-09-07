@@ -2,6 +2,9 @@ package com.clara.skill.api;
 
 import java.util.Set;
 
+/**
+ * 表示。
+ */
 public final class SkillSummary {
     private final String skillId, name, version, domain;
     private final SkillExecutionType executionType;

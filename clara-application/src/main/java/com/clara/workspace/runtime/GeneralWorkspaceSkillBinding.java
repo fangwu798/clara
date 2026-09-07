@@ -8,12 +8,15 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 
+/**
+ * 定义通用工作区技能之间的绑定关系。
+ */
 public final class GeneralWorkspaceSkillBinding {
     private GeneralWorkspaceSkillBinding() {
     }
 
     public static Map<SkillExecutionType, SkillHandler> handlers(GeneralWorkspaceSkillHandler handler) {
-        if (handler == null) throw new IllegalArgumentException("handler is required");
+        if (handler == null) { throw new IllegalArgumentException("handler is required"); }
         Map<String, SkillHandler> routes = Collections.<String, SkillHandler>singletonMap(
                 GeneralWorkspaceSkill.HANDLER_REF, handler);
         EnumMap<SkillExecutionType, SkillHandler> result = new EnumMap<SkillExecutionType, SkillHandler>(SkillExecutionType.class);

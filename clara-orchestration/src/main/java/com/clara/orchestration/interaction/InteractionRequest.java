@@ -1,5 +1,8 @@
 package com.clara.orchestration.interaction;
 
+/**
+ * 封装交互操作的输入参数。
+ */
 public final class InteractionRequest {
     private static final int SCHEMA_VERSION = 1;
     private final InteractionContext context;

@@ -9,6 +9,9 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * 提供检查点存储器的内存实现。
+ */
 public final class InMemoryCheckpointStore implements CheckpointStore {
     private final ConcurrentMap<String, WorkflowCheckpoint> checkpoints =
             new ConcurrentHashMap<String, WorkflowCheckpoint>();
@@ -16,19 +19,19 @@ public final class InMemoryCheckpointStore implements CheckpointStore {
             new ConcurrentHashMap<String, ConcurrentMap<Long, WorkflowCheckpoint>>();
 
     public Optional<WorkflowCheckpoint> load(String instanceId) {
-        if (blank(instanceId)) throw new IllegalArgumentException("instanceId must not be blank");
+        if (blank(instanceId)) { throw new IllegalArgumentException("instanceId must not be blank"); }
         return Optional.ofNullable(checkpoints.get(instanceId));
     }
 
     public Optional<WorkflowCheckpoint> load(String instanceId, long version) {
-        if (blank(instanceId) || version < 0L) throw new IllegalArgumentException("instanceId and version are invalid");
+        if (blank(instanceId) || version < 0L) { throw new IllegalArgumentException("instanceId and version are invalid"); }
         ConcurrentMap<Long, WorkflowCheckpoint> versions = history.get(instanceId);
         return versions == null ? Optional.<WorkflowCheckpoint>empty()
                 : Optional.ofNullable(versions.get(Long.valueOf(version)));
     }
 
     public WorkflowCheckpoint save(WorkflowCheckpoint checkpoint, long expectedVersion) {
-        if (checkpoint == null) throw new IllegalArgumentException("checkpoint must not be null");
+        if (checkpoint == null) { throw new IllegalArgumentException("checkpoint must not be null"); }
         synchronized (checkpoints) {
             WorkflowCheckpoint current = checkpoints.get(checkpoint.getInstanceId());
             long actual = current == null ? -1L : current.getVersion();

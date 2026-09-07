@@ -2,7 +2,13 @@ package com.clara.model.api;
 
 import com.clara.kernel.ClaraError;
 
+/**
+ * 表示流产生的事件。
+ */
 public final class StreamEvent {
+    /**
+     * 定义类型的可选取值。
+     */
     public enum Type {
         TEXT_DELTA, REASONING_DELTA, TOOL_ARGUMENT_DELTA,
         TOOL_CALL_COMPLETE, RESPONSE_COMPLETE, ERROR
@@ -19,8 +25,8 @@ public final class StreamEvent {
     }
     public StreamEvent(Type type, long sequence, String payload,
             String toolCallId, String toolName, ChatResponse response, ClaraError error) {
-        if (type == null) throw new IllegalArgumentException("type must not be null");
-        if (sequence < 0L) throw new IllegalArgumentException("sequence must not be negative");
+        if (type == null) { throw new IllegalArgumentException("type must not be null"); }
+        if (sequence < 0L) { throw new IllegalArgumentException("sequence must not be negative"); }
         this.type = type;
         this.sequence = sequence;
         this.payload = payload;

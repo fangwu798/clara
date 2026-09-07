@@ -1,5 +1,8 @@
 package com.clara.adapter.document;
 import com.clara.kernel.*;import com.clara.workspace.api.*;import java.io.*;import java.util.*;import org.apache.poi.ss.usermodel.*;
+/**
+ * 将POIExcel文档数据解析为领域对象。
+ */
 public final class PoiExcelDocumentParser implements DocumentParser {
  public boolean supports(com.clara.workspace.api.FileDescriptor f){String p=f.getRelativePath().toLowerCase(Locale.ROOT);return p.endsWith(".xlsx")||p.endsWith(".xls");}
  public ParsedDocument parse(FileDocument file){try{Workbook workbook=WorkbookFactory.create(new ByteArrayInputStream(file.getContent()));try{List<DocumentNode> nodes=new ArrayList<DocumentNode>();DataFormatter formatter=new DataFormatter(Locale.ROOT);

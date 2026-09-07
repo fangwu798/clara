@@ -8,6 +8,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * 保存MCP服务端在特定时刻的快照。
+ */
 public final class McpServerSnapshot {
     private final String snapshotId;
     private final String tenantId;
@@ -29,7 +32,7 @@ public final class McpServerSnapshot {
             List<McpPromptDescriptor> prompts,
             McpHealthStatus healthStatus) {
         require(snapshotId, "snapshotId"); require(tenantId, "tenantId"); require(serverKey, "serverKey");
-        if (discoveredAtEpochMillis < 0L) throw new IllegalArgumentException("discoveredAt must not be negative");
+        if (discoveredAtEpochMillis < 0L) { throw new IllegalArgumentException("discoveredAt must not be negative"); }
         require(protocolVersion, "protocolVersion");
         if (identity == null || capabilities == null || tools == null || resources == null
                 || resourceTemplates == null || prompts == null || healthStatus == null) {
@@ -58,29 +61,29 @@ public final class McpServerSnapshot {
     public List<McpPromptDescriptor> getPrompts() { return prompts; }
     public McpHealthStatus getHealthStatus() { return healthStatus; }
     private static <T> List<T> immutable(List<T> values) {
-        if (values.contains(null)) throw new IllegalArgumentException("capabilities must not contain null");
+        if (values.contains(null)) { throw new IllegalArgumentException("capabilities must not contain null"); }
         return Collections.unmodifiableList(new ArrayList<T>(values));
     }
     private static void uniqueToolNames(List<McpToolDescriptor> values) {
         Set<String> names = new HashSet<String>();
-        for (McpToolDescriptor value : values) if (value == null || !names.add(value.getName())) throw duplicate();
+        for (McpToolDescriptor value : values) if (value == null || !names.add(value.getName())) { throw duplicate(); }
     }
     private static void uniqueResourceUris(List<McpResourceDescriptor> values) {
         Set<String> names = new HashSet<String>();
-        for (McpResourceDescriptor value : values) if (value == null || !names.add(value.getUri())) throw duplicate();
+        for (McpResourceDescriptor value : values) if (value == null || !names.add(value.getUri())) { throw duplicate(); }
     }
     private static void uniquePromptNames(List<McpPromptDescriptor> values) {
         Set<String> names = new HashSet<String>();
-        for (McpPromptDescriptor value : values) if (value == null || !names.add(value.getName())) throw duplicate();
+        for (McpPromptDescriptor value : values) if (value == null || !names.add(value.getName())) { throw duplicate(); }
     }
     private static void uniqueResourceTemplateUris(List<McpResourceTemplateDescriptor> values) {
         Set<String> names = new HashSet<String>();
         for (McpResourceTemplateDescriptor value : values) {
-            if (value == null || !names.add(value.getUriTemplate())) throw duplicate();
+            if (value == null || !names.add(value.getUriTemplate())) { throw duplicate(); }
         }
     }
     private static IllegalArgumentException duplicate() { return new IllegalArgumentException("duplicate capability identifier"); }
     private static void require(String value, String field) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(field + " must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(field + " must not be blank"); }
     }
 }

@@ -1,5 +1,8 @@
 package com.clara.orchestration.interaction;
 
+/**
+ * 表示恢复的处理结果。
+ */
 public final class ResumeOutcome {
     private final String instanceStatus;
     private final long instanceVersion;

@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/**
+ * 表示。
+ */
 public final class TaskNode {
     private final String taskId;
     private final String description;
@@ -43,6 +46,9 @@ public final class TaskNode {
     public TaskHandler getHandler() { return handler; }
     private static boolean blank(String value) { return value == null || value.trim().isEmpty(); }
 
+    /**
+     * 表示。
+     */
     public static final class Builder {
         private String taskId;
         private String description;

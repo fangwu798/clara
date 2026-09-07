@@ -2,6 +2,9 @@ package com.clara.media.job;
 
 import com.clara.media.MediaUpload;
 
+/**
+ * 保存媒体服务提供商任务在特定时刻的快照。
+ */
 public final class MediaProviderJobSnapshot {
     private final MediaProviderJobStatus status;
     private final int progress;
@@ -10,12 +13,14 @@ public final class MediaProviderJobSnapshot {
 
     public MediaProviderJobSnapshot(MediaProviderJobStatus status, int progress,
             String errorCode, MediaUpload output) {
-        if (status == null) throw new IllegalArgumentException("status must not be null");
-        if (progress < 0 || progress > 100) throw new IllegalArgumentException("progress must be between 0 and 100");
-        if (status == MediaProviderJobStatus.SUCCEEDED && output == null)
+        if (status == null) { throw new IllegalArgumentException("status must not be null"); }
+        if (progress < 0 || progress > 100) { throw new IllegalArgumentException("progress must be between 0 and 100"); }
+        if (status == MediaProviderJobStatus.SUCCEEDED && output == null) {
             throw new IllegalArgumentException("successful provider job requires output");
-        if (status == MediaProviderJobStatus.FAILED && (errorCode == null || errorCode.trim().isEmpty()))
+        }
+        if (status == MediaProviderJobStatus.FAILED && (errorCode == null || errorCode.trim().isEmpty())) {
             throw new IllegalArgumentException("failed provider job requires errorCode");
+        }
         this.status = status;
         this.progress = progress;
         this.errorCode = errorCode;

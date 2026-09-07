@@ -2,6 +2,9 @@ package com.clara.model.api;
 
 import java.util.Objects;
 
+/**
+ * 表示媒体携带的内容。
+ */
 public final class MediaContent implements Content {
     private final String mediaType;
     private final String assetId;

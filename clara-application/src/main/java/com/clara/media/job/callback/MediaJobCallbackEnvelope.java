@@ -1,5 +1,8 @@
 package com.clara.media.job.callback;
 
+/**
+ * 封装媒体任务回调载荷及其传输元数据。
+ */
 public final class MediaJobCallbackEnvelope {
     private final String tenantId;
     private final String jobId;
@@ -15,12 +18,13 @@ public final class MediaJobCallbackEnvelope {
             String signature) {
         this.tenantId = required(tenantId, "tenantId");
         this.jobId = required(jobId, "jobId");
-        if (expectedVersion < 0L) throw new IllegalArgumentException("expectedVersion must not be negative");
+        if (expectedVersion < 0L) { throw new IllegalArgumentException("expectedVersion must not be negative"); }
         this.keyId = required(keyId, "keyId");
-        if (timestampEpochMillis < 0L)
+        if (timestampEpochMillis < 0L) {
             throw new IllegalArgumentException("timestampEpochMillis must not be negative");
+        }
         this.nonce = required(nonce, "nonce");
-        if (payload == null) throw new IllegalArgumentException("payload must not be null");
+        if (payload == null) { throw new IllegalArgumentException("payload must not be null"); }
         this.payload = payload.clone();
         this.signature = required(signature, "signature");
         this.expectedVersion = expectedVersion;
@@ -37,8 +41,9 @@ public final class MediaJobCallbackEnvelope {
     public String getSignature() { return signature; }
 
     private static String required(String value, String name) {
-        if (value == null || value.trim().isEmpty())
+        if (value == null || value.trim().isEmpty()) {
             throw new IllegalArgumentException(name + " must not be blank");
+        }
         return value;
     }
 }

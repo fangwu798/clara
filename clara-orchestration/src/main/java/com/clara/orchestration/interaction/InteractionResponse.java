@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 封装交互操作的响应数据。
+ */
 public final class InteractionResponse {
     private final String interactionId;
     private final Map<String, Object> answer;
@@ -13,7 +16,7 @@ public final class InteractionResponse {
     public InteractionResponse(String interactionId, Map<String, Object> answer, String responderId,
             String idempotencyKey, long submittedAtEpochMillis) {
         if (blank(interactionId) || blank(responderId) || blank(idempotencyKey)
-                || submittedAtEpochMillis < 0L) throw new IllegalArgumentException("response fields are invalid");
+                || submittedAtEpochMillis < 0L) { throw new IllegalArgumentException("response fields are invalid"); }
         this.interactionId = interactionId;
         this.answer = Collections.unmodifiableMap(new LinkedHashMap<String, Object>(answer));
         this.responderId = responderId; this.idempotencyKey = idempotencyKey;

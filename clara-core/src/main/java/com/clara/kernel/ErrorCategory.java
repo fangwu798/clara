@@ -1,5 +1,8 @@
 package com.clara.kernel;
 
+/**
+ * 定义 Clara 错误的分类。
+ */
 public enum ErrorCategory {
     CONFIGURATION,
     VALIDATION,

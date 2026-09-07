@@ -36,6 +36,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * 实现 MCP Streamable HTTP 传输，支持 JSON 或 SSE 响应、会话 ID、服务端事件流和请求取消。
+ *
+ * <p>常规用法：通过 {@link #builder} 配置 endpoint、允许的主机、认证请求头和响应大小上限，构建后调用
+ * {@link #start}；协议协商完成后设置版本，按需调用 {@link #startEventStream}，结束时调用 {@link #close()}。
+ *
+ * <p>注意：默认只允许 HTTPS，启用明文 HTTP 仅适合可信本地环境；endpoint 主机必须在允许列表中。
+ * 请求 ID 不得并发重复，响应体受大小限制；会话 ID 和 Last-Event-ID 由传输维护，不应由业务请求头覆盖。
+ */
 public final class StreamableHttpMcpTransport implements McpTransport {
     private final URI endpoint;
     private final McpHeadersProvider headersProvider;
@@ -56,7 +65,7 @@ public final class StreamableHttpMcpTransport implements McpTransport {
 
     private StreamableHttpMcpTransport(Builder builder) {
         this.endpoint = validateEndpoint(builder.endpoint, builder.allowedHosts, builder.allowHttp);
-        if (builder.codec == null) throw new IllegalArgumentException("codec must not be null");
+        if (builder.codec == null) { throw new IllegalArgumentException("codec must not be null"); }
         if (builder.connectTimeoutMillis <= 0 || builder.maxResponseBytes <= 0) {
             throw new IllegalArgumentException("transport limits must be positive");
         }
@@ -71,22 +80,22 @@ public final class StreamableHttpMcpTransport implements McpTransport {
 
     public static Builder builder() { return new Builder(); }
     public void setProtocolVersion(String value) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException("protocolVersion must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException("protocolVersion must not be blank"); }
         protocolVersion = value;
     }
     public String getSessionId() { return sessionId.get(); }
 
     public void start(McpTransportListener listener) {
-        if (listener == null) throw new IllegalArgumentException("listener must not be null");
-        if (closed.get()) throw closedError();
-        if (!started.compareAndSet(false, true)) throw new IllegalStateException("transport is already started");
+        if (listener == null) { throw new IllegalArgumentException("listener must not be null"); }
+        if (closed.get()) { throw closedError(); }
+        if (!started.compareAndSet(false, true)) { throw new IllegalStateException("transport is already started"); }
         this.listener = listener;
     }
 
     public CompletableFuture<JsonRpcResponse> sendRequest(final JsonRpcRequest request,
             final long timeoutMillis) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
-        if (timeoutMillis <= 0L) throw new IllegalArgumentException("timeoutMillis must be positive");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
+        if (timeoutMillis <= 0L) { throw new IllegalArgumentException("timeoutMillis must be positive"); }
         ensureStarted();
         final HttpCall call = new HttpCall();
         if (active.putIfAbsent(request.getId(), call) != null) {
@@ -113,7 +122,7 @@ public final class StreamableHttpMcpTransport implements McpTransport {
     }
 
     public void sendNotification(final JsonRpcNotification notification) {
-        if (notification == null) throw new IllegalArgumentException("notification must not be null");
+        if (notification == null) { throw new IllegalArgumentException("notification must not be null"); }
         ensureStarted();
         CompletableFuture.runAsync(() -> {
             try { executeNotification(codec.encode(notification)); }
@@ -122,7 +131,7 @@ public final class StreamableHttpMcpTransport implements McpTransport {
     }
 
     public boolean cancel(String requestId) {
-        if (requestId == null || requestId.trim().isEmpty()) throw new IllegalArgumentException("requestId must not be blank");
+        if (requestId == null || requestId.trim().isEmpty()) { throw new IllegalArgumentException("requestId must not be blank"); }
         HttpCall call = active.remove(requestId);
         if (call == null) return false;
         call.disconnect();
@@ -165,12 +174,12 @@ public final class StreamableHttpMcpTransport implements McpTransport {
             }
             McpDecodedMessage message = codec.decode(readBody(connection.getInputStream()));
             if (message.getType() != McpDecodedMessage.Type.RESPONSE
-                    || !requestId.equals(message.getResponse().getId())) throw invalidMessage();
+                    || !requestId.equals(message.getResponse().getId())) { throw invalidMessage(); }
             return message.getResponse();
         } catch (SocketTimeoutException exception) {
             throw McpTransportErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT, ErrorCategory.TIMEOUT, true);
         } catch (IOException exception) {
-            if (closed.get()) throw closedError();
+            if (closed.get()) { throw closedError(); }
             throw ioError();
         } finally {
             if (connection != null) connection.disconnect();
@@ -211,7 +220,7 @@ public final class StreamableHttpMcpTransport implements McpTransport {
                 dispatch(message); return true;
             }
         });
-        if (response.get() == null) throw new IOException("SSE response ended without matching response");
+        if (response.get() == null) { throw new IOException("SSE response ended without matching response"); }
         return response.get();
     }
 
@@ -309,7 +318,7 @@ public final class StreamableHttpMcpTransport implements McpTransport {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         byte[] buffer = new byte[4096]; int count;
         while ((count = input.read(buffer)) >= 0) {
-            if (output.size() + count > maxResponseBytes) throw messageTooLarge();
+            if (output.size() + count > maxResponseBytes) { throw messageTooLarge(); }
             output.write(buffer, 0, count);
         }
         return new String(output.toByteArray(), StandardCharsets.UTF_8);
@@ -332,8 +341,8 @@ public final class StreamableHttpMcpTransport implements McpTransport {
     }
     private static int timeout(long value) { return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value; }
     private void ensureStarted() {
-        if (closed.get()) throw closedError();
-        if (!started.get()) throw new IllegalStateException("transport is not started");
+        if (closed.get()) { throw closedError(); }
+        if (!started.get()) { throw new IllegalStateException("transport is not started"); }
     }
     private static void validateHeader(String name, String value) {
         if (name == null || value == null || name.indexOf('\r') >= 0 || name.indexOf('\n') >= 0
@@ -347,7 +356,7 @@ public final class StreamableHttpMcpTransport implements McpTransport {
     }
     private static URI validateEndpoint(URI endpoint, Set<String> allowedHosts, boolean allowHttp) {
         if (endpoint == null || endpoint.getHost() == null || endpoint.getUserInfo() != null
-                || endpoint.getFragment() != null) throw new IllegalArgumentException("endpoint is invalid");
+                || endpoint.getFragment() != null) { throw new IllegalArgumentException("endpoint is invalid"); }
         String scheme = endpoint.getScheme();
         if (!"https".equalsIgnoreCase(scheme) && !(allowHttp && "http".equalsIgnoreCase(scheme))) {
             throw new IllegalArgumentException("endpoint scheme is not allowed");
@@ -366,7 +375,7 @@ public final class StreamableHttpMcpTransport implements McpTransport {
         while ((current = reader.read()) >= 0) {
             if (current == '\n') break;
             if (current != '\r') value.append((char) current);
-            if (value.length() > maximum) throw messageTooLarge();
+            if (value.length() > maximum) { throw messageTooLarge(); }
         }
         return current < 0 && value.length() == 0 ? null : value.toString();
     }
@@ -385,13 +394,22 @@ public final class StreamableHttpMcpTransport implements McpTransport {
     private static RuntimeException messageTooLarge() {
         return McpTransportErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false);
     }
+    /**
+     * 消费事件数据。
+     */
     private interface EventConsumer { boolean accept(SseEvent event); }
+    /**
+     * 表示一次HTTP调用。
+     */
     private static final class HttpCall {
         private volatile HttpURLConnection connection;
         private final CompletableFuture<JsonRpcResponse> future =
                 new CompletableFuture<JsonRpcResponse>();
         private void disconnect() { HttpURLConnection value = connection; if (value != null) value.disconnect(); }
     }
+    /**
+     * 负责创建守护进程线程实例。
+     */
     private static final class DaemonThreadFactory implements ThreadFactory {
         private final AtomicInteger sequence = new AtomicInteger();
         public Thread newThread(Runnable runnable) {
@@ -399,6 +417,9 @@ public final class StreamableHttpMcpTransport implements McpTransport {
             thread.setDaemon(true); return thread;
         }
     }
+    /**
+     * 表示。
+     */
     public static final class Builder {
         private URI endpoint;
         private Set<String> allowedHosts;

@@ -18,19 +18,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 提供技能注册表的内存实现。
+ */
 public final class InMemorySkillRegistry implements SkillRegistry {
     private final SkillArtifactVerifier verifier;
     private final Map<String, SkillDefinition> definitions = new LinkedHashMap<String, SkillDefinition>();
     public InMemorySkillRegistry(SkillArtifactVerifier verifier) {
-        if (verifier == null) throw new IllegalArgumentException("verifier must not be null");
+        if (verifier == null) { throw new IllegalArgumentException("verifier must not be null"); }
         this.verifier=verifier;
     }
     public synchronized SkillDefinition get(String skillId, String version) {
         SkillDefinition value=definitions.get(key(skillId,version));
-        if(value==null)throw SkillErrors.error(ErrorCodes.SKILL_NOT_FOUND, ErrorCategory.VALIDATION); return value;
+        if(value==null) {throw SkillErrors.error(ErrorCodes.SKILL_NOT_FOUND, ErrorCategory.VALIDATION); } return value;
     }
     public synchronized List<SkillSummary> search(SkillQuery query) {
-        if(query==null)throw new IllegalArgumentException("query must not be null");
+        if(query==null) {throw new IllegalArgumentException("query must not be null"); }
         List<SkillSummary> result=new ArrayList<SkillSummary>();
         for(SkillDefinition value:definitions.values()){
             if(query.getDomain()!=null&&!query.getDomain().equals(value.getDomain()))continue;
@@ -45,13 +48,13 @@ public final class InMemorySkillRegistry implements SkillRegistry {
     }
     public synchronized SkillDefinition registerDraft(SkillDefinition value) {
         if(value==null||value.getLifecycle()!=SkillLifecycle.DRAFT)lifecycle();
-        if(definitions.containsKey(value.key()))throw SkillErrors.error(ErrorCodes.SKILL_VERSION_EXISTS,ErrorCategory.CONFLICT);
+        if(definitions.containsKey(value.key())) {throw SkillErrors.error(ErrorCodes.SKILL_VERSION_EXISTS,ErrorCategory.CONFLICT); }
         definitions.put(value.key(),value);return value;
     }
     public synchronized SkillDefinition review(String id,String version){return transition(id,version,SkillLifecycle.DRAFT,SkillLifecycle.REVIEWED);}
     public synchronized SkillDefinition publish(String id,String version){
         SkillDefinition value=get(id,version); if(value.getLifecycle()!=SkillLifecycle.REVIEWED)lifecycle();
-        if(!verifier.verify(value))throw SkillErrors.error(ErrorCodes.SKILL_ARTIFACT_REJECTED,ErrorCategory.CONTENT_SAFETY);
+        if(!verifier.verify(value)) {throw SkillErrors.error(ErrorCodes.SKILL_ARTIFACT_REJECTED,ErrorCategory.CONTENT_SAFETY); }
         validateDependencies(value); return replace(value,SkillLifecycle.PUBLISHED);
     }
     public synchronized SkillDefinition deprecate(String id,String version){return transition(id,version,SkillLifecycle.PUBLISHED,SkillLifecycle.DEPRECATED);}
@@ -78,7 +81,7 @@ public final class InMemorySkillRegistry implements SkillRegistry {
         path.remove(value.key());
     }
     private static String key(String id,String version){
-        if(id==null||id.trim().isEmpty()||version==null||version.trim().isEmpty())throw new IllegalArgumentException("skill identity is invalid");
+        if(id==null||id.trim().isEmpty()||version==null||version.trim().isEmpty()) {throw new IllegalArgumentException("skill identity is invalid"); }
         return id+":"+version;
     }
     private static void lifecycle(){throw SkillErrors.error(ErrorCodes.SKILL_INVALID_LIFECYCLE,ErrorCategory.CONFLICT);}

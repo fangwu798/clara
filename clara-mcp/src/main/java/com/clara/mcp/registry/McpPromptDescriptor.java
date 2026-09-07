@@ -6,13 +6,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 描述MCP提示词。
+ */
 public final class McpPromptDescriptor {
     private final String name;
     private final String description;
     private final List<McpPromptArgument> arguments;
     private final String schemaHash;
     public McpPromptDescriptor(String name, String description, List<McpPromptArgument> arguments) {
-        if (name == null || name.trim().isEmpty()) throw new IllegalArgumentException("name must not be blank");
+        if (name == null || name.trim().isEmpty()) { throw new IllegalArgumentException("name must not be blank"); }
         if (arguments == null || arguments.contains(null)) {
             throw new IllegalArgumentException("arguments must not be null or contain null");
         }

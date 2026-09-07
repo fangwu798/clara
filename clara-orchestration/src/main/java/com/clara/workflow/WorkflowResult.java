@@ -1,5 +1,8 @@
 package com.clara.workflow;
 
+/**
+ * 封装工作流操作的执行结果。
+ */
 public final class WorkflowResult {
     private final String instanceId;
     private final WorkflowInstanceStatus status;

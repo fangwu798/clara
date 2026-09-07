@@ -1,5 +1,8 @@
 package com.clara.planner;
 
+/**
+ * 表示预算的额度。
+ */
 public final class BudgetAmount {
     public static final BudgetAmount ZERO = new BudgetAmount(0L, 0L, 0L);
     private final long tokens;
@@ -21,7 +24,7 @@ public final class BudgetAmount {
     }
     public BudgetAmount minus(BudgetAmount other) {
         require(other);
-        if (!covers(other)) throw new IllegalArgumentException("budget subtraction underflow");
+        if (!covers(other)) { throw new IllegalArgumentException("budget subtraction underflow"); }
         return new BudgetAmount(tokens - other.tokens, costMicros - other.costMicros,
                 workUnits - other.workUnits);
     }
@@ -30,10 +33,10 @@ public final class BudgetAmount {
                 && workUnits >= other.workUnits;
     }
     private static void require(BudgetAmount value) {
-        if (value == null) throw new IllegalArgumentException("budget must not be null");
+        if (value == null) { throw new IllegalArgumentException("budget must not be null"); }
     }
     private static long add(long one, long two) {
-        if (Long.MAX_VALUE - one < two) throw new IllegalArgumentException("budget overflow");
+        if (Long.MAX_VALUE - one < two) { throw new IllegalArgumentException("budget overflow"); }
         return one + two;
     }
     @Override public boolean equals(Object value) {

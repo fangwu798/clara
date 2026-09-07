@@ -1,5 +1,8 @@
 package com.clara.mcp.registry;
 
+/**
+ * 表示。
+ */
 public final class McpServerRegistration {
     private final String tenantId;
     private final String serverKey;
@@ -14,13 +17,13 @@ public final class McpServerRegistration {
             McpTransportProfile transportProfile, String address, String authRef,
             String approvedIdentityName, String approvedIdentityVersion,
             McpRegistrationStatus status) {
-        if (isBlank(tenantId)) throw new IllegalArgumentException("tenantId must not be blank");
+        if (isBlank(tenantId)) { throw new IllegalArgumentException("tenantId must not be blank"); }
         if (isBlank(serverKey) || !serverKey.matches("[A-Za-z0-9][A-Za-z0-9_.-]*")) {
             throw new IllegalArgumentException("serverKey is invalid");
         }
-        if (transportProfile == null) throw new IllegalArgumentException("transportProfile must not be null");
-        if (isBlank(address)) throw new IllegalArgumentException("address must not be blank");
-        if (status == null) throw new IllegalArgumentException("status must not be null");
+        if (transportProfile == null) { throw new IllegalArgumentException("transportProfile must not be null"); }
+        if (isBlank(address)) { throw new IllegalArgumentException("address must not be blank"); }
+        if (status == null) { throw new IllegalArgumentException("status must not be null"); }
         this.tenantId = tenantId; this.serverKey = serverKey;
         this.transportProfile = transportProfile; this.address = address; this.authRef = authRef;
         this.approvedIdentityName = approvedIdentityName;

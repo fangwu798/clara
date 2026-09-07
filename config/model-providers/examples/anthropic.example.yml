@@ -1,0 +1,44 @@
+# Anthropic 脱敏样例：复制到 ../local/anthropic.yml 后填写账号可用的固定模型 ID。
+# 平台标识。必须使用程序 ModelProvider 枚举中定义的 ANTHROPIC。
+provider: ANTHROPIC
+
+# 访问平台接口时使用的凭据配置。
+credential:
+  # 凭据逻辑名称，会传给 ProviderCredentialResolver；同一进程内应保持唯一且稳定。
+  secretRef: anthropic-default
+  # 保存 API Key 的环境变量名；程序启动前必须设置，不要提交真实密钥。
+  environmentVariable: ANTHROPIC_API_KEY
+
+# HTTP 连接、安全边界和报文大小限制。
+transport:
+  # 允许访问的服务源站白名单，仅填写“协议 + 主机 + 可选端口”。
+  allowedOrigins:
+    # Anthropic 官方 API 源站；使用代理时应替换为代理的可信源站。
+    - https://api.anthropic.com
+  # 建立 TCP/TLS 连接的最长等待时间，单位为毫秒。
+  connectTimeoutMillis: 3000
+  # 读取模型响应的最长等待时间，单位为毫秒。
+  readTimeoutMillis: 60000
+  # 单次请求体最大字节数；当前值为 4 MiB。
+  maxRequestBytes: 4194304
+  # 单次响应体最大字节数；当前值为 16 MiB。
+  maxResponseBytes: 16777216
+  # 是否允许 HTTP 明文地址；生产环境应保持 false。
+  allowHttp: false
+
+# 本平台启用的模型能力。
+capabilities:
+  # Anthropic Messages 文本对话能力配置。
+  chat:
+    # Messages 完整接口地址，源站必须存在于 allowedOrigins 中。
+    endpoint: https://api.anthropic.com/v1/messages
+    # 实际调用的 Anthropic 模型 ID，应使用账号当前可用的固定版本名称。
+    modelId: replace-with-chat-model-id
+    # Anthropic Messages 协议适配器标识。
+    apiProfile: anthropic-messages
+    # Anthropic 请求所需的协议参数和默认生成限制。
+    parameters:
+      # anthropic-version 请求头的值；升级前需确认响应格式兼容性。
+      apiVersion: "2023-06-01"
+      # 请求未显式指定时采用的最大输出 Token 数。
+      defaultMaxTokens: 4096

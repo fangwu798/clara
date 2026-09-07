@@ -5,6 +5,9 @@ import com.clara.kernel.ClaraException;
 import com.clara.kernel.ErrorCategory;
 import java.util.Collections;
 
+/**
+ * 集中创建运行时相关的领域错误。
+ */
 final class RuntimeErrors {
     private RuntimeErrors() {}
     static ClaraException configuration(String code) {

@@ -1,5 +1,8 @@
 package com.clara.media.object;
 
+/**
+ * 表示处理对象媒体后端时发生的异常。
+ */
 public final class ObjectMediaBackendException extends RuntimeException {
     private final boolean retryable;
     private final boolean resourceLimit;

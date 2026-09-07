@@ -23,6 +23,15 @@ import java.util.List;
 import java.util.Locale;
 import javax.imageio.ImageIO;
 
+/**
+ * 按媒体策略校验文件大小、租户配额、扩展名、MIME、魔数、元数据和内容安全结果。
+ *
+ * <p>常规用法：仅做基础校验时传入 {@link MediaValidationPolicy}；音视频需要可信元数据时注册对应的
+ * {@link MediaMetadataProbe}，策略要求内容安全时还必须提供 {@link MediaContentSafetyScanner}。
+ *
+ * <p>注意：{@link #validate} 可能多次打开 {@link MediaInput}，输入实现必须可重复读取并为每次调用返回新流。
+ * 同一媒体类型和 MIME 最多只能匹配一个探测器；声明元数据与探测结果不一致会直接拒绝上传。
+ */
 public final class DefaultMediaValidator implements MediaValidator {
     private final MediaValidationPolicy config;
     private final List<MediaMetadataProbe> metadataProbes;
@@ -33,12 +42,13 @@ public final class DefaultMediaValidator implements MediaValidator {
     }
     public DefaultMediaValidator(MediaValidationPolicy config, List<MediaMetadataProbe> metadataProbes,
             MediaContentSafetyScanner safetyScanner) {
-        if (config == null) throw new IllegalArgumentException("config must not be null");
+        if (config == null) { throw new IllegalArgumentException("config must not be null"); }
         List<MediaMetadataProbe> safe = metadataProbes == null
                 ? Collections.<MediaMetadataProbe>emptyList() : metadataProbes;
-        if (safe.contains(null)) throw new IllegalArgumentException("metadataProbes must not contain null");
-        if (config.isContentSafetyRequired() && safetyScanner == null)
+        if (safe.contains(null)) { throw new IllegalArgumentException("metadataProbes must not contain null"); }
+        if (config.isContentSafetyRequired() && safetyScanner == null) {
             throw new IllegalArgumentException("content safety scanner is required by policy");
+        }
         this.config = config;
         this.metadataProbes = Collections.unmodifiableList(new ArrayList<MediaMetadataProbe>(safe));
         this.safetyScanner = safetyScanner;
@@ -46,7 +56,7 @@ public final class DefaultMediaValidator implements MediaValidator {
 
     public MediaValidation validate(MediaUpload upload, MediaInput content, long size, long tenantUsage)
             throws IOException {
-        if (upload == null || content == null) throw new IllegalArgumentException("upload and content must not be null");
+        if (upload == null || content == null) { throw new IllegalArgumentException("upload and content must not be null"); }
         if (size > config.getMaxFileBytes() || tenantUsage > config.getMaxTenantBytes() - size)
             fail(ErrorCodes.MEDIA_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT);
         String extension = extension(upload.getFileName());
@@ -60,7 +70,7 @@ public final class DefaultMediaValidator implements MediaValidator {
         Integer height = upload.getHeight();
         Long duration = upload.getDurationMs();
         InputStream opened = content.open();
-        if (opened == null) throw new IOException("media input returned null");
+        if (opened == null) { throw new IOException("media input returned null"); }
         BufferedInputStream buffered = new BufferedInputStream(opened);
         try {
             int max = 0;

@@ -17,6 +17,15 @@ import java.util.UUID;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
+/**
+ * 初始化 MCP 服务端，分页发现工具、资源和提示词，并发布带协议版本及身份的能力快照。
+ *
+ * <p>常规用法：注册服务端后调用 {@link #refresh} 完成发现、发布目录并将注册状态更新为 ACTIVE；
+ * 仅需探测而不发布时可调用 {@link #discover}。
+ *
+ * <p>注意：客户端在每次发现后都会关闭。协议版本必须位于支持列表，已审批的服务端身份发生变化会将注册项
+ * 标记为 REVIEW_REQUIRED；分页页数和游标去重均受保护，不能依赖无限分页或重复游标。
+ */
 public final class DefaultMcpDiscoveryService implements McpDiscoveryService {
     private final McpServerRegistry registry;
     private final McpCapabilityCatalog catalog;
@@ -37,20 +46,20 @@ public final class DefaultMcpDiscoveryService implements McpDiscoveryService {
             McpClientFactory clientFactory, List<String> supportedVersions, int maxPages,
             Supplier<String> snapshotIds, LongSupplier clock) {
         if (registry == null || catalog == null || clientFactory == null
-                || snapshotIds == null || clock == null) throw new IllegalArgumentException("dependencies must not be null");
+                || snapshotIds == null || clock == null) { throw new IllegalArgumentException("dependencies must not be null"); }
         if (supportedVersions == null || supportedVersions.isEmpty() || supportedVersions.contains(null)) {
             throw new IllegalArgumentException("supportedVersions must not be empty");
         }
-        if (maxPages <= 0) throw new IllegalArgumentException("maxPages must be positive");
+        if (maxPages <= 0) { throw new IllegalArgumentException("maxPages must be positive"); }
         this.registry = registry; this.catalog = catalog; this.clientFactory = clientFactory;
         this.supportedVersions = Collections.unmodifiableList(new ArrayList<String>(supportedVersions));
         this.maxPages = maxPages; this.snapshotIds = snapshotIds; this.clock = clock;
     }
 
     public McpServerSnapshot discover(final McpServerRegistration registration) {
-        if (registration == null) throw new IllegalArgumentException("registration must not be null");
+        if (registration == null) { throw new IllegalArgumentException("registration must not be null"); }
         McpClient client = clientFactory.create(registration);
-        if (client == null) throw new IllegalStateException("clientFactory returned null");
+        if (client == null) { throw new IllegalStateException("clientFactory returned null"); }
         RuntimeException failure = null;
         try {
             McpInitialization initialization = client.initialize(supportedVersions);
@@ -83,7 +92,7 @@ public final class DefaultMcpDiscoveryService implements McpDiscoveryService {
         } finally {
             try { client.close(); }
             catch (IOException exception) {
-                if (failure == null) throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategory.EXTERNAL_SERVICE);
+                if (failure == null) { throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategory.EXTERNAL_SERVICE); }
             }
         }
     }
@@ -130,7 +139,7 @@ public final class DefaultMcpDiscoveryService implements McpDiscoveryService {
                 throw McpErrors.error(ErrorCodes.MCP_PAGINATION_LIMIT_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
             }
             McpPage<T> page = loader.load(client, cursor);
-            if (page == null) throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategory.EXTERNAL_SERVICE);
+            if (page == null) { throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategory.EXTERNAL_SERVICE); }
             result.addAll(page.getItems());
             cursor = page.getNextCursor();
             if (cursor != null && !cursors.add(cursor)) {
@@ -140,6 +149,9 @@ public final class DefaultMcpDiscoveryService implements McpDiscoveryService {
         return Collections.unmodifiableList(result);
     }
 
+    /**
+     * 加载分页。
+     */
     private interface PageLoader<T> {
         McpPage<T> load(McpClient client, String cursor);
     }

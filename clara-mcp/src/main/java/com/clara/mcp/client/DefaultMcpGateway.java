@@ -13,6 +13,15 @@ import com.clara.mcp.registry.McpServerSnapshot;
 import java.io.IOException;
 import java.util.Arrays;
 
+/**
+ * 在调用 MCP 工具、资源和提示词前统一校验注册状态、能力快照、Schema 与服务端身份。
+ *
+ * <p>常规用法：先通过发现服务发布健康快照，再使用 {@link #callTool}、{@link #readResource} 或
+ * {@link #getPrompt}；请求应携带发现时的 snapshot ID 和 Schema 哈希。
+ *
+ * <p>注意：仅 ACTIVE 且快照健康的服务端可调用。网关每次调用都会重新初始化临时客户端并核对协议版本和身份，
+ * 能力已变化时会拒绝执行；客户端由网关关闭，调用方不得复用或管理该实例。
+ */
 public final class DefaultMcpGateway implements McpGateway {
     private final McpServerRegistry registry;
     private final McpCapabilityCatalog catalog;
@@ -27,7 +36,7 @@ public final class DefaultMcpGateway implements McpGateway {
     }
 
     public McpToolResult callTool(final McpToolCall call) {
-        if (call == null) throw new IllegalArgumentException("call must not be null");
+        if (call == null) { throw new IllegalArgumentException("call must not be null"); }
         Prepared prepared = prepare(call.getContext(), call.getServerKey(), call.getSnapshotId());
         catalog.resolveTool(call.getContext().getTenantId(), call.getServerKey(), call.getSnapshotId(),
                 call.getToolName(), call.getSchemaHash());
@@ -39,7 +48,7 @@ public final class DefaultMcpGateway implements McpGateway {
     }
 
     public McpResourceContent readResource(final McpResourceRequest request) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         Prepared prepared = prepare(request.getContext(), request.getServerKey(), request.getSnapshotId());
         catalog.resolveResource(request.getContext().getTenantId(), request.getServerKey(),
                 request.getSnapshotId(), request.getUri(), request.getSchemaHash());
@@ -49,7 +58,7 @@ public final class DefaultMcpGateway implements McpGateway {
     }
 
     public McpPromptResult getPrompt(final McpPromptRequest request) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         Prepared prepared = prepare(request.getContext(), request.getServerKey(), request.getSnapshotId());
         catalog.resolvePrompt(request.getContext().getTenantId(), request.getServerKey(),
                 request.getSnapshotId(), request.getPromptName(), request.getSchemaHash());
@@ -98,7 +107,13 @@ public final class DefaultMcpGateway implements McpGateway {
         }
     }
 
+    /**
+     * 定义。
+     */
     private interface Operation<T> { T run(McpClient client); }
+    /**
+     * 表示。
+     */
     private static final class Prepared {
         private final McpServerRegistration registration;
         private final McpServerSnapshot snapshot;

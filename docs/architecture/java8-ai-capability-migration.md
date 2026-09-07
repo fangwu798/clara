@@ -1,8 +1,14 @@
 # Clara AI 能力迁移架构设计（基于 LangChain4j，Java 8）
 
-> 状态：Draft，待评审  
-> 日期：2026-09-03  
+> 状态：编码迁移完成；线上 Provider/Milvus 验证延期
+>
+> 日期：2026-09-07
 > 目标：从当前 LangChain4j 仓库中提炼多模型、多模态生成与理解、上下文记忆、MCP Client、流程编排、任务规划和通用技能服务能力，并迁移到 Clara 的 Java 8 技术栈。
+
+当前迭代以 Java 8 编译、离线单元/契约/安全测试和完整 Maven Reactor
+通过作为编码验收条件。按当前决定不再执行线上 Provider 请求；Anthropic、
+Milvus 服务端和火山图生视频同样暂不验证。线上结果只决定具体 descriptor
+能否在部署环境标记为 `ACTIVE`，不阻塞本文范围内的编码迁移完成。
 
 ## 1. 结论摘要
 
@@ -604,6 +610,15 @@ public interface VideoGenerationModel {
 - 多模态理解：ChatMessage 的 Content 使用 `TextContent/MediaContent` 组合，媒体内容引用 `assetId`，Provider mapper 再转换为 URL、Base64 或上传文件句柄。
 
 视频生成通常是长任务，不包装成阻塞的 `generate()`。`MediaJob` 状态固定为 `QUEUED/RUNNING/SUCCEEDED/FAILED/CANCELLED/EXPIRED`，保存 `providerJobId`、进度、错误和输出 assetId。`MediaJobScheduler` 负责轮询或接收受签名保护的回调，并采用退避、总超时和幂等提交。图片接口首期允许同步返回，但应用层仍可把耗时调用统一包装成 Clara Job。
+
+当前编码实现已包含 OpenAI 图片生成/编辑、语音转写和语音合成适配器，
+火山图片生成/编辑及异步视频任务适配器，以及阿里 DashScope Native
+异步图片/视频、语音转写和语音合成适配器。共用的 Provider 媒体层负责
+Java 8 HTTP、JSON、multipart、凭据清理、请求/响应大小限制和稳定错误映射；
+`DefaultProviderMediaAssetBridge` 将 Clara `assetId` 转换为受控输入，并把
+Provider 的远程输出立即转存为 Clara 管理的资产。本地资产需要显式配置
+短期引用发布器才可供仅支持 URL 的 Provider 使用，系统不会自动公开本地文件。
+异步厂商任务通过 `MediaJobProviderOperation` 接入既有持久化调度器。
 
 媒体生成输出必须经过内容安全检查、格式探测、大小限制和 `MediaStore` 落盘后才标记成功。生成任务只在日志中记录 assetId、requestId 和参数摘要，不记录原始二进制或完整敏感 Prompt。
 

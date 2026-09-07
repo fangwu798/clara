@@ -2,6 +2,9 @@ package com.clara.media.job;
 
 import java.util.List;
 
+/**
+ * 存储并读取媒体任务。
+ */
 public interface MediaJobStore {
     void create(MediaJob job);
     MediaJob get(String tenantId, String jobId);

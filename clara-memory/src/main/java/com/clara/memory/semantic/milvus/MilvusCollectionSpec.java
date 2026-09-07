@@ -5,6 +5,9 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/**
+ * 表示。
+ */
 public final class MilvusCollectionSpec {
     private static final int SCHEMA_VERSION = 1;
     private static final Set<String> REQUIRED_FIELDS = Collections.unmodifiableSet(

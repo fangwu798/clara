@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 提供访问DeepSeek模型目录的客户端。
+ */
 public final class DeepSeekModelCatalogClient {
     private final DeepSeekModelCatalogConfig config;
     private final ProviderHttpTransport transport;
@@ -32,8 +35,9 @@ public final class DeepSeekModelCatalogClient {
 
     public DeepSeekModelCatalogClient(DeepSeekModelCatalogConfig config,
             ProviderHttpTransport transport, ProviderCredentialResolver credentials, Clock clock) {
-        if (config == null || transport == null || credentials == null || clock == null)
+        if (config == null || transport == null || credentials == null || clock == null) {
             throw new IllegalArgumentException("dependencies must not be null");
+        }
         this.config = config;
         this.transport = transport;
         this.credentials = credentials;
@@ -41,11 +45,11 @@ public final class DeepSeekModelCatalogClient {
     }
 
     public DeepSeekModelAvailabilitySnapshot fetch(InvocationContext context) {
-        if (context == null) throw new IllegalArgumentException("context must not be null");
+        if (context == null) { throw new IllegalArgumentException("context must not be null"); }
         context.getCancellationToken().throwIfCancellationRequested(context.getTraceId());
         char[] resolved = credentials.resolve(context.getTenantId(), config.getSecretRef());
-        if (resolved == null || resolved.length == 0) throw error(
-                ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null);
+        if (resolved == null || resolved.length == 0) { throw error(
+                ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null); }
         char[] secret = resolved.clone();
         try {
             Map<String, String> headers = new LinkedHashMap<String, String>();
@@ -53,9 +57,10 @@ public final class DeepSeekModelCatalogClient {
             headers.put("Accept", "application/json");
             ProviderHttpResponse response = transport.execute(new ProviderHttpRequest("GET",
                     config.getEndpoint(), headers, null), context);
-            if (response == null) throw protocol();
-            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300)
+            if (response == null) { throw protocol(); }
+            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 throw providerFailure(response.getStatusCode());
+            }
             return decode(response.getBody());
         } finally {
             Arrays.fill(secret, '\0');
@@ -67,18 +72,18 @@ public final class DeepSeekModelCatalogClient {
             JsonNode root = mapper.readTree(body);
             JsonNode data = root == null ? null : root.get("data");
             if (root == null || !root.isObject() || !"list".equals(text(root.get("object")))
-                    || data == null || !data.isArray()) throw protocol();
-            if (data.size() > config.getMaxModels()) throw tooLarge();
+                    || data == null || !data.isArray()) { throw protocol(); }
+            if (data.size() > config.getMaxModels()) { throw tooLarge(); }
             List<DeepSeekAvailableModel> models = new ArrayList<DeepSeekAvailableModel>();
             Set<String> ids = new HashSet<String>();
             for (JsonNode item : data) {
-                if (item == null || !item.isObject()) throw protocol();
+                if (item == null || !item.isObject()) { throw protocol(); }
                 String id = text(item.get("id"));
                 String object = text(item.get("object"));
                 String ownedBy = optionalText(item.get("owned_by"));
-                if (invalidId(id) || !"model".equals(object) || !ids.add(id)) throw protocol();
+                if (invalidId(id) || !"model".equals(object) || !ids.add(id)) { throw protocol(); }
                 if (ownedBy != null && (ownedBy.length() > config.getMaxModelIdChars()
-                        || containsControl(ownedBy))) throw protocol();
+                        || containsControl(ownedBy))) { throw protocol(); }
                 models.add(new DeepSeekAvailableModel(id, ownedBy));
             }
             Collections.sort(models);
@@ -109,7 +114,7 @@ public final class DeepSeekModelCatalogClient {
 
     private static String optionalText(JsonNode value) {
         if (value == null || value.isNull()) return null;
-        if (!value.isTextual()) throw protocol();
+        if (!value.isTextual()) { throw protocol(); }
         return value.textValue();
     }
 

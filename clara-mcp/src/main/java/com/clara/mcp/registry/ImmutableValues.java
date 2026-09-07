@@ -6,6 +6,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 为注册表数据创建不可变的防御性副本。
+ */
 public final class ImmutableValues {
     private ImmutableValues() {
     }
@@ -13,7 +16,7 @@ public final class ImmutableValues {
         if (source == null) return Collections.emptyMap();
         Map<String, Object> result = new LinkedHashMap<String, Object>();
         for (Map.Entry<String, Object> entry : source.entrySet()) {
-            if (entry.getKey() == null) throw new IllegalArgumentException("map key must not be null");
+            if (entry.getKey() == null) { throw new IllegalArgumentException("map key must not be null"); }
             result.put(entry.getKey(), copy(entry.getValue()));
         }
         return Collections.unmodifiableMap(result);
@@ -22,7 +25,7 @@ public final class ImmutableValues {
         if (source == null) return Collections.emptyList();
         List<Map<String, Object>> result = new ArrayList<Map<String, Object>>(source.size());
         for (Map<String, Object> item : source) {
-            if (item == null) throw new IllegalArgumentException("list must not contain null");
+            if (item == null) { throw new IllegalArgumentException("list must not contain null"); }
             result.add(copyMap(item));
         }
         return Collections.unmodifiableList(result);

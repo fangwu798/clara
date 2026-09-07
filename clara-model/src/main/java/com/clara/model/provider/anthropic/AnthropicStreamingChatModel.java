@@ -23,6 +23,15 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+/**
+ * 调用 Anthropic SSE 对话接口，并将内容块、文本增量和工具调用转换为统一流事件。
+ *
+ * <p>常规用法：注入配置、SSE 传输、租户凭据解析器和执行器后调用 {@link #chat}，由
+ * {@link StreamObserver} 顺序消费事件，并通过返回的 {@link StreamHandle} 取消或查询状态。
+ *
+ * <p>注意：内容块数量和累计字符数必须设置上限；事件顺序、工具参数及结束原因会被严格校验，不完整的流按
+ * 协议错误处理。凭据仅在调用期间解析并清理，执行器生命周期仍由调用方负责。
+ */
 public final class AnthropicStreamingChatModel implements StreamingChatModel {
     private final AnthropicChatConfig config;
     private final ProviderSseTransport transport;
@@ -35,10 +44,12 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
     public AnthropicStreamingChatModel(AnthropicChatConfig config,
             ProviderSseTransport transport, ProviderCredentialResolver credentials,
             ExecutorService executor, int maxContentBlocks, int maxAccumulatedChars) {
-        if (config == null || transport == null || credentials == null || executor == null)
+        if (config == null || transport == null || credentials == null || executor == null) {
             throw new IllegalArgumentException("dependencies must not be null");
-        if (maxContentBlocks <= 0 || maxAccumulatedChars <= 0)
+        }
+        if (maxContentBlocks <= 0 || maxAccumulatedChars <= 0) {
             throw new IllegalArgumentException("stream limits must be positive");
+        }
         this.config = config;
         this.transport = transport;
         this.credentials = credentials;
@@ -48,8 +59,9 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
     }
 
     public StreamHandle chat(final ChatRequest request, final StreamObserver observer) {
-        if (request == null || observer == null)
+        if (request == null || observer == null) {
             throw new IllegalArgumentException("request and observer must not be null");
+        }
         request.getContext().getCancellationToken()
                 .throwIfCancellationRequested(request.getContext().getTraceId());
         final byte[] payload = codec.encode(request, config, true);
@@ -65,8 +77,8 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
         char[] secret = null;
         try {
             char[] resolved = credentials.resolve(request.getContext().getTenantId(), config.getSecretRef());
-            if (resolved == null || resolved.length == 0) throw error(
-                    ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null);
+            if (resolved == null || resolved.length == 0) { throw error(
+                    ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null); }
             secret = resolved.clone();
             Map<String, String> headers = new LinkedHashMap<String, String>();
             headers.put("x-api-key", new String(secret));
@@ -85,10 +97,11 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
                             return !chunk.isComplete();
                         }
                     });
-            if (response == null) throw protocol();
-            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300)
+            if (response == null) { throw protocol(); }
+            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 throw providerFailure(response.getStatusCode());
-            if (!accumulator.isComplete()) throw protocol();
+            }
+            if (!accumulator.isComplete()) { throw protocol(); }
         } catch (ClaraException exception) {
             emitter.error(exception.getError());
         } catch (RuntimeException exception) {
@@ -132,6 +145,9 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
                 "ANTHROPIC", providerCode, null, Collections.<String, String>emptyMap()));
     }
 
+    /**
+     * 表示。
+     */
     private static final class Emitter {
         private final StreamObserver observer;
         private long sequence;
@@ -152,6 +168,9 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
         }
     }
 
+    /**
+     * 控制并观察正在执行的异步。
+     */
     private static final class AsyncHandle implements StreamHandle {
         private final ChatRequest request;
         private volatile Future<?> future;

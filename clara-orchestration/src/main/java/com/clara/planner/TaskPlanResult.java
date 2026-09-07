@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 封装任务计划操作的执行结果。
+ */
 public final class TaskPlanResult {
     private final TaskPlan plan;
     private final PlanStatus status;

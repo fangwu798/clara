@@ -1,5 +1,8 @@
 package com.clara.mcp.client;
 
+/**
+ * 表示。
+ */
 public final class McpServerCapabilities {
     private final boolean tools;
     private final boolean resources;

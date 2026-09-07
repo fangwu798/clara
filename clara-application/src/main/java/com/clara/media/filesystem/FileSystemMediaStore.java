@@ -36,6 +36,16 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 在工作区内以内容摘要为资产 ID，原子保存媒体内容和清单，并执行租户隔离、校验及过期清理。
+ *
+ * <p>常规用法：普通场景使用构造函数，需探测音视频元数据或内容安全检查时使用 {@link #inspected}；
+ * 通过 {@link #put} 写入，通过 {@code get/open/delete} 访问，定期调用 {@link #cleanupExpired}。
+ * 最后调用 {@link #close()} 释放目录锁。
+ *
+ * <p>注意：同一资产目录一次只能由一个实例持有。{@link #open} 返回的流由调用方关闭；资产按租户隔离且
+ * 读取时会复核清单、大小和 SHA-256，禁止绕过本类直接修改 {@code .clara/assets} 内容。
+ */
 public final class FileSystemMediaStore implements MediaStore, Closeable {
     private static final int FORMAT_VERSION = 1;
     private final FileSystemMediaStoreConfig config;
@@ -55,7 +65,7 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
                         metadataProbes, safetyScanner), new ObjectMapper());
     }
     public FileSystemMediaStore(FileSystemMediaStoreConfig config, MediaValidator validator, ObjectMapper json) {
-        if (config == null || validator == null || json == null) throw new IllegalArgumentException("dependencies must not be null");
+        if (config == null || validator == null || json == null) { throw new IllegalArgumentException("dependencies must not be null"); }
         this.config = config;
         this.validator = validator;
         this.json = json;
@@ -79,7 +89,7 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
     }
 
     public synchronized MediaAsset put(MediaUpload upload) {
-        if (upload == null) throw new IllegalArgumentException("upload must not be null");
+        if (upload == null) { throw new IllegalArgumentException("upload must not be null"); }
         Path stage = assetsRoot.resolve(".tmp").resolve(UUID.randomUUID().toString());
         try {
             Files.createDirectory(stage);
@@ -205,11 +215,11 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
     private Path tenantDirectory(String tenantId) { return assetsRoot.resolve(sha256(tenantId.getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
     private Path assetDirectory(String tenantId, String assetId) { return tenantDirectory(tenantId).resolve(assetId); }
     private static void validateIdentity(String tenantId, String assetId) {
-        if (tenantId == null || tenantId.trim().isEmpty()) throw new IllegalArgumentException("tenantId must not be blank");
-        if (assetId == null || !assetId.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("invalid assetId");
+        if (tenantId == null || tenantId.trim().isEmpty()) { throw new IllegalArgumentException("tenantId must not be blank"); }
+        if (assetId == null || !assetId.matches("[0-9a-f]{64}")) { throw new IllegalArgumentException("invalid assetId"); }
     }
     private static DigestAndSize copy(InputStream source, Path target, long limit) throws IOException {
-        if (source == null) throw new IOException("media input returned null");
+        if (source == null) { throw new IOException("media input returned null"); }
         MessageDigest digest = sha256Digest();
         long size = 0;
         InputStream input = new BufferedInputStream(source);
@@ -254,10 +264,16 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
     private static void ioError() { fail(ErrorCodes.MEDIA_STORE_IO_ERROR, ErrorCategory.INTERNAL); }
     private static void fail(String code, ErrorCategory category) { throw new ClaraException(new ClaraError(code, category, code, false, null, null, null, null, Collections.<String, String>emptyMap())); }
 
+    /**
+     * 表示。
+     */
     private static final class DigestAndSize {
         private final String sha256; private final long size;
         private DigestAndSize(String sha256, long size) { this.sha256 = sha256; this.size = size; }
     }
+    /**
+     * 表示。
+     */
     public static final class Manifest {
         public int formatVersion;
         public String assetId;

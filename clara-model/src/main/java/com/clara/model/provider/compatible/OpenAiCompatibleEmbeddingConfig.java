@@ -3,6 +3,9 @@ package com.clara.model.provider.compatible;
 import com.clara.model.api.ModelProvider;
 import java.net.URI;
 
+/**
+ * 定义OpenAI兼容嵌入的配置。
+ */
 public final class OpenAiCompatibleEmbeddingConfig {
     private final ModelProvider provider;
     private final URI endpoint;
@@ -17,15 +20,17 @@ public final class OpenAiCompatibleEmbeddingConfig {
     public OpenAiCompatibleEmbeddingConfig(ModelProvider provider, URI endpoint,
             String modelId, String apiProfile, String secretRef, int dimension,
             int maxInputs, int maxTextChars, int maxTotalChars) {
-        if (provider != ModelProvider.OPENAI && provider != ModelProvider.ALIBABA)
+        if (provider != ModelProvider.OPENAI && provider != ModelProvider.ALIBABA) {
             throw new IllegalArgumentException("provider is not confirmed for compatible embeddings");
-        if (endpoint == null) throw new IllegalArgumentException("endpoint must not be null");
+        }
+        if (endpoint == null) { throw new IllegalArgumentException("endpoint must not be null"); }
         this.modelId = required(modelId, "modelId");
         this.apiProfile = required(apiProfile, "apiProfile");
         this.secretRef = required(secretRef, "secretRef");
         if (dimension <= 0 || maxInputs <= 0 || maxTextChars <= 0 || maxTotalChars <= 0
-                || maxTotalChars < maxTextChars)
+                || maxTotalChars < maxTextChars) {
             throw new IllegalArgumentException("embedding limits must be positive and consistent");
+        }
         this.provider = provider;
         this.endpoint = endpoint;
         this.dimension = dimension;
@@ -45,8 +50,9 @@ public final class OpenAiCompatibleEmbeddingConfig {
     public int getMaxTotalChars() { return maxTotalChars; }
 
     private static String required(String value, String name) {
-        if (value == null || value.trim().isEmpty())
+        if (value == null || value.trim().isEmpty()) {
             throw new IllegalArgumentException(name + " must not be blank");
+        }
         return value;
     }
 }

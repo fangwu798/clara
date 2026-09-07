@@ -29,6 +29,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 负责技能解析、生命周期与健康检查、权限校验、Schema 校验以及同步、恢复和流式执行。
+ *
+ * <p>常规用法：按 {@link SkillExecutionType} 注册处理器后调用 {@link #execute}、{@link #resume}
+ * 或 {@link #executeStream}；流式调用通过返回的 {@link SkillExecutionHandle} 查询状态或取消。
+ * 执行器不再使用时应调用 {@link #close()}。
+ *
+ * <p>注意：只有已发布且健康的技能可以执行，请求上下文中的租户、权限、取消信号和截止时间都会被强制检查。
+ * 同一种执行类型只能对应一个处理器；观察者回调运行在执行器线程中，不应执行长时间阻塞操作。
+ */
 public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
     private final SkillRegistry registry;
     private final SkillSchemaValidator schemas;
@@ -40,8 +50,9 @@ public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
     public DefaultSkillExecutor(SkillRegistry registry, SkillSchemaValidator schemas,
                                 SkillPermissionAuthorizer permissions, SkillHealthResolver health,
                                 Map<SkillExecutionType, SkillHandler> handlers, int threads) {
-        if (registry == null || schemas == null || permissions == null || health == null || handlers == null || threads <= 0)
+        if (registry == null || schemas == null || permissions == null || health == null || handlers == null || threads <= 0) {
             throw new IllegalArgumentException("skill executor dependencies are invalid");
+        }
         this.registry = registry;
         this.schemas = schemas;
         this.permissions = permissions;
@@ -55,7 +66,7 @@ public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
     }
 
     public SkillExecutionResult execute(final SkillExecutionRequest request) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         final SkillDefinition definition = authorize(request);
         if (!schemas.isValid(definition.getInputSchema(), request.getInputs())) schema();
         return invoke(definition, request.getContext().remainingMillis(System.currentTimeMillis()),
@@ -67,7 +78,7 @@ public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
     }
 
     public SkillExecutionResult resume(final SkillResumeRequest request) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         final SkillExecutionRequest execution = request.getExecutionRequest();
         final SkillDefinition definition = authorize(execution);
         if (!schemas.isValid(definition.getInputSchema(), execution.getInputs())) schema();
@@ -80,8 +91,9 @@ public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
     }
 
     public SkillExecutionHandle executeStream(final SkillExecutionRequest request, final SkillEventObserver observer) {
-        if (request == null || observer == null)
+        if (request == null || observer == null) {
             throw new IllegalArgumentException("request and observer must not be null");
+        }
         Future<?> future = streams.submit(new Runnable() {
             public void run() {
                 notifyStarted(observer, request);
@@ -104,25 +116,28 @@ public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
     private SkillDefinition authorize(SkillExecutionRequest request) {
         request.getContext().getCancellationToken().throwIfCancellationRequested(request.getContext().getTraceId());
         SkillDefinition definition = registry.get(request.getSkillId(), request.getVersion());
-        if (definition.getLifecycle() != SkillLifecycle.PUBLISHED && definition.getLifecycle() != SkillLifecycle.DEPRECATED)
+        if (definition.getLifecycle() != SkillLifecycle.PUBLISHED && definition.getLifecycle() != SkillLifecycle.DEPRECATED) {
             throw SkillErrors.error(ErrorCodes.SKILL_UNAVAILABLE, ErrorCategory.CAPABILITY);
+        }
         SkillHealth currentHealth = health.health(definition);
-        if (currentHealth == null || currentHealth == SkillHealth.BLOCKED)
+        if (currentHealth == null || currentHealth == SkillHealth.BLOCKED) {
             throw SkillErrors.error(ErrorCodes.SKILL_UNAVAILABLE, ErrorCategory.CAPABILITY);
-        if (!permissions.isAllowed(request.getContext(), definition))
+        }
+        if (!permissions.isAllowed(request.getContext(), definition)) {
             throw SkillErrors.error(ErrorCodes.SKILL_PERMISSION_DENIED, ErrorCategory.AUTHORIZATION);
+        }
         return definition;
     }
 
     private SkillHandler handler(SkillDefinition definition) {
         SkillHandler value = handlers.get(definition.getExecutionType());
-        if (value == null) throw SkillErrors.error(ErrorCodes.SKILL_HANDLER_NOT_FOUND, ErrorCategory.CONFIGURATION);
+        if (value == null) { throw SkillErrors.error(ErrorCodes.SKILL_HANDLER_NOT_FOUND, ErrorCategory.CONFIGURATION); }
         return value;
     }
 
     private SkillExecutionResult invoke(SkillDefinition definition, long remaining, Invocation invocation) {
         long timeout = Math.min(definition.getTimeoutMillis(), remaining);
-        if (timeout <= 0L) throw SkillErrors.error(ErrorCodes.SKILL_TIMEOUT, ErrorCategory.TIMEOUT);
+        if (timeout <= 0L) { throw SkillErrors.error(ErrorCodes.SKILL_TIMEOUT, ErrorCategory.TIMEOUT); }
         Future<SkillExecutionResult> future = calls.submit(() -> invocation.call());
         try {
             SkillExecutionResult result = future.get(timeout, TimeUnit.MILLISECONDS);
@@ -140,8 +155,8 @@ public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
             throw SkillErrors.error(ErrorCodes.INVOCATION_CANCELLED, ErrorCategory.CANCELLED);
         } catch (ExecutionException failure) {
             Throwable cause = failure.getCause();
-            if (cause instanceof ClaraException) throw (ClaraException) cause;
-            if (cause instanceof RuntimeException) throw (RuntimeException) cause;
+            if (cause instanceof ClaraException) { throw (ClaraException) cause; }
+            if (cause instanceof RuntimeException) { throw (RuntimeException) cause; }
             throw SkillErrors.error(ErrorCodes.SKILL_UNAVAILABLE, ErrorCategory.INTERNAL);
         }
     }
@@ -171,10 +186,16 @@ public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
         }
     }
 
+    /**
+     * 定义。
+     */
     private interface Invocation {
         SkillExecutionResult call() throws Exception;
     }
 
+    /**
+     * 控制并观察正在执行的异步结果。
+     */
     private static final class FutureHandle implements SkillExecutionHandle {
         private final Future<?> future;
 
@@ -191,6 +212,9 @@ public final class DefaultSkillExecutor implements SkillExecutor, Closeable {
         }
     }
 
+    /**
+     * 负责创建技能线程实例。
+     */
     private static final class SkillThreadFactory implements ThreadFactory {
         private final String role;
         private final AtomicInteger sequence = new AtomicInteger();

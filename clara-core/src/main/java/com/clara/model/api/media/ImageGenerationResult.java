@@ -5,6 +5,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 封装图像生成操作的执行结果。
+ */
 public final class ImageGenerationResult {
     private final List<String> assetIds;
     private final String requestId;
@@ -12,7 +15,7 @@ public final class ImageGenerationResult {
 
     public ImageGenerationResult(List<String> assetIds, String requestId, Map<String, String> providerMetadata) {
         this.assetIds = MediaRequestValues.assetIds(assetIds, "assetIds");
-        if (this.assetIds.isEmpty()) throw new IllegalArgumentException("assetIds must not be empty");
+        if (this.assetIds.isEmpty()) { throw new IllegalArgumentException("assetIds must not be empty"); }
         this.requestId = requestId;
         this.providerMetadata = providerMetadata == null ? Collections.<String, String>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, String>(providerMetadata));

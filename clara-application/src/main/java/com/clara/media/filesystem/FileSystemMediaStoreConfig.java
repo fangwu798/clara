@@ -5,6 +5,9 @@ import com.clara.media.validation.MediaValidationPolicy;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 定义文件系统媒体存储器的配置。
+ */
 public final class FileSystemMediaStoreConfig {
     private final Path workspaceRoot;
     private final MediaValidationPolicy validationPolicy;
@@ -17,8 +20,8 @@ public final class FileSystemMediaStoreConfig {
     }
 
     public FileSystemMediaStoreConfig(Path workspaceRoot, MediaValidationPolicy validationPolicy) {
-        if (workspaceRoot == null) throw new IllegalArgumentException("workspaceRoot must not be null");
-        if (validationPolicy == null) throw new IllegalArgumentException("validationPolicy must not be null");
+        if (workspaceRoot == null) { throw new IllegalArgumentException("workspaceRoot must not be null"); }
+        if (validationPolicy == null) { throw new IllegalArgumentException("validationPolicy must not be null"); }
         this.workspaceRoot = workspaceRoot.toAbsolutePath().normalize();
         this.validationPolicy = validationPolicy;
     }

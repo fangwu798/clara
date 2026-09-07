@@ -4,6 +4,9 @@ import com.clara.kernel.InvocationContext;
 import com.clara.mcp.registry.ImmutableValues;
 import java.util.Map;
 
+/**
+ * 封装MCP提示词操作的输入参数。
+ */
 public final class McpPromptRequest {
     private final String serverKey, snapshotId, promptName, schemaHash;
     private final Map<String, Object> arguments;
@@ -13,7 +16,7 @@ public final class McpPromptRequest {
         if (isBlank(serverKey) || isBlank(snapshotId) || isBlank(promptName) || isBlank(schemaHash)) {
             throw new IllegalArgumentException("prompt request identifiers must not be blank");
         }
-        if (context == null) throw new IllegalArgumentException("context must not be null");
+        if (context == null) { throw new IllegalArgumentException("context must not be null"); }
         this.serverKey = serverKey; this.snapshotId = snapshotId; this.promptName = promptName;
         this.schemaHash = schemaHash; this.arguments = ImmutableValues.copyMap(arguments);
         this.context = context;

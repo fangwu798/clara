@@ -3,6 +3,9 @@ package com.clara.mcp.transport;
 import com.clara.mcp.client.JsonRpcNotification;
 import com.clara.mcp.client.JsonRpcRequest;
 
+/**
+ * 监听MCP传输器的生命周期事件。
+ */
 public interface McpTransportListener {
     void onNotification(JsonRpcNotification notification);
     void onServerRequest(JsonRpcRequest request);

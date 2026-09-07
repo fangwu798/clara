@@ -1,5 +1,8 @@
 package com.clara.kernel;
 
+/**
+ * 集中定义 Clara 的稳定错误码。
+ */
 public final class ErrorCodes {
     public static final String INVOCATION_CANCELLED = "INVOCATION_CANCELLED";
     public static final String CAPABILITY_NOT_SUPPORTED = "CAPABILITY_NOT_SUPPORTED";

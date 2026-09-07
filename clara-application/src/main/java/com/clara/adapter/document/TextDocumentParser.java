@@ -1,5 +1,8 @@
 package com.clara.adapter.document;
 import com.clara.kernel.*;import com.clara.workspace.api.*;import java.nio.*;import java.nio.charset.*;import java.util.*;
+/**
+ * 将文本文档数据解析为领域对象。
+ */
 public final class TextDocumentParser implements DocumentParser {private static final Set<String> EXT=new HashSet<String>(Arrays.asList(".txt",".md",".java",".xml",".json",".yaml",".yml",".properties",".csv",".sql",".js",".ts",".css",".html"));
  public boolean supports(FileDescriptor file){return EXT.contains(extension(file.getRelativePath()));}
  public ParsedDocument parse(FileDocument file){try{byte[] bytes=file.getContent();int offset=bytes.length>=3&&(bytes[0]&255)==239&&(bytes[1]&255)==187&&(bytes[2]&255)==191?3:0;

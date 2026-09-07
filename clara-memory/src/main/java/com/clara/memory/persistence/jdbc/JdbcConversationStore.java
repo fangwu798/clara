@@ -18,6 +18,15 @@ import java.util.Collections;
 import java.util.List;
 import javax.sql.DataSource;
 
+/**
+ * 通过 JDBC 持久化对话消息，并在事务内使用版本号实现并发追加控制。
+ *
+ * <p>常规用法：注入已配置的数据源，可选指定受校验的表名；先调用 {@link #loadSnapshot} 获取当前版本，
+ * 再调用 {@link #append} 追加消息，清理会话使用 {@link #clear}。
+ *
+ * <p>注意：调用方需预先创建兼容的表结构并保证数据源事务可用。本类不拥有也不会关闭 {@link javax.sql.DataSource}；
+ * 版本冲突应重新读取后处理，数据库异常会统一映射为会话存储领域错误。
+ */
 public final class JdbcConversationStore implements ConversationStore {
     private final DataSource dataSource;
     private final String table;
@@ -31,7 +40,7 @@ public final class JdbcConversationStore implements ConversationStore {
         if (table == null || !table.matches("[A-Za-z][A-Za-z0-9_]*")) {
             throw new IllegalArgumentException("table must be a simple SQL identifier");
         }
-        if (dataSource == null) throw new IllegalArgumentException("dataSource must not be null");
+        if (dataSource == null) { throw new IllegalArgumentException("dataSource must not be null"); }
         this.dataSource = dataSource;
         this.table = table;
     }
@@ -66,7 +75,7 @@ public final class JdbcConversationStore implements ConversationStore {
             connection = dataSource.getConnection();
             connection.setAutoCommit(false);
             ConversationSnapshot current = loadForUpdate(connection, conversationId);
-            if (current.getVersion() != expectedVersion) throw versionConflict();
+            if (current.getVersion() != expectedVersion) { throw versionConflict(); }
             List<ChatMessage> combined = new ArrayList<ChatMessage>(current.getMessages());
             combined.addAll(messages);
             byte[] payload = codec.encode(conversationId,
@@ -74,7 +83,7 @@ public final class JdbcConversationStore implements ConversationStore {
             int changed = current.getVersion() == 0L
                     ? insert(connection, conversationId, payload)
                     : update(connection, conversationId, expectedVersion, payload);
-            if (changed != 1) throw versionConflict();
+            if (changed != 1) { throw versionConflict(); }
             connection.commit();
         } catch (ClaraException exception) {
             rollback(connection);
@@ -84,7 +93,7 @@ public final class JdbcConversationStore implements ConversationStore {
             throw corrupted();
         } catch (SQLException exception) {
             rollback(connection);
-            if (isConstraintViolation(exception)) throw versionConflict();
+            if (isConstraintViolation(exception)) { throw versionConflict(); }
             throw ioError();
         } finally {
             close(connection);
@@ -142,7 +151,7 @@ public final class JdbcConversationStore implements ConversationStore {
     private ConversationSnapshot decode(String conversationId, long databaseVersion, byte[] payload) {
         try {
             ConversationSnapshot snapshot = codec.decode(conversationId, payload);
-            if (snapshot.getVersion() != databaseVersion) throw corrupted();
+            if (snapshot.getVersion() != databaseVersion) { throw corrupted(); }
             return snapshot;
         } catch (IOException exception) {
             throw corrupted();
@@ -165,7 +174,7 @@ public final class JdbcConversationStore implements ConversationStore {
         if (messages == null || messages.isEmpty()) {
             throw new IllegalArgumentException("messages must not be empty");
         }
-        if (messages.contains(null)) throw new IllegalArgumentException("messages must not contain null");
+        if (messages.contains(null)) { throw new IllegalArgumentException("messages must not contain null"); }
     }
     private static ClaraException versionConflict() {
         return ConversationStoreErrors.error(ErrorCodes.CONVERSATION_VERSION_CONFLICT,

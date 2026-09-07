@@ -1,5 +1,8 @@
 package com.clara.workflow;
 
+/**
+ * 表示。
+ */
 public final class WorkflowCheckpoint {
     private static final int SCHEMA_VERSION = 1;
     private final String instanceId;

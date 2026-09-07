@@ -1,5 +1,8 @@
 package com.clara.model.api;
 
+/**
+ * 表示。
+ */
 public final class TokenUsage {
     private final int inputTokens;
     private final int outputTokens;

@@ -1,5 +1,8 @@
 package com.clara.model.runtime;
 
+/**
+ * 定义模型元数据来源的可选取值。
+ */
 public enum ModelMetadataSource {
     PROVIDER_CATALOG(0),
     AUDITED_STATIC(1),

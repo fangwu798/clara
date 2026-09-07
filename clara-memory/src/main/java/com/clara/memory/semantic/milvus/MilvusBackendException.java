@@ -1,5 +1,8 @@
 package com.clara.memory.semantic.milvus;
 
+/**
+ * 表示处理Milvus后端时发生的异常。
+ */
 public final class MilvusBackendException extends RuntimeException {
     private final boolean retryable;
 

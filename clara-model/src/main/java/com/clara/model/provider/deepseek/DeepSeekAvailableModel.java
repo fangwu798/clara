@@ -1,5 +1,8 @@
 package com.clara.model.provider.deepseek;
 
+/**
+ * 提供DeepSeek可用模型能力。
+ */
 public final class DeepSeekAvailableModel implements Comparable<DeepSeekAvailableModel> {
     private final String modelId;
     private final String ownedBy;

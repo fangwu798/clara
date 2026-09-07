@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 表示。
+ */
 public final class MediaUpload {
     private final String tenantId;
     private final MediaType mediaType;
@@ -21,15 +24,16 @@ public final class MediaUpload {
             String sourceUri, Integer width, Integer height, Long durationMs, Long expiresAt,
             Map<String, String> metadata, MediaInput input) {
         this.tenantId = required(tenantId, "tenantId");
-        if (mediaType == null) throw new IllegalArgumentException("mediaType must not be null");
+        if (mediaType == null) { throw new IllegalArgumentException("mediaType must not be null"); }
         this.mediaType = mediaType;
         this.fileName = required(fileName, "fileName");
         this.mimeType = required(mimeType, "mimeType").toLowerCase(java.util.Locale.ROOT);
-        if ((width == null) != (height == null)) throw new IllegalArgumentException("width and height must be set together");
-        if (width != null && (width.intValue() <= 0 || height.intValue() <= 0))
+        if ((width == null) != (height == null)) { throw new IllegalArgumentException("width and height must be set together"); }
+        if (width != null && (width.intValue() <= 0 || height.intValue() <= 0)) {
             throw new IllegalArgumentException("dimensions must be positive");
-        if (durationMs != null && durationMs.longValue() < 0) throw new IllegalArgumentException("durationMs must not be negative");
-        if (input == null) throw new IllegalArgumentException("input must not be null");
+        }
+        if (durationMs != null && durationMs.longValue() < 0) { throw new IllegalArgumentException("durationMs must not be negative"); }
+        if (input == null) { throw new IllegalArgumentException("input must not be null"); }
         this.sourceUri = sourceUri;
         this.width = width;
         this.height = height;
@@ -41,7 +45,7 @@ public final class MediaUpload {
     }
 
     private static String required(String value, String name) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(name + " must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(name + " must not be blank"); }
         return value;
     }
     public String getTenantId() { return tenantId; }

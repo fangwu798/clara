@@ -2,11 +2,14 @@ package com.clara.mcp.client;
 
 import java.util.Objects;
 
+/**
+ * 标识MCP服务端。
+ */
 public final class McpServerIdentity {
     private final String name;
     private final String version;
     public McpServerIdentity(String name, String version) {
-        if (name == null || name.trim().isEmpty()) throw new IllegalArgumentException("name must not be blank");
+        if (name == null || name.trim().isEmpty()) { throw new IllegalArgumentException("name must not be blank"); }
         this.name = name;
         this.version = version;
     }

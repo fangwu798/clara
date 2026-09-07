@@ -1,5 +1,8 @@
 package com.clara.skill.api;
 
+/**
+ * 表示技能产生的制品。
+ */
 public final class SkillArtifact {
     private final String source;
     private final String author;

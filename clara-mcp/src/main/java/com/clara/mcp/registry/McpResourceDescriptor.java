@@ -3,13 +3,16 @@ package com.clara.mcp.registry;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 描述MCP资源。
+ */
 public final class McpResourceDescriptor {
     private final String uri;
     private final String name;
     private final String mimeType;
     private final String schemaHash;
     public McpResourceDescriptor(String uri, String name, String mimeType) {
-        if (uri == null || uri.trim().isEmpty()) throw new IllegalArgumentException("uri must not be blank");
+        if (uri == null || uri.trim().isEmpty()) { throw new IllegalArgumentException("uri must not be blank"); }
         this.uri = uri;
         this.name = name;
         this.mimeType = mimeType;

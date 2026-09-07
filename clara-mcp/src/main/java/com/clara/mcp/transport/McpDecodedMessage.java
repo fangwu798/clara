@@ -4,7 +4,13 @@ import com.clara.mcp.client.JsonRpcNotification;
 import com.clara.mcp.client.JsonRpcRequest;
 import com.clara.mcp.client.JsonRpcResponse;
 
+/**
+ * 表示MCP解码结果交换的消息。
+ */
 public final class McpDecodedMessage {
+    /**
+     * 定义类型的可选取值。
+     */
     public enum Type { RESPONSE, NOTIFICATION, SERVER_REQUEST }
     private final Type type;
     private final JsonRpcResponse response;

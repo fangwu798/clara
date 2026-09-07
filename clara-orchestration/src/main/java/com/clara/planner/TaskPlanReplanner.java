@@ -6,10 +6,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 表示。
+ */
 public final class TaskPlanReplanner {
     private final PlanValidator validator;
     public TaskPlanReplanner(PlanValidator validator) {
-        if (validator == null) throw new IllegalArgumentException("validator must not be null");
+        if (validator == null) { throw new IllegalArgumentException("validator must not be null"); }
         this.validator = validator;
     }
     public TaskPlan replan(TaskPlan current, TaskPlan replacement, int priorReplans,

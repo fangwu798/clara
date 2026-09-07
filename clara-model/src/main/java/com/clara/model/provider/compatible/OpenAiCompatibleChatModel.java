@@ -16,6 +16,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 提供OpenAI兼容对话模型能力。
+ */
 public final class OpenAiCompatibleChatModel implements ChatModel {
     private final OpenAiCompatibleChatConfig config;
     private final ProviderHttpTransport transport;
@@ -24,8 +27,9 @@ public final class OpenAiCompatibleChatModel implements ChatModel {
 
     public OpenAiCompatibleChatModel(OpenAiCompatibleChatConfig config,
             ProviderHttpTransport transport, ProviderCredentialResolver credentials) {
-        if (config == null || transport == null || credentials == null)
+        if (config == null || transport == null || credentials == null) {
             throw new IllegalArgumentException("dependencies must not be null");
+        }
         this.config = config;
         this.transport = transport;
         this.credentials = credentials;
@@ -33,7 +37,7 @@ public final class OpenAiCompatibleChatModel implements ChatModel {
     }
 
     public ChatResponse chat(ChatRequest request) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         request.getContext().getCancellationToken()
                 .throwIfCancellationRequested(request.getContext().getTraceId());
         byte[] payload = codec.encode(request, config);

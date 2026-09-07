@@ -3,6 +3,9 @@ package com.clara.mcp.registry;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 描述MCP资源模板。
+ */
 public final class McpResourceTemplateDescriptor {
     private final String uriTemplate;
     private final String name;

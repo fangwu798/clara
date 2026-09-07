@@ -6,6 +6,9 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 表示。
+ */
 public final class ExecutionScope {
     private static final int SCHEMA_VERSION = 1;
     private final Map<String, Object> variables;

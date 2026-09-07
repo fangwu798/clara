@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * 定义媒体校验需要遵循的策略。
+ */
 public final class MediaValidationPolicy {
     private final long maxFileBytes;
     private final long maxTenantBytes;
@@ -31,13 +34,16 @@ public final class MediaValidationPolicy {
             Map<String, String> extensionMimeTypes, Map<String, List<String>> magicPrefixes,
             boolean verifiedMetadataRequired, boolean contentSafetyRequired) {
         if (maxFileBytes <= 0 || maxTenantBytes <= 0 || retentionMillis <= 0
-                || maxImageWidth <= 0 || maxImageHeight <= 0 || maxDurationMs <= 0)
+                || maxImageWidth <= 0 || maxImageHeight <= 0 || maxDurationMs <= 0) {
             throw new IllegalArgumentException("media limits must be positive");
-        if (maxFileBytes > maxTenantBytes) throw new IllegalArgumentException("file limit exceeds tenant limit");
-        if (extensionMimeTypes == null || extensionMimeTypes.isEmpty())
+        }
+        if (maxFileBytes > maxTenantBytes) { throw new IllegalArgumentException("file limit exceeds tenant limit"); }
+        if (extensionMimeTypes == null || extensionMimeTypes.isEmpty()) {
             throw new IllegalArgumentException("extensionMimeTypes must not be empty");
-        if (magicPrefixes == null || magicPrefixes.isEmpty())
+        }
+        if (magicPrefixes == null || magicPrefixes.isEmpty()) {
             throw new IllegalArgumentException("magicPrefixes must not be empty");
+        }
         this.maxFileBytes = maxFileBytes;
         this.maxTenantBytes = maxTenantBytes;
         this.retentionMillis = retentionMillis;
@@ -52,8 +58,9 @@ public final class MediaValidationPolicy {
         this.extensionMimeTypes = Collections.unmodifiableMap(extensions);
         Map<String, List<String>> signatures = new LinkedHashMap<String, List<String>>();
         for (Map.Entry<String, List<String>> entry : magicPrefixes.entrySet()) {
-            if (entry.getValue() == null || entry.getValue().isEmpty())
+            if (entry.getValue() == null || entry.getValue().isEmpty()) {
                 throw new IllegalArgumentException("magic prefix list must not be empty");
+            }
             List<String> values = new ArrayList<String>();
             for (String value : entry.getValue()) values.add(normalizeHex(value));
             signatures.put(normalizeMime(entry.getKey()), Collections.unmodifiableList(values));
@@ -61,19 +68,20 @@ public final class MediaValidationPolicy {
         this.magicPrefixes = Collections.unmodifiableMap(signatures);
     }
     private static String normalizeExtension(String value) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException("extension must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException("extension must not be blank"); }
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         return normalized.charAt(0) == '.' ? normalized : "." + normalized;
     }
     private static String normalizeMime(String value) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException("mime type must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException("mime type must not be blank"); }
         return value.trim().toLowerCase(Locale.ROOT);
     }
     private static String normalizeHex(String value) {
-        if (value == null) throw new IllegalArgumentException("magic prefix must not be null");
+        if (value == null) { throw new IllegalArgumentException("magic prefix must not be null"); }
         String normalized = value.replace(" ", "").toUpperCase(Locale.ROOT);
-        if (normalized.isEmpty() || (normalized.length() & 1) != 0 || !normalized.matches("[0-9A-F]+"))
+        if (normalized.isEmpty() || (normalized.length() & 1) != 0 || !normalized.matches("[0-9A-F]+")) {
             throw new IllegalArgumentException("magic prefix must contain complete hexadecimal bytes");
+        }
         return normalized;
     }
     public long getMaxFileBytes() { return maxFileBytes; }

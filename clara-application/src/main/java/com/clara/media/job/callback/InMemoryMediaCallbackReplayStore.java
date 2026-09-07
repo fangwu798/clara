@@ -4,14 +4,18 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+/**
+ * 提供媒体回调重放存储器的内存实现。
+ */
 public final class InMemoryMediaCallbackReplayStore implements MediaCallbackReplayStore {
     private final Map<String, Long> expirations = new HashMap<String, Long>();
 
     public synchronized MediaCallbackReplayDecision reserve(String tenantId, String keyId,
             String nonce, long expiresAt, long now, int maxEntries) {
         if (tenantId == null || keyId == null || nonce == null || expiresAt < 0L
-                || now < 0L || maxEntries <= 0)
+                || now < 0L || maxEntries <= 0) {
             throw new IllegalArgumentException("invalid replay reservation");
+        }
         Iterator<Map.Entry<String, Long>> iterator = expirations.entrySet().iterator();
         while (iterator.hasNext()) {
             if (iterator.next().getValue().longValue() < now) iterator.remove();

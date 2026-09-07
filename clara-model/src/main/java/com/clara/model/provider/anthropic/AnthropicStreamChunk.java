@@ -3,6 +3,9 @@ package com.clara.model.provider.anthropic;
 import com.clara.model.api.ChatResponse;
 import com.clara.model.api.ToolCallContent;
 
+/**
+ * 表示。
+ */
 final class AnthropicStreamChunk {
     private final String textDelta;
     private final String toolCallId;

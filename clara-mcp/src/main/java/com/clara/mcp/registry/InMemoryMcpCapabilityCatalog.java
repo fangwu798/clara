@@ -5,6 +5,9 @@ import com.clara.kernel.ErrorCodes;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 提供MCP能力目录的内存实现。
+ */
 public final class InMemoryMcpCapabilityCatalog implements McpCapabilityCatalog {
     private final Map<String, McpServerSnapshot> snapshots =
             new ConcurrentHashMap<String, McpServerSnapshot>();
@@ -12,7 +15,7 @@ public final class InMemoryMcpCapabilityCatalog implements McpCapabilityCatalog 
             new ConcurrentHashMap<String, McpServerSnapshot>();
 
     public void publish(McpServerSnapshot snapshot) {
-        if (snapshot == null) throw new IllegalArgumentException("snapshot must not be null");
+        if (snapshot == null) { throw new IllegalArgumentException("snapshot must not be null"); }
         String snapshotKey = snapshotKey(snapshot.getTenantId(), snapshot.getServerKey(),
                 snapshot.getSnapshotId());
         if (snapshots.putIfAbsent(snapshotKey, snapshot) != null) {
@@ -30,17 +33,17 @@ public final class InMemoryMcpCapabilityCatalog implements McpCapabilityCatalog 
     }
     public McpServerSnapshot latest(String tenantId, String serverKey) {
         McpServerSnapshot snapshot = latest.get(serverKey(tenantId, serverKey));
-        if (snapshot == null) throw notFound();
+        if (snapshot == null) { throw notFound(); }
         return snapshot;
     }
     public McpServerSnapshot get(String tenantId, String serverKey, String snapshotId) {
         McpServerSnapshot snapshot = snapshots.get(snapshotKey(tenantId, serverKey, snapshotId));
-        if (snapshot == null) throw notFound();
+        if (snapshot == null) { throw notFound(); }
         return snapshot;
     }
     public McpToolDescriptor resolveTool(String tenantId, String serverKey, String snapshotId,
             String toolName, String expectedSchemaHash) {
-        if (toolName == null || toolName.trim().isEmpty()) throw new IllegalArgumentException("toolName must not be blank");
+        if (toolName == null || toolName.trim().isEmpty()) { throw new IllegalArgumentException("toolName must not be blank"); }
         if (expectedSchemaHash == null || expectedSchemaHash.trim().isEmpty()) {
             throw new IllegalArgumentException("expectedSchemaHash must not be blank");
         }
@@ -87,7 +90,7 @@ public final class InMemoryMcpCapabilityCatalog implements McpCapabilityCatalog 
         require(snapshotId, "snapshotId"); return serverKey(tenantId, serverKey) + '\u0000' + snapshotId;
     }
     private static void require(String value, String field) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(field + " must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(field + " must not be blank"); }
     }
     private static RuntimeException notFound() {
         return McpErrors.error(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, ErrorCategory.CAPABILITY);

@@ -26,6 +26,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 负责Anthropic对话数据的编码与解码。
+ */
 final class AnthropicChatCodec {
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -37,8 +40,9 @@ final class AnthropicChatCodec {
         validateOptions(request);
         ModelParameters parameters = request.getParameters();
         if (parameters != null && parameters.getModel() != null
-                && !config.getModelId().equals(parameters.getModel()))
+                && !config.getModelId().equals(parameters.getModel())) {
             throw new IllegalArgumentException("request model differs from registered model");
+        }
         Map<String, Object> root = new LinkedHashMap<String, Object>();
         root.put("model", config.getModelId());
         root.put("max_tokens", parameters != null && parameters.getMaxTokens() != null
@@ -49,14 +53,14 @@ final class AnthropicChatCodec {
         boolean conversationStarted = false;
         for (ChatMessage message : request.getMessages()) {
             if (message.getRole() == Role.SYSTEM) {
-                if (conversationStarted) throw new IllegalArgumentException("system messages must be leading");
+                if (conversationStarted) { throw new IllegalArgumentException("system messages must be leading"); }
                 system.addAll(textBlocks(message));
             } else {
                 conversationStarted = true;
                 messages.add(message(message));
             }
         }
-        if (messages.isEmpty()) throw new IllegalArgumentException("conversation requires a non-system message");
+        if (messages.isEmpty()) { throw new IllegalArgumentException("conversation requires a non-system message"); }
         if (!system.isEmpty()) root.put("system", system);
         root.put("messages", messages);
         parameters(root, parameters);
@@ -68,22 +72,23 @@ final class AnthropicChatCodec {
     ChatResponse decode(byte[] body, AnthropicChatConfig config) {
         try {
             JsonNode root = mapper.readTree(body);
-            if (root == null || !root.isObject() || !"assistant".equals(text(root.get("role"))))
+            if (root == null || !root.isObject() || !"assistant".equals(text(root.get("role")))) {
                 throw protocol();
+            }
             JsonNode blocks = root.get("content");
-            if (blocks == null || !blocks.isArray() || blocks.size() == 0) throw protocol();
+            if (blocks == null || !blocks.isArray() || blocks.size() == 0) { throw protocol(); }
             List<Content> contents = new ArrayList<Content>();
             for (JsonNode block : blocks) {
                 String type = text(block.get("type"));
                 if ("text".equals(type)) {
                     String value = text(block.get("text"));
-                    if (value == null) throw protocol();
+                    if (value == null) { throw protocol(); }
                     contents.add(new TextContent(value));
                 } else if ("tool_use".equals(type)) {
                     String id = text(block.get("id"));
                     String name = text(block.get("name"));
                     JsonNode input = block.get("input");
-                    if (id == null || name == null || input == null || !input.isObject()) throw protocol();
+                    if (id == null || name == null || input == null || !input.isObject()) { throw protocol(); }
                     contents.add(new ToolCallContent(id, name, mapper.writeValueAsString(input)));
                 } else {
                     throw protocol();
@@ -110,8 +115,9 @@ final class AnthropicChatCodec {
     private Map<String, Object> message(ChatMessage message) {
         Map<String, Object> value = new LinkedHashMap<String, Object>();
         if (message.getRole() == Role.TOOL) {
-            if (message.getName() == null || message.getName().trim().isEmpty())
+            if (message.getName() == null || message.getName().trim().isEmpty()) {
                 throw new IllegalArgumentException("tool message requires tool use id as name");
+            }
             value.put("role", "user");
             List<Map<String, Object>> blocks = new ArrayList<Map<String, Object>>();
             Map<String, Object> result = new LinkedHashMap<String, Object>();
@@ -122,8 +128,9 @@ final class AnthropicChatCodec {
             value.put("content", blocks);
             return value;
         }
-        if (message.getRole() != Role.USER && message.getRole() != Role.ASSISTANT)
+        if (message.getRole() != Role.USER && message.getRole() != Role.ASSISTANT) {
             throw new IllegalArgumentException("unsupported Anthropic message role");
+        }
         value.put("role", message.getRole() == Role.USER ? "user" : "assistant");
         List<Map<String, Object>> blocks = new ArrayList<Map<String, Object>>();
         for (Content content : message.getContents()) {
@@ -159,8 +166,9 @@ final class AnthropicChatCodec {
     private Map<String, Object> toolUse(ToolCallContent call) {
         try {
             JsonNode input = mapper.readTree(call.getArguments());
-            if (input == null || !input.isObject())
+            if (input == null || !input.isObject()) {
                 throw new IllegalArgumentException("tool arguments must be a JSON object");
+            }
             Map<String, Object> block = new LinkedHashMap<String, Object>();
             block.put("type", "tool_use");
             block.put("id", call.getId());
@@ -175,8 +183,9 @@ final class AnthropicChatCodec {
     private static String joinedText(ChatMessage message) {
         StringBuilder result = new StringBuilder();
         for (Content content : message.getContents()) {
-            if (!(content instanceof TextContent))
+            if (!(content instanceof TextContent)) {
                 throw new IllegalArgumentException("tool result content must be text");
+            }
             result.append(((TextContent) content).getText());
         }
         return result.toString();
@@ -209,7 +218,7 @@ final class AnthropicChatCodec {
         JsonNode input = usage.get("input_tokens");
         JsonNode output = usage.get("output_tokens");
         if (input == null || output == null || !input.canConvertToInt() || !output.canConvertToInt()
-                || input.intValue() < 0 || output.intValue() < 0) throw protocol();
+                || input.intValue() < 0 || output.intValue() < 0) { throw protocol(); }
         return new TokenUsage(input.intValue(), output.intValue());
     }
 
@@ -223,8 +232,9 @@ final class AnthropicChatCodec {
 
     private static void validateOptions(ChatRequest request) {
         if (request.getProviderOptions() == null) return;
-        if (request.getProviderOptions().getProvider() != ModelProvider.ANTHROPIC)
+        if (request.getProviderOptions().getProvider() != ModelProvider.ANTHROPIC) {
             throw new IllegalArgumentException("provider options do not match ANTHROPIC");
+        }
         throw new IllegalArgumentException("Anthropic provider options are not enabled for this profile");
     }
     private static String text(JsonNode value) {

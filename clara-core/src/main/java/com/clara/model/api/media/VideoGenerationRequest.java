@@ -4,6 +4,9 @@ import com.clara.kernel.InvocationContext;
 import com.clara.model.api.ProviderOptions;
 import java.util.List;
 
+/**
+ * 封装视频生成操作的输入参数。
+ */
 public final class VideoGenerationRequest {
     private final String prompt;
     private final List<String> referenceImageAssetIds;
@@ -28,19 +31,21 @@ public final class VideoGenerationRequest {
         if (firstFrameAssetId != null) MediaRequestValues.required(firstFrameAssetId, "firstFrameAssetId");
         if (lastFrameAssetId != null) {
             MediaRequestValues.required(lastFrameAssetId, "lastFrameAssetId");
-            if (firstFrameAssetId == null) throw new IllegalArgumentException("last frame requires first frame");
+            if (firstFrameAssetId == null) { throw new IllegalArgumentException("last frame requires first frame"); }
         }
-        if (durationMs != null && durationMs.longValue() <= 0) throw new IllegalArgumentException("durationMs must be positive");
-        if ((width == null) != (height == null)) throw new IllegalArgumentException("width and height must be set together");
-        if (width != null && (width.intValue() <= 0 || height.intValue() <= 0))
+        if (durationMs != null && durationMs.longValue() <= 0) { throw new IllegalArgumentException("durationMs must be positive"); }
+        if ((width == null) != (height == null)) { throw new IllegalArgumentException("width and height must be set together"); }
+        if (width != null && (width.intValue() <= 0 || height.intValue() <= 0)) {
             throw new IllegalArgumentException("dimensions must be positive");
+        }
         if (aspectRatio != null) {
             MediaRequestValues.required(aspectRatio, "aspectRatio");
-            if (width != null) throw new IllegalArgumentException("aspectRatio and dimensions are mutually exclusive");
+            if (width != null) { throw new IllegalArgumentException("aspectRatio and dimensions are mutually exclusive"); }
         }
-        if (framesPerSecond != null && framesPerSecond.intValue() <= 0)
+        if (framesPerSecond != null && framesPerSecond.intValue() <= 0) {
             throw new IllegalArgumentException("framesPerSecond must be positive");
-        if (context == null) throw new IllegalArgumentException("context must not be null");
+        }
+        if (context == null) { throw new IllegalArgumentException("context must not be null"); }
         this.firstFrameAssetId = firstFrameAssetId;
         this.lastFrameAssetId = lastFrameAssetId;
         this.durationMs = durationMs;

@@ -2,10 +2,13 @@ package com.clara.model.api;
 
 import java.util.Objects;
 
+/**
+ * 表示文本携带的内容。
+ */
 public final class TextContent implements Content {
     private final String text;
     public TextContent(String text) {
-        if (text == null) throw new IllegalArgumentException("text must not be null");
+        if (text == null) { throw new IllegalArgumentException("text must not be null"); }
         this.text = text;
     }
     public String getType() { return "text"; }

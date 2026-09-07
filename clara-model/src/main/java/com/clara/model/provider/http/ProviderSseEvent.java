@@ -1,5 +1,8 @@
 package com.clara.model.provider.http;
 
+/**
+ * 表示服务提供商SSE产生的事件。
+ */
 public final class ProviderSseEvent {
     private final String event;
     private final String data;

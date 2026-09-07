@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+/**
+ * 累积Anthropic流的增量状态。
+ */
 final class AnthropicStreamAccumulator {
     private final AnthropicChatConfig config;
     private final int maxContentBlocks;
@@ -42,25 +45,27 @@ final class AnthropicStreamAccumulator {
 
     AnthropicStreamAccumulator(AnthropicChatConfig config, int maxContentBlocks,
             int maxAccumulatedChars) {
-        if (config == null) throw new IllegalArgumentException("config must not be null");
-        if (maxContentBlocks <= 0 || maxAccumulatedChars <= 0)
+        if (config == null) { throw new IllegalArgumentException("config must not be null"); }
+        if (maxContentBlocks <= 0 || maxAccumulatedChars <= 0) {
             throw new IllegalArgumentException("stream limits must be positive");
+        }
         this.config = config;
         this.maxContentBlocks = maxContentBlocks;
         this.maxAccumulatedChars = maxAccumulatedChars;
     }
 
     AnthropicStreamChunk accept(String eventName, String data) {
-        if (eventName == null || data == null)
+        if (eventName == null || data == null) {
             throw new IllegalArgumentException("eventName and data must not be null");
-        if (complete) throw protocol();
+        }
+        if (complete) { throw protocol(); }
         try {
             JsonNode root = mapper.readTree(data);
-            if (root == null || !root.isObject()) throw protocol();
+            if (root == null || !root.isObject()) { throw protocol(); }
             String type = requiredText(root, "type");
-            if (!type.equals(eventName)) throw protocol();
+            if (!type.equals(eventName)) { throw protocol(); }
             if ("ping".equals(type)) return AnthropicStreamChunk.empty();
-            if ("error".equals(type)) throw providerError(root.get("error"));
+            if ("error".equals(type)) { throw providerError(root.get("error")); }
             if ("message_start".equals(type)) return messageStart(root);
             requireStarted();
             if ("content_block_start".equals(type)) return blockStart(root);
@@ -81,28 +86,28 @@ final class AnthropicStreamAccumulator {
     boolean isComplete() { return complete; }
 
     private AnthropicStreamChunk messageStart(JsonNode root) {
-        if (started) throw protocol();
+        if (started) { throw protocol(); }
         JsonNode message = root.get("message");
         if (message == null || !message.isObject()
-                || !"assistant".equals(requiredText(message, "role"))) throw protocol();
+                || !"assistant".equals(requiredText(message, "role"))) { throw protocol(); }
         JsonNode content = message.get("content");
-        if (content == null || !content.isArray() || content.size() != 0) throw protocol();
+        if (content == null || !content.isArray() || content.size() != 0) { throw protocol(); }
         id = optionalText(message, "id");
         model = optionalText(message, "model");
         JsonNode usage = message.get("usage");
-        if (usage == null || !usage.isObject()) throw protocol();
+        if (usage == null || !usage.isObject()) { throw protocol(); }
         inputTokens = nonNegativeInt(usage, "input_tokens");
         started = true;
         return AnthropicStreamChunk.empty();
     }
 
     private AnthropicStreamChunk blockStart(JsonNode root) {
-        if (messageDelta) throw protocol();
+        if (messageDelta) { throw protocol(); }
         int index = index(root);
-        if (blocks.containsKey(Integer.valueOf(index))) throw protocol();
+        if (blocks.containsKey(Integer.valueOf(index))) { throw protocol(); }
         if (blocks.size() >= maxContentBlocks) resourceLimit();
         JsonNode content = root.get("content_block");
-        if (content == null || !content.isObject()) throw protocol();
+        if (content == null || !content.isObject()) { throw protocol(); }
         String type = requiredText(content, "type");
         Block block = new Block(type);
         if ("text".equals(type)) {
@@ -111,12 +116,12 @@ final class AnthropicStreamAccumulator {
             blocks.put(Integer.valueOf(index), block);
             return new AnthropicStreamChunk(initial, null, null, null, null, null);
         }
-        if (!"tool_use".equals(type)) throw protocol();
+        if (!"tool_use".equals(type)) { throw protocol(); }
         block.id = requiredText(content, "id");
         block.name = requiredText(content, "name");
         appendCount(block.id.length() + block.name.length());
         JsonNode input = content.get("input");
-        if (input == null || !input.isObject() || input.size() != 0) throw protocol();
+        if (input == null || !input.isObject() || input.size() != 0) { throw protocol(); }
         blocks.put(Integer.valueOf(index), block);
         return AnthropicStreamChunk.empty();
     }
@@ -124,7 +129,7 @@ final class AnthropicStreamAccumulator {
     private AnthropicStreamChunk blockDelta(JsonNode root) {
         Block block = activeBlock(index(root));
         JsonNode delta = root.get("delta");
-        if (delta == null || !delta.isObject()) throw protocol();
+        if (delta == null || !delta.isObject()) { throw protocol(); }
         String type = requiredText(delta, "type");
         if ("text".equals(block.type) && "text_delta".equals(type)) {
             String value = requiredText(delta, "text");
@@ -145,33 +150,33 @@ final class AnthropicStreamAccumulator {
         if (!"tool_use".equals(block.type)) return AnthropicStreamChunk.empty();
         try {
             JsonNode arguments = mapper.readTree(block.value.toString());
-            if (arguments == null || !arguments.isObject()) throw protocol();
+            if (arguments == null || !arguments.isObject()) { throw protocol(); }
         } catch (IOException exception) { throw protocol(); }
         ToolCallContent tool = new ToolCallContent(block.id, block.name, block.value.toString());
         return new AnthropicStreamChunk(null, block.id, block.name, null, tool, null);
     }
 
     private AnthropicStreamChunk messageDelta(JsonNode root) {
-        if (messageDelta || !allBlocksStopped()) throw protocol();
+        if (messageDelta || !allBlocksStopped()) { throw protocol(); }
         JsonNode delta = root.get("delta");
-        if (delta == null || !delta.isObject()) throw protocol();
+        if (delta == null || !delta.isObject()) { throw protocol(); }
         finishReason = finish(requiredText(delta, "stop_reason"));
         stopSequence = optionalText(delta, "stop_sequence");
         JsonNode usage = root.get("usage");
-        if (usage == null || !usage.isObject()) throw protocol();
+        if (usage == null || !usage.isObject()) { throw protocol(); }
         outputTokens = nonNegativeInt(usage, "output_tokens");
         messageDelta = true;
         return AnthropicStreamChunk.empty();
     }
 
     private AnthropicStreamChunk messageStop() {
-        if (!messageDelta || inputTokens == null || outputTokens == null) throw protocol();
+        if (!messageDelta || inputTokens == null || outputTokens == null) { throw protocol(); }
         List<Content> contents = new ArrayList<Content>();
         for (Block block : blocks.values()) {
             if ("text".equals(block.type)) contents.add(new TextContent(block.value.toString()));
             else contents.add(new ToolCallContent(block.id, block.name, block.value.toString()));
         }
-        if (contents.isEmpty()) throw protocol();
+        if (contents.isEmpty()) { throw protocol(); }
         Map<String, String> metadata = new LinkedHashMap<String, String>();
         put(metadata, "id", id);
         put(metadata, "model", model);
@@ -187,7 +192,7 @@ final class AnthropicStreamAccumulator {
 
     private Block activeBlock(int index) {
         Block block = blocks.get(Integer.valueOf(index));
-        if (block == null || block.stopped) throw protocol();
+        if (block == null || block.stopped) { throw protocol(); }
         return block;
     }
 
@@ -198,7 +203,7 @@ final class AnthropicStreamAccumulator {
     }
 
     private void requireStarted() {
-        if (!started || complete) throw protocol();
+        if (!started || complete) { throw protocol(); }
     }
 
     private void append(StringBuilder target, String value) {
@@ -213,26 +218,26 @@ final class AnthropicStreamAccumulator {
 
     private static int index(JsonNode root) {
         JsonNode value = root.get("index");
-        if (value == null || !value.canConvertToInt() || value.intValue() < 0) throw protocol();
+        if (value == null || !value.canConvertToInt() || value.intValue() < 0) { throw protocol(); }
         return value.intValue();
     }
 
     private static Integer nonNegativeInt(JsonNode root, String field) {
         JsonNode value = root.get(field);
-        if (value == null || !value.canConvertToInt() || value.intValue() < 0) throw protocol();
+        if (value == null || !value.canConvertToInt() || value.intValue() < 0) { throw protocol(); }
         return Integer.valueOf(value.intValue());
     }
 
     private static String requiredText(JsonNode root, String field) {
         String value = optionalText(root, field);
-        if (value == null) throw protocol();
+        if (value == null) { throw protocol(); }
         return value;
     }
 
     private static String optionalText(JsonNode root, String field) {
         JsonNode value = root.get(field);
         if (value == null || value.isNull()) return null;
-        if (!value.isTextual()) throw protocol();
+        if (!value.isTextual()) { throw protocol(); }
         return value.textValue();
     }
 
@@ -274,6 +279,9 @@ final class AnthropicStreamAccumulator {
         if (value != null) target.put(key, value);
     }
 
+    /**
+     * 表示。
+     */
     private static final class Block {
         private final String type;
         private final StringBuilder value = new StringBuilder();

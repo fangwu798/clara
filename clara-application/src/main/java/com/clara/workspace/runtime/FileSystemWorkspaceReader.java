@@ -1,9 +1,18 @@
 package com.clara.workspace.runtime;
 import com.clara.kernel.*;import com.clara.workspace.api.*;import java.io.IOException;import java.nio.file.*;import java.nio.file.attribute.BasicFileAttributes;import java.security.MessageDigest;import java.security.NoSuchAlgorithmException;import java.util.*;
+/**
+ * 在工作区策略约束内扫描、读取和查找文件，并阻止路径逃逸及不受控的符号链接访问。
+ *
+ * <p>常规用法：使用部署级 {@link WorkspacePolicy} 构造实例，通过 {@link #scan} 获取受限快照，
+ * 再按相对路径调用 {@link #read} 或使用 {@link #findFiles} 筛选文件。
+ *
+ * <p>注意：工作区根目录必须真实存在，传入路径必须是相对业务路径。扫描结果可能因文件数、单文件大小或
+ * 总大小限制而截断；是否跟随符号链接由策略决定，即使开启也不会允许目标逃出工作区根目录。
+ */
 public final class FileSystemWorkspaceReader implements WorkspaceReader {
  private final WorkspacePolicy defaultPolicy;
- public FileSystemWorkspaceReader(WorkspacePolicy policy){if(policy==null)throw new IllegalArgumentException("policy must not be null");defaultPolicy=policy;}
- public WorkspaceSnapshot scan(WorkspaceRef workspace,WorkspacePolicy policy){if(workspace==null||policy==null)throw new IllegalArgumentException();final Path root=realRoot(workspace);final List<FileDescriptor> files=new ArrayList<FileDescriptor>();final long[] total={0L};final boolean[] truncated={false};
+ public FileSystemWorkspaceReader(WorkspacePolicy policy){if(policy==null) {throw new IllegalArgumentException("policy must not be null"); }defaultPolicy=policy;}
+ public WorkspaceSnapshot scan(WorkspaceRef workspace,WorkspacePolicy policy){if(workspace==null||policy==null) {throw new IllegalArgumentException(); }final Path root=realRoot(workspace);final List<FileDescriptor> files=new ArrayList<FileDescriptor>();final long[] total={0L};final boolean[] truncated={false};
   EnumSet<FileVisitOption> options=policy.isFollowLinks()?EnumSet.of(FileVisitOption.FOLLOW_LINKS):EnumSet.noneOf(FileVisitOption.class);
   try{Files.walkFileTree(root,options,Integer.MAX_VALUE,new SimpleFileVisitor<Path>(){
    public FileVisitResult preVisitDirectory(Path dir,BasicFileAttributes attrs)throws IOException{if(!dir.equals(root)&&(ignored(dir.getFileName().toString(),policy)||!inside(root,dir,policy.isFollowLinks())))return FileVisitResult.SKIP_SUBTREE;return FileVisitResult.CONTINUE;}
@@ -16,14 +25,14 @@ public final class FileSystemWorkspaceReader implements WorkspaceReader {
   return new WorkspaceSnapshot(files,fingerprint(files),truncated[0],total[0]);}
  public FileDocument read(WorkspaceRef workspace,String relativePath){Path root=realRoot(workspace);Path file=resolve(root,relativePath,defaultPolicy);try{
    BasicFileAttributes attrs=Files.readAttributes(file,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);if(!attrs.isRegularFile())denied();
-   if(attrs.size()>defaultPolicy.getMaxFileBytes())throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_RESOURCE_LIMIT,ErrorCategory.RESOURCE_LIMIT);
+   if(attrs.size()>defaultPolicy.getMaxFileBytes()) {throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_RESOURCE_LIMIT,ErrorCategory.RESOURCE_LIMIT); }
    if(!allowed(file,defaultPolicy)||!pathAllowed(root,file,defaultPolicy))denied();
    byte[] bytes=Files.readAllBytes(file);return new FileDocument(descriptor(root,file,attrs,bytes),bytes);
   }catch(NoSuchFileException e){throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_FILE_NOT_FOUND,ErrorCategory.VALIDATION);}catch(IOException e){throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_ACCESS_DENIED,ErrorCategory.AUTHORIZATION);}}
- public List<FileDescriptor> findFiles(WorkspaceRef workspace,FileQuery query){if(query==null)throw new IllegalArgumentException();List<FileDescriptor> result=new ArrayList<FileDescriptor>();String needle=query.getNameContains()==null?null:query.getNameContains().toLowerCase(Locale.ROOT);
+ public List<FileDescriptor> findFiles(WorkspaceRef workspace,FileQuery query){if(query==null) {throw new IllegalArgumentException(); }List<FileDescriptor> result=new ArrayList<FileDescriptor>();String needle=query.getNameContains()==null?null:query.getNameContains().toLowerCase(Locale.ROOT);
   for(FileDescriptor file:scan(workspace,defaultPolicy).getFiles()){if(needle==null||file.getRelativePath().toLowerCase(Locale.ROOT).contains(needle)){result.add(file);if(result.size()==query.getMaximum())break;}}return Collections.unmodifiableList(result);}
- private static Path realRoot(WorkspaceRef workspace){if(workspace==null)throw new IllegalArgumentException();try{return workspace.getRoot().toRealPath();}catch(IOException e){throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_ACCESS_DENIED,ErrorCategory.AUTHORIZATION);}}
- private static Path resolve(Path root,String relative,WorkspacePolicy policy){if(relative==null||relative.trim().isEmpty())throw new IllegalArgumentException();Path candidate=Paths.get(relative);if(candidate.isAbsolute())denied();candidate=root.resolve(candidate).normalize();if(!candidate.startsWith(root)||!pathAllowed(root,candidate,policy))denied();
+ private static Path realRoot(WorkspaceRef workspace){if(workspace==null) {throw new IllegalArgumentException(); }try{return workspace.getRoot().toRealPath();}catch(IOException e){throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_ACCESS_DENIED,ErrorCategory.AUTHORIZATION);}}
+ private static Path resolve(Path root,String relative,WorkspacePolicy policy){if(relative==null||relative.trim().isEmpty()) {throw new IllegalArgumentException(); }Path candidate=Paths.get(relative);if(candidate.isAbsolute())denied();candidate=root.resolve(candidate).normalize();if(!candidate.startsWith(root)||!pathAllowed(root,candidate,policy))denied();
   try{if(Files.isSymbolicLink(candidate)&&!policy.isFollowLinks())denied();Path real=candidate.toRealPath();if(!real.startsWith(root))denied();return real;}catch(NoSuchFileException e){throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_FILE_NOT_FOUND,ErrorCategory.VALIDATION);}catch(IOException e){denied();return candidate;}}
  private static boolean inside(Path root,Path value,boolean follow)throws IOException{return !follow||value.toRealPath().startsWith(root);}
  private static boolean ignored(String name,WorkspacePolicy p){String n=name.toLowerCase(Locale.ROOT);if(n.startsWith(".")||"target".equals(n)||"node_modules".equals(n))return true;

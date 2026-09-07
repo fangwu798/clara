@@ -7,15 +7,18 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 校验计划是否符合约束。
+ */
 public final class PlanValidator {
     private final PlanLimits limits;
     private final CapabilityAuthorizer authorizer;
     public PlanValidator(PlanLimits limits, CapabilityAuthorizer authorizer) {
-        if (limits == null || authorizer == null) throw new IllegalArgumentException("limits and authorizer are required");
+        if (limits == null || authorizer == null) { throw new IllegalArgumentException("limits and authorizer are required"); }
         this.limits = limits; this.authorizer = authorizer;
     }
     public TaskPlan validate(TaskPlan plan) {
-        if (plan == null) throw new IllegalArgumentException("plan must not be null");
+        if (plan == null) { throw new IllegalArgumentException("plan must not be null"); }
         if (plan.getTasks().size() > limits.getMaxTasks()
                 || plan.getTasks().size() > limits.getMaxPlanSteps()) {
             throw PlannerErrors.error(ErrorCodes.PLAN_LIMIT_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);

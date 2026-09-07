@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 表示。
+ */
 public final class MediaAsset {
     private final String assetId;
     private final MediaType mediaType;
@@ -24,10 +27,10 @@ public final class MediaAsset {
             String storageUri, String sourceUri, Integer width, Integer height, Long durationMs,
             String ownerTenantId, long createdAt, Long expiresAt, Map<String, String> metadata) {
         this.assetId = required(assetId, "assetId");
-        if (mediaType == null) throw new IllegalArgumentException("mediaType must not be null");
+        if (mediaType == null) { throw new IllegalArgumentException("mediaType must not be null"); }
         this.mediaType = mediaType;
         this.mimeType = required(mimeType, "mimeType");
-        if (size < 0) throw new IllegalArgumentException("size must not be negative");
+        if (size < 0) { throw new IllegalArgumentException("size must not be negative"); }
         this.size = size;
         this.sha256 = required(sha256, "sha256");
         this.storageUri = required(storageUri, "storageUri");
@@ -43,7 +46,7 @@ public final class MediaAsset {
     }
 
     private static String required(String value, String name) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(name + " must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(name + " must not be blank"); }
         return value;
     }
     public String getAssetId() { return assetId; }

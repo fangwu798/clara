@@ -6,6 +6,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * 表示。
+ */
 public final class WorkflowNodes {
     private WorkflowNodes() { }
 
@@ -23,29 +26,32 @@ public final class WorkflowNodes {
         Set<String> outputs = new LinkedHashSet<String>();
         for (WorkflowNode child : requireChildren(children)) {
             for (String key : child.getOutputKeys()) {
-                if (!outputs.add(key)) throw new IllegalArgumentException("parallel output keys must be unique: " + key);
+                if (!outputs.add(key)) { throw new IllegalArgumentException("parallel output keys must be unique: " + key); }
             }
         }
         return new CompositeNode(id, WorkflowNodeType.PARALLEL, children);
     }
     public static WorkflowNode condition(String id, ScopeCondition condition,
             WorkflowNode whenTrue, WorkflowNode whenFalse) {
-        if (condition == null || whenTrue == null) throw new IllegalArgumentException("condition and true branch are required");
+        if (condition == null || whenTrue == null) { throw new IllegalArgumentException("condition and true branch are required"); }
         return new ConditionNode(id, condition, whenTrue, whenFalse);
     }
     public static WorkflowNode loop(String id, WorkflowNode body, int maxIterations,
             ScopeCondition exitCondition) {
-        if (body == null || maxIterations <= 0) throw new IllegalArgumentException("loop body and positive maxIterations are required");
+        if (body == null || maxIterations <= 0) { throw new IllegalArgumentException("loop body and positive maxIterations are required"); }
         return new LoopNode(id, body, maxIterations, exitCondition);
     }
     public static WorkflowNode human(String id, String inputKey) {
         return new HumanNode(id, inputKey);
     }
 
+    /**
+     * 表示。
+     */
     static abstract class BaseNode implements WorkflowNode {
         private final String id; private final WorkflowNodeType type; private final Set<String> outputs;
         BaseNode(String id, WorkflowNodeType type, Set<String> outputs) {
-            if (blank(id)) throw new IllegalArgumentException("node id must not be blank");
+            if (blank(id)) { throw new IllegalArgumentException("node id must not be blank"); }
             this.id = id; this.type = type;
             this.outputs = Collections.unmodifiableSet(new LinkedHashSet<String>(outputs));
         }
@@ -53,14 +59,20 @@ public final class WorkflowNodes {
         public WorkflowNodeType getType() { return type; }
         public Set<String> getOutputKeys() { return outputs; }
     }
+    /**
+     * 表示。
+     */
     static final class ActionNode extends BaseNode {
         final String idempotencyKey; final WorkflowAction action;
         ActionNode(String id, WorkflowNodeType type, Set<String> outputs, String key, WorkflowAction action) {
             super(id, type, outputs == null ? Collections.<String>emptySet() : outputs);
-            if (blank(key) || action == null) throw new IllegalArgumentException("idempotencyKey and action are required");
+            if (blank(key) || action == null) { throw new IllegalArgumentException("idempotencyKey and action are required"); }
             idempotencyKey = key; this.action = action;
         }
     }
+    /**
+     * 表示。
+     */
     static final class CompositeNode extends BaseNode {
         final List<WorkflowNode> children;
         CompositeNode(String id, WorkflowNodeType type, List<WorkflowNode> children) {
@@ -68,6 +80,9 @@ public final class WorkflowNodes {
             this.children = Collections.unmodifiableList(new ArrayList<WorkflowNode>(children));
         }
     }
+    /**
+     * 表示。
+     */
     static final class ConditionNode extends BaseNode {
         final ScopeCondition condition; final WorkflowNode whenTrue; final WorkflowNode whenFalse;
         ConditionNode(String id, ScopeCondition condition, WorkflowNode whenTrue, WorkflowNode whenFalse) {
@@ -75,6 +90,9 @@ public final class WorkflowNodes {
             this.condition = condition; this.whenTrue = whenTrue; this.whenFalse = whenFalse;
         }
     }
+    /**
+     * 表示。
+     */
     static final class LoopNode extends BaseNode {
         final WorkflowNode body; final int maxIterations; final ScopeCondition exitCondition;
         LoopNode(String id, WorkflowNode body, int maxIterations, ScopeCondition exitCondition) {
@@ -82,11 +100,14 @@ public final class WorkflowNodes {
             this.body = body; this.maxIterations = maxIterations; this.exitCondition = exitCondition;
         }
     }
+    /**
+     * 表示。
+     */
     static final class HumanNode extends BaseNode {
         final String inputKey;
         HumanNode(String id, String inputKey) {
             super(id, WorkflowNodeType.HUMAN, singleton(inputKey));
-            if (blank(inputKey)) throw new IllegalArgumentException("inputKey must not be blank");
+            if (blank(inputKey)) { throw new IllegalArgumentException("inputKey must not be blank"); }
             this.inputKey = inputKey;
         }
     }

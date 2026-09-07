@@ -1,5 +1,8 @@
 package com.clara.orchestration.interaction;
 
+/**
+ * 封装反馈操作的执行结果。
+ */
 public final class FeedbackResult {
     private final InteractionRequest request;
     private final boolean idempotentReplay;

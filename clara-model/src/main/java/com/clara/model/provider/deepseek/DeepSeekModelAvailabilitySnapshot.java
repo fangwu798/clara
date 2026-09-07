@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 保存DeepSeek模型可用性在特定时刻的快照。
+ */
 public final class DeepSeekModelAvailabilitySnapshot {
     private final String apiProfile;
     private final long discoveredAtEpochMillis;

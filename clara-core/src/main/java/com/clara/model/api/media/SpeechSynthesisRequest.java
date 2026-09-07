@@ -3,6 +3,9 @@ package com.clara.model.api.media;
 import com.clara.kernel.InvocationContext;
 import com.clara.model.api.ProviderOptions;
 
+/**
+ * 封装语音合成操作的输入参数。
+ */
 public final class SpeechSynthesisRequest {
     private final String text;
     private final String voice;
@@ -17,11 +20,13 @@ public final class SpeechSynthesisRequest {
             Integer sampleRateHz, Double speed, ProviderOptions providerOptions, InvocationContext context) {
         this.text = MediaRequestValues.required(text, "text");
         this.outputMimeType = MediaRequestValues.required(outputMimeType, "outputMimeType");
-        if (sampleRateHz != null && sampleRateHz.intValue() <= 0)
+        if (sampleRateHz != null && sampleRateHz.intValue() <= 0) {
             throw new IllegalArgumentException("sampleRateHz must be positive");
-        if (speed != null && (speed.doubleValue() <= 0 || speed.isNaN() || speed.isInfinite()))
+        }
+        if (speed != null && (speed.doubleValue() <= 0 || speed.isNaN() || speed.isInfinite())) {
             throw new IllegalArgumentException("speed must be finite and positive");
-        if (context == null) throw new IllegalArgumentException("context must not be null");
+        }
+        if (context == null) { throw new IllegalArgumentException("context must not be null"); }
         this.voice = voice;
         this.language = language;
         this.sampleRateHz = sampleRateHz;

@@ -35,6 +35,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+/**
+ * 管理本地 MCP 子进程，并通过逐行 JSON-RPC 在标准输入输出上发送请求、通知和取消消息。
+ *
+ * <p>常规用法：使用 {@link #builder} 配置命令、允许的可执行文件、工作目录和消息上限，构建后先调用
+ * {@link #start}，再调用 {@link #sendRequest} 或 {@link #sendNotification}；最终调用 {@link #close()}。
+ *
+ * <p>注意：可执行文件必须在允许列表中，工作目录必须真实存在。请求 ID 在未完成期间必须唯一；每个请求都应
+ * 设置正超时。关闭、子进程退出或协议读取失败会使全部待处理 Future 失败，stderr 消费器不得阻塞读取线程。
+ */
 public final class StdioMcpTransport implements McpTransport {
     private final List<String> command;
     private final Path workingDirectory;
@@ -61,7 +70,7 @@ public final class StdioMcpTransport implements McpTransport {
         if (builder.maxMessageBytes <= 0 || builder.maxStderrBytes < 0) {
             throw new IllegalArgumentException("transport limits are invalid");
         }
-        if (builder.codec == null) throw new IllegalArgumentException("codec must not be null");
+        if (builder.codec == null) { throw new IllegalArgumentException("codec must not be null"); }
         this.maxMessageBytes = builder.maxMessageBytes;
         this.maxStderrBytes = builder.maxStderrBytes;
         this.stderrConsumer = builder.stderrConsumer;
@@ -74,9 +83,9 @@ public final class StdioMcpTransport implements McpTransport {
     public static Builder builder() { return new Builder(); }
 
     public synchronized void start(McpTransportListener listener) {
-        if (listener == null) throw new IllegalArgumentException("listener must not be null");
-        if (closed.get()) throw closedError();
-        if (!started.compareAndSet(false, true)) throw new IllegalStateException("transport is already started");
+        if (listener == null) { throw new IllegalArgumentException("listener must not be null"); }
+        if (closed.get()) { throw closedError(); }
+        if (!started.compareAndSet(false, true)) { throw new IllegalStateException("transport is already started"); }
         this.listener = listener;
         try {
             process = processFactory.start(command, workingDirectory, environment);
@@ -93,8 +102,8 @@ public final class StdioMcpTransport implements McpTransport {
 
     public CompletableFuture<JsonRpcResponse> sendRequest(final JsonRpcRequest request,
             long timeoutMillis) {
-        if (request == null) throw new IllegalArgumentException("request must not be null");
-        if (timeoutMillis <= 0L) throw new IllegalArgumentException("timeoutMillis must be positive");
+        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
+        if (timeoutMillis <= 0L) { throw new IllegalArgumentException("timeoutMillis must be positive"); }
         ensureRunning();
         final CompletableFuture<JsonRpcResponse> future = new CompletableFuture<JsonRpcResponse>();
         final PendingRequest item = new PendingRequest(future);
@@ -128,7 +137,7 @@ public final class StdioMcpTransport implements McpTransport {
     }
 
     public void sendNotification(JsonRpcNotification notification) {
-        if (notification == null) throw new IllegalArgumentException("notification must not be null");
+        if (notification == null) { throw new IllegalArgumentException("notification must not be null"); }
         ensureRunning(); write(codec.encode(notification));
     }
 
@@ -145,7 +154,7 @@ public final class StdioMcpTransport implements McpTransport {
 
     public void checkHealth() {
         ensureRunning();
-        if (!process.isAlive()) throw ioError();
+        if (!process.isAlive()) { throw ioError(); }
     }
 
     public synchronized void close() {
@@ -262,8 +271,8 @@ public final class StdioMcpTransport implements McpTransport {
     }
 
     private void ensureRunning() {
-        if (closed.get()) throw closedError();
-        if (!started.get() || process == null) throw new IllegalStateException("transport is not started");
+        if (closed.get()) { throw closedError(); }
+        if (!started.get() || process == null) { throw new IllegalStateException("transport is not started"); }
     }
 
     private static String readBoundedLine(BufferedReader reader, int maxBytes) throws IOException {
@@ -294,13 +303,13 @@ public final class StdioMcpTransport implements McpTransport {
         }
         try {
             Path executable = java.nio.file.Paths.get(command.get(0));
-            if (!executable.isAbsolute()) throw new IllegalArgumentException("executable must be absolute");
+            if (!executable.isAbsolute()) { throw new IllegalArgumentException("executable must be absolute"); }
             executable = executable.toRealPath();
             boolean approved = false;
             for (Path candidate : allowed) {
                 if (candidate != null && executable.equals(candidate.toRealPath())) { approved = true; break; }
             }
-            if (!approved) throw new IllegalArgumentException("executable is not allowlisted");
+            if (!approved) { throw new IllegalArgumentException("executable is not allowlisted"); }
             List<String> result = new ArrayList<String>(command);
             result.set(0, executable.toString());
             return Collections.unmodifiableList(result);
@@ -310,10 +319,10 @@ public final class StdioMcpTransport implements McpTransport {
     }
 
     private static Path validateWorkingDirectory(Path path) {
-        if (path == null) throw new IllegalArgumentException("workingDirectory must not be null");
+        if (path == null) { throw new IllegalArgumentException("workingDirectory must not be null"); }
         try {
             Path real = path.toRealPath();
-            if (!Files.isDirectory(real)) throw new IllegalArgumentException("workingDirectory must be a directory");
+            if (!Files.isDirectory(real)) { throw new IllegalArgumentException("workingDirectory must be a directory"); }
             return real;
         } catch (IOException exception) {
             throw new IllegalArgumentException("workingDirectory cannot be resolved", exception);
@@ -335,6 +344,9 @@ public final class StdioMcpTransport implements McpTransport {
         return McpTransportErrors.error(ErrorCodes.MCP_TRANSPORT_IO_ERROR, ErrorCategory.EXTERNAL_SERVICE, true);
     }
 
+    /**
+     * 封装待处理操作的输入参数。
+     */
     private static final class PendingRequest {
         private final CompletableFuture<JsonRpcResponse> future;
         private volatile ScheduledFuture<?> timeout;
@@ -342,6 +354,9 @@ public final class StdioMcpTransport implements McpTransport {
         private void cancelTimeout() { if (timeout != null) timeout.cancel(false); }
     }
 
+    /**
+     * 提供进程工厂的默认实现。
+     */
     private static final class DefaultProcessFactory implements ProcessFactory {
         public Process start(List<String> command, Path workingDirectory,
                 Map<String, String> environment) throws IOException {
@@ -352,6 +367,9 @@ public final class StdioMcpTransport implements McpTransport {
         }
     }
 
+    /**
+     * 负责创建守护进程线程实例。
+     */
     private static final class DaemonThreadFactory implements ThreadFactory {
         private final AtomicInteger sequence = new AtomicInteger();
         public Thread newThread(Runnable runnable) {
@@ -360,6 +378,9 @@ public final class StdioMcpTransport implements McpTransport {
         }
     }
 
+    /**
+     * 表示。
+     */
     public static final class Builder {
         private List<String> command;
         private List<Path> allowedExecutables;

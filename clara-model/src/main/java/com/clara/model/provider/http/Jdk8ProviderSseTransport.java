@@ -16,15 +16,19 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * 传输JDK 8服务提供商SSE消息。
+ */
 public final class Jdk8ProviderSseTransport implements ProviderSseTransport {
     private final Jdk8ProviderHttpTransportConfig config;
     private final ProviderSseParser parser;
 
     public Jdk8ProviderSseTransport(Jdk8ProviderHttpTransportConfig config,
             int maxLineBytes, int maxEventBytes, int maxEvents) {
-        if (config == null) throw new IllegalArgumentException("config must not be null");
-        if (maxEventBytes > config.getMaxResponseBytes())
+        if (config == null) { throw new IllegalArgumentException("config must not be null"); }
+        if (maxEventBytes > config.getMaxResponseBytes()) {
             throw new IllegalArgumentException("event limit exceeds response limit");
+        }
         this.config = config;
         this.parser = new ProviderSseParser(maxLineBytes, maxEventBytes, maxEvents,
                 config.getMaxResponseBytes());
@@ -32,8 +36,9 @@ public final class Jdk8ProviderSseTransport implements ProviderSseTransport {
 
     public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
             ProviderSseListener listener) {
-        if (request == null || context == null || listener == null)
+        if (request == null || context == null || listener == null) {
             throw new IllegalArgumentException("request, context and listener must not be null");
+        }
         checkContext(context);
         if (!config.allows(request.getEndpoint())) endpointDenied();
         byte[] body = request.getBody();

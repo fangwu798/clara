@@ -19,6 +19,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 负责会话数据的编码与解码。
+ */
 public final class ConversationCodec {
     private static final int MAGIC = 0x434C5241;
     private static final int FORMAT_VERSION = 1;
@@ -43,8 +46,8 @@ public final class ConversationCodec {
     public ConversationSnapshot decode(String expectedConversationId, byte[] encoded) throws IOException {
         DataInputStream input = new DataInputStream(new ByteArrayInputStream(encoded));
         try {
-            if (input.readInt() != MAGIC) throw new IOException("invalid conversation file magic");
-            if (input.readInt() != FORMAT_VERSION) throw new IOException("unsupported conversation format");
+            if (input.readInt() != MAGIC) { throw new IOException("invalid conversation file magic"); }
+            if (input.readInt() != FORMAT_VERSION) { throw new IOException("unsupported conversation format"); }
             if (!expectedConversationId.equals(readString(input))) {
                 throw new IOException("conversation identifier mismatch");
             }
@@ -52,7 +55,7 @@ public final class ConversationCodec {
             int count = readCount(input, MAX_MESSAGES, "message count");
             List<ChatMessage> messages = new ArrayList<ChatMessage>(count);
             for (int i = 0; i < count; i++) messages.add(readMessage(input));
-            if (input.read() != -1) throw new IOException("trailing conversation data");
+            if (input.read() != -1) { throw new IOException("trailing conversation data"); }
             return new ConversationSnapshot(version, messages);
         } catch (EOFException exception) {
             throw new IOException("truncated conversation data", exception);
@@ -92,7 +95,7 @@ public final class ConversationCodec {
 
     private static ChatMessage readMessage(DataInputStream input) throws IOException {
         int role = input.readUnsignedByte();
-        if (role >= Role.values().length) throw new IOException("invalid role");
+        if (role >= Role.values().length) { throw new IOException("invalid role"); }
         String name = readNullableString(input);
         int contentCount = readCount(input, MAX_CONTENTS, "content count");
         List<Content> contents = new ArrayList<Content>(contentCount);
@@ -122,9 +125,9 @@ public final class ConversationCodec {
     }
 
     private static void writeString(DataOutputStream output, String value) throws IOException {
-        if (value == null) throw new IOException("required string is null");
+        if (value == null) { throw new IOException("required string is null"); }
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length > MAX_STRING_BYTES) throw new IOException("string is too large");
+        if (bytes.length > MAX_STRING_BYTES) { throw new IOException("string is too large"); }
         output.writeInt(bytes.length);
         output.write(bytes);
     }
@@ -138,7 +141,7 @@ public final class ConversationCodec {
 
     private static int readCount(DataInputStream input, int maximum, String field) throws IOException {
         int value = input.readInt();
-        if (value < 0 || value > maximum) throw new IOException("invalid " + field);
+        if (value < 0 || value > maximum) { throw new IOException("invalid " + field); }
         return value;
     }
 }

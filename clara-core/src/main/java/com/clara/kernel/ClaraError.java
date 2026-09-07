@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 表示。
+ */
 public final class ClaraError {
     private static ClaraError simple(String code, ErrorCategory category, String traceId) {
         return new ClaraError(code, category, code, false, traceId,
@@ -25,8 +28,8 @@ public final class ClaraError {
     public ClaraError(String code, ErrorCategory category, String safeMessage,
             boolean retryable, String traceId, String provider, String providerCode,
             Long retryAfterMillis, Map<String, String> safeDetails) {
-        if (code == null || code.trim().isEmpty()) throw new IllegalArgumentException("code must not be blank");
-        if (category == null) throw new IllegalArgumentException("category must not be null");
+        if (code == null || code.trim().isEmpty()) { throw new IllegalArgumentException("code must not be blank"); }
+        if (category == null) { throw new IllegalArgumentException("category must not be null"); }
         this.code = code;
         this.category = category;
         this.safeMessage = safeMessage == null ? code : safeMessage;

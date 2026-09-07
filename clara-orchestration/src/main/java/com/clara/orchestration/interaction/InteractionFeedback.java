@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 表示针对交互的反馈。
+ */
 public final class InteractionFeedback {
     private final String tenantId;
     private final String runId;

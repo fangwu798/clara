@@ -1,5 +1,8 @@
 package com.clara.media.job;
 
+/**
+ * 描述对媒体任务的一次更新。
+ */
 public final class MediaJobUpdate {
     private final String providerJobId;
     private final Integer progress;
@@ -14,10 +17,12 @@ public final class MediaJobUpdate {
     }
     public MediaJobUpdate(String providerJobId, Integer progress, String errorCode, String outputAssetId,
             Boolean submissionAttempted, Integer pollAttempts, Long nextPollAt) {
-        if (progress != null && (progress.intValue() < 0 || progress.intValue() > 100))
+        if (progress != null && (progress.intValue() < 0 || progress.intValue() > 100)) {
             throw new IllegalArgumentException("progress must be between 0 and 100");
-        if (pollAttempts != null && pollAttempts.intValue() < 0)
+        }
+        if (pollAttempts != null && pollAttempts.intValue() < 0) {
             throw new IllegalArgumentException("pollAttempts must not be negative");
+        }
         this.providerJobId = providerJobId;
         this.progress = progress;
         this.errorCode = errorCode;

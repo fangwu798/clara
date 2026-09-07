@@ -6,6 +6,9 @@ import com.clara.model.api.ChatMessage;
 import java.util.List;
 import java.util.function.ToIntFunction;
 
+/**
+ * 表示。
+ */
 public final class TokenWindowChatMemory extends AbstractWindowChatMemory {
     private final String id;
     private final ToIntFunction<String> maxTokensProvider;
@@ -17,7 +20,7 @@ public final class TokenWindowChatMemory extends AbstractWindowChatMemory {
         if (builder.maxTokensProvider == null) {
             throw new IllegalArgumentException("maxTokensProvider must not be null");
         }
-        if (builder.estimator == null) throw new IllegalArgumentException("estimator must not be null");
+        if (builder.estimator == null) { throw new IllegalArgumentException("estimator must not be null"); }
         this.id = builder.id;
         this.maxTokensProvider = builder.maxTokensProvider;
         this.estimator = builder.estimator;
@@ -36,13 +39,13 @@ public final class TokenWindowChatMemory extends AbstractWindowChatMemory {
 
     private int tokenCount(List<ChatMessage> messages) {
         int count = estimator.estimateTokenCountInMessages(messages);
-        if (count < 0) throw new IllegalStateException("token count must not be negative");
+        if (count < 0) { throw new IllegalStateException("token count must not be negative"); }
         return count;
     }
 
     private int maxTokens() {
         int value = maxTokensProvider.applyAsInt(id);
-        if (value <= 0) throw new IllegalArgumentException("maxTokens must be positive");
+        if (value <= 0) { throw new IllegalArgumentException("maxTokens must be positive"); }
         return value;
     }
 
@@ -53,6 +56,9 @@ public final class TokenWindowChatMemory extends AbstractWindowChatMemory {
 
     public static Builder builder() { return new Builder(); }
 
+    /**
+     * 表示。
+     */
     public static final class Builder {
         private String id = "default";
         private ToIntFunction<String> maxTokensProvider;

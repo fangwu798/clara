@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+/**
+ * 累积OpenAI兼容流的增量状态。
+ */
 final class OpenAiCompatibleStreamAccumulator {
     private final OpenAiCompatibleChatConfig config;
     private final int maxToolCalls;
@@ -41,39 +44,40 @@ final class OpenAiCompatibleStreamAccumulator {
 
     OpenAiCompatibleStreamAccumulator(OpenAiCompatibleChatConfig config,
             int maxToolCalls, int maxAccumulatedChars) {
-        if (config == null) throw new IllegalArgumentException("config must not be null");
-        if (maxToolCalls <= 0 || maxAccumulatedChars <= 0)
+        if (config == null) { throw new IllegalArgumentException("config must not be null"); }
+        if (maxToolCalls <= 0 || maxAccumulatedChars <= 0) {
             throw new IllegalArgumentException("stream limits must be positive");
+        }
         this.config = config;
         this.maxToolCalls = maxToolCalls;
         this.maxAccumulatedChars = maxAccumulatedChars;
     }
 
     OpenAiCompatibleStreamChunk accept(String data) {
-        if (data == null) throw new IllegalArgumentException("data must not be null");
-        if (complete) throw protocol();
+        if (data == null) { throw new IllegalArgumentException("data must not be null"); }
+        if (complete) { throw protocol(); }
         if ("[DONE]".equals(data.trim())) return complete();
         try {
             JsonNode root = mapper.readTree(data);
-            if (root == null || !root.isObject()) throw protocol();
+            if (root == null || !root.isObject()) { throw protocol(); }
             id = stable(id, textual(root.get("id")));
             model = stable(model, textual(root.get("model")));
             fingerprint = stable(fingerprint, textual(root.get("system_fingerprint")));
             TokenUsage chunkUsage = usage(root.get("usage"));
             if (chunkUsage != null) usage = stableUsage(usage, chunkUsage);
             JsonNode choices = root.get("choices");
-            if (choices == null || !choices.isArray() || choices.size() > 1) throw protocol();
+            if (choices == null || !choices.isArray() || choices.size() > 1) { throw protocol(); }
             if (choices.size() == 0) {
-                if (chunkUsage == null) throw protocol();
+                if (chunkUsage == null) { throw protocol(); }
                 return emptyChunk();
             }
             JsonNode choice = choices.get(0);
             JsonNode index = choice.get("index");
-            if (index != null && (!index.canConvertToInt() || index.intValue() != 0)) throw protocol();
+            if (index != null && (!index.canConvertToInt() || index.intValue() != 0)) { throw protocol(); }
             JsonNode delta = choice.get("delta");
-            if (delta == null || !delta.isObject()) throw protocol();
+            if (delta == null || !delta.isObject()) { throw protocol(); }
             String role = textual(delta.get("role"));
-            if (role != null && !"assistant".equals(role)) throw protocol();
+            if (role != null && !"assistant".equals(role)) { throw protocol(); }
             String textDelta = optionalText(delta, "content");
             if (textDelta != null) {
                 append(text, textDelta);
@@ -85,7 +89,7 @@ final class OpenAiCompatibleStreamAccumulator {
             String finish = textual(choice.get("finish_reason"));
             if (finish != null) {
                 FinishReason mapped = finish(finish);
-                if (finishReason != null && finishReason != mapped) throw protocol();
+                if (finishReason != null && finishReason != mapped) { throw protocol(); }
                 finishReason = mapped;
             } else if (choice.has("finish_reason") && !choice.get("finish_reason").isNull()) {
                 throw protocol();
@@ -103,15 +107,15 @@ final class OpenAiCompatibleStreamAccumulator {
     boolean isComplete() { return complete; }
 
     private OpenAiCompatibleStreamChunk complete() {
-        if (finishReason == null) throw protocol();
+        if (finishReason == null) { throw protocol(); }
         List<Content> contents = new ArrayList<Content>();
         if (sawText) contents.add(new TextContent(text.toString()));
         for (ToolState tool : tools.values()) {
-            if (blank(tool.id) || blank(tool.name)) throw protocol();
+            if (blank(tool.id) || blank(tool.name)) { throw protocol(); }
             contents.add(new ToolCallContent(tool.id.toString(), tool.name.toString(),
                     tool.arguments.toString()));
         }
-        if (contents.isEmpty()) throw protocol();
+        if (contents.isEmpty()) { throw protocol(); }
         Map<String, String> metadata = new LinkedHashMap<String, String>();
         put(metadata, "id", id);
         put(metadata, "model", model);
@@ -128,12 +132,12 @@ final class OpenAiCompatibleStreamAccumulator {
 
     private List<OpenAiCompatibleStreamChunk.ToolDelta> tools(JsonNode calls) {
         if (calls == null || calls.isNull()) return Collections.emptyList();
-        if (!calls.isArray()) throw protocol();
+        if (!calls.isArray()) { throw protocol(); }
         List<OpenAiCompatibleStreamChunk.ToolDelta> result =
                 new ArrayList<OpenAiCompatibleStreamChunk.ToolDelta>();
         for (JsonNode call : calls) {
             JsonNode index = call.get("index");
-            if (index == null || !index.canConvertToInt() || index.intValue() < 0) throw protocol();
+            if (index == null || !index.canConvertToInt() || index.intValue() < 0) { throw protocol(); }
             int value = index.intValue();
             ToolState state = tools.get(Integer.valueOf(value));
             if (state == null) {
@@ -142,15 +146,15 @@ final class OpenAiCompatibleStreamAccumulator {
                 tools.put(Integer.valueOf(value), state);
             }
             String type = textual(call.get("type"));
-            if (type != null && !"function".equals(type)) throw protocol();
+            if (type != null && !"function".equals(type)) { throw protocol(); }
             String idDelta = optionalText(call, "id");
             JsonNode function = call.get("function");
-            if (function != null && !function.isNull() && !function.isObject()) throw protocol();
+            if (function != null && !function.isNull() && !function.isObject()) { throw protocol(); }
             String nameDelta = function == null || function.isNull()
                     ? null : optionalText(function, "name");
             String argumentsDelta = function == null || function.isNull()
                     ? null : optionalText(function, "arguments");
-            if (idDelta == null && nameDelta == null && argumentsDelta == null) throw protocol();
+            if (idDelta == null && nameDelta == null && argumentsDelta == null) { throw protocol(); }
             if (idDelta != null) append(state.id, idDelta);
             if (nameDelta != null) append(state.name, nameDelta);
             if (argumentsDelta != null) append(state.arguments, argumentsDelta);
@@ -168,17 +172,17 @@ final class OpenAiCompatibleStreamAccumulator {
 
     private static TokenUsage usage(JsonNode value) {
         if (value == null || value.isNull()) return null;
-        if (!value.isObject()) throw protocol();
+        if (!value.isObject()) { throw protocol(); }
         JsonNode input = value.get("prompt_tokens");
         JsonNode output = value.get("completion_tokens");
         if (input == null || output == null || !input.canConvertToInt() || !output.canConvertToInt()
-                || input.intValue() < 0 || output.intValue() < 0) throw protocol();
+                || input.intValue() < 0 || output.intValue() < 0) { throw protocol(); }
         return new TokenUsage(input.intValue(), output.intValue());
     }
 
     private static TokenUsage stableUsage(TokenUsage current, TokenUsage next) {
         if (current != null && (current.getInputTokens() != next.getInputTokens()
-                || current.getOutputTokens() != next.getOutputTokens())) throw protocol();
+                || current.getOutputTokens() != next.getOutputTokens())) { throw protocol(); }
         return next;
     }
 
@@ -194,19 +198,19 @@ final class OpenAiCompatibleStreamAccumulator {
     private static String optionalText(JsonNode parent, String field) {
         JsonNode value = parent.get(field);
         if (value == null || value.isNull()) return null;
-        if (!value.isTextual()) throw protocol();
+        if (!value.isTextual()) { throw protocol(); }
         return value.textValue();
     }
 
     private static String textual(JsonNode value) {
         if (value == null || value.isNull()) return null;
-        if (!value.isTextual()) throw protocol();
+        if (!value.isTextual()) { throw protocol(); }
         return value.textValue();
     }
 
     private static String stable(String current, String next) {
         if (next == null) return current;
-        if (current != null && !current.equals(next)) throw protocol();
+        if (current != null && !current.equals(next)) { throw protocol(); }
         return next;
     }
 
@@ -240,6 +244,9 @@ final class OpenAiCompatibleStreamAccumulator {
                 null, null, null, Collections.<String, String>emptyMap()));
     }
 
+    /**
+     * 表示。
+     */
     private static final class ToolState {
         private final StringBuilder id = new StringBuilder();
         private final StringBuilder name = new StringBuilder();

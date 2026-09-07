@@ -1,5 +1,8 @@
 package com.clara.workspace.runtime;
 import com.clara.workspace.api.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.security.*;import java.util.*;
+/**
+ * 表示。
+ */
 final class WorkspaceDigests {
  private WorkspaceDigests(){}
  static String sha(byte[] value){try{byte[] digest=MessageDigest.getInstance("SHA-256").digest(value);StringBuilder out=new StringBuilder(64);for(byte b:digest)out.append(String.format("%02x",b&255));return out.toString();}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}

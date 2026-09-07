@@ -3,6 +3,9 @@ package com.clara.memory.api;
 import com.clara.model.api.ChatMessage;
 import java.util.List;
 
+/**
+ * 存储并读取会话。
+ */
 public interface ConversationStore {
     List<ChatMessage> load(String conversationId);
     ConversationSnapshot loadSnapshot(String conversationId);

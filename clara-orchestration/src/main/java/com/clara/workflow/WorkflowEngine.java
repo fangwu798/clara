@@ -19,6 +19,16 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 执行确定性工作流，并通过检查点支持暂停、人工输入、恢复和取消。
+ *
+ * <p>常规用法：为引擎配置检查点存储和最大并行度，首次执行调用 {@link #start}；当结果为
+ * {@link WorkflowInstanceStatus#WAITING_INPUT} 或 {@link WorkflowInstanceStatus#SUSPENDED} 时，
+ * 补充输入后调用 {@link #resume}。不再使用时应调用 {@link #close()} 释放并行执行线程。
+ *
+ * <p>注意：实例 ID 在检查点存储内必须唯一；恢复时工作流 ID 和版本必须与检查点一致。
+ * 建议传入期望检查点版本以检测并发恢复。并行分支写入同一输出键会被视为冲突，已完成节点会根据检查点跳过。
+ */
 public final class WorkflowEngine implements Closeable {
     private final CheckpointStore checkpoints;
     private final ExecutorService parallelExecutor;
@@ -34,7 +44,7 @@ public final class WorkflowEngine implements Closeable {
     public WorkflowResult start(WorkflowDefinition definition, String instanceId,
             Map<String, Object> inputs) {
         requireDefinition(definition); requireId(instanceId);
-        if (checkpoints.load(instanceId).isPresent()) throw error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategory.CONFLICT);
+        if (checkpoints.load(instanceId).isPresent()) { throw error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategory.CONFLICT); }
         Run run = new Run(definition, instanceId, new ExecutionScope(inputs), -1L);
         run.checkpoint(WorkflowInstanceStatus.RUNNING);
         return execute(run);
@@ -49,7 +59,7 @@ public final class WorkflowEngine implements Closeable {
             Map<String, Object> inputs, long expectedCheckpointVersion) {
         requireDefinition(definition); requireId(instanceId);
         Optional<WorkflowCheckpoint> loaded = checkpoints.load(instanceId);
-        if (!loaded.isPresent()) throw error(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, ErrorCategory.VALIDATION);
+        if (!loaded.isPresent()) { throw error(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, ErrorCategory.VALIDATION); }
         WorkflowCheckpoint checkpoint = loaded.get();
         if (expectedCheckpointVersion >= 0L
                 && checkpoint.getVersion() != expectedCheckpointVersion) {
@@ -171,7 +181,7 @@ public final class WorkflowEngine implements Closeable {
             }
         }
         run.checkpoint(WorkflowInstanceStatus.RUNNING);
-        if (deferred != null) throw deferred;
+        if (deferred != null) { throw deferred; }
     }
 
     private void executeCondition(WorkflowNodes.ConditionNode node, Run run, String key, boolean persist) {
@@ -200,23 +210,26 @@ public final class WorkflowEngine implements Closeable {
     }
 
     private void executeHuman(WorkflowNodes.HumanNode node, Run run, String key, boolean persist) {
-        if (!run.scope.contains(node.inputKey)) throw new WaitingInput(node.getId(), node.inputKey);
+        if (!run.scope.contains(node.inputKey)) { throw new WaitingInput(node.getId(), node.inputKey); }
         Map<String, Object> output = new LinkedHashMap<String, Object>();
         output.put(node.inputKey, run.scope.get(node.inputKey));
         run.scope.complete(key, node.getId(), output); if (persist) run.checkpoint(WorkflowInstanceStatus.RUNNING);
     }
 
     private static void requireDefinition(WorkflowDefinition value) {
-        if (value == null) throw new IllegalArgumentException("definition must not be null");
+        if (value == null) { throw new IllegalArgumentException("definition must not be null"); }
     }
     private static void requireId(String value) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException("instanceId must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException("instanceId must not be blank"); }
     }
     private static ClaraException error(String code, ErrorCategory category) {
         return new ClaraException(new ClaraError(code, category, code, false,
                 null, null, null, null, Collections.<String, String>emptyMap()));
     }
 
+    /**
+     * 表示。
+     */
     private final class Run {
         final WorkflowDefinition definition; final String instanceId; final ExecutionScope scope;
         final String workflowId; final String workflowVersion; long checkpointVersion;
@@ -245,12 +258,18 @@ public final class WorkflowEngine implements Closeable {
                     waitingNodeId, waitingInputKey);
         }
     }
+    /**
+     * 表示。
+     */
     private static final class WaitingInput extends RuntimeException {
         final String nodeId; final String inputKey;
         WaitingInput(String nodeId, String inputKey) {
             this.nodeId = nodeId; this.inputKey = inputKey;
         }
     }
+    /**
+     * 负责创建工作流线程实例。
+     */
     private static final class WorkflowThreadFactory implements ThreadFactory {
         private final AtomicInteger sequence = new AtomicInteger();
         public Thread newThread(Runnable runnable) {

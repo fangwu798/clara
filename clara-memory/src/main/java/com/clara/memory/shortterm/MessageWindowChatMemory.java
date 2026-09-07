@@ -5,6 +5,9 @@ import com.clara.model.api.ChatMessage;
 import java.util.List;
 import java.util.function.ToIntFunction;
 
+/**
+ * 表示。
+ */
 public final class MessageWindowChatMemory extends AbstractWindowChatMemory {
     private final String id;
     private final ToIntFunction<String> maxMessagesProvider;
@@ -32,7 +35,7 @@ public final class MessageWindowChatMemory extends AbstractWindowChatMemory {
 
     private int maxMessages() {
         int value = maxMessagesProvider.applyAsInt(id);
-        if (value <= 0) throw new IllegalArgumentException("maxMessages must be positive");
+        if (value <= 0) { throw new IllegalArgumentException("maxMessages must be positive"); }
         return value;
     }
 
@@ -42,6 +45,9 @@ public final class MessageWindowChatMemory extends AbstractWindowChatMemory {
 
     public static Builder builder() { return new Builder(); }
 
+    /**
+     * 表示。
+     */
     public static final class Builder {
         private String id = "default";
         private ToIntFunction<String> maxMessagesProvider;

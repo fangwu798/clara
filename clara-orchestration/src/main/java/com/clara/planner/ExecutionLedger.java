@@ -2,6 +2,9 @@ package com.clara.planner;
 
 import java.util.Optional;
 
+/**
+ * 跟踪执行的预留与使用情况。
+ */
 public interface ExecutionLedger {
     ExecutionRecord recordIntent(String idempotencyKey, String planId, int planVersion, String taskId);
     ExecutionRecord beginAttempt(String idempotencyKey);

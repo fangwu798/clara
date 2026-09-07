@@ -8,6 +8,9 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Set;
 
+/**
+ * 表示需要用户回答的交互问题。
+ */
 public final class Question {
     private final InteractionType type;
     private final String text;
@@ -32,7 +35,7 @@ public final class Question {
             }
         }
         if ((type == InteractionType.SINGLE_SELECT || type == InteractionType.MULTI_SELECT)
-                && copied.isEmpty()) throw new IllegalArgumentException("selection question requires options");
+                && copied.isEmpty()) { throw new IllegalArgumentException("selection question requires options"); }
         this.type = type; this.text = text;
         this.options = Collections.unmodifiableList(copied); this.answerSchema = answerSchema;
         this.defaultAnswer = defaultAnswer == null ? Collections.<String, Object>emptyMap()

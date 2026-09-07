@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/**
+ * 定义技能的查询条件。
+ */
 public final class SkillQuery {
     private final String domain;
     private final SkillExecutionType executionType;

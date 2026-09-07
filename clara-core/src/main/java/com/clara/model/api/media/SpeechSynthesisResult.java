@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 封装语音合成操作的执行结果。
+ */
 public final class SpeechSynthesisResult {
     private final String audioAssetId;
     private final Long durationMs;
@@ -11,7 +14,7 @@ public final class SpeechSynthesisResult {
 
     public SpeechSynthesisResult(String audioAssetId, Long durationMs, Map<String, String> providerMetadata) {
         this.audioAssetId = MediaRequestValues.required(audioAssetId, "audioAssetId");
-        if (durationMs != null && durationMs.longValue() < 0) throw new IllegalArgumentException("durationMs must not be negative");
+        if (durationMs != null && durationMs.longValue() < 0) { throw new IllegalArgumentException("durationMs must not be negative"); }
         this.durationMs = durationMs;
         this.providerMetadata = providerMetadata == null ? Collections.<String, String>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, String>(providerMetadata));

@@ -5,6 +5,7 @@ import com.clara.kernel.ClaraException;
 import com.clara.kernel.ErrorCategory;
 import com.clara.kernel.ErrorCodes;
 import com.clara.kernel.InvocationContext;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,19 +16,22 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
+/**
+ * 将服务提供商SSE数据解析为领域对象。
+ */
 public final class ProviderSseParser {
     private final int maxLineBytes;
     private final int maxEventBytes;
     private final int maxEvents;
     private final long maxTotalBytes;
 
-    public ProviderSseParser(int maxLineBytes, int maxEventBytes, int maxEvents,
-            long maxTotalBytes) {
-        if (maxLineBytes <= 0 || maxEventBytes <= 0 || maxEvents <= 0
-                || maxTotalBytes <= 0L)
+    public ProviderSseParser(int maxLineBytes, int maxEventBytes, int maxEvents, long maxTotalBytes) {
+        if (maxLineBytes <= 0 || maxEventBytes <= 0 || maxEvents <= 0 || maxTotalBytes <= 0L) {
             throw new IllegalArgumentException("SSE limits must be positive");
-        if (maxLineBytes > maxEventBytes || maxEventBytes > maxTotalBytes)
+        }
+        if (maxLineBytes > maxEventBytes || maxEventBytes > maxTotalBytes) {
             throw new IllegalArgumentException("SSE limits must be ordered");
+        }
         this.maxLineBytes = maxLineBytes;
         this.maxEventBytes = maxEventBytes;
         this.maxEvents = maxEvents;
@@ -35,8 +39,9 @@ public final class ProviderSseParser {
     }
 
     public int parse(InputStream input, InvocationContext context, ProviderSseListener listener) {
-        if (input == null || context == null || listener == null)
+        if (input == null || context == null || listener == null) {
             throw new IllegalArgumentException("input, context and listener must not be null");
+        }
         State state = new State();
         ByteArrayOutputStream line = new ByteArrayOutputStream(Math.min(maxLineBytes, 256));
         long total = 0L;
@@ -55,10 +60,13 @@ public final class ProviderSseParser {
                 if (value == '\r' || value == '\n') {
                     String decoded = decode(line.toByteArray());
                     line.reset();
-                    if (firstLine && decoded.length() > 0 && decoded.charAt(0) == '\ufeff')
+                    if (firstLine && decoded.length() > 0 && decoded.charAt(0) == '\ufeff') {
                         decoded = decoded.substring(1);
+                    }
                     firstLine = false;
-                    if (!accept(decoded, state, listener)) return state.events;
+                    if (!accept(decoded, state, listener)) {
+                        return state.events;
+                    }
                     if (value == '\r') skipLf = true;
                 } else {
                     if (line.size() >= maxLineBytes) tooLarge();
@@ -132,8 +140,11 @@ public final class ProviderSseParser {
         if (value.isEmpty()) return null;
         for (int i = 0; i < value.length(); i++)
             if (value.charAt(i) < '0' || value.charAt(i) > '9') return null;
-        try { return Long.valueOf(value); }
-        catch (NumberFormatException exception) { return null; }
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private static String decode(byte[] bytes) throws CharacterCodingException {
@@ -170,6 +181,9 @@ public final class ProviderSseParser {
                 null, null, null, Collections.<String, String>emptyMap()));
     }
 
+    /**
+     * 表示。
+     */
     private static final class State {
         private final StringBuilder data = new StringBuilder();
         private String event;

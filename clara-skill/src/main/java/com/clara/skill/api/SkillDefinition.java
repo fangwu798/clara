@@ -9,6 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 定义技能的结构与元数据。
+ */
 public final class SkillDefinition {
     private static final int SCHEMA_VERSION = 1;
     private final String skillId, name, version, domain, description;
@@ -40,8 +43,9 @@ public final class SkillDefinition {
         validateStrings(resources,"resource"); validateStrings(requiredTools,"required tool");
         validateStrings(tags,"tag");
         Set<String> dependencyKeys=new LinkedHashSet<String>();
-        for(SkillRef dependency:dependencies)if(dependency==null||!dependencyKeys.add(dependency.key()))
+        for(SkillRef dependency:dependencies)if(dependency==null||!dependencyKeys.add(dependency.key())) {
             throw new IllegalArgumentException("skill dependencies are invalid");
+        }
     }
     public static Builder builder() { return new Builder(); }
     public int getSchemaVersion(){return SCHEMA_VERSION;} public String getSkillId(){return skillId;}
@@ -61,8 +65,12 @@ public final class SkillDefinition {
     private static List<String> list(List<String> v){return Collections.unmodifiableList(new ArrayList<String>(v));}
     private static Set<String> set(Set<String> v){return Collections.unmodifiableSet(new LinkedHashSet<String>(v));}
     private static boolean blank(String v){return v==null||v.trim().isEmpty();}
-    private static void validateStrings(Iterable<String> values,String name){for(String value:values)if(blank(value))
-        throw new IllegalArgumentException(name+" must not be blank");}
+    private static void validateStrings(Iterable<String> values,String name){for(String value:values)if(blank(value)) {
+        throw new IllegalArgumentException(name+" must not be blank");
+    }}
+    /**
+     * 表示。
+     */
     public static final class Builder {
         private String skillId,name,version,domain,description,executionRef,inputSchema,outputSchema,instruction,permissionPolicy;
         private SkillExecutionType executionType; private List<String> resources=Collections.emptyList();

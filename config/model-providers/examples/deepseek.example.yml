@@ -1,0 +1,57 @@
+# DeepSeek 脱敏样例：复制到 ../local/deepseek.yml 后按账号实际能力修改模型 ID 和限制。
+# 平台标识。必须使用程序 ModelProvider 枚举中定义的 DEEPSEEK。
+provider: DEEPSEEK
+
+# 访问平台接口时使用的凭据配置。
+credential:
+  # 凭据逻辑名称，会传给 ProviderCredentialResolver；同一进程内应保持唯一且稳定。
+  secretRef: deepseek-default
+  # 保存 API Key 的环境变量名；程序启动前必须设置，不要提交真实密钥。
+  environmentVariable: DEEPSEEK_API_KEY
+
+# HTTP 连接、安全边界和报文大小限制。
+transport:
+  # 允许访问的服务源站白名单，仅填写“协议 + 主机 + 可选端口”。
+  allowedOrigins:
+    # DeepSeek 官方 API 源站；如使用代理，应替换为代理的可信源站。
+    - https://api.deepseek.com
+  # 建立 TCP/TLS 连接的最长等待时间，单位为毫秒。
+  connectTimeoutMillis: 3000
+  # 读取接口响应的最长等待时间，单位为毫秒。
+  readTimeoutMillis: 60000
+  # 单次请求体最大字节数；当前值为 4 MiB。
+  maxRequestBytes: 4194304
+  # 单次响应体最大字节数；当前值为 16 MiB。
+  maxResponseBytes: 16777216
+  # 是否允许 HTTP 明文地址；生产环境应保持 false。
+  allowHttp: false
+
+# 本平台启用的模型能力，不需要的能力节点可以删除。
+capabilities:
+  # 文本对话能力配置。
+  chat:
+    # Chat Completions 完整接口地址，源站必须存在于 allowedOrigins 中。
+    endpoint: https://api.deepseek.com/chat/completions
+    # 实际调用的固定模型 ID，例如账号当前开放的 chat 或 reasoner 模型。
+    modelId: replace-with-chat-model-id
+    # DeepSeek 对话接口的协议适配器标识。
+    apiProfile: chat-completions-v1
+    # 对话能力的默认请求参数。
+    parameters:
+      # 默认采样温度；推理模型是否支持该参数应以平台文档为准。
+      temperature: 0.7
+      # 默认最大输出 Token 数，不应超过模型上限。
+      maxTokens: 4096
+
+  # 平台模型目录查询能力配置，用于获取当前账号可见的模型列表。
+  catalog:
+    # Models 完整接口地址，源站必须存在于 allowedOrigins 中。
+    endpoint: https://api.deepseek.com/models
+    # 模型目录接口的协议适配器标识。
+    apiProfile: models-v1
+    # 模型目录响应的本地保护限制。
+    parameters:
+      # 单次响应允许解析的最大模型数量，防止异常响应占满内存。
+      maxModels: 1000
+      # 单个模型 ID 允许的最大字符数。
+      maxModelIdChars: 256

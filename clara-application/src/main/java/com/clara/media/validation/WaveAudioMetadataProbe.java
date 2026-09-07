@@ -13,13 +13,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 
+/**
+ * 探测并报告WAVE音频元数据。
+ */
 public final class WaveAudioMetadataProbe implements MediaMetadataProbe {
     private final int maxChunks;
     private final long maxHeaderBytes;
 
     public WaveAudioMetadataProbe(int maxChunks, long maxHeaderBytes) {
-        if (maxChunks <= 0 || maxHeaderBytes < 44)
+        if (maxChunks <= 0 || maxHeaderBytes < 44) {
             throw new IllegalArgumentException("WAV probe limits are invalid");
+        }
         this.maxChunks = maxChunks;
         this.maxHeaderBytes = maxHeaderBytes;
     }
@@ -30,10 +34,10 @@ public final class WaveAudioMetadataProbe implements MediaMetadataProbe {
     }
 
     public MediaMetadata probe(MediaType mediaType, String mimeType, MediaInput content) throws IOException {
-        if (!supports(mediaType, mimeType)) throw new IllegalArgumentException("unsupported media type");
-        if (content == null) throw new IllegalArgumentException("content must not be null");
+        if (!supports(mediaType, mimeType)) { throw new IllegalArgumentException("unsupported media type"); }
+        if (content == null) { throw new IllegalArgumentException("content must not be null"); }
         InputStream opened = content.open();
-        if (opened == null) throw new IOException("media input returned null");
+        if (opened == null) { throw new IOException("media input returned null"); }
         InputStream input = new BufferedInputStream(opened);
         try {
             if (!"RIFF".equals(ascii(input, 4))) invalid();

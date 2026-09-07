@@ -6,6 +6,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 封装音频转写操作的执行结果。
+ */
 public final class AudioTranscriptionResult {
     private final String text;
     private final String detectedLanguage;
@@ -16,14 +19,15 @@ public final class AudioTranscriptionResult {
     public AudioTranscriptionResult(String text, String detectedLanguage, Long durationMs,
             List<TranscriptionSegment> segments, Map<String, String> providerMetadata) {
         this.text = MediaRequestValues.required(text, "text");
-        if (durationMs != null && durationMs.longValue() < 0) throw new IllegalArgumentException("durationMs must not be negative");
+        if (durationMs != null && durationMs.longValue() < 0) { throw new IllegalArgumentException("durationMs must not be negative"); }
         List<TranscriptionSegment> safe = segments == null ? Collections.<TranscriptionSegment>emptyList() : segments;
-        if (safe.contains(null)) throw new IllegalArgumentException("segments must not contain null");
+        if (safe.contains(null)) { throw new IllegalArgumentException("segments must not contain null"); }
         long previousEnd = 0;
         for (TranscriptionSegment segment : safe) {
-            if (segment.getStartMs() < previousEnd) throw new IllegalArgumentException("segments must be ordered and non-overlapping");
-            if (durationMs != null && segment.getEndMs() > durationMs.longValue())
+            if (segment.getStartMs() < previousEnd) { throw new IllegalArgumentException("segments must be ordered and non-overlapping"); }
+            if (durationMs != null && segment.getEndMs() > durationMs.longValue()) {
                 throw new IllegalArgumentException("segment exceeds duration");
+            }
             previousEnd = segment.getEndMs();
         }
         this.detectedLanguage = detectedLanguage;

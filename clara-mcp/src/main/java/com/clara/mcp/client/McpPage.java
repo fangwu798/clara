@@ -4,13 +4,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 封装MCP的分页数据。
+ */
 public final class McpPage<T> {
     private final List<T> items;
     private final String nextCursor;
 
     public McpPage(List<T> items, String nextCursor) {
-        if (items == null) throw new IllegalArgumentException("items must not be null");
-        if (items.contains(null)) throw new IllegalArgumentException("items must not contain null");
+        if (items == null) { throw new IllegalArgumentException("items must not be null"); }
+        if (items.contains(null)) { throw new IllegalArgumentException("items must not contain null"); }
         this.items = Collections.unmodifiableList(new ArrayList<T>(items));
         this.nextCursor = normalize(nextCursor);
     }

@@ -1,5 +1,8 @@
 package com.clara.adapter.document;
 import com.clara.kernel.*;import com.clara.workspace.api.*;import java.io.*;import java.util.*;import org.apache.poi.hwpf.HWPFDocument;import org.apache.poi.hwpf.extractor.WordExtractor;import org.apache.poi.xwpf.usermodel.*;
+/**
+ * 将POIWord文档数据解析为领域对象。
+ */
 public final class PoiWordDocumentParser implements DocumentParser {
  public boolean supports(com.clara.workspace.api.FileDescriptor f){String p=f.getRelativePath().toLowerCase(Locale.ROOT);return p.endsWith(".docx")||p.endsWith(".doc");}
  public ParsedDocument parse(FileDocument file){String p=file.getDescriptor().getRelativePath().toLowerCase(Locale.ROOT);try{return p.endsWith(".docx")?docx(file):doc(file);}catch(Exception e){throw DocumentParsingErrors.error(ErrorCodes.DOCUMENT_PARSE_FAILED,ErrorCategory.VALIDATION);}}

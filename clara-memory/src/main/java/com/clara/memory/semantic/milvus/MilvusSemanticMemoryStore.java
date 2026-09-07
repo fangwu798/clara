@@ -18,13 +18,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 将语义记忆映射到 Milvus 后端，并统一执行集合初始化、租户过滤、结果校验和过期剔除。
+ *
+ * <p>常规用法：通过 {@link MilvusSemanticMemoryConfig} 和已连接的 {@link MilvusBackend} 构造实例，
+ * 使用 {@link #upsert}、{@link #search} 和 {@link #deleteByConversation}，结束后调用 {@link #close()}。
+ *
+ * <p>注意：集合规格和向量维度必须与配置一致。后端查询必须保留本类生成的租户及业务过滤条件；本类还会
+ * 对返回记录再次校验并过滤过期数据。实例关闭时会关闭所注入的后端，调用方不要重复共享其生命周期。
+ */
 public final class MilvusSemanticMemoryStore implements SemanticMemoryStore {
     private final MilvusSemanticMemoryConfig config;
     private final MilvusBackend backend;
     private boolean closed;
 
     public MilvusSemanticMemoryStore(MilvusSemanticMemoryConfig config, MilvusBackend backend) {
-        if (config == null || backend == null) throw new IllegalArgumentException();
+        if (config == null || backend == null) { throw new IllegalArgumentException(); }
         this.config = config;
         this.backend = backend;
         MilvusCollectionSpec expected = new MilvusCollectionSpec(config.getCollection(),
@@ -37,7 +46,7 @@ public final class MilvusSemanticMemoryStore implements SemanticMemoryStore {
             if (failure instanceof MilvusBackendException) {
                 backend((MilvusBackendException) failure);
             }
-            if (failure instanceof ClaraException) throw failure;
+            if (failure instanceof ClaraException) { throw failure; }
             backend(false);
         }
     }
@@ -50,7 +59,7 @@ public final class MilvusSemanticMemoryStore implements SemanticMemoryStore {
         Set<String> ids = new HashSet<String>();
         for (MemoryEntry entry : entries) {
             dimension(entry.getDimension());
-            if (!ids.add(entry.getId())) throw new IllegalArgumentException("duplicate memory id");
+            if (!ids.add(entry.getId())) { throw new IllegalArgumentException("duplicate memory id"); }
         }
         try {
             for (int from = 0; from < entries.size(); from += config.getMaxBatchSize()) {
@@ -67,7 +76,7 @@ public final class MilvusSemanticMemoryStore implements SemanticMemoryStore {
 
     public synchronized List<MemoryMatch> search(SemanticMemoryQuery query) {
         open();
-        if (query == null) throw new IllegalArgumentException();
+        if (query == null) { throw new IllegalArgumentException(); }
         dimension(query.getVector().length);
         if (query.getTopK() > config.getMaxTopK()) limit();
         long multiplied = (long) query.getTopK() * config.getOversamplingFactor();
@@ -115,7 +124,7 @@ public final class MilvusSemanticMemoryStore implements SemanticMemoryStore {
 
     public synchronized void deleteByConversation(String tenant, String conversation) {
         open();
-        if (isBlank(tenant) || isBlank(conversation)) throw new IllegalArgumentException();
+        if (isBlank(tenant) || isBlank(conversation)) { throw new IllegalArgumentException(); }
         try {
             backend.deleteByConversation(config.getCollection(), tenant, conversation);
         } catch (MilvusBackendException failure) {
@@ -149,7 +158,7 @@ public final class MilvusSemanticMemoryStore implements SemanticMemoryStore {
     }
 
     private void open() {
-        if (closed) throw new IllegalStateException("semantic memory store is closed");
+        if (closed) { throw new IllegalStateException("semantic memory store is closed"); }
     }
 
     private static double cosine(float[] left, float[] right) {

@@ -18,12 +18,21 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 将通用工作区技能请求转换为受约束的任务计划并交由规划引擎执行。
+ *
+ * <p>常规用法：通过 {@link com.clara.skill.runtime.SkillHandler} 路由调用 {@link #execute}；
+ * 有人工反馈时使用 {@link #resume}，反馈会作为只读输入加入新计划。
+ *
+ * <p>注意：请求必须包含非空的 {@code goal} 和 run ID。计划中的每项 capability 都必须出现在技能定义的
+ * required tools 中；run ID 与实例 ID 共同形成规划执行标识，调用方应保持稳定以维持幂等性。
+ */
 public final class GeneralWorkspaceSkillHandler implements SkillHandler {
     private final TaskPlanEngine engine;
     private final GeneralWorkspacePlanFactory plans;
 
     public GeneralWorkspaceSkillHandler(TaskPlanEngine engine, GeneralWorkspacePlanFactory plans) {
-        if (engine == null || plans == null) throw new IllegalArgumentException("handler dependencies are required");
+        if (engine == null || plans == null) { throw new IllegalArgumentException("handler dependencies are required"); }
         this.engine = engine;
         this.plans = plans;
     }

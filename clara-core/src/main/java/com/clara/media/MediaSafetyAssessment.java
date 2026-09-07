@@ -1,5 +1,8 @@
 package com.clara.media;
 
+/**
+ * 表示。
+ */
 public final class MediaSafetyAssessment {
     private final boolean allowed;
     private final String reasonCode;
@@ -10,8 +13,9 @@ public final class MediaSafetyAssessment {
     }
     public static MediaSafetyAssessment allowed() { return new MediaSafetyAssessment(true, null); }
     public static MediaSafetyAssessment rejected(String reasonCode) {
-        if (reasonCode == null || reasonCode.trim().isEmpty())
+        if (reasonCode == null || reasonCode.trim().isEmpty()) {
             throw new IllegalArgumentException("reasonCode must not be blank");
+        }
         return new MediaSafetyAssessment(false, reasonCode);
     }
     public boolean isAllowed() { return allowed; }

@@ -24,6 +24,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * 基于对象存储后端保存媒体资产，采用暂存、校验和条件发布流程保证内容完整性与租户配额。
+ *
+ * <p>常规用法：注入支持暂存和原子发布的 {@link ObjectMediaBackend}，通过 {@link #put} 写入资产，
+ * 通过 {@code get/open/delete} 访问，并定期执行 {@link #cleanupExpired}；结束后调用 {@link #close()}。
+ *
+ * <p>注意：{@link #open} 返回的流由调用方关闭。后端必须正确实现 {@code publishIfAbsent} 和租户 usage，
+ * 本类会验证键空间、摘要、大小及资产归属；暂存对象在成功或失败后都会尝试清理。
+ */
 public final class ObjectMediaStore implements MediaStore, Closeable {
     private final ObjectMediaStoreConfig config;
     private final ObjectMediaBackend backend;
@@ -39,8 +48,9 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
                 metadataProbes, safetyScanner));
     }
     public ObjectMediaStore(ObjectMediaStoreConfig config, ObjectMediaBackend backend, MediaValidator validator) {
-        if (config == null || backend == null || validator == null)
+        if (config == null || backend == null || validator == null) {
             throw new IllegalArgumentException("dependencies must not be null");
+        }
         this.config = config;
         this.backend = backend;
         this.validator = validator;
@@ -48,12 +58,12 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
 
     public synchronized MediaAsset put(MediaUpload upload) {
         ensureOpen();
-        if (upload == null) throw new IllegalArgumentException("upload must not be null");
+        if (upload == null) { throw new IllegalArgumentException("upload must not be null"); }
         String stagingKey = config.getNamespace() + "/staging/" + UUID.randomUUID().toString();
         boolean staged = false;
         try {
             InputStream source = upload.getInput().open();
-            if (source == null) throw new IOException("media input returned null");
+            if (source == null) { throw new IOException("media input returned null"); }
             StagedMediaObject stagedObject;
             try { stagedObject = backend.stage(stagingKey, source, config.getValidationPolicy().getMaxFileBytes()); }
             finally { source.close(); }
@@ -176,17 +186,17 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
                 || !tenantId.equals(record.getAsset().getOwnerTenantId())) backendFailure(false);
     }
     private String tenantPrefix(String tenantId) {
-        if (tenantId == null || tenantId.trim().isEmpty()) throw new IllegalArgumentException("tenantId must not be blank");
+        if (tenantId == null || tenantId.trim().isEmpty()) { throw new IllegalArgumentException("tenantId must not be blank"); }
         return config.getNamespace() + "/assets/" + sha256(tenantId.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + "/";
     }
     private static void validateIdentity(String tenantId, String assetId) {
-        if (tenantId == null || tenantId.trim().isEmpty()) throw new IllegalArgumentException("tenantId must not be blank");
-        if (assetId == null || !assetId.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("invalid assetId");
+        if (tenantId == null || tenantId.trim().isEmpty()) { throw new IllegalArgumentException("tenantId must not be blank"); }
+        if (assetId == null || !assetId.matches("[0-9a-f]{64}")) { throw new IllegalArgumentException("invalid assetId"); }
     }
-    private void ensureOpen() { if (closed) throw new IllegalStateException("media store is closed"); }
+    private void ensureOpen() { if (closed) { throw new IllegalStateException("media store is closed"); } }
     private void deleteQuietly(String key) { try { backend.delete(key); } catch (RuntimeException ignored) { } }
     private static DigestAndSize digest(InputStream source, long limit) throws IOException {
-        if (source == null) throw new IOException("backend returned null content");
+        if (source == null) { throw new IOException("backend returned null content"); }
         MessageDigest digest = sha256Digest(); long size = 0;
         InputStream input = new BufferedInputStream(source);
         try { byte[] buffer = new byte[8192]; int count; while ((count = input.read(buffer)) >= 0) { if (count == 0) continue; if (size > limit - count) resourceLimit(); digest.update(buffer, 0, count); size += count; } }
@@ -206,5 +216,8 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
     }
     private static void backendFailure(boolean retryable) { fail(ErrorCodes.MEDIA_BACKEND_FAILED, ErrorCategory.EXTERNAL_SERVICE, retryable); }
     private static void fail(String code, ErrorCategory category, boolean retryable) { throw new ClaraException(new ClaraError(code, category, code, retryable, null, null, null, null, Collections.<String, String>emptyMap())); }
+    /**
+     * 表示。
+     */
     private static final class DigestAndSize { private final String sha256; private final long size; private DigestAndSize(String sha256, long size) { this.sha256 = sha256; this.size = size; } }
 }

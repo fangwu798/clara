@@ -1,5 +1,8 @@
 package com.clara.planner;
 
+/**
+ * 表示执行的持久化记录。
+ */
 public final class ExecutionRecord {
     private final String idempotencyKey;
     private final String planId;

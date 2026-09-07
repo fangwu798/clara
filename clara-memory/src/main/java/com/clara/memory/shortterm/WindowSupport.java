@@ -7,6 +7,9 @@ import com.clara.model.api.ToolCallContent;
 import java.util.Iterator;
 import java.util.List;
 
+/**
+ * 提供窗口式对话记忆共用的计算逻辑。
+ */
 final class WindowSupport {
     private WindowSupport() {
     }
@@ -34,7 +37,7 @@ final class WindowSupport {
         int nonSystemMessagesBeforeLast = 0;
         int nonSystemCount = 0;
         for (ChatMessage message : messages) {
-            if (message == null) throw new IllegalArgumentException("messages must not contain null");
+            if (message == null) { throw new IllegalArgumentException("messages must not contain null"); }
             if (message.getRole() == Role.SYSTEM) {
                 lastSystem = message;
                 nonSystemMessagesBeforeLast = nonSystemCount;

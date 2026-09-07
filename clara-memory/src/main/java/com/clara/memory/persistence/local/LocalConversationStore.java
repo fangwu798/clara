@@ -25,6 +25,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 使用工作区内的本地文件持久化对话消息，并通过版本号提供乐观并发控制。
+ *
+ * <p>常规用法：以固定工作区构造实例，使用 {@link #loadSnapshot} 取得消息及版本，再将该版本传给
+ * {@link #append}；清空会话使用 {@link #clear}，进程退出前调用 {@link #close()} 释放目录锁。构造时只
+ * 创建目录并取得锁，不会预加载历史会话；程序重启后按会话 ID 读取对应文件即可恢复历史。
+ *
+ * <p>注意：同一目录只允许一个存储实例持有，不支持多进程共享。会话 ID 会被严格校验，文件大小受构造参数
+ * 限制；版本冲突时应重新加载快照，不应覆盖写入或直接编辑持久化文件。每次读取仍会完整反序列化指定
+ * 会话，超长会话应配合窗口裁剪、归档策略或分段存储，不能仅依赖文件大小上限控制堆内存峰值。
+ */
 public final class LocalConversationStore implements ConversationStore, Closeable {
     private static final long DEFAULT_MAX_FILE_BYTES = 128L * 1024L * 1024L;
     private final Path directory;
@@ -39,8 +50,8 @@ public final class LocalConversationStore implements ConversationStore, Closeabl
     }
 
     public LocalConversationStore(Path workspace, long maxFileBytes) {
-        if (workspace == null) throw new IllegalArgumentException("workspace must not be null");
-        if (maxFileBytes <= 0L) throw new IllegalArgumentException("maxFileBytes must be positive");
+        if (workspace == null) { throw new IllegalArgumentException("workspace must not be null"); }
+        if (maxFileBytes <= 0L) { throw new IllegalArgumentException("maxFileBytes must be positive"); }
         this.directory = workspace.toAbsolutePath().normalize()
                 .resolve(".clara").resolve("state").resolve("conversations");
         this.maxFileBytes = maxFileBytes;
@@ -51,7 +62,7 @@ public final class LocalConversationStore implements ConversationStore, Closeabl
             channel = FileChannel.open(directory.resolve("store.lock"),
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             acquiredLock = channel.tryLock();
-            if (acquiredLock == null) throw locked();
+            if (acquiredLock == null) { throw locked(); }
         } catch (OverlappingFileLockException exception) {
             closeQuietly(channel);
             throw locked();
@@ -80,7 +91,7 @@ public final class LocalConversationStore implements ConversationStore, Closeabl
         }
         try {
             long size = Files.size(file);
-            if (size > maxFileBytes) throw corrupted();
+            if (size > maxFileBytes) { throw corrupted(); }
             return codec.decode(conversationId, Files.readAllBytes(file));
         } catch (ClaraException exception) {
             throw exception;
@@ -95,7 +106,7 @@ public final class LocalConversationStore implements ConversationStore, Closeabl
         ensureOpen();
         requireMessages(messages);
         ConversationSnapshot current = loadSnapshot(conversationId);
-        if (current.getVersion() != expectedVersion) throw versionConflict();
+        if (current.getVersion() != expectedVersion) { throw versionConflict(); }
         List<ChatMessage> combined = new ArrayList<ChatMessage>(current.getMessages());
         combined.addAll(messages);
         write(conversationId, new ConversationSnapshot(expectedVersion + 1L, combined));
@@ -126,7 +137,7 @@ public final class LocalConversationStore implements ConversationStore, Closeabl
         Path temporary = null;
         try {
             byte[] encoded = codec.encode(conversationId, snapshot);
-            if (encoded.length > maxFileBytes) throw ioError();
+            if (encoded.length > maxFileBytes) { throw ioError(); }
             temporary = Files.createTempFile(directory, "conversation-", ".tmp");
             FileChannel output = FileChannel.open(temporary, StandardOpenOption.WRITE,
                     StandardOpenOption.TRUNCATE_EXISTING);
@@ -176,11 +187,11 @@ public final class LocalConversationStore implements ConversationStore, Closeabl
         if (messages == null || messages.isEmpty()) {
             throw new IllegalArgumentException("messages must not be empty");
         }
-        if (messages.contains(null)) throw new IllegalArgumentException("messages must not contain null");
+        if (messages.contains(null)) { throw new IllegalArgumentException("messages must not contain null"); }
     }
 
     private void ensureOpen() {
-        if (closed) throw new IllegalStateException("conversation store is closed");
+        if (closed) { throw new IllegalStateException("conversation store is closed"); }
     }
 
     private static ClaraException locked() {

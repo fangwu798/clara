@@ -7,6 +7,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 表示对话交换的消息。
+ */
 public final class ChatMessage {
     private final Role role;
     private final List<Content> contents;
@@ -15,11 +18,11 @@ public final class ChatMessage {
 
     public ChatMessage(Role role, List<Content> contents, String name,
             Map<String, String> metadata) {
-        if (role == null) throw new IllegalArgumentException("role must not be null");
+        if (role == null) { throw new IllegalArgumentException("role must not be null"); }
         if (contents == null || contents.isEmpty()) {
             throw new IllegalArgumentException("contents must not be empty");
         }
-        if (contents.contains(null)) throw new IllegalArgumentException("contents must not contain null");
+        if (contents.contains(null)) { throw new IllegalArgumentException("contents must not contain null"); }
         this.role = role;
         this.contents = Collections.unmodifiableList(new ArrayList<Content>(contents));
         this.name = name;

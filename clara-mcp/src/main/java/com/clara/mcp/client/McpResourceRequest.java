@@ -2,6 +2,9 @@ package com.clara.mcp.client;
 
 import com.clara.kernel.InvocationContext;
 
+/**
+ * 封装MCP资源操作的输入参数。
+ */
 public final class McpResourceRequest {
     private final String serverKey, snapshotId, uri, schemaHash;
     private final InvocationContext context;
@@ -10,7 +13,7 @@ public final class McpResourceRequest {
         if (isBlank(serverKey) || isBlank(snapshotId) || isBlank(uri) || isBlank(schemaHash)) {
             throw new IllegalArgumentException("resource request identifiers must not be blank");
         }
-        if (context == null) throw new IllegalArgumentException("context must not be null");
+        if (context == null) { throw new IllegalArgumentException("context must not be null"); }
         this.serverKey = serverKey; this.snapshotId = snapshotId; this.uri = uri;
         this.schemaHash = schemaHash; this.context = context;
     }

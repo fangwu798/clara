@@ -5,6 +5,9 @@ import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/**
+ * 描述服务提供商模型的元数据。
+ */
 public final class ProviderModelMetadata {
     private static final ProviderModelMetadata EMPTY = new Builder().build();
 
@@ -82,6 +85,9 @@ public final class ProviderModelMetadata {
         return Collections.unmodifiableSet(copy);
     }
 
+    /**
+     * 表示。
+     */
     public static final class Builder {
         private Set<ModelModality> inputModalities;
         private Set<ModelModality> outputModalities;

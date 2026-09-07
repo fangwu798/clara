@@ -1,5 +1,8 @@
 package com.clara.model.api;
 
+/**
+ * 定义模型支持的能力。
+ */
 public enum ModelCapability {
     CHAT_TEXT, CHAT_IMAGE_INPUT, CHAT_AUDIO_INPUT, CHAT_VIDEO_INPUT,
     EMBEDDING, TOOL_CALLING, IMAGE_GENERATION, IMAGE_BATCH_GENERATION, IMAGE_EDIT, IMAGE_MASK_EDIT,

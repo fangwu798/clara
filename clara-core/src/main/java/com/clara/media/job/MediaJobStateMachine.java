@@ -6,11 +6,14 @@ import com.clara.kernel.ErrorCategory;
 import com.clara.kernel.ErrorCodes;
 import java.util.Collections;
 
+/**
+ * 管理媒体任务的合法状态转换。
+ */
 public final class MediaJobStateMachine {
     private final MediaJobStore store;
 
     public MediaJobStateMachine(MediaJobStore store) {
-        if (store == null) throw new IllegalArgumentException("store must not be null");
+        if (store == null) { throw new IllegalArgumentException("store must not be null"); }
         this.store = store;
     }
     public MediaJob create(String jobId, String tenantId, long now) {
@@ -41,7 +44,7 @@ public final class MediaJobStateMachine {
     }
     public MediaJob transition(String tenantId, String jobId, long expectedVersion,
             MediaJobStatus target, MediaJobUpdate update, long now) {
-        if (target == null) throw new IllegalArgumentException("target must not be null");
+        if (target == null) { throw new IllegalArgumentException("target must not be null"); }
         if (update == null) update = MediaJobUpdate.none();
         MediaJob current = get(tenantId, jobId);
         if (current.getVersion() != expectedVersion)

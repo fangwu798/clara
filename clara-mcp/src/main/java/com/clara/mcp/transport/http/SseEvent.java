@@ -1,5 +1,8 @@
 package com.clara.mcp.transport.http;
 
+/**
+ * 表示SSE产生的事件。
+ */
 final class SseEvent {
     private final String data;
     private final String id;

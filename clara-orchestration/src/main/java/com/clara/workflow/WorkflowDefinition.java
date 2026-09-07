@@ -6,6 +6,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * 定义工作流的结构与元数据。
+ */
 public final class WorkflowDefinition {
     private final String workflowId;
     private final String version;
@@ -35,8 +38,8 @@ public final class WorkflowDefinition {
 
     private static void collect(WorkflowNode node, Set<String> ids, Set<WorkflowNode> path,
             List<WorkflowNode> result) {
-        if (!path.add(node)) throw new IllegalArgumentException("workflow graph contains a cycle");
-        if (!ids.add(node.getId())) throw new IllegalArgumentException("duplicate node id: " + node.getId());
+        if (!path.add(node)) { throw new IllegalArgumentException("workflow graph contains a cycle"); }
+        if (!ids.add(node.getId())) { throw new IllegalArgumentException("duplicate node id: " + node.getId()); }
         result.add(node);
         if (node instanceof WorkflowNodes.CompositeNode) {
             for (WorkflowNode child : ((WorkflowNodes.CompositeNode) node).children) collect(child, ids, path, result);

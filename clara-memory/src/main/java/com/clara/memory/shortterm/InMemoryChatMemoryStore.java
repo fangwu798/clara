@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 提供对话记忆存储器的内存实现。
+ */
 public final class InMemoryChatMemoryStore implements ChatMemoryStore {
     private final Map<String, List<ChatMessage>> messagesById =
             new ConcurrentHashMap<String, List<ChatMessage>>();
@@ -24,7 +27,7 @@ public final class InMemoryChatMemoryStore implements ChatMemoryStore {
     @Override
     public void updateMessages(String memoryId, List<ChatMessage> messages) {
         requireId(memoryId);
-        if (messages == null) throw new IllegalArgumentException("messages must not be null");
+        if (messages == null) { throw new IllegalArgumentException("messages must not be null"); }
         messagesById.put(memoryId, Collections.unmodifiableList(new ArrayList<ChatMessage>(messages)));
     }
 

@@ -8,6 +8,9 @@ import java.io.Closeable;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 提供访问MCP的客户端。
+ */
 public interface McpClient extends Closeable {
     McpInitialization initialize(List<String> supportedProtocolVersions);
     McpPage<McpToolDescriptor> listTools(String cursor);

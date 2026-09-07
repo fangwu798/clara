@@ -1,5 +1,8 @@
 package com.clara.media.job;
 
+/**
+ * 定义媒体任务调度器的配置。
+ */
 public final class MediaJobSchedulerConfig {
     private final long initialPollDelayMs;
     private final long maxPollDelayMs;
@@ -10,8 +13,9 @@ public final class MediaJobSchedulerConfig {
             double backoffMultiplier, int maxPollAttempts) {
         if (initialPollDelayMs <= 0 || maxPollDelayMs < initialPollDelayMs
                 || backoffMultiplier < 1 || Double.isNaN(backoffMultiplier)
-                || Double.isInfinite(backoffMultiplier) || maxPollAttempts <= 0)
+                || Double.isInfinite(backoffMultiplier) || maxPollAttempts <= 0) {
             throw new IllegalArgumentException("invalid scheduler limits");
+        }
         this.initialPollDelayMs = initialPollDelayMs;
         this.maxPollDelayMs = maxPollDelayMs;
         this.backoffMultiplier = backoffMultiplier;

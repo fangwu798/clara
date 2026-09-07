@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 定义模型的参数。
+ */
 public final class ModelParameters {
     private final String model;
     private final Double temperature;
@@ -30,12 +33,12 @@ public final class ModelParameters {
         if (topP != null && (topP.doubleValue() < 0.0d || topP.doubleValue() > 1.0d)) {
             throw new IllegalArgumentException("topP must be between 0 and 1");
         }
-        if (topK != null && topK.intValue() <= 0) throw new IllegalArgumentException("topK must be positive");
+        if (topK != null && topK.intValue() <= 0) { throw new IllegalArgumentException("topK must be positive"); }
         if (maxTokens != null && maxTokens.intValue() <= 0) {
             throw new IllegalArgumentException("maxTokens must be positive");
         }
         List<String> safeStops = stops == null ? Collections.<String>emptyList() : stops;
-        if (safeStops.contains(null)) throw new IllegalArgumentException("stops must not contain null");
+        if (safeStops.contains(null)) { throw new IllegalArgumentException("stops must not contain null"); }
         this.model = model;
         this.temperature = temperature;
         this.topP = topP;

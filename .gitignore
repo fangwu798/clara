@@ -3,3 +3,7 @@ target/
 .idea/
 *.iml
 .clara/
+
+# 本机模型平台配置可能包含真实地址和密钥，只提交 examples 与说明文件。
+/config/model-providers/local/*.yml
+/config/model-providers/local/*.yaml

@@ -4,6 +4,9 @@ import com.clara.kernel.InvocationContext;
 import com.clara.model.api.ProviderOptions;
 import java.util.List;
 
+/**
+ * 封装图像生成操作的输入参数。
+ */
 public final class ImageGenerationRequest {
     private final String prompt;
     private final List<String> sourceImageAssetIds;
@@ -26,9 +29,9 @@ public final class ImageGenerationRequest {
         this.sourceImageAssetIds = MediaRequestValues.assetIds(sourceImageAssetIds, "sourceImageAssetIds");
         if (maskAssetId != null) {
             MediaRequestValues.required(maskAssetId, "maskAssetId");
-            if (this.sourceImageAssetIds.isEmpty()) throw new IllegalArgumentException("mask requires a source image");
+            if (this.sourceImageAssetIds.isEmpty()) { throw new IllegalArgumentException("mask requires a source image"); }
         }
-        if (count <= 0) throw new IllegalArgumentException("count must be positive");
+        if (count <= 0) { throw new IllegalArgumentException("count must be positive"); }
         dimensions(width, height, aspectRatio);
         this.maskAssetId = maskAssetId;
         this.count = count;
@@ -40,16 +43,17 @@ public final class ImageGenerationRequest {
         this.seed = seed;
         this.negativePrompt = negativePrompt;
         this.providerOptions = providerOptions;
-        if (context == null) throw new IllegalArgumentException("context must not be null");
+        if (context == null) { throw new IllegalArgumentException("context must not be null"); }
         this.context = context;
     }
     private static void dimensions(Integer width, Integer height, String aspectRatio) {
-        if ((width == null) != (height == null)) throw new IllegalArgumentException("width and height must be set together");
-        if (width != null && (width.intValue() <= 0 || height.intValue() <= 0))
+        if ((width == null) != (height == null)) { throw new IllegalArgumentException("width and height must be set together"); }
+        if (width != null && (width.intValue() <= 0 || height.intValue() <= 0)) {
             throw new IllegalArgumentException("dimensions must be positive");
+        }
         if (aspectRatio != null) {
             MediaRequestValues.required(aspectRatio, "aspectRatio");
-            if (width != null) throw new IllegalArgumentException("aspectRatio and dimensions are mutually exclusive");
+            if (width != null) { throw new IllegalArgumentException("aspectRatio and dimensions are mutually exclusive"); }
         }
     }
     public String getPrompt() { return prompt; }

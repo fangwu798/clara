@@ -4,10 +4,13 @@ import com.clara.model.api.ModelParameters;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 合并并覆盖模型参数。
+ */
 public final class ModelParameterOverlay {
     public ModelParameters merge(ModelParameters lower, ModelParameters higher) {
-        if (lower == null) throw new IllegalArgumentException("lower parameters must not be null");
-        if (higher == null) throw new IllegalArgumentException("higher parameters must not be null");
+        if (lower == null) { throw new IllegalArgumentException("lower parameters must not be null"); }
+        if (higher == null) { throw new IllegalArgumentException("higher parameters must not be null"); }
         String model = lower.getModel();
         Double temperature = lower.getTemperature();
         Double topP = lower.getTopP();

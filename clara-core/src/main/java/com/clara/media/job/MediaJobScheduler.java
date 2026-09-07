@@ -2,6 +2,9 @@ package com.clara.media.job;
 
 import java.util.List;
 
+/**
+ * 调度并跟踪媒体任务。
+ */
 public interface MediaJobScheduler {
     MediaJob submit(String tenantId, String jobId, String idempotencyKey, long deadlineAt,
             MediaJobProviderOperation operation, long now);

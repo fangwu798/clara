@@ -5,6 +5,9 @@ import java.io.Closeable;
 import java.io.InputStream;
 import java.util.List;
 
+/**
+ * 定义。
+ */
 public interface ObjectMediaBackend extends Closeable {
     // stage must enforce maxBytes while streaming and return a checksum for the stored bytes.
     StagedMediaObject stage(String stagingKey, InputStream content, long maxBytes);

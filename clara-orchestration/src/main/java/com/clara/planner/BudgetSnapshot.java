@@ -1,5 +1,8 @@
 package com.clara.planner;
 
+/**
+ * 保存预算在特定时刻的快照。
+ */
 public final class BudgetSnapshot {
     private final BudgetAmount limit;
     private final BudgetAmount reserved;

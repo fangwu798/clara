@@ -5,6 +5,9 @@ import com.clara.kernel.ErrorCodes;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 提供预算账本的内存实现。
+ */
 public final class InMemoryBudgetLedger implements BudgetLedger {
     private final BudgetAmount tenantLimit;
     private final Map<String, RunAccount> runs = new LinkedHashMap<String, RunAccount>();
@@ -14,7 +17,7 @@ public final class InMemoryBudgetLedger implements BudgetLedger {
     private BudgetAmount tenantUsed = BudgetAmount.ZERO;
 
     public InMemoryBudgetLedger(BudgetAmount tenantLimit) {
-        if (tenantLimit == null) throw new IllegalArgumentException("tenantLimit must not be null");
+        if (tenantLimit == null) { throw new IllegalArgumentException("tenantLimit must not be null"); }
         this.tenantLimit = tenantLimit;
     }
     public synchronized void openRun(String runId, BudgetAmount limit) {
@@ -28,7 +31,7 @@ public final class InMemoryBudgetLedger implements BudgetLedger {
     }
     public synchronized BudgetReservation reserve(String runId, String taskId, BudgetAmount maximum) {
         requireId(runId, "runId"); requireId(taskId, "taskId");
-        if (maximum == null) throw new IllegalArgumentException("maximum must not be null");
+        if (maximum == null) { throw new IllegalArgumentException("maximum must not be null"); }
         RunAccount run = runs.get(runId); if (run == null) invalid();
         String reservationId = runId + ":" + taskId;
         BudgetReservation existing = reservations.get(reservationId);
@@ -104,8 +107,11 @@ public final class InMemoryBudgetLedger implements BudgetLedger {
         throw PlannerErrors.error(ErrorCodes.BUDGET_RESERVATION_INVALID, ErrorCategory.CONFLICT);
     }
     private static void requireId(String value, String name) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(name + " must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(name + " must not be blank"); }
     }
+    /**
+     * 表示。
+     */
     private static final class RunAccount {
         final BudgetAmount limit;
         BudgetAmount reserved = BudgetAmount.ZERO;

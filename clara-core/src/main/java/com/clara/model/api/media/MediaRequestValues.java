@@ -6,10 +6,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * 表示。
+ */
 final class MediaRequestValues {
     private MediaRequestValues() { }
     static String required(String value, String name) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(name + " must not be blank");
+        if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(name + " must not be blank"); }
         return value;
     }
     static List<String> assetIds(List<String> values, String name) {
@@ -18,7 +21,7 @@ final class MediaRequestValues {
         Set<String> unique = new HashSet<String>();
         for (String value : values) {
             required(value, name);
-            if (!unique.add(value)) throw new IllegalArgumentException(name + " must not contain duplicates");
+            if (!unique.add(value)) { throw new IllegalArgumentException(name + " must not contain duplicates"); }
             copy.add(value);
         }
         return Collections.unmodifiableList(copy);

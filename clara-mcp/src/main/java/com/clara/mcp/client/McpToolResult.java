@@ -4,6 +4,9 @@ import com.clara.mcp.registry.ImmutableValues;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 封装MCP工具操作的执行结果。
+ */
 public final class McpToolResult {
     private final List<Map<String, Object>> content;
     private final boolean error;

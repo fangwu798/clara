@@ -1,10 +1,13 @@
 package com.clara.skill.api;
 
+/**
+ * 标识对技能的引用。
+ */
 public final class SkillRef {
     private final String skillId;
     private final String version;
     public SkillRef(String skillId, String version) {
-        if (blank(skillId) || blank(version)) throw new IllegalArgumentException("skill reference is invalid");
+        if (blank(skillId) || blank(version)) { throw new IllegalArgumentException("skill reference is invalid"); }
         this.skillId = skillId; this.version = version;
     }
     public String getSkillId() { return skillId; }

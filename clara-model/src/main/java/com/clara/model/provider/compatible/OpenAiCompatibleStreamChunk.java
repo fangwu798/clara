@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 表示。
+ */
 final class OpenAiCompatibleStreamChunk {
     private final String textDelta;
     private final String reasoningDelta;
@@ -26,6 +29,9 @@ final class OpenAiCompatibleStreamChunk {
     ChatResponse getResponse() { return response; }
     boolean isComplete() { return response != null; }
 
+    /**
+     * 表示。
+     */
     static final class ToolDelta {
         private final int index;
         private final String id;

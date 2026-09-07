@@ -3,6 +3,9 @@ package com.clara.mcp.client;
 import com.clara.mcp.registry.ImmutableValues;
 import java.util.Map;
 
+/**
+ * 表示JSONRPC通知。
+ */
 public final class JsonRpcNotification {
     private final String method;
     private final Map<String, Object> params;

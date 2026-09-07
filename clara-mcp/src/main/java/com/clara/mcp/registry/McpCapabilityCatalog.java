@@ -1,5 +1,8 @@
 package com.clara.mcp.registry;
 
+/**
+ * 维护可用的MCP能力目录。
+ */
 public interface McpCapabilityCatalog {
     void publish(McpServerSnapshot snapshot);
     McpServerSnapshot latest(String tenantId, String serverKey);

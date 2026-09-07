@@ -1,5 +1,8 @@
 package com.clara.planner;
 
+/**
+ * 定义计划的限制。
+ */
 public final class PlanLimits {
     private final int maxTasks;
     private final int maxPlanSteps;

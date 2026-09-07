@@ -14,7 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Frozen storage and retention baseline for the first Windows single-host deployment. */
+/**
+ * 定义 Windows 单机部署的存储与保留基线。
+ */
 public final class WindowsSingleHostStoragePolicy {
     public static final long MIB = 1024L * 1024L;
     public static final long GIB = 1024L * MIB;
@@ -49,9 +51,10 @@ public final class WindowsSingleHostStoragePolicy {
     private final MediaValidationPolicy mediaValidationPolicy;
 
     public WindowsSingleHostStoragePolicy(Path workspaceRoot, String workspaceId) {
-        if (workspaceRoot == null) throw new IllegalArgumentException("workspaceRoot must not be null");
-        if (workspaceId == null || workspaceId.trim().isEmpty())
+        if (workspaceRoot == null) { throw new IllegalArgumentException("workspaceRoot must not be null"); }
+        if (workspaceId == null || workspaceId.trim().isEmpty()) {
             throw new IllegalArgumentException("workspaceId must not be blank");
+        }
         this.workspaceRoot = workspaceRoot.toAbsolutePath().normalize();
         this.workspaceId = workspaceId;
         this.mediaValidationPolicy = new MediaValidationPolicy(MEDIA_MAX_FILE_BYTES,

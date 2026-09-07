@@ -2,6 +2,9 @@ package com.clara.model.runtime;
 
 import com.clara.model.api.ModelProvider;
 
+/**
+ * 唯一标识模型。
+ */
 final class ModelKey {
     private final ModelProvider provider;
     private final String alias;
