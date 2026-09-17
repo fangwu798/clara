@@ -6,7 +6,7 @@ import com.clara.model.api.media.ImageGenerationModel;
 import com.clara.model.api.media.ImageGenerationRequest;
 import com.clara.model.api.media.ImageGenerationResult;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
 import com.clara.model.provider.media.MediaJson;
 import com.clara.model.provider.media.MultipartBody;
@@ -16,7 +16,7 @@ import com.clara.model.provider.media.ProviderMediaHttp;
 import com.clara.model.runtime.ModelCapabilityGuard;
 import com.clara.model.runtime.ProviderModelDescriptor;
 import com.fasterxml.jackson.databind.JsonNode;
-import java.nio.charset.StandardCharsets;
+
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;

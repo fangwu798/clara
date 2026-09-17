@@ -8,9 +8,10 @@ import com.clara.model.api.EmbeddingRequest;
 import com.clara.model.api.EmbeddingResponse;
 import com.clara.model.api.ModelProvider;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.ProviderSseListener;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -154,6 +155,10 @@ public class OpenAiCompatibleEmbeddingModelTest {
         public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context) {
             this.request = request;
             return response;
+        }
+        public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
+                ProviderSseListener listener) {
+            throw new UnsupportedOperationException("streaming is not used in this test");
         }
     }
 }

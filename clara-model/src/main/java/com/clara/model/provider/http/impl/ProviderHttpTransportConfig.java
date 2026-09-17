@@ -1,4 +1,6 @@
-package com.clara.model.provider.http;
+package com.clara.model.provider.http.impl;
+
+import lombok.Data;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -10,6 +12,7 @@ import java.util.Set;
 /**
  * 定义JDK 8服务提供商HTTP传输器的配置。
  */
+@Data
 public final class ProviderHttpTransportConfig {
     private final Set<String> allowedOrigins;
     private final int connectTimeoutMillis;
@@ -38,16 +41,13 @@ public final class ProviderHttpTransportConfig {
         this.allowHttp = allowHttp;
     }
 
-    public Set<String> getAllowedOrigins() { return allowedOrigins; }
-    public int getConnectTimeoutMillis() { return connectTimeoutMillis; }
-    public int getReadTimeoutMillis() { return readTimeoutMillis; }
-    public int getMaxRequestBytes() { return maxRequestBytes; }
-    public int getMaxResponseBytes() { return maxResponseBytes; }
-    public boolean isAllowHttp() { return allowHttp; }
 
-    boolean allows(URI endpoint) {
-        try { return allowedOrigins.contains(origin(endpoint, allowHttp)); }
-        catch (IllegalArgumentException exception) { return false; }
+    public boolean allows(URI endpoint) {
+        try {
+            return allowedOrigins.contains(origin(endpoint, allowHttp));
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
     }
 
     private static String normalizeConfiguredOrigin(String value, boolean allowHttp) {

@@ -1,4 +1,6 @@
-package com.clara.model.provider.http;
+package com.clara.model.provider.http.impl;
+
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,6 +11,7 @@ import java.util.Map;
 /**
  * 封装服务提供商HTTP操作的响应数据。
  */
+@Data
 public final class ProviderHttpResponse {
     private final int statusCode;
     private final Map<String, List<String>> headers;
@@ -35,13 +38,6 @@ public final class ProviderHttpResponse {
         this.body = body.clone();
     }
 
-    public int getStatusCode() {
-        return statusCode;
-    }
-
-    public Map<String, List<String>> getHeaders() {
-        return headers;
-    }
 
     public byte[] getBody() {
         return body.clone();

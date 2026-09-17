@@ -7,7 +7,7 @@ import com.clara.model.configuration.ProviderCapabilityConfiguration;
 import com.clara.model.configuration.ProviderConfiguration;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.model.provider.compatible.OpenAiCompatibleChatModel;
-import com.clara.model.provider.http.Jdk8ProviderHttpTransport;
+import com.clara.model.provider.http.impl.Jdk8ProviderHttpTransport;
 import com.clara.model.provider.http.ProviderHttpTransport;
 import com.clara.model.provider.volcengine.VolcengineImageModel;
 import com.clara.model.runtime.ProviderModelDescriptor;

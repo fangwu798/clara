@@ -1,6 +1,6 @@
 package com.clara.model.configuration;
 
-import com.clara.model.provider.http.ProviderHttpTransportConfig;
+import com.clara.model.provider.http.impl.ProviderHttpTransportConfig;
 import lombok.Data;
 
 import java.util.Collections;

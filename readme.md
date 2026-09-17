@@ -229,7 +229,7 @@ YAML 顶层结构如下：
 import com.clara.model.configuration.ProviderConfiguration;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.model.provider.compatible.OpenAiCompatibleChatModel;
-import com.clara.model.provider.http.Jdk8ProviderHttpTransport;
+import com.clara.model.provider.http.impl.Jdk8ProviderHttpTransport;
 import java.nio.file.Paths;
 
 ProviderYamlConfigurationLoader loader = new ProviderYamlConfigurationLoader();
@@ -269,8 +269,8 @@ CLI 已保留 `--config` 路径参数，但 Clara 当前没有独立启动进程
 import com.clara.model.api.ModelProvider;
 import com.clara.model.provider.compatible.OpenAiCompatibleChatConfig;
 import com.clara.model.provider.compatible.OpenAiCompatibleChatModel;
-import com.clara.model.provider.http.Jdk8ProviderHttpTransport;
-import com.clara.model.provider.http.Jdk8ProviderHttpTransportConfig;
+import com.clara.model.provider.http.impl.Jdk8ProviderHttpTransport;
+import com.clara.model.provider.http.impl.Jdk8ProviderHttpTransportConfig;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import java.net.URI;
 import java.util.Collections;

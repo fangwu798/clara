@@ -11,11 +11,11 @@ import com.clara.model.api.StreamHandle;
 import com.clara.model.api.StreamObserver;
 import com.clara.model.api.TextContent;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
-import com.clara.model.provider.http.ProviderSseEvent;
+import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
+import com.clara.model.provider.http.event.ProviderSseEvent;
 import com.clara.model.provider.http.ProviderSseListener;
-import com.clara.model.provider.http.Jdk8ProviderSseTransport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -76,7 +76,7 @@ public class AnthropicStreamingChatModelTest {
         assertEquals("MODEL_PROTOCOL_ERROR", incomplete.events.get(0).getError().getCode());
     }
 
-    private AnthropicStreamingChatModel model(Jdk8ProviderSseTransport transport) throws Exception {
+    private AnthropicStreamingChatModel model(ProviderHttpTransport transport) throws Exception {
         return new AnthropicStreamingChatModel(new AnthropicChatConfig(
                 new URI("https://api.anthropic.example/v1/messages"), "claude-fixed",
                 "messages-v1", "2023-06-01", "secret-ref", 128), transport,
@@ -115,13 +115,16 @@ public class AnthropicStreamingChatModelTest {
         }
     }
 
-    private static final class FakeTransport implements Jdk8ProviderSseTransport {
+    private static final class FakeTransport implements ProviderHttpTransport {
         private final int status;
         private final ProviderSseEvent[] events;
         private ProviderHttpRequest request;
         private FakeTransport(int status, ProviderSseEvent... events) {
             this.status = status;
             this.events = events;
+        }
+        public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context) {
+            throw new UnsupportedOperationException("sync call is not used in this test");
         }
         public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
                 ProviderSseListener listener) {

@@ -1,4 +1,6 @@
-package com.clara.model.provider.http;
+package com.clara.model.provider.http.impl;
+
+import lombok.Data;
 
 import java.net.URI;
 import java.util.Collections;
@@ -11,6 +13,7 @@ import java.util.Set;
 /**
  * 封装服务提供商HTTP操作的输入参数。
  */
+@Data
 public final class ProviderHttpRequest {
     private final String method;
     private final URI endpoint;
@@ -55,17 +58,6 @@ public final class ProviderHttpRequest {
         this.body = safeBody.clone();
     }
 
-    public String getMethod() {
-        return method;
-    }
-
-    public URI getEndpoint() {
-        return endpoint;
-    }
-
-    public Map<String, String> getHeaders() {
-        return headers;
-    }
 
     public byte[] getBody() {
         return body.clone();

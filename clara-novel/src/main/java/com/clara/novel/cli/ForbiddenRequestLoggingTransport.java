@@ -1,9 +1,10 @@
 package com.clara.novel.cli;
 
 import com.clara.kernel.InvocationContext;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.ProviderSseListener;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -22,8 +23,9 @@ public final class ForbiddenRequestLoggingTransport implements ProviderHttpTrans
         this.console = console;
     }
 
-    public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context) {
-        ProviderHttpResponse response = delegate.execute(request, context);
+    public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
+                                        ProviderSseListener listener) {
+        ProviderHttpResponse response = delegate.execute(request, context, listener);
         if (response != null && response.getStatusCode() == 403) log(request);
         return response;
     }

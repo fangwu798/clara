@@ -18,9 +18,10 @@ import com.clara.model.api.Role;
 import com.clara.model.api.TextContent;
 import com.clara.model.api.ToolCallContent;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.ProviderSseListener;
 import com.clara.tool.ToolSpecification;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -249,6 +250,10 @@ public class AnthropicChatModelTest {
         public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context) {
             this.request = request;
             return response;
+        }
+        public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
+                ProviderSseListener listener) {
+            throw new UnsupportedOperationException("streaming is not used in this test");
         }
     }
 }

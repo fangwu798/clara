@@ -3,8 +3,8 @@ package com.clara.model.provider.media;
 import com.clara.kernel.InvocationContext;
 import com.clara.model.api.ModelProvider;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
 
 import java.net.URI;

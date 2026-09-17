@@ -9,12 +9,10 @@ import com.clara.media.job.MediaJobProviderOperation;
 import com.clara.media.job.MediaProviderJobSnapshot;
 import com.clara.media.job.MediaProviderJobStatus;
 import com.clara.model.api.ModelProvider;
-import com.clara.model.provider.http.ProviderHttpResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Locale;

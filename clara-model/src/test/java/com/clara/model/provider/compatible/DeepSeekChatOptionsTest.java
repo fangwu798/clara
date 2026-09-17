@@ -12,9 +12,10 @@ import com.clara.model.api.Role;
 import com.clara.model.api.TextContent;
 import com.clara.model.provider.deepseek.DeepSeekChatOptions;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.ProviderSseListener;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -113,6 +114,10 @@ public class DeepSeekChatOptionsTest {
                     + "\"content\":\"answer\",\"reasoning_content\":\"response reasoning\"},"
                     + "\"finish_reason\":\"stop\"}]}";
             return new ProviderHttpResponse(200, null, body.getBytes(StandardCharsets.UTF_8));
+        }
+        public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
+                ProviderSseListener listener) {
+            throw new UnsupportedOperationException("streaming is not used in this test");
         }
     }
 }

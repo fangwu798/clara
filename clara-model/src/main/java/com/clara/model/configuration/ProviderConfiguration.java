@@ -52,7 +52,7 @@ import java.util.Map;
  *     ExecutorService executor = Executors.newSingleThreadExecutor();
  *     try {
  *         StreamingChatModel streaming = new OpenAiCompatibleStreamingChatModel(chatConfig,
- *                 new Jdk8ProviderSseTransport(config.getTransport().toHttpTransportConfig(),
+ *                 new Jdk8ProviderHttpTransport(config.getTransport().toHttpTransportConfig(),
  *                         8192, 65536, 100000),
  *                 config.credentialResolver(), executor, 8, 1000000);
  *         StreamHandle handle = streaming.chat(request, new StreamObserver() {

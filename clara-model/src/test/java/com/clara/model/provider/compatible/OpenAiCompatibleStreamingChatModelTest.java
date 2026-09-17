@@ -14,11 +14,11 @@ import com.clara.model.api.StreamObserver;
 import com.clara.model.api.TextContent;
 import com.clara.model.api.ToolCallContent;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
-import com.clara.model.provider.http.ProviderSseEvent;
+import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
+import com.clara.model.provider.http.event.ProviderSseEvent;
 import com.clara.model.provider.http.ProviderSseListener;
-import com.clara.model.provider.http.Jdk8ProviderSseTransport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -129,7 +129,7 @@ public class OpenAiCompatibleStreamingChatModelTest {
         } catch (IllegalArgumentException expected) { }
     }
 
-    private OpenAiCompatibleStreamingChatModel model(Jdk8ProviderSseTransport transport,
+    private OpenAiCompatibleStreamingChatModel model(ProviderHttpTransport transport,
                                                      ProviderCredentialResolver resolver) {
         try {
             return new OpenAiCompatibleStreamingChatModel(new OpenAiCompatibleChatConfig(
@@ -171,13 +171,16 @@ public class OpenAiCompatibleStreamingChatModelTest {
         }
     }
 
-    private static final class FakeTransport implements Jdk8ProviderSseTransport {
+    private static final class FakeTransport implements ProviderHttpTransport {
         private final int status;
         private final String[] chunks;
         private ProviderHttpRequest request;
         private FakeTransport(int status, String... chunks) {
             this.status = status;
             this.chunks = chunks;
+        }
+        public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context) {
+            throw new UnsupportedOperationException("sync call is not used in this test");
         }
         public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
                 ProviderSseListener listener) {
@@ -191,8 +194,11 @@ public class OpenAiCompatibleStreamingChatModelTest {
         }
     }
 
-    private static final class BlockingTransport implements Jdk8ProviderSseTransport {
+    private static final class BlockingTransport implements ProviderHttpTransport {
         private final CountDownLatch started = new CountDownLatch(1);
+        public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context) {
+            throw new UnsupportedOperationException("sync call is not used in this test");
+        }
         public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
                 ProviderSseListener listener) {
             started.countDown();

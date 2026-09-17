@@ -4,20 +4,14 @@ import com.clara.kernel.ClaraError;
 import com.clara.kernel.ClaraException;
 import com.clara.kernel.ErrorCategory;
 import com.clara.kernel.ErrorCodes;
-import com.clara.model.api.ChatRequest;
-import com.clara.model.api.ChatResponse;
-import com.clara.model.api.Content;
-import com.clara.model.api.StreamEvent;
-import com.clara.model.api.StreamHandle;
-import com.clara.model.api.StreamObserver;
-import com.clara.model.api.StreamingChatModel;
-import com.clara.model.api.ToolCallContent;
+import com.clara.model.api.*;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
-import com.clara.model.provider.http.ProviderSseEvent;
+import com.clara.model.provider.http.ProviderHttpTransport;
 import com.clara.model.provider.http.ProviderSseListener;
-import com.clara.model.provider.http.Jdk8ProviderSseTransport;
+import com.clara.model.provider.http.event.ProviderSseEvent;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -36,7 +30,7 @@ import java.util.concurrent.Future;
  */
 public final class OpenAiCompatibleStreamingChatModel implements StreamingChatModel {
     private final OpenAiCompatibleChatConfig config;
-    private final Jdk8ProviderSseTransport transport;
+    private final ProviderHttpTransport transport;
     private final ProviderCredentialResolver credentials;
     private final ExecutorService executor;
     private final int maxToolCalls;
@@ -44,7 +38,7 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
     private final OpenAiCompatibleChatCodec codec = new OpenAiCompatibleChatCodec();
 
     public OpenAiCompatibleStreamingChatModel(OpenAiCompatibleChatConfig config,
-                                              Jdk8ProviderSseTransport transport, ProviderCredentialResolver credentials,
+                                              ProviderHttpTransport transport, ProviderCredentialResolver credentials,
                                               ExecutorService executor, int maxToolCalls, int maxAccumulatedChars) {
         if (config == null || transport == null || credentials == null || executor == null) {
             throw new IllegalArgumentException("dependencies must not be null");

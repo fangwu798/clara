@@ -10,6 +10,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.clara.model.provider.http.event.ProviderSseEvent;
+import com.clara.model.provider.http.event.ProviderSseParser;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -33,9 +36,24 @@ public class ProviderSseParserTest {
         assertEquals(Long.valueOf(250L), events.get(0).getRetryMillis());
     }
 
-    @Test public void dispatchesAtEofAndAllowsListenerToStop() {
+    @Test public void discardsUnterminatedTailAtEof() {
         final List<String> data = new ArrayList<String>();
         int count = parser().parse(bytes("data: first\n\ndata: second"), context(),
+                new ProviderSseListener() {
+                    public boolean onEvent(ProviderSseEvent event) {
+                        data.add(event.getData());
+                        return true;
+                    }
+                });
+
+        assertEquals(1, count);
+        assertEquals(1, data.size());
+        assertEquals("first", data.get(0));
+    }
+
+    @Test public void allowsListenerToStop() {
+        final List<String> data = new ArrayList<String>();
+        int count = parser().parse(bytes("data: first\n\ndata: second\n\n"), context(),
                 new ProviderSseListener() {
                     public boolean onEvent(ProviderSseEvent event) {
                         data.add(event.getData());
@@ -44,6 +62,7 @@ public class ProviderSseParserTest {
                 });
 
         assertEquals(1, count);
+        assertEquals(1, data.size());
         assertEquals("first", data.get(0));
     }
 

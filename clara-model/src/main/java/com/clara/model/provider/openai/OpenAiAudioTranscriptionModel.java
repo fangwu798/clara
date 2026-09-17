@@ -7,7 +7,7 @@ import com.clara.model.api.media.AudioTranscriptionRequest;
 import com.clara.model.api.media.AudioTranscriptionResult;
 import com.clara.model.api.media.TranscriptionSegment;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
 import com.clara.model.provider.media.MediaJson;
 import com.clara.model.provider.media.MultipartBody;

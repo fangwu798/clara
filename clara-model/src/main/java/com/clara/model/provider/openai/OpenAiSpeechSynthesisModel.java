@@ -6,7 +6,7 @@ import com.clara.model.api.media.SpeechSynthesisModel;
 import com.clara.model.api.media.SpeechSynthesisRequest;
 import com.clara.model.api.media.SpeechSynthesisResult;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
 import com.clara.model.provider.media.MediaJson;
 import com.clara.model.provider.media.ProviderMediaAssetBridge;

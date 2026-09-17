@@ -23,9 +23,10 @@ import com.clara.model.provider.alibaba.AlibabaAudioConfig;
 import com.clara.model.provider.alibaba.AlibabaAudioTranscriptionModel;
 import com.clara.model.provider.alibaba.AlibabaSpeechSynthesisModel;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.ProviderSseListener;
 import com.clara.model.provider.openai.OpenAiAudioTranscriptionModel;
 import com.clara.model.provider.openai.OpenAiMediaConfig;
 import com.clara.model.provider.openai.OpenAiSpeechSynthesisModel;
@@ -171,6 +172,10 @@ public class ProviderMediaAdaptersTest {
         QueueTransport(ProviderHttpResponse... responses) { this.responses.addAll(Arrays.asList(responses)); }
         public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context) {
             requests.add(request); return responses.remove(0);
+        }
+        public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
+                ProviderSseListener listener) {
+            throw new UnsupportedOperationException("streaming is not used in this test");
         }
     }
     private static final class FakeAssets implements ProviderMediaAssetBridge {

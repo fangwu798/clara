@@ -4,6 +4,8 @@ import com.clara.kernel.CancellationToken;
 import com.clara.kernel.ClaraException;
 import com.clara.kernel.ErrorCodes;
 import com.clara.kernel.InvocationContext;
+import com.clara.model.provider.http.event.ProviderSseEvent;
+import com.clara.model.provider.http.impl.*;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -19,7 +21,10 @@ import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
-public class Jdk8ProviderSseTransportTest {
+/**
+ * 验证合并后的 {@link Jdk8ProviderHttpTransport} 的 SSE 流式行为，以及与同步调用共存的语义。
+ */
+public class Jdk8ProviderHttpTransportStreamingTest {
     private HttpServer server;
     private String origin;
 
@@ -91,8 +96,26 @@ public class Jdk8ProviderSseTransportTest {
         assertEquals(Collections.singletonList("first"), events);
     }
 
+    @Test public void servesSyncCallOnSameInstance() throws Exception {
+        ProviderHttpResponse response = transport(100, 1024, 256, 512, 20, 1000)
+                .execute(request("/stream", null), context());
+
+        assertEquals(200, response.getStatusCode());
+        String body = new String(response.getBody(), StandardCharsets.UTF_8);
+        assertTrue(body.contains("data: first"));
+    }
+
+    @Test public void rejectsStreamingWhenNotConfiguredForSse() {
+        Jdk8ProviderHttpTransport syncOnly = new Jdk8ProviderHttpTransport(new ProviderHttpTransportConfig(
+                Collections.singleton(origin), 1000, 1000, 100, 1000, true));
+        try {
+            syncOnly.execute(request("/stream", null), context(), sink());
+            fail("expected unsupported streaming");
+        } catch (UnsupportedOperationException expected) { }
+    }
+
     @Test public void returnsHttpFailuresAndDoesNotFollowRedirects() throws Exception {
-        Jdk8ProviderSseTransport transport = transport(100, 100, 50, 80, 10, 1000);
+        Jdk8ProviderHttpTransport transport = transport(100, 100, 50, 80, 10, 1000);
         ProviderHttpResponse error = transport.execute(request("/error", null), context(), sink());
         assertEquals(429, error.getStatusCode());
         assertEquals("provider diagnostic", new String(error.getBody(), StandardCharsets.UTF_8));
@@ -103,22 +126,22 @@ public class Jdk8ProviderSseTransportTest {
     }
 
     @Test public void rejectsWrongContentTypeAndOversizedResponses() {
-        final Jdk8ProviderSseTransport normal = transport(100, 100, 50, 80, 10, 1000);
+        final Jdk8ProviderHttpTransport normal = transport(100, 100, 50, 80, 10, 1000);
         assertCode(ErrorCodes.MODEL_PROTOCOL_ERROR, new Runnable() { public void run() {
             normal.execute(request("/wrong-type", null), context(), sink());
         }});
-        final Jdk8ProviderSseTransport streamLimited = transport(100, 16, 8, 16, 10, 1000);
+        final Jdk8ProviderHttpTransport streamLimited = transport(100, 16, 8, 16, 10, 1000);
         assertCode(ErrorCodes.MODEL_RESPONSE_TOO_LARGE, new Runnable() { public void run() {
             streamLimited.execute(request("/large-stream", null), context(), sink());
         }});
-        final Jdk8ProviderSseTransport errorLimited = transport(100, 10, 10, 10, 10, 1000);
+        final Jdk8ProviderHttpTransport errorLimited = transport(100, 10, 10, 10, 10, 1000);
         assertCode(ErrorCodes.MODEL_RESPONSE_TOO_LARGE, new Runnable() { public void run() {
             errorLimited.execute(request("/large-error", null), context(), sink());
         }});
     }
 
     @Test public void enforcesOriginRequestLimitDeadlineAndReadTimeout() {
-        final Jdk8ProviderSseTransport limited = transport(2, 100, 50, 80, 10, 1000);
+        final Jdk8ProviderHttpTransport limited = transport(2, 100, 50, 80, 10, 1000);
         assertCode(ErrorCodes.MODEL_REQUEST_TOO_LARGE, new Runnable() { public void run() {
             limited.execute(request("/stream", "abc"), context(), sink());
         }});
@@ -134,17 +157,17 @@ public class Jdk8ProviderSseTransportTest {
         assertCode(ErrorCodes.MODEL_REQUEST_TIMEOUT, new Runnable() { public void run() {
             limited.execute(request("/stream", null), expired, sink());
         }});
-        final Jdk8ProviderSseTransport shortRead = transport(100, 100, 50, 80, 10, 50);
+        final Jdk8ProviderHttpTransport shortRead = transport(100, 100, 50, 80, 10, 50);
         assertCode(ErrorCodes.MODEL_REQUEST_TIMEOUT, new Runnable() { public void run() {
             shortRead.execute(request("/slow", null), context(), sink());
         }});
     }
 
-    private Jdk8ProviderSseTransport transport(int maxRequest, int maxResponse,
+    private Jdk8ProviderHttpTransport transport(int maxRequest, int maxResponse,
             int maxLine, int maxEvent, int maxEvents, int readTimeout) {
         ProviderHttpTransportConfig config = new ProviderHttpTransportConfig(
                 Collections.singleton(origin), 1000, readTimeout, maxRequest, maxResponse, true);
-        return new Jdk8ProviderSseTransport(config, maxLine, maxEvent, maxEvents);
+        return new Jdk8ProviderHttpTransport(config, maxLine, maxEvent, maxEvents);
     }
 
     private ProviderHttpRequest request(String path, String body) {

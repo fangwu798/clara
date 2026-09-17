@@ -2,9 +2,10 @@ package com.clara.novel.cli;
 
 import com.clara.kernel.CancellationToken;
 import com.clara.kernel.InvocationContext;
-import com.clara.model.provider.http.ProviderHttpRequest;
-import com.clara.model.provider.http.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderHttpRequest;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.ProviderSseListener;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URI;
@@ -21,7 +22,7 @@ public class ForbiddenRequestLoggingTransportTest {
                 Collections.<String, java.util.List<String>>emptyMap(), new byte[0]);
         ProviderHttpTransport delegate = new ProviderHttpTransport() {
             public ProviderHttpResponse execute(ProviderHttpRequest request,
-                    InvocationContext context) { return forbidden; }
+                    InvocationContext context, ProviderSseListener listener) { return forbidden; }
         };
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
         ForbiddenRequestLoggingTransport transport = new ForbiddenRequestLoggingTransport(
