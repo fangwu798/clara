@@ -1,8 +1,49 @@
 package com.clara.workspace.api;
-import java.util.ArrayList;import java.util.Collections;import java.util.List;import java.util.Map;import java.util.LinkedHashMap;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+
 /**
  * 表示。
  */
-public final class ParsedDocument {private final DocumentFormat format;private final List<DocumentNode> nodes;private final Map<String,String> metadata;private final boolean editable;private final List<String>warnings;
- public ParsedDocument(DocumentFormat format,List<DocumentNode> nodes,Map<String,String> metadata,boolean editable,List<String>warnings){if(format==null||nodes==null) {throw new IllegalArgumentException(); }this.format=format;this.nodes=Collections.unmodifiableList(new ArrayList<DocumentNode>(nodes));this.metadata=metadata==null?Collections.<String,String>emptyMap():Collections.unmodifiableMap(new LinkedHashMap<String,String>(metadata));this.editable=editable;this.warnings=warnings==null?Collections.<String>emptyList():Collections.unmodifiableList(new ArrayList<String>(warnings));}
- public DocumentFormat getFormat(){return format;}public List<DocumentNode> getNodes(){return nodes;}public Map<String,String> getMetadata(){return metadata;}public boolean isEditable(){return editable;}public List<String> getWarnings(){return warnings;}}
+public final class ParsedDocument {
+    private final DocumentFormat format;
+    private final List<DocumentNode> nodes;
+    private final Map<String, String> metadata;
+    private final boolean editable;
+    private final List<String> warnings;
+
+    public ParsedDocument(DocumentFormat format, List<DocumentNode> nodes, Map<String, String> metadata, boolean editable, List<String> warnings) {
+        if (format == null || nodes == null) {
+            throw new IllegalArgumentException();
+        }
+        this.format = format;
+        this.nodes = Collections.unmodifiableList(new ArrayList<DocumentNode>(nodes));
+        this.metadata = metadata == null ? Collections.<String, String>emptyMap() : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.editable = editable;
+        this.warnings = warnings == null ? Collections.<String>emptyList() : Collections.unmodifiableList(new ArrayList<String>(warnings));
+    }
+
+    public DocumentFormat getFormat() {
+        return format;
+    }
+
+    public List<DocumentNode> getNodes() {
+        return nodes;
+    }
+
+    public Map<String, String> getMetadata() {
+        return metadata;
+    }
+
+    public boolean isEditable() {
+        return editable;
+    }
+
+    public List<String> getWarnings() {
+        return warnings;
+    }
+}

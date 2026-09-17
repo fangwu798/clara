@@ -15,6 +15,7 @@ import com.clara.media.MediaValidation;
 import com.clara.media.MediaValidator;
 import com.clara.media.validation.DefaultMediaValidator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.Closeable;
@@ -58,14 +59,18 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
     public FileSystemMediaStore(FileSystemMediaStoreConfig config) {
         this(config, new DefaultMediaValidator(config == null ? null : config.getValidationPolicy()), new ObjectMapper());
     }
+
     public static FileSystemMediaStore inspected(FileSystemMediaStoreConfig config,
-            List<MediaMetadataProbe> metadataProbes, MediaContentSafetyScanner safetyScanner) {
+                                                 List<MediaMetadataProbe> metadataProbes, MediaContentSafetyScanner safetyScanner) {
         return new FileSystemMediaStore(config,
                 new DefaultMediaValidator(config == null ? null : config.getValidationPolicy(),
                         metadataProbes, safetyScanner), new ObjectMapper());
     }
+
     public FileSystemMediaStore(FileSystemMediaStoreConfig config, MediaValidator validator, ObjectMapper json) {
-        if (config == null || validator == null || json == null) { throw new IllegalArgumentException("dependencies must not be null"); }
+        if (config == null || validator == null || json == null) {
+            throw new IllegalArgumentException("dependencies must not be null");
+        }
         this.config = config;
         this.validator = validator;
         this.json = json;
@@ -89,7 +94,9 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
     }
 
     public synchronized MediaAsset put(MediaUpload upload) {
-        if (upload == null) { throw new IllegalArgumentException("upload must not be null"); }
+        if (upload == null) {
+            throw new IllegalArgumentException("upload must not be null");
+        }
         Path stage = assetsRoot.resolve(".tmp").resolve(UUID.randomUUID().toString());
         try {
             Files.createDirectory(stage);
@@ -100,7 +107,9 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
             long existingSize = Files.isDirectory(destination) ? readManifest(destination, upload.getTenantId(), assetId).size : 0;
             long usage = tenantUsage(upload.getTenantId()) - existingSize;
             MediaInput stagedInput = new MediaInput() {
-                public InputStream open() throws IOException { return Files.newInputStream(content); }
+                public InputStream open() throws IOException {
+                    return Files.newInputStream(content);
+                }
             };
             MediaValidation validation = validator.validate(upload, stagedInput, digest.size, usage);
             long now = System.currentTimeMillis();
@@ -140,30 +149,45 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
             DigestAndSize actual = digest(content);
             if (actual.size != manifest.size || !actual.sha256.equals(manifest.sha256)) ioError();
             return manifest.toAsset();
-        } catch (ClaraException e) { throw e; }
-        catch (IOException e) { ioError(); return null; }
+        } catch (ClaraException e) {
+            throw e;
+        } catch (IOException e) {
+            ioError();
+            return null;
+        }
     }
 
     public synchronized InputStream open(String tenantId, String assetId) {
         get(tenantId, assetId);
-        try { return new BufferedInputStream(Files.newInputStream(assetDirectory(tenantId, assetId).resolve("content"))); }
-        catch (IOException e) { ioError(); return null; }
+        try {
+            return new BufferedInputStream(Files.newInputStream(assetDirectory(tenantId, assetId).resolve("content")));
+        } catch (IOException e) {
+            ioError();
+            return null;
+        }
     }
 
     public synchronized void delete(String tenantId, String assetId) {
         validateIdentity(tenantId, assetId);
         Path directory = assetDirectory(tenantId, assetId);
         if (!Files.isDirectory(directory)) notFound();
-        try { readManifest(directory, tenantId, assetId); deleteTree(directory); }
-        catch (ClaraException e) { throw e; }
-        catch (IOException e) { ioError(); }
+        try {
+            readManifest(directory, tenantId, assetId);
+            deleteTree(directory);
+        } catch (ClaraException e) {
+            throw e;
+        } catch (IOException e) {
+            ioError();
+        }
     }
 
     public synchronized int cleanupExpired(long now) {
         int removed = 0;
         try {
             DirectoryStream<Path> tenants = Files.newDirectoryStream(assetsRoot, new DirectoryStream.Filter<Path>() {
-                public boolean accept(Path entry) { return Files.isDirectory(entry) && !entry.getFileName().toString().startsWith("."); }
+                public boolean accept(Path entry) {
+                    return Files.isDirectory(entry) && !entry.getFileName().toString().startsWith(".");
+                }
             });
             try {
                 for (Path tenant : tenants) {
@@ -176,19 +200,32 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
                                     deleteTree(asset);
                                     removed++;
                                 }
-                            } catch (IOException corruptOrRacing) { ioError(); }
+                            } catch (IOException corruptOrRacing) {
+                                ioError();
+                            }
                         }
-                    } finally { assets.close(); }
+                    } finally {
+                        assets.close();
+                    }
                 }
-            } finally { tenants.close(); }
+            } finally {
+                tenants.close();
+            }
             return removed;
-        } catch (ClaraException e) { throw e; }
-        catch (IOException e) { ioError(); return 0; }
+        } catch (ClaraException e) {
+            throw e;
+        } catch (IOException e) {
+            ioError();
+            return 0;
+        }
     }
 
     public void close() throws IOException {
-        try { if (lock != null && lock.isValid()) lock.release(); }
-        finally { lockChannel.close(); }
+        try {
+            if (lock != null && lock.isValid()) lock.release();
+        } finally {
+            lockChannel.close();
+        }
     }
 
     private Manifest readManifest(Path directory, String tenantId, String assetId) throws IOException {
@@ -197,29 +234,47 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
                 || !tenantId.equals(manifest.ownerTenantId) || !assetId.equals(manifest.sha256)) ioError();
         return manifest;
     }
+
     private long tenantUsage(String tenantId) throws IOException {
         Path directory = tenantDirectory(tenantId);
         if (!Files.isDirectory(directory)) return 0;
         long total = 0;
         DirectoryStream<Path> stream = Files.newDirectoryStream(directory);
         try {
-            for (Path asset : stream) if (Files.isDirectory(asset)) {
-                Manifest manifest = json.readValue(asset.resolve("manifest.json").toFile(), Manifest.class);
-                if (!tenantId.equals(manifest.ownerTenantId)) denied();
-                if (Long.MAX_VALUE - total < manifest.size) resourceLimit();
-                total += manifest.size;
-            }
-        } finally { stream.close(); }
+            for (Path asset : stream)
+                if (Files.isDirectory(asset)) {
+                    Manifest manifest = json.readValue(asset.resolve("manifest.json").toFile(), Manifest.class);
+                    if (!tenantId.equals(manifest.ownerTenantId)) denied();
+                    if (Long.MAX_VALUE - total < manifest.size) resourceLimit();
+                    total += manifest.size;
+                }
+        } finally {
+            stream.close();
+        }
         return total;
     }
-    private Path tenantDirectory(String tenantId) { return assetsRoot.resolve(sha256(tenantId.getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
-    private Path assetDirectory(String tenantId, String assetId) { return tenantDirectory(tenantId).resolve(assetId); }
-    private static void validateIdentity(String tenantId, String assetId) {
-        if (tenantId == null || tenantId.trim().isEmpty()) { throw new IllegalArgumentException("tenantId must not be blank"); }
-        if (assetId == null || !assetId.matches("[0-9a-f]{64}")) { throw new IllegalArgumentException("invalid assetId"); }
+
+    private Path tenantDirectory(String tenantId) {
+        return assetsRoot.resolve(sha256(tenantId.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
+
+    private Path assetDirectory(String tenantId, String assetId) {
+        return tenantDirectory(tenantId).resolve(assetId);
+    }
+
+    private static void validateIdentity(String tenantId, String assetId) {
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new IllegalArgumentException("tenantId must not be blank");
+        }
+        if (assetId == null || !assetId.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("invalid assetId");
+        }
+    }
+
     private static DigestAndSize copy(InputStream source, Path target, long limit) throws IOException {
-        if (source == null) { throw new IOException("media input returned null"); }
+        if (source == null) {
+            throw new IOException("media input returned null");
+        }
         MessageDigest digest = sha256Digest();
         long size = 0;
         InputStream input = new BufferedInputStream(source);
@@ -234,43 +289,126 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
                 output.write(buffer, 0, count);
                 size += count;
             }
-        } finally { try { input.close(); } finally { output.close(); } }
+        } finally {
+            try {
+                input.close();
+            } finally {
+                output.close();
+            }
+        }
         return new DigestAndSize(hex(digest.digest()), size);
     }
+
     private static DigestAndSize digest(Path path) throws IOException {
         MessageDigest digest = sha256Digest();
         long size = 0;
         InputStream input = new BufferedInputStream(Files.newInputStream(path));
-        try { byte[] buffer = new byte[8192]; int count; while ((count = input.read(buffer)) >= 0) { if (count > 0) { digest.update(buffer, 0, count); size += count; } } }
-        finally { input.close(); }
+        try {
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) >= 0) {
+                if (count > 0) {
+                    digest.update(buffer, 0, count);
+                    size += count;
+                }
+            }
+        } finally {
+            input.close();
+        }
         return new DigestAndSize(hex(digest.digest()), size);
     }
-    private static String sha256(byte[] value) { MessageDigest digest = sha256Digest(); return hex(digest.digest(value)); }
-    private static MessageDigest sha256Digest() { try { return MessageDigest.getInstance("SHA-256"); } catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); } }
-    private static String hex(byte[] value) { StringBuilder text = new StringBuilder(value.length * 2); for (byte b : value) text.append(String.format(Locale.ROOT, "%02x", b & 0xff)); return text.toString(); }
-    private static long safeAdd(long left, long right) { return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right; }
+
+    private static String sha256(byte[] value) {
+        MessageDigest digest = sha256Digest();
+        return hex(digest.digest(value));
+    }
+
+    private static MessageDigest sha256Digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String hex(byte[] value) {
+        StringBuilder text = new StringBuilder(value.length * 2);
+        for (byte b : value) text.append(String.format(Locale.ROOT, "%02x", b & 0xff));
+        return text.toString();
+    }
+
+    private static long safeAdd(long left, long right) {
+        return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
+
     private static void deleteTree(Path path) throws IOException {
         if (!Files.exists(path)) return;
-        if (Files.isDirectory(path)) { DirectoryStream<Path> stream = Files.newDirectoryStream(path); try { for (Path child : stream) deleteTree(child); } finally { stream.close(); } }
+        if (Files.isDirectory(path)) {
+            DirectoryStream<Path> stream = Files.newDirectoryStream(path);
+            try {
+                for (Path child : stream) deleteTree(child);
+            } finally {
+                stream.close();
+            }
+        }
         Files.deleteIfExists(path);
     }
-    private static void deleteTreeQuietly(Path path) { try { deleteTree(path); } catch (IOException ignored) { } }
-    private static void closeQuietly(Closeable closeable) { if (closeable != null) try { closeable.close(); } catch (IOException ignored) { } }
-    private static void notFound() { fail(ErrorCodes.MEDIA_NOT_FOUND, ErrorCategory.VALIDATION); }
-    private static void invalid() { fail(ErrorCodes.MEDIA_VALIDATION_FAILED, ErrorCategory.VALIDATION); }
-    private static void denied() { fail(ErrorCodes.MEDIA_ACCESS_DENIED, ErrorCategory.AUTHORIZATION); }
-    private static void locked() { fail(ErrorCodes.MEDIA_STORE_LOCKED, ErrorCategory.CONFLICT); }
-    private static void resourceLimit() { fail(ErrorCodes.MEDIA_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT); }
-    private static void ioError() { fail(ErrorCodes.MEDIA_STORE_IO_ERROR, ErrorCategory.INTERNAL); }
-    private static void fail(String code, ErrorCategory category) { throw new ClaraException(new ClaraError(code, category, code, false, null, null, null, null, Collections.<String, String>emptyMap())); }
+
+    private static void deleteTreeQuietly(Path path) {
+        try {
+            deleteTree(path);
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static void closeQuietly(Closeable closeable) {
+        if (closeable != null) try {
+            closeable.close();
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static void notFound() {
+        fail(ErrorCodes.MEDIA_NOT_FOUND, ErrorCategory.VALIDATION);
+    }
+
+    private static void invalid() {
+        fail(ErrorCodes.MEDIA_VALIDATION_FAILED, ErrorCategory.VALIDATION);
+    }
+
+    private static void denied() {
+        fail(ErrorCodes.MEDIA_ACCESS_DENIED, ErrorCategory.AUTHORIZATION);
+    }
+
+    private static void locked() {
+        fail(ErrorCodes.MEDIA_STORE_LOCKED, ErrorCategory.CONFLICT);
+    }
+
+    private static void resourceLimit() {
+        fail(ErrorCodes.MEDIA_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT);
+    }
+
+    private static void ioError() {
+        fail(ErrorCodes.MEDIA_STORE_IO_ERROR, ErrorCategory.INTERNAL);
+    }
+
+    private static void fail(String code, ErrorCategory category) {
+        throw new ClaraException(new ClaraError(code, category, code, false, null, null, null, null, Collections.<String, String>emptyMap()));
+    }
 
     /**
      * 表示。
      */
     private static final class DigestAndSize {
-        private final String sha256; private final long size;
-        private DigestAndSize(String sha256, long size) { this.sha256 = sha256; this.size = size; }
+        private final String sha256;
+        private final long size;
+
+        private DigestAndSize(String sha256, long size) {
+            this.sha256 = sha256;
+            this.size = size;
+        }
     }
+
     /**
      * 表示。
      */
@@ -290,16 +428,32 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
         public long createdAt;
         public Long expiresAt;
         public Map<String, String> metadata;
-        public Manifest() { }
+
+        public Manifest() {
+        }
+
         static Manifest from(MediaUpload upload, MediaValidation validation, String id, long size, long now, Long expiry) {
             Manifest value = new Manifest();
-            value.formatVersion = FORMAT_VERSION; value.assetId = id; value.mediaType = upload.getMediaType().name();
-            value.mimeType = validation.getDetectedMimeType(); value.size = size; value.sha256 = id;
-            value.storageUri = "clara-media:" + id; value.sourceUri = upload.getSourceUri();
-            value.width = validation.getWidth(); value.height = validation.getHeight(); value.durationMs = validation.getDurationMs();
-            value.ownerTenantId = upload.getTenantId(); value.createdAt = now; value.expiresAt = expiry; value.metadata = upload.getMetadata();
+            value.formatVersion = FORMAT_VERSION;
+            value.assetId = id;
+            value.mediaType = upload.getMediaType().name();
+            value.mimeType = validation.getDetectedMimeType();
+            value.size = size;
+            value.sha256 = id;
+            value.storageUri = "clara-media:" + id;
+            value.sourceUri = upload.getSourceUri();
+            value.width = validation.getWidth();
+            value.height = validation.getHeight();
+            value.durationMs = validation.getDurationMs();
+            value.ownerTenantId = upload.getTenantId();
+            value.createdAt = now;
+            value.expiresAt = expiry;
+            value.metadata = upload.getMetadata();
             return value;
         }
-        MediaAsset toAsset() { return new MediaAsset(assetId, MediaType.valueOf(mediaType), mimeType, size, sha256, storageUri, sourceUri, width, height, durationMs, ownerTenantId, createdAt, expiresAt, metadata); }
+
+        MediaAsset toAsset() {
+            return new MediaAsset(assetId, MediaType.valueOf(mediaType), mimeType, size, sha256, storageUri, sourceUri, width, height, durationMs, ownerTenantId, createdAt, expiresAt, metadata);
+        }
     }
 }

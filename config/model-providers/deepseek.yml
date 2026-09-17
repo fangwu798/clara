@@ -1,0 +1,19 @@
+provider: DEEPSEEK
+credential:
+  secretRef: deepseek-novel
+  environmentVariable: CLARA_DEEPSEEK_API_KEY
+transport:
+  allowedOrigins:
+    - https://api.deepseek.com
+  connectTimeoutMillis: 10000
+  readTimeoutMillis: 180000
+  maxRequestBytes: 8388608
+  maxResponseBytes: 33554432
+  allowHttp: false
+capabilities:
+  chat:
+    endpoint: https://api.deepseek.com/chat/completions
+    modelId: deepseek-v4-pro
+    apiProfile: chat-completions-v1
+    parameters:
+      maxTokens: 30000

@@ -5,6 +5,7 @@ import com.clara.kernel.ClaraException;
 import com.clara.kernel.ErrorCategory;
 import com.clara.kernel.ErrorCodes;
 import com.clara.kernel.InvocationContext;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,12 +21,14 @@ import java.util.Map;
  * 传输JDK 8服务提供商SSE消息。
  */
 public final class Jdk8ProviderSseTransport implements ProviderSseTransport {
-    private final Jdk8ProviderHttpTransportConfig config;
+    private final ProviderHttpTransportConfig config;
     private final ProviderSseParser parser;
 
-    public Jdk8ProviderSseTransport(Jdk8ProviderHttpTransportConfig config,
-            int maxLineBytes, int maxEventBytes, int maxEvents) {
-        if (config == null) { throw new IllegalArgumentException("config must not be null"); }
+    public Jdk8ProviderSseTransport(ProviderHttpTransportConfig config,
+                                    int maxLineBytes, int maxEventBytes, int maxEvents) {
+        if (config == null) {
+            throw new IllegalArgumentException("config must not be null");
+        }
         if (maxEventBytes > config.getMaxResponseBytes()) {
             throw new IllegalArgumentException("event limit exceeds response limit");
         }
@@ -35,7 +38,7 @@ public final class Jdk8ProviderSseTransport implements ProviderSseTransport {
     }
 
     public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
-            ProviderSseListener listener) {
+                                        ProviderSseListener listener) {
         if (request == null || context == null || listener == null) {
             throw new IllegalArgumentException("request, context and listener must not be null");
         }
@@ -65,8 +68,14 @@ public final class Jdk8ProviderSseTransport implements ProviderSseTransport {
             }
             if (!isEventStream(connection.getContentType())) protocolError();
             InputStream input = connection.getInputStream();
-            try { parser.parse(input, context, listener); }
-            finally { try { input.close(); } catch (IOException ignored) { } }
+            try {
+                parser.parse(input, context, listener);
+            } finally {
+                try {
+                    input.close();
+                } catch (IOException ignored) {
+                }
+            }
             return new ProviderHttpResponse(status, headers, new byte[0]);
         } catch (SocketTimeoutException exception) {
             timeout();
@@ -85,8 +94,12 @@ public final class Jdk8ProviderSseTransport implements ProviderSseTransport {
         connection.setDoOutput(true);
         connection.setFixedLengthStreamingMode(body.length);
         OutputStream output = connection.getOutputStream();
-        try { output.write(body); output.flush(); }
-        finally { output.close(); }
+        try {
+            output.write(body);
+            output.flush();
+        } finally {
+            output.close();
+        }
     }
 
     private static byte[] readBounded(InputStream input, int maximum, InvocationContext context)
@@ -104,7 +117,12 @@ public final class Jdk8ProviderSseTransport implements ProviderSseTransport {
                 total += count;
             }
             return output.toByteArray();
-        } finally { try { input.close(); } catch (IOException ignored) { } }
+        } finally {
+            try {
+                input.close();
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     private static Map<String, List<String>> headers(HttpURLConnection connection) {
@@ -134,21 +152,27 @@ public final class Jdk8ProviderSseTransport implements ProviderSseTransport {
     private static void endpointDenied() {
         fail(ErrorCodes.MODEL_ENDPOINT_DENIED, ErrorCategory.AUTHORIZATION, false);
     }
+
     private static void requestTooLarge() {
         fail(ErrorCodes.MODEL_REQUEST_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false);
     }
+
     private static void responseTooLarge() {
         fail(ErrorCodes.MODEL_RESPONSE_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false);
     }
+
     private static void protocolError() {
         fail(ErrorCodes.MODEL_PROTOCOL_ERROR, ErrorCategory.EXTERNAL_SERVICE, false);
     }
+
     private static void timeout() {
         fail(ErrorCodes.MODEL_REQUEST_TIMEOUT, ErrorCategory.TIMEOUT, true);
     }
+
     private static void transportError() {
         fail(ErrorCodes.MODEL_TRANSPORT_IO_ERROR, ErrorCategory.EXTERNAL_SERVICE, true);
     }
+
     private static void fail(String code, ErrorCategory category, boolean retryable) {
         throw new ClaraException(new ClaraError(code, category, code, retryable, null,
                 null, null, null, Collections.<String, String>emptyMap()));

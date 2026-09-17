@@ -142,7 +142,7 @@ public class Jdk8ProviderSseTransportTest {
 
     private Jdk8ProviderSseTransport transport(int maxRequest, int maxResponse,
             int maxLine, int maxEvent, int maxEvents, int readTimeout) {
-        Jdk8ProviderHttpTransportConfig config = new Jdk8ProviderHttpTransportConfig(
+        ProviderHttpTransportConfig config = new ProviderHttpTransportConfig(
                 Collections.singleton(origin), 1000, readTimeout, maxRequest, maxResponse, true);
         return new Jdk8ProviderSseTransport(config, maxLine, maxEvent, maxEvents);
     }

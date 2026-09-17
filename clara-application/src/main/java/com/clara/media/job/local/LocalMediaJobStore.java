@@ -7,6 +7,7 @@ import com.clara.kernel.ErrorCodes;
 import com.clara.media.job.MediaJob;
 import com.clara.media.job.MediaJobStatus;
 import com.clara.media.job.MediaJobStore;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -59,7 +60,9 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
     private boolean closed;
 
     public LocalMediaJobStore(LocalMediaJobStoreConfig config) {
-        if (config == null) { throw new IllegalArgumentException("config must not be null"); }
+        if (config == null) {
+            throw new IllegalArgumentException("config must not be null");
+        }
         this.config = config;
         this.directory = config.getWorkspaceRoot().resolve(".clara").resolve("state").resolve("media-jobs");
         this.snapshotFile = directory.resolve("jobs.bin");
@@ -70,7 +73,9 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
             channel = FileChannel.open(directory.resolve("store.lock"),
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             acquired = channel.tryLock();
-            if (acquired == null) { throw locked(); }
+            if (acquired == null) {
+                throw locked();
+            }
             loadSnapshot();
             if (!Files.exists(snapshotFile)) {
                 persistAndReplace(Collections.<String, MediaJob>emptyMap(),
@@ -95,9 +100,13 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
     @Override
     public synchronized void create(MediaJob job) {
         ensureOpen();
-        if (job == null) { throw new IllegalArgumentException("job must not be null"); }
+        if (job == null) {
+            throw new IllegalArgumentException("job must not be null");
+        }
         String jobKey = key(job.getTenantId(), job.getJobId());
-        if (jobs.containsKey(jobKey)) { throw new IllegalStateException("job already exists"); }
+        if (jobs.containsKey(jobKey)) {
+            throw new IllegalStateException("job already exists");
+        }
         Map<String, MediaJob> replacement = new HashMap<String, MediaJob>(jobs);
         Map<String, String> replacementIndex = new HashMap<String, String>(idempotencyIndex);
         if (job.getIdempotencyKey() != null) {
@@ -127,7 +136,9 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
     @Override
     public synchronized List<MediaJob> findDue(long now, int limit) {
         ensureOpen();
-        if (limit <= 0) { throw new IllegalArgumentException("limit must be positive"); }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
         List<MediaJob> due = new ArrayList<MediaJob>();
         for (MediaJob job : jobs.values()) {
             if (job.getStatus() == MediaJobStatus.RUNNING && job.getNextPollAt() != null
@@ -140,7 +151,7 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
 
     @Override
     public synchronized boolean replace(String tenantId, String jobId, long expectedVersion,
-            MediaJob replacement) {
+                                        MediaJob replacement) {
         ensureOpen();
         String jobKey = key(tenantId, jobId);
         MediaJob current = jobs.get(jobKey);
@@ -163,19 +174,27 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
     public synchronized void close() throws IOException {
         if (closed) return;
         closed = true;
-        try { lock.release(); } finally { lockChannel.close(); }
+        try {
+            lock.release();
+        } finally {
+            lockChannel.close();
+        }
     }
 
     private void loadSnapshot() {
         if (!Files.exists(snapshotFile)) return;
         try {
             long size = Files.size(snapshotFile);
-            if (size < CHECKSUM_BYTES || size > config.getMaxFileBytes()) { throw corrupted(); }
+            if (size < CHECKSUM_BYTES || size > config.getMaxFileBytes()) {
+                throw corrupted();
+            }
             byte[] encoded = Files.readAllBytes(snapshotFile);
             int payloadLength = encoded.length - CHECKSUM_BYTES;
             byte[] payload = Arrays.copyOf(encoded, payloadLength);
             byte[] expected = Arrays.copyOfRange(encoded, payloadLength, encoded.length);
-            if (!MessageDigest.isEqual(expected, sha256(payload))) { throw corrupted(); }
+            if (!MessageDigest.isEqual(expected, sha256(payload))) {
+                throw corrupted();
+            }
             decode(payload);
         } catch (ClaraException exception) {
             throw exception;
@@ -188,22 +207,34 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
 
     private void decode(byte[] payload) throws IOException {
         DataInputStream input = new DataInputStream(new ByteArrayInputStream(payload));
-        if (input.readInt() != MAGIC || input.readInt() != FORMAT_VERSION) { throw corrupted(); }
-        if (!config.getWorkspaceId().equals(readString(input, false))) { throw corrupted(); }
+        if (input.readInt() != MAGIC || input.readInt() != FORMAT_VERSION) {
+            throw corrupted();
+        }
+        if (!config.getWorkspaceId().equals(readString(input, false))) {
+            throw corrupted();
+        }
         int count = input.readInt();
-        if (count < 0 || count > config.getMaxJobs()) { throw corrupted(); }
+        if (count < 0 || count > config.getMaxJobs()) {
+            throw corrupted();
+        }
         Map<String, MediaJob> loaded = new HashMap<String, MediaJob>();
         Map<String, String> loadedIndex = new HashMap<String, String>();
         for (int i = 0; i < count; i++) {
             MediaJob job = readJob(input);
             String jobKey = key(job.getTenantId(), job.getJobId());
-            if (loaded.put(jobKey, job) != null) { throw corrupted(); }
+            if (loaded.put(jobKey, job) != null) {
+                throw corrupted();
+            }
             if (job.getIdempotencyKey() != null) {
                 String indexKey = key(job.getTenantId(), job.getIdempotencyKey());
-                if (loadedIndex.put(indexKey, job.getJobId()) != null) { throw corrupted(); }
+                if (loadedIndex.put(indexKey, job.getJobId()) != null) {
+                    throw corrupted();
+                }
             }
         }
-        if (input.read() != -1) { throw corrupted(); }
+        if (input.read() != -1) {
+            throw corrupted();
+        }
         jobs.clear();
         jobs.putAll(loaded);
         idempotencyIndex.clear();
@@ -211,10 +242,14 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
     }
 
     private void persistAndReplace(Map<String, MediaJob> updated,
-            Map<String, String> updatedIndex) {
-        if (updated.size() > config.getMaxJobs()) { throw resourceLimit(); }
+                                   Map<String, String> updatedIndex) {
+        if (updated.size() > config.getMaxJobs()) {
+            throw resourceLimit();
+        }
         byte[] encoded = encode(updated);
-        if (encoded.length > config.getMaxFileBytes()) { throw resourceLimit(); }
+        if (encoded.length > config.getMaxFileBytes()) {
+            throw resourceLimit();
+        }
         Path temporary = null;
         try {
             temporary = Files.createTempFile(directory, "jobs-", ".tmp");
@@ -240,7 +275,10 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
             throw ioError();
         } finally {
             if (temporary != null) {
-                try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (IOException ignored) {
+                }
             }
         }
     }
@@ -307,12 +345,16 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
     private static void writeString(DataOutputStream output, String value, boolean nullable)
             throws IOException {
         if (value == null) {
-            if (!nullable) { throw new IllegalArgumentException("required value is null"); }
+            if (!nullable) {
+                throw new IllegalArgumentException("required value is null");
+            }
             output.writeInt(-1);
             return;
         }
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length > MAX_STRING_BYTES) { throw resourceLimit(); }
+        if (bytes.length > MAX_STRING_BYTES) {
+            throw resourceLimit();
+        }
         output.writeInt(bytes.length);
         output.write(bytes);
     }
@@ -320,7 +362,9 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
     private static String readString(DataInputStream input, boolean nullable) throws IOException {
         int length = input.readInt();
         if (length == -1 && nullable) return null;
-        if (length < 0 || length > MAX_STRING_BYTES) { throw corrupted(); }
+        if (length < 0 || length > MAX_STRING_BYTES) {
+            throw corrupted();
+        }
         byte[] bytes = new byte[length];
         input.readFully(bytes);
         return new String(bytes, StandardCharsets.UTF_8);
@@ -336,19 +380,24 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
     }
 
     private static byte[] sha256(byte[] payload) {
-        try { return MessageDigest.getInstance("SHA-256").digest(payload); }
-        catch (NoSuchAlgorithmException exception) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(payload);
+        } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 
     private static String key(String tenantId, String id) {
-        if (tenantId == null || id == null) { throw new IllegalArgumentException("identity must not be null"); }
+        if (tenantId == null || id == null) {
+            throw new IllegalArgumentException("identity must not be null");
+        }
         return tenantId.length() + ":" + tenantId + id;
     }
 
     private void ensureOpen() {
-        if (closed) { throw new IllegalStateException("media job store is closed"); }
+        if (closed) {
+            throw new IllegalStateException("media job store is closed");
+        }
     }
 
     private static ClaraException locked() {
@@ -374,12 +423,18 @@ public final class LocalMediaJobStore implements MediaJobStore, Closeable {
 
     private static void releaseQuietly(FileLock value) {
         if (value == null) return;
-        try { value.release(); } catch (IOException ignored) { }
+        try {
+            value.release();
+        } catch (IOException ignored) {
+        }
     }
 
     private static void closeQuietly(FileChannel value) {
         if (value == null) return;
-        try { value.close(); } catch (IOException ignored) { }
+        try {
+            value.close();
+        } catch (IOException ignored) {
+        }
     }
 
     private static final Comparator<MediaJob> IDENTITY_ORDER = new Comparator<MediaJob>() {

@@ -13,6 +13,7 @@ import com.clara.media.MediaType;
 import com.clara.media.MediaUpload;
 import com.clara.media.MediaValidation;
 import com.clara.media.MediaValidator;
+
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -40,12 +41,17 @@ public final class DefaultMediaValidator implements MediaValidator {
     public DefaultMediaValidator(MediaValidationPolicy config) {
         this(config, Collections.<MediaMetadataProbe>emptyList(), null);
     }
+
     public DefaultMediaValidator(MediaValidationPolicy config, List<MediaMetadataProbe> metadataProbes,
-            MediaContentSafetyScanner safetyScanner) {
-        if (config == null) { throw new IllegalArgumentException("config must not be null"); }
+                                 MediaContentSafetyScanner safetyScanner) {
+        if (config == null) {
+            throw new IllegalArgumentException("config must not be null");
+        }
         List<MediaMetadataProbe> safe = metadataProbes == null
                 ? Collections.<MediaMetadataProbe>emptyList() : metadataProbes;
-        if (safe.contains(null)) { throw new IllegalArgumentException("metadataProbes must not contain null"); }
+        if (safe.contains(null)) {
+            throw new IllegalArgumentException("metadataProbes must not contain null");
+        }
         if (config.isContentSafetyRequired() && safetyScanner == null) {
             throw new IllegalArgumentException("content safety scanner is required by policy");
         }
@@ -56,7 +62,9 @@ public final class DefaultMediaValidator implements MediaValidator {
 
     public MediaValidation validate(MediaUpload upload, MediaInput content, long size, long tenantUsage)
             throws IOException {
-        if (upload == null || content == null) { throw new IllegalArgumentException("upload and content must not be null"); }
+        if (upload == null || content == null) {
+            throw new IllegalArgumentException("upload and content must not be null");
+        }
         if (size > config.getMaxFileBytes() || tenantUsage > config.getMaxTenantBytes() - size)
             fail(ErrorCodes.MEDIA_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT);
         String extension = extension(upload.getFileName());
@@ -70,7 +78,9 @@ public final class DefaultMediaValidator implements MediaValidator {
         Integer height = upload.getHeight();
         Long duration = upload.getDurationMs();
         InputStream opened = content.open();
-        if (opened == null) { throw new IOException("media input returned null"); }
+        if (opened == null) {
+            throw new IOException("media input returned null");
+        }
         BufferedInputStream buffered = new BufferedInputStream(opened);
         try {
             int max = 0;
@@ -80,7 +90,11 @@ public final class DefaultMediaValidator implements MediaValidator {
             int count = readUpTo(buffered, header);
             buffered.reset();
             boolean matched = false;
-            for (String prefix : prefixes) if (matches(header, count, prefix)) { matched = true; break; }
+            for (String prefix : prefixes)
+                if (matches(header, count, prefix)) {
+                    matched = true;
+                    break;
+                }
             if (!matched) invalid();
             if (upload.getMediaType() == MediaType.IMAGE) {
                 BufferedImage image = ImageIO.read(buffered);
@@ -89,7 +103,9 @@ public final class DefaultMediaValidator implements MediaValidator {
                 height = Integer.valueOf(image.getHeight());
                 compareDeclared(upload, new MediaMetadata(width, height, duration));
             }
-        } finally { buffered.close(); }
+        } finally {
+            buffered.close();
+        }
 
         if (upload.getMediaType() == MediaType.AUDIO || upload.getMediaType() == MediaType.VIDEO) {
             MediaMetadataProbe probe = selectProbe(upload.getMediaType(), expectedMime);
@@ -119,12 +135,14 @@ public final class DefaultMediaValidator implements MediaValidator {
 
     private MediaMetadataProbe selectProbe(MediaType type, String mime) {
         MediaMetadataProbe selected = null;
-        for (MediaMetadataProbe probe : metadataProbes) if (probe.supports(type, mime)) {
-            if (selected != null) invalid();
-            selected = probe;
-        }
+        for (MediaMetadataProbe probe : metadataProbes)
+            if (probe.supports(type, mime)) {
+                if (selected != null) invalid();
+                selected = probe;
+            }
         return selected;
     }
+
     private void enforceMetadataLimits(Integer width, Integer height, Long duration) {
         if (width != null && (width.intValue() > config.getMaxImageWidth()
                 || height.intValue() > config.getMaxImageHeight()))
@@ -132,12 +150,14 @@ public final class DefaultMediaValidator implements MediaValidator {
         if (duration != null && duration.longValue() > config.getMaxDurationMs())
             fail(ErrorCodes.MEDIA_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT);
     }
+
     private static void compareDeclared(MediaUpload upload, MediaMetadata detected) {
         if ((upload.getWidth() != null && !upload.getWidth().equals(detected.getWidth()))
                 || (upload.getHeight() != null && !upload.getHeight().equals(detected.getHeight()))
                 || (upload.getDurationMs() != null && !upload.getDurationMs().equals(detected.getDurationMs())))
             invalid();
     }
+
     private static int readUpTo(InputStream input, byte[] bytes) throws IOException {
         int offset = 0;
         while (offset < bytes.length) {
@@ -147,6 +167,7 @@ public final class DefaultMediaValidator implements MediaValidator {
         }
         return offset;
     }
+
     private static boolean matches(byte[] header, int count, String hex) {
         int length = hex.length() / 2;
         if (count < length) return false;
@@ -154,6 +175,7 @@ public final class DefaultMediaValidator implements MediaValidator {
             if ((header[i] & 0xff) != Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16)) return false;
         return true;
     }
+
     private static boolean matchesMediaType(MediaType type, String mime) {
         if (type == MediaType.IMAGE) return mime.startsWith("image/");
         if (type == MediaType.AUDIO) return mime.startsWith("audio/");
@@ -161,15 +183,26 @@ public final class DefaultMediaValidator implements MediaValidator {
         if (type == MediaType.DOCUMENT) return mime.startsWith("application/") || mime.startsWith("text/");
         return true;
     }
+
     private static String extension(String fileName) {
         int slash = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
         int dot = fileName.lastIndexOf('.');
         if (dot <= slash || dot == fileName.length() - 1) invalid();
         return fileName.substring(dot).toLowerCase(Locale.ROOT);
     }
-    private static void invalid() { fail(ErrorCodes.MEDIA_VALIDATION_FAILED, ErrorCategory.VALIDATION); }
-    private static void metadataUnsupported() { fail(ErrorCodes.MEDIA_METADATA_UNSUPPORTED, ErrorCategory.CAPABILITY); }
-    private static void rejected() { fail(ErrorCodes.MEDIA_CONTENT_REJECTED, ErrorCategory.CONTENT_SAFETY); }
+
+    private static void invalid() {
+        fail(ErrorCodes.MEDIA_VALIDATION_FAILED, ErrorCategory.VALIDATION);
+    }
+
+    private static void metadataUnsupported() {
+        fail(ErrorCodes.MEDIA_METADATA_UNSUPPORTED, ErrorCategory.CAPABILITY);
+    }
+
+    private static void rejected() {
+        fail(ErrorCodes.MEDIA_CONTENT_REJECTED, ErrorCategory.CONTENT_SAFETY);
+    }
+
     private static void fail(String code, ErrorCategory category) {
         throw new ClaraException(new ClaraError(code, category, code, false, null, null, null, null,
                 Collections.<String, String>emptyMap()));

@@ -1,10 +1,13 @@
 package com.clara.model.provider.deepseek;
 
+import lombok.Data;
+
 import java.net.URI;
 
 /**
  * 定义DeepSeek模型目录的配置。
  */
+@Data
 public final class DeepSeekModelCatalogConfig {
     private final URI endpoint;
     private final String apiProfile;
@@ -13,8 +16,10 @@ public final class DeepSeekModelCatalogConfig {
     private final int maxModelIdChars;
 
     public DeepSeekModelCatalogConfig(URI endpoint, String apiProfile, String secretRef,
-            int maxModels, int maxModelIdChars) {
-        if (endpoint == null) { throw new IllegalArgumentException("endpoint must not be null"); }
+                                      int maxModels, int maxModelIdChars) {
+        if (endpoint == null) {
+            throw new IllegalArgumentException("endpoint must not be null");
+        }
         if (maxModels <= 0 || maxModelIdChars <= 0) {
             throw new IllegalArgumentException("catalog limits must be positive");
         }
@@ -24,12 +29,6 @@ public final class DeepSeekModelCatalogConfig {
         this.maxModels = maxModels;
         this.maxModelIdChars = maxModelIdChars;
     }
-
-    public URI getEndpoint() { return endpoint; }
-    public String getApiProfile() { return apiProfile; }
-    public String getSecretRef() { return secretRef; }
-    public int getMaxModels() { return maxModels; }
-    public int getMaxModelIdChars() { return maxModelIdChars; }
 
     private static String required(String value, String name) {
         if (value == null || value.trim().isEmpty()) {

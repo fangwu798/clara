@@ -5,6 +5,7 @@ import com.clara.media.job.callback.MediaCallbackSecurityPolicy;
 import com.clara.media.job.local.LocalMediaJobStoreConfig;
 import com.clara.media.validation.MediaValidationPolicy;
 import com.clara.workspace.api.WorkspacePolicy;
+
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,7 +52,9 @@ public final class WindowsSingleHostStoragePolicy {
     private final MediaValidationPolicy mediaValidationPolicy;
 
     public WindowsSingleHostStoragePolicy(Path workspaceRoot, String workspaceId) {
-        if (workspaceRoot == null) { throw new IllegalArgumentException("workspaceRoot must not be null"); }
+        if (workspaceRoot == null) {
+            throw new IllegalArgumentException("workspaceRoot must not be null");
+        }
         if (workspaceId == null || workspaceId.trim().isEmpty()) {
             throw new IllegalArgumentException("workspaceId must not be blank");
         }
@@ -81,19 +84,57 @@ public final class WindowsSingleHostStoragePolicy {
                 WORKSPACE_MAX_FILES, WORKSPACE_MAX_FILE_BYTES, WORKSPACE_MAX_TOTAL_BYTES, false);
     }
 
-    public MediaValidationPolicy getMediaValidationPolicy() { return mediaValidationPolicy; }
-    public long getConversationRetentionMillis() { return CONVERSATION_RETENTION_MILLIS; }
-    public long getTerminalJobRetentionMillis() { return TERMINAL_JOB_RETENTION_MILLIS; }
-    public long getAuditRetentionMillis() { return AUDIT_RETENTION_MILLIS; }
-    public long getStagingRetentionMillis() { return STAGING_RETENTION_MILLIS; }
-    public long getBackupRetentionMillis() { return BACKUP_RETENTION_MILLIS; }
-    public long getBackupIntervalMillis() { return BACKUP_INTERVAL_MILLIS; }
-    public long getBackupRpoMillis() { return BACKUP_RPO_MILLIS; }
-    public long getBackupRtoMillis() { return BACKUP_RTO_MILLIS; }
-    public long getRestoreDrillIntervalMillis() { return RESTORE_DRILL_INTERVAL_MILLIS; }
-    public boolean isEncryptedVolumeRequired() { return true; }
-    public boolean isWindowsCredentialStoreRequired() { return true; }
-    public boolean isExternalMediaAllowedWithoutSafetyScanner() { return false; }
+    public MediaValidationPolicy getMediaValidationPolicy() {
+        return mediaValidationPolicy;
+    }
+
+    public long getConversationRetentionMillis() {
+        return CONVERSATION_RETENTION_MILLIS;
+    }
+
+    public long getTerminalJobRetentionMillis() {
+        return TERMINAL_JOB_RETENTION_MILLIS;
+    }
+
+    public long getAuditRetentionMillis() {
+        return AUDIT_RETENTION_MILLIS;
+    }
+
+    public long getStagingRetentionMillis() {
+        return STAGING_RETENTION_MILLIS;
+    }
+
+    public long getBackupRetentionMillis() {
+        return BACKUP_RETENTION_MILLIS;
+    }
+
+    public long getBackupIntervalMillis() {
+        return BACKUP_INTERVAL_MILLIS;
+    }
+
+    public long getBackupRpoMillis() {
+        return BACKUP_RPO_MILLIS;
+    }
+
+    public long getBackupRtoMillis() {
+        return BACKUP_RTO_MILLIS;
+    }
+
+    public long getRestoreDrillIntervalMillis() {
+        return RESTORE_DRILL_INTERVAL_MILLIS;
+    }
+
+    public boolean isEncryptedVolumeRequired() {
+        return true;
+    }
+
+    public boolean isWindowsCredentialStoreRequired() {
+        return true;
+    }
+
+    public boolean isExternalMediaAllowedWithoutSafetyScanner() {
+        return false;
+    }
 
     private static Map<String, String> mediaTypes() {
         Map<String, String> values = new LinkedHashMap<String, String>();

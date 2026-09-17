@@ -1,1 +1,3 @@
-package com.clara.adapter.cli;public enum CliCommand { RUN, RESUME }
+package com.clara.adapter.cli;
+
+public enum CliCommand {RUN, RESUME}

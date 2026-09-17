@@ -15,7 +15,7 @@ import com.clara.model.provider.http.ProviderHttpRequest;
 import com.clara.model.provider.http.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderSseEvent;
 import com.clara.model.provider.http.ProviderSseListener;
-import com.clara.model.provider.http.ProviderSseTransport;
+import com.clara.model.provider.http.Jdk8ProviderSseTransport;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -34,7 +34,7 @@ import java.util.concurrent.Future;
  */
 public final class AnthropicStreamingChatModel implements StreamingChatModel {
     private final AnthropicChatConfig config;
-    private final ProviderSseTransport transport;
+    private final Jdk8ProviderSseTransport transport;
     private final ProviderCredentialResolver credentials;
     private final ExecutorService executor;
     private final int maxContentBlocks;
@@ -42,8 +42,8 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
     private final AnthropicChatCodec codec = new AnthropicChatCodec();
 
     public AnthropicStreamingChatModel(AnthropicChatConfig config,
-            ProviderSseTransport transport, ProviderCredentialResolver credentials,
-            ExecutorService executor, int maxContentBlocks, int maxAccumulatedChars) {
+                                       Jdk8ProviderSseTransport transport, ProviderCredentialResolver credentials,
+                                       ExecutorService executor, int maxContentBlocks, int maxAccumulatedChars) {
         if (config == null || transport == null || credentials == null || executor == null) {
             throw new IllegalArgumentException("dependencies must not be null");
         }

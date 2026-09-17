@@ -1,0 +1,27 @@
+provider: OPENAI
+credential:
+  secretRef: openai-novel
+  environmentVariable: CLARA_OPENAI_API_KEY
+transport:
+  allowedOrigins:
+    - https://new.aicontrol.top/
+  connectTimeoutMillis: 10000
+  readTimeoutMillis: 180000
+  maxRequestBytes: 8388608
+  maxResponseBytes: 33554432
+  allowHttp: false
+capabilities:
+  chat:
+    endpoint: https://new.aicontrol.top/v1/chat/completions
+    modelId: gpt-4o-mini
+    apiProfile: chat-completions-v1
+    parameters:
+      maxTokens: 6000
+  image:
+    endpoint: https://new.aicontrol.top/v1/images/generations
+    modelId: gpt-image-1
+    apiProfile: images-v1
+    parameters:
+      maxTextChars: 12000
+      maxInputBytes: 33554432
+      maxOutputs: 1

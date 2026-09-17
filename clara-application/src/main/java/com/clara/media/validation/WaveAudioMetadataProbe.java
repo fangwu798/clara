@@ -8,6 +8,7 @@ import com.clara.media.MediaInput;
 import com.clara.media.MediaMetadata;
 import com.clara.media.MediaMetadataProbe;
 import com.clara.media.MediaType;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,10 +35,16 @@ public final class WaveAudioMetadataProbe implements MediaMetadataProbe {
     }
 
     public MediaMetadata probe(MediaType mediaType, String mimeType, MediaInput content) throws IOException {
-        if (!supports(mediaType, mimeType)) { throw new IllegalArgumentException("unsupported media type"); }
-        if (content == null) { throw new IllegalArgumentException("content must not be null"); }
+        if (!supports(mediaType, mimeType)) {
+            throw new IllegalArgumentException("unsupported media type");
+        }
+        if (content == null) {
+            throw new IllegalArgumentException("content must not be null");
+        }
         InputStream opened = content.open();
-        if (opened == null) { throw new IOException("media input returned null"); }
+        if (opened == null) {
+            throw new IOException("media input returned null");
+        }
         InputStream input = new BufferedInputStream(opened);
         try {
             if (!"RIFF".equals(ascii(input, 4))) invalid();
@@ -73,43 +80,64 @@ public final class WaveAudioMetadataProbe implements MediaMetadataProbe {
                     skipFully(input, size);
                 }
                 consumed += size;
-                if ((size & 1) != 0) { skipFully(input, 1); consumed++; }
+                if ((size & 1) != 0) {
+                    skipFully(input, 1);
+                    consumed++;
+                }
                 if (byteRate != null && dataSize != null) return metadata(dataSize.longValue(), byteRate.longValue());
             }
             invalid();
             return null;
-        } finally { input.close(); }
+        } finally {
+            input.close();
+        }
     }
 
     private static MediaMetadata metadata(long dataSize, long byteRate) {
         long duration = (dataSize / byteRate) * 1000L + ((dataSize % byteRate) * 1000L) / byteRate;
         return new MediaMetadata(null, null, Long.valueOf(duration));
     }
+
     private static int readUnsignedInt16(InputStream input) throws IOException {
-        int first = input.read(); int second = input.read();
+        int first = input.read();
+        int second = input.read();
         if ((first | second) < 0) invalid();
         return first | (second << 8);
     }
+
     private static long readUnsignedInt32(InputStream input) throws IOException {
-        long first = input.read(); long second = input.read(); long third = input.read(); long fourth = input.read();
+        long first = input.read();
+        long second = input.read();
+        long third = input.read();
+        long fourth = input.read();
         if ((first | second | third | fourth) < 0) invalid();
         return first | (second << 8) | (third << 16) | (fourth << 24);
     }
+
     private static String ascii(InputStream input, int length) throws IOException {
         byte[] bytes = new byte[length];
         int offset = 0;
-        while (offset < length) { int read = input.read(bytes, offset, length - offset); if (read < 0) invalid(); offset += read; }
+        while (offset < length) {
+            int read = input.read(bytes, offset, length - offset);
+            if (read < 0) invalid();
+            offset += read;
+        }
         return new String(bytes, java.nio.charset.StandardCharsets.US_ASCII);
     }
+
     private static void skipFully(InputStream input, long count) throws IOException {
         long remaining = count;
         while (remaining > 0) {
             long skipped = input.skip(remaining);
-            if (skipped > 0) { remaining -= skipped; continue; }
+            if (skipped > 0) {
+                remaining -= skipped;
+                continue;
+            }
             if (input.read() < 0) invalid();
             remaining--;
         }
     }
+
     private static void invalid() {
         throw new ClaraException(new ClaraError(ErrorCodes.MEDIA_VALIDATION_FAILED, ErrorCategory.VALIDATION,
                 ErrorCodes.MEDIA_VALIDATION_FAILED, false, null, null, null, null,

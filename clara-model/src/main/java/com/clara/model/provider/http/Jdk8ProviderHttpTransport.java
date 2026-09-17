@@ -18,10 +18,10 @@ import java.util.Map;
 /**
  * 传输JDK 8服务提供商HTTP消息。
  */
-public final class Jdk8ProviderHttpTransport implements ProviderHttpTransport {
-    private final Jdk8ProviderHttpTransportConfig config;
+public final class Jdk8ProviderHttpTransport implements ProviderHttpTransport  {
+    private final ProviderHttpTransportConfig config;
 
-    public Jdk8ProviderHttpTransport(Jdk8ProviderHttpTransportConfig config) {
+    public Jdk8ProviderHttpTransport(ProviderHttpTransportConfig config) {
         if (config == null) { throw new IllegalArgumentException("config must not be null"); }
         this.config = config;
     }

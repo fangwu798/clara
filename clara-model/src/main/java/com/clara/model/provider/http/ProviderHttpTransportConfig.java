@@ -10,7 +10,7 @@ import java.util.Set;
 /**
  * 定义JDK 8服务提供商HTTP传输器的配置。
  */
-public final class Jdk8ProviderHttpTransportConfig {
+public final class ProviderHttpTransportConfig {
     private final Set<String> allowedOrigins;
     private final int connectTimeoutMillis;
     private final int readTimeoutMillis;
@@ -18,9 +18,9 @@ public final class Jdk8ProviderHttpTransportConfig {
     private final int maxResponseBytes;
     private final boolean allowHttp;
 
-    public Jdk8ProviderHttpTransportConfig(Set<String> allowedOrigins,
-            int connectTimeoutMillis, int readTimeoutMillis, int maxRequestBytes,
-            int maxResponseBytes, boolean allowHttp) {
+    public ProviderHttpTransportConfig(Set<String> allowedOrigins,
+                                       int connectTimeoutMillis, int readTimeoutMillis, int maxRequestBytes,
+                                       int maxResponseBytes, boolean allowHttp) {
         if (allowedOrigins == null || allowedOrigins.isEmpty() || allowedOrigins.contains(null)) {
             throw new IllegalArgumentException("allowedOrigins must not be empty");
         }

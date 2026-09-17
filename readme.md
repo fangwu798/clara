@@ -24,6 +24,7 @@ Clara 是一套兼容 Java 8 的 AI 能力运行时和领域组件库。它将�
 | `clara-orchestration` | 工作流、DAG 规划、执行预算、检查点及人工交互 | 多步骤任务、并发节点、失败恢复、暂停等待审批或补充输入 |
 | `clara-skill` | 技能注册、校验、生命周期、权限、健康状态和执行 | 将可复用业务能力封装成受治理的技能，并接入编排流程 |
 | `clara-application` | 应用层组合：工作区、媒体存储与回调、文档解析、CLI/REST/SSE 适配器 | 在宿主系统中组合全部模块，向命令行或服务接口暴露能力 |
+| `clara-novel` | 可执行的小说创作 Agent：故事圣经、大纲、逐章创作、审校和断点恢复 | 使用 OpenAI-compatible 模型创建并持久化中文小说项目 |
 
 模块之间的主要依赖关系如下：
 
@@ -42,6 +43,8 @@ flowchart TD
     application --> mcp
     application --> orchestration
     application --> skill
+    novel[clara-novel] --> core
+    novel --> model
 ```
 
 ### `clara-bom` 是否必须保留

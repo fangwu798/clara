@@ -116,7 +116,7 @@ public class Jdk8ProviderHttpTransportTest {
         } catch (IllegalArgumentException expected) { }
 
         try {
-            new Jdk8ProviderHttpTransportConfig(Collections.singleton(origin),
+            new ProviderHttpTransportConfig(Collections.singleton(origin),
                     1000, 1000, 100, 100, false);
             fail("expected HTTP origin rejection");
         } catch (IllegalArgumentException expected) { }
@@ -131,7 +131,7 @@ public class Jdk8ProviderHttpTransportTest {
     }
 
     private Jdk8ProviderHttpTransport transport(int maxRequest, int maxResponse) {
-        return new Jdk8ProviderHttpTransport(new Jdk8ProviderHttpTransportConfig(
+        return new Jdk8ProviderHttpTransport(new ProviderHttpTransportConfig(
                 Collections.singleton(origin), 1000, 1000, maxRequest, maxResponse, true));
     }
 

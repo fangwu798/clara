@@ -7,6 +7,7 @@ import com.clara.kernel.ErrorCodes;
 import com.clara.media.job.MediaJob;
 import com.clara.media.job.MediaJobScheduler;
 import com.clara.media.job.MediaProviderJobSnapshot;
+
 import java.util.Collections;
 
 /**
@@ -23,7 +24,7 @@ public final class VerifiedMediaJobCallbackHandler {
     private final HmacSha256MediaCallbackVerifier verifier;
 
     public VerifiedMediaJobCallbackHandler(MediaJobScheduler scheduler,
-            HmacSha256MediaCallbackVerifier verifier) {
+                                           HmacSha256MediaCallbackVerifier verifier) {
         if (scheduler == null || verifier == null) {
             throw new IllegalArgumentException("dependencies must not be null");
         }
@@ -32,8 +33,10 @@ public final class VerifiedMediaJobCallbackHandler {
     }
 
     public MediaJob handle(MediaJobCallbackEnvelope envelope,
-            MediaProviderCallbackParser parser, long now) {
-        if (parser == null) { throw new IllegalArgumentException("parser must not be null"); }
+                           MediaProviderCallbackParser parser, long now) {
+        if (parser == null) {
+            throw new IllegalArgumentException("parser must not be null");
+        }
         verifier.verifyAndReserve(envelope, now);
         MediaProviderJobSnapshot snapshot;
         try {

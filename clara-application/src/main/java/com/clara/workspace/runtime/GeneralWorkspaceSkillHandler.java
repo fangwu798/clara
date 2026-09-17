@@ -14,6 +14,7 @@ import com.clara.skill.api.SkillExecutionResult;
 import com.clara.skill.api.SkillExecutionStatus;
 import com.clara.skill.api.SkillResumeRequest;
 import com.clara.skill.runtime.SkillHandler;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -32,7 +33,9 @@ public final class GeneralWorkspaceSkillHandler implements SkillHandler {
     private final GeneralWorkspacePlanFactory plans;
 
     public GeneralWorkspaceSkillHandler(TaskPlanEngine engine, GeneralWorkspacePlanFactory plans) {
-        if (engine == null || plans == null) { throw new IllegalArgumentException("handler dependencies are required"); }
+        if (engine == null || plans == null) {
+            throw new IllegalArgumentException("handler dependencies are required");
+        }
         this.engine = engine;
         this.plans = plans;
     }
@@ -48,9 +51,10 @@ public final class GeneralWorkspaceSkillHandler implements SkillHandler {
     }
 
     private SkillExecutionResult executePlan(SkillDefinition definition, SkillExecutionRequest request,
-            Map<String, Object> feedback, String instanceId, long instanceVersion) {
+                                             Map<String, Object> feedback, String instanceId, long instanceVersion) {
         Object goal = request.getInputs().get("goal");
-        if (!(goal instanceof String) || ((String) goal).trim().isEmpty()) invalid(ErrorCodes.SKILL_SCHEMA_INVALID, ErrorCategory.VALIDATION);
+        if (!(goal instanceof String) || ((String) goal).trim().isEmpty())
+            invalid(ErrorCodes.SKILL_SCHEMA_INVALID, ErrorCategory.VALIDATION);
         String runId = request.getContext().getRunId();
         if (runId == null || runId.trim().isEmpty()) invalid(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION);
         request.getContext().getCancellationToken().throwIfCancellationRequested(request.getContext().getTraceId());
@@ -63,7 +67,8 @@ public final class GeneralWorkspaceSkillHandler implements SkillHandler {
             }
         }
         Map<String, Object> inputs = new LinkedHashMap<String, Object>(request.getInputs());
-        if (!feedback.isEmpty()) inputs.put("feedback", Collections.unmodifiableMap(new LinkedHashMap<String, Object>(feedback)));
+        if (!feedback.isEmpty())
+            inputs.put("feedback", Collections.unmodifiableMap(new LinkedHashMap<String, Object>(feedback)));
         TaskPlanResult result = engine.execute(plan, runId + ":" + instanceId, inputs);
         Map<String, Object> outputs = new LinkedHashMap<String, Object>();
         outputs.put("goal", goal);

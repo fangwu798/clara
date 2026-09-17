@@ -15,7 +15,7 @@ import com.clara.model.provider.http.ProviderHttpRequest;
 import com.clara.model.provider.http.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderSseEvent;
 import com.clara.model.provider.http.ProviderSseListener;
-import com.clara.model.provider.http.ProviderSseTransport;
+import com.clara.model.provider.http.Jdk8ProviderSseTransport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -76,7 +76,7 @@ public class AnthropicStreamingChatModelTest {
         assertEquals("MODEL_PROTOCOL_ERROR", incomplete.events.get(0).getError().getCode());
     }
 
-    private AnthropicStreamingChatModel model(ProviderSseTransport transport) throws Exception {
+    private AnthropicStreamingChatModel model(Jdk8ProviderSseTransport transport) throws Exception {
         return new AnthropicStreamingChatModel(new AnthropicChatConfig(
                 new URI("https://api.anthropic.example/v1/messages"), "claude-fixed",
                 "messages-v1", "2023-06-01", "secret-ref", 128), transport,
@@ -115,7 +115,7 @@ public class AnthropicStreamingChatModelTest {
         }
     }
 
-    private static final class FakeTransport implements ProviderSseTransport {
+    private static final class FakeTransport implements Jdk8ProviderSseTransport {
         private final int status;
         private final ProviderSseEvent[] events;
         private ProviderHttpRequest request;

@@ -4,6 +4,7 @@ import com.clara.kernel.ClaraError;
 import com.clara.kernel.ClaraException;
 import com.clara.kernel.ErrorCategory;
 import com.clara.kernel.ErrorCodes;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -34,7 +35,7 @@ public final class HmacSha256MediaCallbackVerifier {
     private final MediaCallbackReplayStore replayStore;
 
     public HmacSha256MediaCallbackVerifier(MediaCallbackSecretResolver secretResolver,
-            MediaCallbackSecurityPolicy policy, MediaCallbackReplayStore replayStore) {
+                                           MediaCallbackSecurityPolicy policy, MediaCallbackReplayStore replayStore) {
         if (secretResolver == null || policy == null || replayStore == null) {
             throw new IllegalArgumentException("dependencies must not be null");
         }
@@ -44,8 +45,12 @@ public final class HmacSha256MediaCallbackVerifier {
     }
 
     public void verifyAndReserve(MediaJobCallbackEnvelope envelope, long now) {
-        if (envelope == null) { throw new IllegalArgumentException("envelope must not be null"); }
-        if (now < 0L) { throw new IllegalArgumentException("now must not be negative"); }
+        if (envelope == null) {
+            throw new IllegalArgumentException("envelope must not be null");
+        }
+        if (now < 0L) {
+            throw new IllegalArgumentException("now must not be negative");
+        }
         byte[] payload = envelope.getPayload();
         if (payload.length > policy.getMaxPayloadBytes()
                 || envelope.getTenantId().length() > policy.getMaxIdentityChars()
@@ -78,7 +83,9 @@ public final class HmacSha256MediaCallbackVerifier {
     }
 
     static String sign(byte[] secret, MediaJobCallbackEnvelope envelope) {
-        if (secret == null || envelope == null) { throw new IllegalArgumentException("signing values are required"); }
+        if (secret == null || envelope == null) {
+            throw new IllegalArgumentException("signing values are required");
+        }
         byte[] payload = envelope.getPayload();
         return encodeHex(hmac(secret.clone(), canonical(envelope, payload)));
     }
@@ -157,15 +164,19 @@ public final class HmacSha256MediaCallbackVerifier {
     private static void authenticationFailed() {
         fail(ErrorCodes.MEDIA_CALLBACK_AUTHENTICATION_FAILED, ErrorCategory.AUTHENTICATION);
     }
+
     private static void expired() {
         fail(ErrorCodes.MEDIA_CALLBACK_EXPIRED, ErrorCategory.AUTHENTICATION);
     }
+
     private static void replayed() {
         fail(ErrorCodes.MEDIA_CALLBACK_REPLAYED, ErrorCategory.CONFLICT);
     }
+
     private static void resourceLimit() {
         fail(ErrorCodes.MEDIA_CALLBACK_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT);
     }
+
     private static void fail(String code, ErrorCategory category) {
         throw new ClaraException(new ClaraError(code, category, code, false, null,
                 null, null, null, Collections.<String, String>emptyMap()));

@@ -12,6 +12,8 @@ import com.clara.model.provider.http.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
+
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.Set;
 /**
  * 提供访问DeepSeek模型目录的客户端。
  */
+@Data
 public final class DeepSeekModelCatalogClient {
     private final DeepSeekModelCatalogConfig config;
     private final ProviderHttpTransport transport;

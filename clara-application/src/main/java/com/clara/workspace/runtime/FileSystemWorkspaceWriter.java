@@ -1,5 +1,12 @@
 package com.clara.workspace.runtime;
-import com.clara.kernel.*;import com.clara.workspace.api.*;import java.io.*;import java.nio.file.*;import java.util.*;
+
+import com.clara.kernel.*;
+import com.clara.workspace.api.*;
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+
 /**
  * 以“预览、审批、暂存、原子替换”的流程将变更集写入工作区，并支持失败回滚与中断恢复。
  *
@@ -11,46 +18,395 @@ import com.clara.kernel.*;import com.clara.workspace.api.*;import java.io.*;impo
  * {@link ApplyState#UNKNOWN} 时不得自动重试，应先人工核对目标文件和 {@code .clara} 恢复记录。
  */
 public final class FileSystemWorkspaceWriter implements WorkspaceWriter {
- private final WorkspacePolicy policy;private final AtomicMover mover;
- public FileSystemWorkspaceWriter(WorkspacePolicy policy){this(policy,new AtomicMover(){public void move(Path source,Path target)throws IOException{Files.move(source,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}});}
- FileSystemWorkspaceWriter(WorkspacePolicy policy,AtomicMover mover){if(policy==null||mover==null) {throw new IllegalArgumentException(); }this.policy=policy;this.mover=mover;}
- public ChangePreview preview(WorkspaceRef workspace,ChangeSet changeSet){validate(workspace,changeSet,false);Path root=realRoot(workspace);List<ChangePreview.FilePreview> files=new ArrayList<ChangePreview.FilePreview>();for(FileChange change:changeSet.getChanges()){Path target=resolveBusiness(root,change.getRelativePath());try{if(!hash(target).equals(change.getBaseHash()))conflict();}catch(IOException e){conflict();}files.add(new ChangePreview.FilePreview(change.getRelativePath(),change.getBaseHash(),change.getResultHash(),change.getContent().length));}return new ChangePreview(changeSet.getChangeSetId(),changeSet.getRevision(),changeSet.getDigest(),changeSet.getPreviewDigest(),files);}
- public ApplyResult apply(WorkspaceRef workspace,ChangeSet changeSet,Approval approval){validate(workspace,changeSet,true);validateApproval(changeSet,approval);Path root=realRoot(workspace);String key=key(changeSet);Path staging=root.resolve(".clara").resolve("staging").resolve(segment(changeSet.getRunId())).resolve(key);Path backups=root.resolve(".clara").resolve("backups").resolve(segment(changeSet.getRunId())).resolve(key);if(Files.isRegularFile(staging.resolve("manifest.bin"))){ApplyResult recovered=recover(workspace,changeSet.getRunId(),changeSet.getChangeSetId(),changeSet.getRevision());if(recovered.getState()!=ApplyState.NOT_APPLIED)return recovered;}List<Record> records=records(root,staging,backups,changeSet);
-  try{Files.createDirectories(staging);Files.createDirectories(backups);for(int i=0;i<records.size();i++){Record record=records.get(i);verifyBase(record);writeAtomic(record.stage,record.change.getContent());}writeManifest(staging.resolve("manifest.bin"),changeSet,records);writeJournal(staging.resolve("journal.bin"),records);
-   for(Record record:records){Path parent=record.target.getParent();if(parent!=null)Files.createDirectories(parent);Files.copy(record.target,record.backup,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.COPY_ATTRIBUTES);Path temporary=temporary(record.target,changeSet.getDigest());writeAtomic(temporary,record.change.getContent());mover.move(temporary,record.target);record.status=FileApplyStatus.APPLIED;writeJournal(staging.resolve("journal.bin"),records);}return result(changeSet.getChangeSetId(),ApplyState.APPLIED,records);
-  }catch(ClaraException e){throw e;}catch(Exception failure){boolean restored=rollback(records,staging.resolve("journal.bin"));return result(changeSet.getChangeSetId(),restored?ApplyState.ROLLED_BACK:ApplyState.PARTIALLY_APPLIED,records);}}
- public ApplyResult recover(WorkspaceRef workspace,String runId,String changeSetId,int revision){if(workspace==null||!workspace.getRunId().equals(runId))denied();Path root=realRoot(workspace);String key=segment(changeSetId)+"-r"+revision;Path staging=root.resolve(".clara").resolve("staging").resolve(segment(runId)).resolve(key);Path manifest=staging.resolve("manifest.bin");if(!Files.isRegularFile(manifest)) {throw WorkspaceErrors.error(ErrorCodes.CHANGESET_APPLY_FAILED,ErrorCategory.VALIDATION); }try{Manifest loaded=readManifest(root,staging,manifest);if(!changeSetId.equals(loaded.id)||revision!=loaded.revision||!loaded.digest.equals(WorkspaceDigests.changes(changes(loaded.records)))||!loaded.preview.equals(WorkspaceDigests.preview(changes(loaded.records)))) {throw new IOException("manifest integrity"); }int applied=0,base=0,unknown=0;for(Record record:loaded.records){String current=hash(record.target);if(current.equals(record.change.getResultHash())){record.status=FileApplyStatus.APPLIED;applied++;}else if(current.equals(record.change.getBaseHash())){record.status=FileApplyStatus.NOT_APPLIED;base++;}else{record.status=FileApplyStatus.UNKNOWN;unknown++;}}
-   if(unknown>0)return result(changeSetId,ApplyState.UNKNOWN,loaded.records);if(applied==loaded.records.size())return result(changeSetId,ApplyState.APPLIED,loaded.records);if(applied==0)return result(changeSetId,base==loaded.records.size()?ApplyState.NOT_APPLIED:ApplyState.UNKNOWN,loaded.records);boolean restored=rollback(loaded.records,staging.resolve("journal.bin"));return result(changeSetId,restored?ApplyState.ROLLED_BACK:ApplyState.PARTIALLY_APPLIED,loaded.records);
-  }catch(IOException e){throw WorkspaceErrors.error(ErrorCodes.CHANGESET_APPLY_FAILED,ErrorCategory.UNKNOWN_SIDE_EFFECT);}}
- private void validate(WorkspaceRef workspace,ChangeSet set,boolean write){if(workspace==null||set==null) {throw new IllegalArgumentException(); }if(write&&workspace.getMode()!=WorkspaceAccessMode.APPLY_WRITE)denied();if(!workspace.getRunId().equals(set.getRunId()))denied();if(!WorkspaceDigests.changes(set.getChanges()).equals(set.getDigest())||!WorkspaceDigests.preview(set.getChanges()).equals(set.getPreviewDigest())) {throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_CONFLICT,ErrorCategory.CONFLICT); }Set<String> paths=new HashSet<String>();long total=0;for(FileChange change:set.getChanges()){if(!paths.add(change.getRelativePath()))conflict();if(!WorkspaceDigests.sha(change.getContent()).equals(change.getResultHash()))conflict();if(change.getContent().length>policy.getMaxFileBytes()||(total+=change.getContent().length)>policy.getMaxTotalBytes()) {throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_RESOURCE_LIMIT,ErrorCategory.RESOURCE_LIMIT); }}}
- private static void validateApproval(ChangeSet set,Approval approval){if(approval==null||!set.getChangeSetId().equals(approval.getChangeSetId())||set.getRevision()!=approval.getRevision()||!set.getDigest().equals(approval.getChangeSetDigest())||!set.getPreviewDigest().equals(approval.getPreviewDigest()))approvalInvalid();for(FileChange change:set.getChanges())if(!approval.getPaths().isEmpty()&&!approval.getPaths().contains(change.getRelativePath()))approvalInvalid();}
- private List<Record> records(Path root,Path staging,Path backups,ChangeSet set){List<Record> result=new ArrayList<Record>();Set<Path> targets=new HashSet<Path>();int index=0;for(FileChange change:set.getChanges()){Path target=resolveBusiness(root,change.getRelativePath());if(!targets.add(target))conflict();String name=String.format("%04d.bin",index++);result.add(new Record(change,target,staging.resolve(name),backups.resolve(name),FileApplyStatus.NOT_APPLIED));}return result;}
- private Path resolveBusiness(Path root,String relative){Path supplied=Paths.get(relative);if(supplied.isAbsolute())denied();Path target=root.resolve(supplied).normalize();String canonical=root.relativize(target).toString().replace('\\','/');if(!canonical.equals(relative.replace('\\','/'))||!target.startsWith(root)||target.startsWith(root.resolve(".clara")))denied();Path rel=root.relativize(target);for(Path part:rel)if(ignored(part.toString()))denied();String name=target.getFileName().toString();int dot=name.lastIndexOf('.');String ext=dot<0?"":name.substring(dot).toLowerCase(Locale.ROOT);boolean allowed=false;for(String configured:policy.getAllowedExtensions())if(ext.equals(configured.toLowerCase(Locale.ROOT)))allowed=true;if(!allowed)denied();try{Path real=target.toRealPath(LinkOption.NOFOLLOW_LINKS);if(!real.startsWith(root)||Files.isSymbolicLink(target)||!Files.isRegularFile(real))denied();return real;}catch(IOException e){denied();return target;}}
- private boolean ignored(String name){String n=name.toLowerCase(Locale.ROOT);if(n.startsWith(".")||"target".equals(n)||"node_modules".equals(n)||".env".equals(n)||n.endsWith(".key")||n.endsWith(".pem")||n.endsWith(".p12"))return true;for(String v:policy.getIgnoredNames())if(n.equals(v.toLowerCase(Locale.ROOT)))return true;for(String v:policy.getSensitiveNames())if(n.equals(v.toLowerCase(Locale.ROOT)))return true;return false;}
- private static void verifyBase(Record record)throws IOException{if(!Files.isRegularFile(record.target)||!hash(record.target).equals(record.change.getBaseHash()))conflict();}
- private boolean rollback(List<Record> records,Path journal){boolean ok=true;for(int i=records.size()-1;i>=0;i--){Record record=records.get(i);if(record.status!=FileApplyStatus.APPLIED)continue;try{if(!Files.isRegularFile(record.backup)||!hash(record.target).equals(record.change.getResultHash())){record.status=FileApplyStatus.ROLLBACK_FAILED;ok=false;continue;}Path temporary=temporary(record.target,record.change.getBaseHash());Files.copy(record.backup,temporary,StandardCopyOption.REPLACE_EXISTING);mover.move(temporary,record.target);record.status=FileApplyStatus.ROLLED_BACK;}catch(Exception e){record.status=FileApplyStatus.ROLLBACK_FAILED;ok=false;}try{writeJournal(journal,records);}catch(IOException e){ok=false;}}return ok;}
- private static ApplyResult result(String id,ApplyState state,List<Record> records){List<FileApplyResult> files=new ArrayList<FileApplyResult>();for(Record record:records)files.add(new FileApplyResult(record.change.getRelativePath(),record.change.getBaseHash(),record.change.getResultHash(),record.backup.toString(),record.status));return new ApplyResult(id,state,files);}
- private static List<FileChange> changes(List<Record> records){List<FileChange> changes=new ArrayList<FileChange>();for(Record record:records)changes.add(record.change);return changes;}
- private static void writeManifest(Path path,ChangeSet set,List<Record> records)throws IOException{Path temp=path.resolveSibling(path.getFileName()+".tmp");DataOutputStream out=new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(temp)));try{out.writeInt(1);out.writeUTF(set.getChangeSetId());out.writeInt(set.getRevision());out.writeUTF(set.getDigest());out.writeUTF(set.getPreviewDigest());out.writeInt(records.size());for(Record r:records){out.writeUTF(r.change.getRelativePath());out.writeUTF(r.change.getBaseHash());out.writeUTF(r.change.getResultHash());out.writeUTF(r.stage.getFileName().toString());out.writeUTF(r.backup.getFileName().toString());}}finally{out.close();}Files.move(temp,path,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
- private static Manifest readManifest(Path root,Path staging,Path path)throws IOException{DataInputStream in=new DataInputStream(new BufferedInputStream(Files.newInputStream(path)));try{if(in.readInt()!=1) {throw new IOException("unknown manifest"); }String id=in.readUTF();int revision=in.readInt();String digest=in.readUTF();String preview=in.readUTF();int count=in.readInt();if(count<1||count>10000) {throw new IOException("manifest count"); }List<Record> records=new ArrayList<Record>();Path backups=root.resolve(".clara").resolve("backups").resolve(staging.getParent().getFileName()).resolve(staging.getFileName());for(int i=0;i<count;i++){String relative=in.readUTF(),base=in.readUTF(),result=in.readUTF(),stage=in.readUTF(),backup=in.readUTF();Path target=root.resolve(relative).normalize();if(!target.startsWith(root)||target.startsWith(root.resolve(".clara"))) {throw new IOException("manifest path"); }records.add(new Record(new FileChange(relative,base,result,Files.readAllBytes(staging.resolve(stage))),target,staging.resolve(stage),backups.resolve(backup),FileApplyStatus.NOT_APPLIED));}return new Manifest(id,revision,digest,preview,records);}finally{in.close();}}
- private static void writeJournal(Path path,List<Record> records)throws IOException{Path temp=path.resolveSibling(path.getFileName()+".tmp");DataOutputStream out=new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(temp)));try{out.writeInt(1);out.writeInt(records.size());for(Record record:records){out.writeUTF(record.change.getRelativePath());out.writeUTF(record.status.name());}}finally{out.close();}Files.move(temp,path,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
- private static void writeAtomic(Path path,byte[] content)throws IOException{Path parent=path.getParent();if(parent!=null)Files.createDirectories(parent);Path temp=path.resolveSibling(path.getFileName()+".write");Files.write(temp,content);Files.move(temp,path,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
- private static Path temporary(Path target,String suffix){return target.resolveSibling("."+target.getFileName()+".clara-"+suffix.substring(0,12)+".tmp");}
- private static String hash(Path path)throws IOException{return WorkspaceDigests.sha(Files.readAllBytes(path));}
- private static Path realRoot(WorkspaceRef workspace){try{return workspace.getRoot().toRealPath();}catch(IOException e){denied();return workspace.getRoot();}}
- private static String key(ChangeSet set){return segment(set.getChangeSetId())+"-r"+set.getRevision();}
- private static String segment(String value){if(value==null||!value.matches("[A-Za-z0-9._-]{1,128}"))denied();return value;}
- private static void denied(){throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_ACCESS_DENIED,ErrorCategory.AUTHORIZATION);}private static void conflict(){throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_CONFLICT,ErrorCategory.CONFLICT);}private static void approvalInvalid(){throw WorkspaceErrors.error(ErrorCodes.CHANGESET_APPROVAL_INVALID,ErrorCategory.AUTHORIZATION);}
- /**
-  * 移动原子。
-  */
- interface AtomicMover {void move(Path source,Path target)throws IOException;}
- /**
-  * 表示。
-  */
- private static final class Record {private final FileChange change;private final Path target,stage,backup;private FileApplyStatus status;private Record(FileChange c,Path t,Path s,Path b,FileApplyStatus status){change=c;target=t;stage=s;backup=b;this.status=status;}}
- /**
-  * 表示。
-  */
- private static final class Manifest {private final String id,digest,preview;private final int revision;private final List<Record> records;private Manifest(String id,int revision,String digest,String preview,List<Record> records){this.id=id;this.revision=revision;this.digest=digest;this.preview=preview;this.records=records;}}
+    private final WorkspacePolicy policy;
+    private final AtomicMover mover;
+
+    public FileSystemWorkspaceWriter(WorkspacePolicy policy) {
+        this(policy, new AtomicMover() {
+            public void move(Path source, Path target) throws IOException {
+                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            }
+        });
+    }
+
+    FileSystemWorkspaceWriter(WorkspacePolicy policy, AtomicMover mover) {
+        if (policy == null || mover == null) {
+            throw new IllegalArgumentException();
+        }
+        this.policy = policy;
+        this.mover = mover;
+    }
+
+    public ChangePreview preview(WorkspaceRef workspace, ChangeSet changeSet) {
+        validate(workspace, changeSet, false);
+        Path root = realRoot(workspace);
+        List<ChangePreview.FilePreview> files = new ArrayList<ChangePreview.FilePreview>();
+        for (FileChange change : changeSet.getChanges()) {
+            Path target = resolveBusiness(root, change.getRelativePath());
+            try {
+                if (!hash(target).equals(change.getBaseHash())) conflict();
+            } catch (IOException e) {
+                conflict();
+            }
+            files.add(new ChangePreview.FilePreview(change.getRelativePath(), change.getBaseHash(), change.getResultHash(), change.getContent().length));
+        }
+        return new ChangePreview(changeSet.getChangeSetId(), changeSet.getRevision(), changeSet.getDigest(), changeSet.getPreviewDigest(), files);
+    }
+
+    public ApplyResult apply(WorkspaceRef workspace, ChangeSet changeSet, Approval approval) {
+        validate(workspace, changeSet, true);
+        validateApproval(changeSet, approval);
+        Path root = realRoot(workspace);
+        String key = key(changeSet);
+        Path staging = root.resolve(".clara").resolve("staging").resolve(segment(changeSet.getRunId())).resolve(key);
+        Path backups = root.resolve(".clara").resolve("backups").resolve(segment(changeSet.getRunId())).resolve(key);
+        if (Files.isRegularFile(staging.resolve("manifest.bin"))) {
+            ApplyResult recovered = recover(workspace, changeSet.getRunId(), changeSet.getChangeSetId(), changeSet.getRevision());
+            if (recovered.getState() != ApplyState.NOT_APPLIED) return recovered;
+        }
+        List<Record> records = records(root, staging, backups, changeSet);
+        try {
+            Files.createDirectories(staging);
+            Files.createDirectories(backups);
+            for (int i = 0; i < records.size(); i++) {
+                Record record = records.get(i);
+                verifyBase(record);
+                writeAtomic(record.stage, record.change.getContent());
+            }
+            writeManifest(staging.resolve("manifest.bin"), changeSet, records);
+            writeJournal(staging.resolve("journal.bin"), records);
+            for (Record record : records) {
+                Path parent = record.target.getParent();
+                if (parent != null) Files.createDirectories(parent);
+                Files.copy(record.target, record.backup, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                Path temporary = temporary(record.target, changeSet.getDigest());
+                writeAtomic(temporary, record.change.getContent());
+                mover.move(temporary, record.target);
+                record.status = FileApplyStatus.APPLIED;
+                writeJournal(staging.resolve("journal.bin"), records);
+            }
+            return result(changeSet.getChangeSetId(), ApplyState.APPLIED, records);
+        } catch (ClaraException e) {
+            throw e;
+        } catch (Exception failure) {
+            boolean restored = rollback(records, staging.resolve("journal.bin"));
+            return result(changeSet.getChangeSetId(), restored ? ApplyState.ROLLED_BACK : ApplyState.PARTIALLY_APPLIED, records);
+        }
+    }
+
+    public ApplyResult recover(WorkspaceRef workspace, String runId, String changeSetId, int revision) {
+        if (workspace == null || !workspace.getRunId().equals(runId)) denied();
+        Path root = realRoot(workspace);
+        String key = segment(changeSetId) + "-r" + revision;
+        Path staging = root.resolve(".clara").resolve("staging").resolve(segment(runId)).resolve(key);
+        Path manifest = staging.resolve("manifest.bin");
+        if (!Files.isRegularFile(manifest)) {
+            throw WorkspaceErrors.error(ErrorCodes.CHANGESET_APPLY_FAILED, ErrorCategory.VALIDATION);
+        }
+        try {
+            Manifest loaded = readManifest(root, staging, manifest);
+            if (!changeSetId.equals(loaded.id) || revision != loaded.revision || !loaded.digest.equals(WorkspaceDigests.changes(changes(loaded.records))) || !loaded.preview.equals(WorkspaceDigests.preview(changes(loaded.records)))) {
+                throw new IOException("manifest integrity");
+            }
+            int applied = 0, base = 0, unknown = 0;
+            for (Record record : loaded.records) {
+                String current = hash(record.target);
+                if (current.equals(record.change.getResultHash())) {
+                    record.status = FileApplyStatus.APPLIED;
+                    applied++;
+                } else if (current.equals(record.change.getBaseHash())) {
+                    record.status = FileApplyStatus.NOT_APPLIED;
+                    base++;
+                } else {
+                    record.status = FileApplyStatus.UNKNOWN;
+                    unknown++;
+                }
+            }
+            if (unknown > 0) return result(changeSetId, ApplyState.UNKNOWN, loaded.records);
+            if (applied == loaded.records.size()) return result(changeSetId, ApplyState.APPLIED, loaded.records);
+            if (applied == 0)
+                return result(changeSetId, base == loaded.records.size() ? ApplyState.NOT_APPLIED : ApplyState.UNKNOWN, loaded.records);
+            boolean restored = rollback(loaded.records, staging.resolve("journal.bin"));
+            return result(changeSetId, restored ? ApplyState.ROLLED_BACK : ApplyState.PARTIALLY_APPLIED, loaded.records);
+        } catch (IOException e) {
+            throw WorkspaceErrors.error(ErrorCodes.CHANGESET_APPLY_FAILED, ErrorCategory.UNKNOWN_SIDE_EFFECT);
+        }
+    }
+
+    private void validate(WorkspaceRef workspace, ChangeSet set, boolean write) {
+        if (workspace == null || set == null) {
+            throw new IllegalArgumentException();
+        }
+        if (write && workspace.getMode() != WorkspaceAccessMode.APPLY_WRITE) denied();
+        if (!workspace.getRunId().equals(set.getRunId())) denied();
+        if (!WorkspaceDigests.changes(set.getChanges()).equals(set.getDigest()) || !WorkspaceDigests.preview(set.getChanges()).equals(set.getPreviewDigest())) {
+            throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_CONFLICT, ErrorCategory.CONFLICT);
+        }
+        Set<String> paths = new HashSet<String>();
+        long total = 0;
+        for (FileChange change : set.getChanges()) {
+            if (!paths.add(change.getRelativePath())) conflict();
+            if (!WorkspaceDigests.sha(change.getContent()).equals(change.getResultHash())) conflict();
+            if (change.getContent().length > policy.getMaxFileBytes() || (total += change.getContent().length) > policy.getMaxTotalBytes()) {
+                throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT);
+            }
+        }
+    }
+
+    private static void validateApproval(ChangeSet set, Approval approval) {
+        if (approval == null || !set.getChangeSetId().equals(approval.getChangeSetId()) || set.getRevision() != approval.getRevision() || !set.getDigest().equals(approval.getChangeSetDigest()) || !set.getPreviewDigest().equals(approval.getPreviewDigest()))
+            approvalInvalid();
+        for (FileChange change : set.getChanges())
+            if (!approval.getPaths().isEmpty() && !approval.getPaths().contains(change.getRelativePath()))
+                approvalInvalid();
+    }
+
+    private List<Record> records(Path root, Path staging, Path backups, ChangeSet set) {
+        List<Record> result = new ArrayList<Record>();
+        Set<Path> targets = new HashSet<Path>();
+        int index = 0;
+        for (FileChange change : set.getChanges()) {
+            Path target = resolveBusiness(root, change.getRelativePath());
+            if (!targets.add(target)) conflict();
+            String name = String.format("%04d.bin", index++);
+            result.add(new Record(change, target, staging.resolve(name), backups.resolve(name), FileApplyStatus.NOT_APPLIED));
+        }
+        return result;
+    }
+
+    private Path resolveBusiness(Path root, String relative) {
+        Path supplied = Paths.get(relative);
+        if (supplied.isAbsolute()) denied();
+        Path target = root.resolve(supplied).normalize();
+        String canonical = root.relativize(target).toString().replace('\\', '/');
+        if (!canonical.equals(relative.replace('\\', '/')) || !target.startsWith(root) || target.startsWith(root.resolve(".clara")))
+            denied();
+        Path rel = root.relativize(target);
+        for (Path part : rel) if (ignored(part.toString())) denied();
+        String name = target.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        String ext = dot < 0 ? "" : name.substring(dot).toLowerCase(Locale.ROOT);
+        boolean allowed = false;
+        for (String configured : policy.getAllowedExtensions())
+            if (ext.equals(configured.toLowerCase(Locale.ROOT))) allowed = true;
+        if (!allowed) denied();
+        try {
+            Path real = target.toRealPath(LinkOption.NOFOLLOW_LINKS);
+            if (!real.startsWith(root) || Files.isSymbolicLink(target) || !Files.isRegularFile(real)) denied();
+            return real;
+        } catch (IOException e) {
+            denied();
+            return target;
+        }
+    }
+
+    private boolean ignored(String name) {
+        String n = name.toLowerCase(Locale.ROOT);
+        if (n.startsWith(".") || "target".equals(n) || "node_modules".equals(n) || ".env".equals(n) || n.endsWith(".key") || n.endsWith(".pem") || n.endsWith(".p12"))
+            return true;
+        for (String v : policy.getIgnoredNames()) if (n.equals(v.toLowerCase(Locale.ROOT))) return true;
+        for (String v : policy.getSensitiveNames()) if (n.equals(v.toLowerCase(Locale.ROOT))) return true;
+        return false;
+    }
+
+    private static void verifyBase(Record record) throws IOException {
+        if (!Files.isRegularFile(record.target) || !hash(record.target).equals(record.change.getBaseHash())) conflict();
+    }
+
+    private boolean rollback(List<Record> records, Path journal) {
+        boolean ok = true;
+        for (int i = records.size() - 1; i >= 0; i--) {
+            Record record = records.get(i);
+            if (record.status != FileApplyStatus.APPLIED) continue;
+            try {
+                if (!Files.isRegularFile(record.backup) || !hash(record.target).equals(record.change.getResultHash())) {
+                    record.status = FileApplyStatus.ROLLBACK_FAILED;
+                    ok = false;
+                    continue;
+                }
+                Path temporary = temporary(record.target, record.change.getBaseHash());
+                Files.copy(record.backup, temporary, StandardCopyOption.REPLACE_EXISTING);
+                mover.move(temporary, record.target);
+                record.status = FileApplyStatus.ROLLED_BACK;
+            } catch (Exception e) {
+                record.status = FileApplyStatus.ROLLBACK_FAILED;
+                ok = false;
+            }
+            try {
+                writeJournal(journal, records);
+            } catch (IOException e) {
+                ok = false;
+            }
+        }
+        return ok;
+    }
+
+    private static ApplyResult result(String id, ApplyState state, List<Record> records) {
+        List<FileApplyResult> files = new ArrayList<FileApplyResult>();
+        for (Record record : records)
+            files.add(new FileApplyResult(record.change.getRelativePath(), record.change.getBaseHash(), record.change.getResultHash(), record.backup.toString(), record.status));
+        return new ApplyResult(id, state, files);
+    }
+
+    private static List<FileChange> changes(List<Record> records) {
+        List<FileChange> changes = new ArrayList<FileChange>();
+        for (Record record : records) changes.add(record.change);
+        return changes;
+    }
+
+    private static void writeManifest(Path path, ChangeSet set, List<Record> records) throws IOException {
+        Path temp = path.resolveSibling(path.getFileName() + ".tmp");
+        DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(temp)));
+        try {
+            out.writeInt(1);
+            out.writeUTF(set.getChangeSetId());
+            out.writeInt(set.getRevision());
+            out.writeUTF(set.getDigest());
+            out.writeUTF(set.getPreviewDigest());
+            out.writeInt(records.size());
+            for (Record r : records) {
+                out.writeUTF(r.change.getRelativePath());
+                out.writeUTF(r.change.getBaseHash());
+                out.writeUTF(r.change.getResultHash());
+                out.writeUTF(r.stage.getFileName().toString());
+                out.writeUTF(r.backup.getFileName().toString());
+            }
+        } finally {
+            out.close();
+        }
+        Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static Manifest readManifest(Path root, Path staging, Path path) throws IOException {
+        DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(path)));
+        try {
+            if (in.readInt() != 1) {
+                throw new IOException("unknown manifest");
+            }
+            String id = in.readUTF();
+            int revision = in.readInt();
+            String digest = in.readUTF();
+            String preview = in.readUTF();
+            int count = in.readInt();
+            if (count < 1 || count > 10000) {
+                throw new IOException("manifest count");
+            }
+            List<Record> records = new ArrayList<Record>();
+            Path backups = root.resolve(".clara").resolve("backups").resolve(staging.getParent().getFileName()).resolve(staging.getFileName());
+            for (int i = 0; i < count; i++) {
+                String relative = in.readUTF(), base = in.readUTF(), result = in.readUTF(), stage = in.readUTF(), backup = in.readUTF();
+                Path target = root.resolve(relative).normalize();
+                if (!target.startsWith(root) || target.startsWith(root.resolve(".clara"))) {
+                    throw new IOException("manifest path");
+                }
+                records.add(new Record(new FileChange(relative, base, result, Files.readAllBytes(staging.resolve(stage))), target, staging.resolve(stage), backups.resolve(backup), FileApplyStatus.NOT_APPLIED));
+            }
+            return new Manifest(id, revision, digest, preview, records);
+        } finally {
+            in.close();
+        }
+    }
+
+    private static void writeJournal(Path path, List<Record> records) throws IOException {
+        Path temp = path.resolveSibling(path.getFileName() + ".tmp");
+        DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(temp)));
+        try {
+            out.writeInt(1);
+            out.writeInt(records.size());
+            for (Record record : records) {
+                out.writeUTF(record.change.getRelativePath());
+                out.writeUTF(record.status.name());
+            }
+        } finally {
+            out.close();
+        }
+        Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static void writeAtomic(Path path, byte[] content) throws IOException {
+        Path parent = path.getParent();
+        if (parent != null) Files.createDirectories(parent);
+        Path temp = path.resolveSibling(path.getFileName() + ".write");
+        Files.write(temp, content);
+        Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static Path temporary(Path target, String suffix) {
+        return target.resolveSibling("." + target.getFileName() + ".clara-" + suffix.substring(0, 12) + ".tmp");
+    }
+
+    private static String hash(Path path) throws IOException {
+        return WorkspaceDigests.sha(Files.readAllBytes(path));
+    }
+
+    private static Path realRoot(WorkspaceRef workspace) {
+        try {
+            return workspace.getRoot().toRealPath();
+        } catch (IOException e) {
+            denied();
+            return workspace.getRoot();
+        }
+    }
+
+    private static String key(ChangeSet set) {
+        return segment(set.getChangeSetId()) + "-r" + set.getRevision();
+    }
+
+    private static String segment(String value) {
+        if (value == null || !value.matches("[A-Za-z0-9._-]{1,128}")) denied();
+        return value;
+    }
+
+    private static void denied() {
+        throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_ACCESS_DENIED, ErrorCategory.AUTHORIZATION);
+    }
+
+    private static void conflict() {
+        throw WorkspaceErrors.error(ErrorCodes.WORKSPACE_CONFLICT, ErrorCategory.CONFLICT);
+    }
+
+    private static void approvalInvalid() {
+        throw WorkspaceErrors.error(ErrorCodes.CHANGESET_APPROVAL_INVALID, ErrorCategory.AUTHORIZATION);
+    }
+
+    /**
+     * 移动原子。
+     */
+    interface AtomicMover {
+        void move(Path source, Path target) throws IOException;
+    }
+
+    /**
+     * 表示。
+     */
+    private static final class Record {
+        private final FileChange change;
+        private final Path target, stage, backup;
+        private FileApplyStatus status;
+
+        private Record(FileChange c, Path t, Path s, Path b, FileApplyStatus status) {
+            change = c;
+            target = t;
+            stage = s;
+            backup = b;
+            this.status = status;
+        }
+    }
+
+    /**
+     * 表示。
+     */
+    private static final class Manifest {
+        private final String id, digest, preview;
+        private final int revision;
+        private final List<Record> records;
+
+        private Manifest(String id, int revision, String digest, String preview, List<Record> records) {
+            this.id = id;
+            this.revision = revision;
+            this.digest = digest;
+            this.preview = preview;
+            this.records = records;
+        }
+    }
 }

@@ -13,6 +13,7 @@ import com.clara.media.MediaUpload;
 import com.clara.media.MediaValidation;
 import com.clara.media.MediaValidator;
 import com.clara.media.validation.DefaultMediaValidator;
+
 import java.io.BufferedInputStream;
 import java.io.Closeable;
 import java.io.IOException;
@@ -42,11 +43,13 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
     public ObjectMediaStore(ObjectMediaStoreConfig config, ObjectMediaBackend backend) {
         this(config, backend, new DefaultMediaValidator(config == null ? null : config.getValidationPolicy()));
     }
+
     public ObjectMediaStore(ObjectMediaStoreConfig config, ObjectMediaBackend backend,
-            List<MediaMetadataProbe> metadataProbes, MediaContentSafetyScanner safetyScanner) {
+                            List<MediaMetadataProbe> metadataProbes, MediaContentSafetyScanner safetyScanner) {
         this(config, backend, new DefaultMediaValidator(config == null ? null : config.getValidationPolicy(),
                 metadataProbes, safetyScanner));
     }
+
     public ObjectMediaStore(ObjectMediaStoreConfig config, ObjectMediaBackend backend, MediaValidator validator) {
         if (config == null || backend == null || validator == null) {
             throw new IllegalArgumentException("dependencies must not be null");
@@ -58,15 +61,22 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
 
     public synchronized MediaAsset put(MediaUpload upload) {
         ensureOpen();
-        if (upload == null) { throw new IllegalArgumentException("upload must not be null"); }
+        if (upload == null) {
+            throw new IllegalArgumentException("upload must not be null");
+        }
         String stagingKey = config.getNamespace() + "/staging/" + UUID.randomUUID().toString();
         boolean staged = false;
         try {
             InputStream source = upload.getInput().open();
-            if (source == null) { throw new IOException("media input returned null"); }
+            if (source == null) {
+                throw new IOException("media input returned null");
+            }
             StagedMediaObject stagedObject;
-            try { stagedObject = backend.stage(stagingKey, source, config.getValidationPolicy().getMaxFileBytes()); }
-            finally { source.close(); }
+            try {
+                stagedObject = backend.stage(stagingKey, source, config.getValidationPolicy().getMaxFileBytes());
+            } finally {
+                source.close();
+            }
             staged = true;
             if (stagedObject == null || !stagingKey.equals(stagedObject.getKey())) backendFailure(false);
             DigestAndSize actual = digest(backend.open(stagingKey), config.getValidationPolicy().getMaxFileBytes());
@@ -76,10 +86,15 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
             String destinationKey = tenantPrefix + actual.sha256;
             ObjectMediaRecord existing = backend.head(destinationKey);
             long usage = backend.usage(tenantPrefix);
-            if (existing != null) { verify(existing, upload.getTenantId(), actual.sha256, destinationKey); usage -= existing.getSize(); }
+            if (existing != null) {
+                verify(existing, upload.getTenantId(), actual.sha256, destinationKey);
+                usage -= existing.getSize();
+            }
             if (usage < 0) backendFailure(false);
             MediaInput stagedInput = new MediaInput() {
-                public InputStream open() { return backend.open(stagingKey); }
+                public InputStream open() {
+                    return backend.open(stagingKey);
+                }
             };
             MediaValidation validation = validator.validate(upload, stagedInput, actual.size, usage);
             long now = System.currentTimeMillis();
@@ -97,10 +112,17 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
         } catch (ObjectMediaBackendException e) {
             backendFailure(e);
             return null;
-        } catch (ClaraException e) { throw e; }
-        catch (IOException e) { backendFailure(true); return null; }
-        catch (RuntimeException e) { backendFailure(false); return null; }
-        finally { if (staged) deleteQuietly(stagingKey); }
+        } catch (ClaraException e) {
+            throw e;
+        } catch (IOException e) {
+            backendFailure(true);
+            return null;
+        } catch (RuntimeException e) {
+            backendFailure(false);
+            return null;
+        } finally {
+            if (staged) deleteQuietly(stagingKey);
+        }
     }
 
     public synchronized MediaAsset get(String tenantId, String assetId) {
@@ -117,9 +139,15 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
                 notFound();
             }
             return asset;
-        } catch (ObjectMediaBackendException e) { backendFailure(e); return null; }
-        catch (ClaraException e) { throw e; }
-        catch (RuntimeException e) { backendFailure(false); return null; }
+        } catch (ObjectMediaBackendException e) {
+            backendFailure(e);
+            return null;
+        } catch (ClaraException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            backendFailure(false);
+            return null;
+        }
     }
 
     public synchronized InputStream open(String tenantId, String assetId) {
@@ -129,9 +157,15 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
             InputStream input = backend.open(tenantPrefix(tenantId) + assetId);
             if (input == null) backendFailure(false);
             return new BufferedInputStream(input);
-        } catch (ObjectMediaBackendException e) { backendFailure(e); return null; }
-        catch (ClaraException e) { throw e; }
-        catch (RuntimeException e) { backendFailure(false); return null; }
+        } catch (ObjectMediaBackendException e) {
+            backendFailure(e);
+            return null;
+        } catch (ClaraException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            backendFailure(false);
+            return null;
+        }
     }
 
     public synchronized void delete(String tenantId, String assetId) {
@@ -143,9 +177,13 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
             if (current == null) notFound();
             verify(current, tenantId, assetId, key);
             backend.delete(key);
-        } catch (ObjectMediaBackendException e) { backendFailure(e); }
-        catch (ClaraException e) { throw e; }
-        catch (RuntimeException e) { backendFailure(false); }
+        } catch (ObjectMediaBackendException e) {
+            backendFailure(e);
+        } catch (ClaraException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            backendFailure(false);
+        }
     }
 
     public synchronized int cleanupExpired(long now) {
@@ -162,12 +200,21 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
                 if (separator < 0) backendFailure(false);
                 verify(record, record.getAsset().getOwnerTenantId(), key.substring(separator + 1), key);
                 Long expiry = record.getAsset().getExpiresAt();
-                if (expiry != null && expiry.longValue() <= now) { backend.delete(record.getKey()); removed++; }
+                if (expiry != null && expiry.longValue() <= now) {
+                    backend.delete(record.getKey());
+                    removed++;
+                }
             }
             return removed;
-        } catch (ObjectMediaBackendException e) { backendFailure(e); return 0; }
-        catch (ClaraException e) { throw e; }
-        catch (RuntimeException e) { backendFailure(false); return 0; }
+        } catch (ObjectMediaBackendException e) {
+            backendFailure(e);
+            return 0;
+        } catch (ClaraException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            backendFailure(false);
+            return 0;
+        }
     }
 
     public synchronized void close() throws IOException {
@@ -185,39 +232,115 @@ public final class ObjectMediaStore implements MediaStore, Closeable {
                 || !("clara-object:" + key).equals(record.getAsset().getStorageUri())
                 || !tenantId.equals(record.getAsset().getOwnerTenantId())) backendFailure(false);
     }
+
     private String tenantPrefix(String tenantId) {
-        if (tenantId == null || tenantId.trim().isEmpty()) { throw new IllegalArgumentException("tenantId must not be blank"); }
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new IllegalArgumentException("tenantId must not be blank");
+        }
         return config.getNamespace() + "/assets/" + sha256(tenantId.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + "/";
     }
+
     private static void validateIdentity(String tenantId, String assetId) {
-        if (tenantId == null || tenantId.trim().isEmpty()) { throw new IllegalArgumentException("tenantId must not be blank"); }
-        if (assetId == null || !assetId.matches("[0-9a-f]{64}")) { throw new IllegalArgumentException("invalid assetId"); }
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new IllegalArgumentException("tenantId must not be blank");
+        }
+        if (assetId == null || !assetId.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("invalid assetId");
+        }
     }
-    private void ensureOpen() { if (closed) { throw new IllegalStateException("media store is closed"); } }
-    private void deleteQuietly(String key) { try { backend.delete(key); } catch (RuntimeException ignored) { } }
+
+    private void ensureOpen() {
+        if (closed) {
+            throw new IllegalStateException("media store is closed");
+        }
+    }
+
+    private void deleteQuietly(String key) {
+        try {
+            backend.delete(key);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
     private static DigestAndSize digest(InputStream source, long limit) throws IOException {
-        if (source == null) { throw new IOException("backend returned null content"); }
-        MessageDigest digest = sha256Digest(); long size = 0;
+        if (source == null) {
+            throw new IOException("backend returned null content");
+        }
+        MessageDigest digest = sha256Digest();
+        long size = 0;
         InputStream input = new BufferedInputStream(source);
-        try { byte[] buffer = new byte[8192]; int count; while ((count = input.read(buffer)) >= 0) { if (count == 0) continue; if (size > limit - count) resourceLimit(); digest.update(buffer, 0, count); size += count; } }
-        finally { input.close(); }
+        try {
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) >= 0) {
+                if (count == 0) continue;
+                if (size > limit - count) resourceLimit();
+                digest.update(buffer, 0, count);
+                size += count;
+            }
+        } finally {
+            input.close();
+        }
         return new DigestAndSize(hex(digest.digest()), size);
     }
-    private static String sha256(byte[] value) { return hex(sha256Digest().digest(value)); }
-    private static MessageDigest sha256Digest() { try { return MessageDigest.getInstance("SHA-256"); } catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); } }
-    private static String hex(byte[] value) { StringBuilder text = new StringBuilder(value.length * 2); for (byte b : value) text.append(String.format(Locale.ROOT, "%02x", b & 0xff)); return text.toString(); }
-    private static long safeAdd(long left, long right) { return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right; }
-    private static void notFound() { fail(ErrorCodes.MEDIA_NOT_FOUND, ErrorCategory.VALIDATION, false); }
-    private static void invalid() { fail(ErrorCodes.MEDIA_VALIDATION_FAILED, ErrorCategory.VALIDATION, false); }
-    private static void resourceLimit() { fail(ErrorCodes.MEDIA_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT, false); }
+
+    private static String sha256(byte[] value) {
+        return hex(sha256Digest().digest(value));
+    }
+
+    private static MessageDigest sha256Digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String hex(byte[] value) {
+        StringBuilder text = new StringBuilder(value.length * 2);
+        for (byte b : value) text.append(String.format(Locale.ROOT, "%02x", b & 0xff));
+        return text.toString();
+    }
+
+    private static long safeAdd(long left, long right) {
+        return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
+
+    private static void notFound() {
+        fail(ErrorCodes.MEDIA_NOT_FOUND, ErrorCategory.VALIDATION, false);
+    }
+
+    private static void invalid() {
+        fail(ErrorCodes.MEDIA_VALIDATION_FAILED, ErrorCategory.VALIDATION, false);
+    }
+
+    private static void resourceLimit() {
+        fail(ErrorCodes.MEDIA_RESOURCE_LIMIT, ErrorCategory.RESOURCE_LIMIT, false);
+    }
+
     private static void backendFailure(ObjectMediaBackendException error) {
         if (error.isResourceLimit()) resourceLimit();
         backendFailure(error.isRetryable());
     }
-    private static void backendFailure(boolean retryable) { fail(ErrorCodes.MEDIA_BACKEND_FAILED, ErrorCategory.EXTERNAL_SERVICE, retryable); }
-    private static void fail(String code, ErrorCategory category, boolean retryable) { throw new ClaraException(new ClaraError(code, category, code, retryable, null, null, null, null, Collections.<String, String>emptyMap())); }
+
+    private static void backendFailure(boolean retryable) {
+        fail(ErrorCodes.MEDIA_BACKEND_FAILED, ErrorCategory.EXTERNAL_SERVICE, retryable);
+    }
+
+    private static void fail(String code, ErrorCategory category, boolean retryable) {
+        throw new ClaraException(new ClaraError(code, category, code, retryable, null, null, null, null, Collections.<String, String>emptyMap()));
+    }
+
     /**
      * 表示。
      */
-    private static final class DigestAndSize { private final String sha256; private final long size; private DigestAndSize(String sha256, long size) { this.sha256 = sha256; this.size = size; } }
+    private static final class DigestAndSize {
+        private final String sha256;
+        private final long size;
+
+        private DigestAndSize(String sha256, long size) {
+            this.sha256 = sha256;
+            this.size = size;
+        }
+    }
 }

@@ -1,0 +1,46 @@
+provider: VOLCENGINE
+credential:
+  secretRef: volcengine-novel
+  environmentVariable: CLARA_VOLCENGINE_API_KEY
+transport:
+  allowedOrigins:
+    - https://ark.cn-beijing.volces.com
+  connectTimeoutMillis: 10000
+  readTimeoutMillis: 180000
+  maxRequestBytes: 16777216
+  maxResponseBytes: 33554432
+  allowHttp: false
+capabilities:
+  chat:
+    endpoint: https://ark.cn-beijing.volces.com/api/v3/chat/completions
+    modelId: doubao-seed-character-260628
+    apiProfile: ark-v3-chat
+    parameters:
+      maxTokens: 20000
+  image:
+    endpoint: https://ark.cn-beijing.volces.com/api/v3/images/generations
+    modelId: doubao-seedream-5-0-pro-260628
+    apiProfile: ark-v3-images
+    parameters:
+      maxPromptChars: 32000
+      maxImages: 1
+      maxSourceImages: 0
+      watermark: false
+  image-fast:
+    endpoint: https://ark.cn-beijing.volces.com/api/v3/images/generations
+    modelId: doubao-seedream-5-0-260128
+    apiProfile: ark-v3-images
+    parameters:
+      maxPromptChars: 32000
+      maxImages: 1
+      maxSourceImages: 0
+      watermark: false
+  image-quality:
+    endpoint: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    modelId: doubao-seedance-1-5-pro-251215
+    apiProfile: ark-v3-images
+    parameters:
+      maxPromptChars: 32000
+      maxImages: 1
+      maxSourceImages: 0
+      watermark: false

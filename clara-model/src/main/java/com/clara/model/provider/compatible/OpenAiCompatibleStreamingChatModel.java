@@ -17,7 +17,7 @@ import com.clara.model.provider.http.ProviderHttpRequest;
 import com.clara.model.provider.http.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderSseEvent;
 import com.clara.model.provider.http.ProviderSseListener;
-import com.clara.model.provider.http.ProviderSseTransport;
+import com.clara.model.provider.http.Jdk8ProviderSseTransport;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -36,7 +36,7 @@ import java.util.concurrent.Future;
  */
 public final class OpenAiCompatibleStreamingChatModel implements StreamingChatModel {
     private final OpenAiCompatibleChatConfig config;
-    private final ProviderSseTransport transport;
+    private final Jdk8ProviderSseTransport transport;
     private final ProviderCredentialResolver credentials;
     private final ExecutorService executor;
     private final int maxToolCalls;
@@ -44,8 +44,8 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
     private final OpenAiCompatibleChatCodec codec = new OpenAiCompatibleChatCodec();
 
     public OpenAiCompatibleStreamingChatModel(OpenAiCompatibleChatConfig config,
-            ProviderSseTransport transport, ProviderCredentialResolver credentials,
-            ExecutorService executor, int maxToolCalls, int maxAccumulatedChars) {
+                                              Jdk8ProviderSseTransport transport, ProviderCredentialResolver credentials,
+                                              ExecutorService executor, int maxToolCalls, int maxAccumulatedChars) {
         if (config == null || transport == null || credentials == null || executor == null) {
             throw new IllegalArgumentException("dependencies must not be null");
         }

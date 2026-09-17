@@ -11,7 +11,7 @@ public final class InMemoryMediaCallbackReplayStore implements MediaCallbackRepl
     private final Map<String, Long> expirations = new HashMap<String, Long>();
 
     public synchronized MediaCallbackReplayDecision reserve(String tenantId, String keyId,
-            String nonce, long expiresAt, long now, int maxEntries) {
+                                                            String nonce, long expiresAt, long now, int maxEntries) {
         if (tenantId == null || keyId == null || nonce == null || expiresAt < 0L
                 || now < 0L || maxEntries <= 0) {
             throw new IllegalArgumentException("invalid replay reservation");

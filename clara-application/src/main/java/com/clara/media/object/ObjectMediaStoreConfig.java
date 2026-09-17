@@ -14,10 +14,18 @@ public final class ObjectMediaStoreConfig {
                 || namespace.startsWith("/") || namespace.endsWith("/") || namespace.contains("..")) {
             throw new IllegalArgumentException("invalid namespace");
         }
-        if (validationPolicy == null) { throw new IllegalArgumentException("validationPolicy must not be null"); }
+        if (validationPolicy == null) {
+            throw new IllegalArgumentException("validationPolicy must not be null");
+        }
         this.namespace = namespace;
         this.validationPolicy = validationPolicy;
     }
-    public String getNamespace() { return namespace; }
-    public MediaValidationPolicy getValidationPolicy() { return validationPolicy; }
+
+    public String getNamespace() {
+        return namespace;
+    }
+
+    public MediaValidationPolicy getValidationPolicy() {
+        return validationPolicy;
+    }
 }

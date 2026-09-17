@@ -1,7 +1,6 @@
 package com.clara.model.provider.compatible;
 
 import com.clara.kernel.CancellationToken;
-import com.clara.kernel.ClaraException;
 import com.clara.kernel.ErrorCodes;
 import com.clara.kernel.InvocationContext;
 import com.clara.model.api.ChatMessage;
@@ -19,7 +18,7 @@ import com.clara.model.provider.http.ProviderHttpRequest;
 import com.clara.model.provider.http.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderSseEvent;
 import com.clara.model.provider.http.ProviderSseListener;
-import com.clara.model.provider.http.ProviderSseTransport;
+import com.clara.model.provider.http.Jdk8ProviderSseTransport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -130,8 +129,8 @@ public class OpenAiCompatibleStreamingChatModelTest {
         } catch (IllegalArgumentException expected) { }
     }
 
-    private OpenAiCompatibleStreamingChatModel model(ProviderSseTransport transport,
-            ProviderCredentialResolver resolver) {
+    private OpenAiCompatibleStreamingChatModel model(Jdk8ProviderSseTransport transport,
+                                                     ProviderCredentialResolver resolver) {
         try {
             return new OpenAiCompatibleStreamingChatModel(new OpenAiCompatibleChatConfig(
                     ModelProvider.OPENAI, new URI("https://provider.example/v1/chat/completions"),
@@ -172,7 +171,7 @@ public class OpenAiCompatibleStreamingChatModelTest {
         }
     }
 
-    private static final class FakeTransport implements ProviderSseTransport {
+    private static final class FakeTransport implements Jdk8ProviderSseTransport {
         private final int status;
         private final String[] chunks;
         private ProviderHttpRequest request;
@@ -192,7 +191,7 @@ public class OpenAiCompatibleStreamingChatModelTest {
         }
     }
 
-    private static final class BlockingTransport implements ProviderSseTransport {
+    private static final class BlockingTransport implements Jdk8ProviderSseTransport {
         private final CountDownLatch started = new CountDownLatch(1);
         public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
                 ProviderSseListener listener) {

@@ -1,16 +1,21 @@
 package com.clara.deployment.local;
 
 import com.clara.media.validation.MediaValidationPolicy;
+
 import java.nio.file.Path;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+
 import static org.junit.Assert.*;
 
 public class WindowsSingleHostStoragePolicyTest {
-    @Rule public final TemporaryFolder folder = new TemporaryFolder();
+    @Rule
+    public final TemporaryFolder folder = new TemporaryFolder();
 
-    @Test public void exposesFrozenFailClosedSingleHostLimits() throws Exception {
+    @Test
+    public void exposesFrozenFailClosedSingleHostLimits() throws Exception {
         Path workspace = folder.newFolder("workspace").toPath();
         WindowsSingleHostStoragePolicy policy =
                 new WindowsSingleHostStoragePolicy(workspace, "workspace-1");
@@ -28,7 +33,8 @@ public class WindowsSingleHostStoragePolicyTest {
         assertTrue(policy.isWindowsCredentialStoreRequired());
     }
 
-    @Test public void createsBoundedComponentConfigurations() throws Exception {
+    @Test
+    public void createsBoundedComponentConfigurations() throws Exception {
         Path workspace = folder.newFolder("configs").toPath();
         WindowsSingleHostStoragePolicy policy =
                 new WindowsSingleHostStoragePolicy(workspace, "workspace-2");

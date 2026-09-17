@@ -9,5 +9,5 @@ import com.clara.media.MediaUpload;
  */
 public interface RemoteMediaIngestor {
     MediaUpload fetch(String sourceUrl, MediaType expectedType, String expectedMimeType,
-            InvocationContext context);
+                      InvocationContext context);
 }
