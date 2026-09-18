@@ -7,7 +7,7 @@ import com.clara.model.api.ChatResponse;
 import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.ProviderHttpTransport;
-import com.clara.model.provider.http.impl.ProviderHttpResponse;
+import com.clara.model.provider.http.impl.ProviderInvoker;
 import com.clara.model.utils.ExceptionUtils;
 
 /**
@@ -18,9 +18,9 @@ import com.clara.model.utils.ExceptionUtils;
  * 并对响应结构做严格校验；OpenAI、DeepSeek、火山引擎、阿里云等平台共用本实现，差异由
  * {@link OpenAiCompatibleChatConfig} 中的平台与协议档位决定。
  *
- * <p>与流式的分工：编码、凭据解析、请求头、发送与状态码映射等与流式共用的部分由
- * {@link OpenAiCompatibleChatExchange} 承载，本类只负责同步响应处理——一次性解码出完整
- * {@link ChatResponse}。流式调用见 {@link OpenAiCompatibleStreamingChatModel}。
+ * <p>与流式的分工：编码由 {@link OpenAiCompatibleChatCodec} 负责，凭据解析、请求头、发送与状态码映射由
+ * {@link ProviderInvoker} 统一承担，本类只描述「这一次往返打哪个端点、发哪份请求体、如何解析响应」。
+ * 流式调用见 {@link OpenAiCompatibleStreamingChatModel}。
  *
  * <p>使用方式：
  * <pre>{@code
@@ -35,9 +35,17 @@ import com.clara.model.utils.ExceptionUtils;
  */
 public final class OpenAiCompatibleChatModel implements ChatModel {
     /**
-     * 编解码与一次往返请求的共用执行体，同时持有配置、传输器与凭据解析器。
+     * 对话配置，提供平台、端点、模型 ID 与凭据引用。
      */
-    private final OpenAiCompatibleChatExchange exchange;
+    private final OpenAiCompatibleChatConfig config;
+    /**
+     * 统一的往返执行器，负责凭据、请求头、发送与状态码校验。
+     */
+    private final ProviderInvoker invoker;
+    /**
+     * 协议编解码器，协议细节集中在其中。
+     */
+    private final OpenAiCompatibleChatCodec codec = new OpenAiCompatibleChatCodec();
 
     /**
      * 创建对话模型。
@@ -48,13 +56,17 @@ public final class OpenAiCompatibleChatModel implements ChatModel {
      * @throws IllegalArgumentException 任一依赖为 null 时
      */
     public OpenAiCompatibleChatModel(OpenAiCompatibleChatConfig config, ProviderHttpTransport transport, ProviderCredentialResolver credentials) {
-        this.exchange = new OpenAiCompatibleChatExchange(config, transport, credentials);
+        if (config == null) {
+            throw new IllegalArgumentException("config must not be null");
+        }
+        this.config = config;
+        this.invoker = new ProviderInvoker(config.getProvider(), config.getSecretRef(), transport, credentials);
     }
 
     /**
      * 执行一次同步对话调用。
      *
-     * <p>流程：校验取消状态 → 编码请求体 → 由 {@link OpenAiCompatibleChatExchange#send} 解析凭据、发送并
+     * <p>流程：在调用线程编码请求体（非法请求同步抛出）→ 由 {@link ProviderInvoker} 解析凭据、发送并
      * 校验状态码 → 解码响应；凭据副本在发送过程中清零，本类不接触密钥。
      *
      * @param request 对话请求，包含消息、参数与调用上下文，不可为 null
@@ -66,8 +78,10 @@ public final class OpenAiCompatibleChatModel implements ChatModel {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
-        request.getContext().getCancellationToken().throwIfCancellationRequested(request.getContext().getTraceId());
-        ProviderHttpResponse response = exchange.send(request, exchange.encode(request, false), null);
-        return exchange.decode(response.getBody());
+        byte[] payload = codec.encode(request, config, false);
+        return invoker.exchange(request,
+                request.getContext(),
+                new OpenAiCompatibleChatExchange(config, codec, payload, false)
+        );
     }
 }

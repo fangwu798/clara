@@ -22,6 +22,8 @@ import com.clara.model.provider.alibaba.AlibabaNativeTaskConfig;
 import com.clara.model.provider.alibaba.AlibabaAudioConfig;
 import com.clara.model.provider.alibaba.AlibabaAudioTranscriptionModel;
 import com.clara.model.provider.alibaba.AlibabaSpeechSynthesisModel;
+import com.clara.model.provider.compatible.image.OpenAiCompatibleImageConfig;
+import com.clara.model.provider.compatible.image.OpenAiCompatibleImageModel;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.impl.ProviderHttpRequest;
 import com.clara.model.provider.http.impl.ProviderHttpResponse;
@@ -30,8 +32,7 @@ import com.clara.model.provider.http.ProviderSseListener;
 import com.clara.model.provider.openai.OpenAiAudioTranscriptionModel;
 import com.clara.model.provider.openai.OpenAiMediaConfig;
 import com.clara.model.provider.openai.OpenAiSpeechSynthesisModel;
-import com.clara.model.provider.volcengine.VolcengineImageConfig;
-import com.clara.model.provider.volcengine.VolcengineImageModel;
+import com.clara.model.provider.volcengine.VolcengineImageOptions;
 import com.clara.model.provider.volcengine.VolcengineVideoConfig;
 import com.clara.model.provider.volcengine.VolcengineVideoJobFactory;
 import com.clara.model.runtime.ProviderModelDescriptor;
@@ -53,8 +54,10 @@ public class ProviderMediaAdaptersTest {
     @Test public void volcengineImageMapsRequestAndPersistsRemoteOutput() throws Exception {
         QueueTransport transport = new QueueTransport(response("{\"request_id\":\"r1\",\"data\":[{\"url\":\"https://output.test/a.png\"}]}"));
         FakeAssets assets = new FakeAssets();
-        VolcengineImageModel model = new VolcengineImageModel(
-                new VolcengineImageConfig(uri("https://ark.test/images/generations"), "seedream", "secret", 100, 2, 1, true),
+        OpenAiCompatibleImageModel model = new OpenAiCompatibleImageModel(
+                new OpenAiCompatibleImageConfig(ModelProvider.VOLCENGINE,
+                        uri("https://ark.test/images/generations"), "seedream", "secret", 100, 2, 1, 0),
+                new VolcengineImageOptions(true),
                 descriptor(ModelProvider.VOLCENGINE, "seedream", ModelCapability.IMAGE_GENERATION),
                 assets, transport, credentials());
         ImageGenerationResult result = model.generate(new ImageGenerationRequest("draw", null, null,
@@ -62,6 +65,8 @@ public class ProviderMediaAdaptersTest {
         JsonNode sent = new ObjectMapper().readTree(transport.requests.get(0).getBody());
         assertEquals("seedream", sent.get("model").asText());
         assertEquals("1024x1024", sent.get("size").asText());
+        assertEquals("url", sent.get("response_format").asText());
+        assertTrue(sent.get("watermark").asBoolean());
         assertEquals("stored-remote", result.getAssetIds().get(0));
         assertEquals("https://output.test/a.png", assets.remoteUrl);
     }

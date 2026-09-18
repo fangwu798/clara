@@ -7,9 +7,9 @@ import com.clara.model.configuration.ProviderCapabilityConfiguration;
 import com.clara.model.configuration.ProviderConfiguration;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.model.provider.compatible.OpenAiCompatibleChatModel;
+import com.clara.model.provider.compatible.image.OpenAiCompatibleImageModel;
 import com.clara.model.provider.http.impl.Jdk8ProviderHttpTransport;
 import com.clara.model.provider.http.ProviderHttpTransport;
-import com.clara.model.provider.volcengine.VolcengineImageModel;
 import com.clara.model.runtime.ProviderModelDescriptor;
 import com.clara.novel.DefaultNovelAgent;
 import com.clara.novel.NovelCoverAssetBridge;
@@ -92,8 +92,9 @@ public final class NovelAgentMain {
                         volcengine.getProvider(), image.requireModelId(), "novel-cover",
                         image.getApiProfile(), null, null,
                         EnumSet.of(ModelCapability.IMAGE_GENERATION));
-                VolcengineImageModel imageModel = new VolcengineImageModel(
-                        volcengine.toVolcengineImageConfig(imageCapability), imageDescriptor,
+                OpenAiCompatibleImageModel imageModel = new OpenAiCompatibleImageModel(
+                        volcengine.toVolcengineImageConfig(imageCapability),
+                        volcengine.toVolcengineImageOptions(imageCapability), imageDescriptor,
                         new NovelCoverAssetBridge(request.getOutputDirectory()), volcTransport,
                         volcengine.credentialResolver());
                 DefaultNovelAgent agent = new DefaultNovelAgent(model, chat.requireModelId(),

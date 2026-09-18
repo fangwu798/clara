@@ -335,12 +335,11 @@ public class OpenAiCompatibleStreamAccumulator {
     /**
      * 解析 token 用量。
      *
-     * <p>必填 {@code prompt_tokens} 与 {@code completion_tokens}；可选 {@code total_tokens} 与缓存命中量，
-     * 可选字段缺失时对应值记为 null，存在但非法（非整数或为负）则按协议错误处理。
+     * <p>必填 {@code prompt_tokens} 与 {@code completion_tokens}，缺失时按 0 处理；可选
+     * {@code total_tokens} 与缓存命中量按「缺失即 null」读取，以便上层按输入加输出推导总量。
      *
      * @param value usage 节点，可为 null
      * @return token 用量，节点缺失时返回 null
-     * @throws ClaraException 字段缺失、非整数或为负时
      */
     private static TokenUsage usage(JsonNode value) {
         if (value == null || value.isNull()) {
@@ -349,8 +348,8 @@ public class OpenAiCompatibleStreamAccumulator {
         return new TokenUsage(
                 JsonNodeUtils.getIntValue(value, "prompt_tokens"),   //提示词输入token大小
                 JsonNodeUtils.getIntValue(value, "completion_tokens"),//当前响应token大小
-                JsonNodeUtils.getIntValue(value, "total_tokens"),//当前会话token总大小
-                JsonNodeUtils.getIntValue(value, "cached_tokens") //当前请求命中缓存token大小
+                JsonNodeUtils.optionalIntValue(value, "total_tokens"),//当前会话token总大小，缺失时为 null
+                JsonNodeUtils.optionalIntValue(value, "cached_tokens") //当前请求命中缓存token大小，缺失时为 null
         );
     }
 

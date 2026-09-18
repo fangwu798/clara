@@ -9,6 +9,7 @@ import com.clara.model.provider.compatible.tool.StreamChunk;
 import com.clara.model.provider.compatible.tool.ToolDelta;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.impl.ProviderInvoker;
 import com.clara.model.utils.ExceptionUtils;
 
 import java.util.concurrent.ExecutorService;
@@ -22,13 +23,13 @@ import java.util.concurrent.Future;
  * {@code TEXT_DELTA}、{@code REASONING_DELTA}、{@code TOOL_ARGUMENT_DELTA}、
  * {@code TOOL_CALL_COMPLETE}，最后以 {@code RESPONSE_COMPLETE} 或 {@code ERROR} 收尾。
  *
- * <p>与非流式的分工：编码、凭据解析、请求头、发送与状态码映射等与非流式共用的部分由
- * {@link OpenAiCompatibleChatExchange} 承载（差量只有 {@code stream=true}、{@code Accept} 头与是否传
- * SSE 监听器），本类只负责流式响应处理：把事件交给累加器、按序推送，并把异常转成 {@code ERROR} 事件。
- * 同步调用见 {@link OpenAiCompatibleChatModel}。
+ * <p>与非流式的分工：请求编码由 {@link OpenAiCompatibleChatCodec} 负责，凭据解析、请求头、发送与状态码
+ * 映射由 {@link ProviderInvoker} 统一承担（与非流式共用同一骨架），差异只有 {@code stream=true}、
+ * {@code Accept} 头与是否传 SSE 监听器；本类只负责流式响应处理：把事件交给累加器、按序推送，
+ * 并把异常转成 {@code ERROR} 事件。同步调用见 {@link OpenAiCompatibleChatModel}。
  *
  * <p>相关实现细节：事件发射器 {@link EventEmitter} 与异步句柄 {@link AsyncStreamHandle} 放在
- * {@code chat.handler} 包，本类只保留调用流程。
+ * {@code compatible.handler} 包（异步句柄与流式生图共用），本类只保留调用流程。
  *
  * <p>常规用法：
  * <pre>{@code
@@ -53,9 +54,13 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
      */
     private final OpenAiCompatibleChatConfig config;
     /**
-     * 编解码与一次往返请求的共用执行体，与非流式共用同一套凭据、请求头与状态码处理。
+     * 统一的往返执行器，负责凭据、请求头、发送与状态码校验，与非流式共用同一骨架。
      */
-    private final OpenAiCompatibleChatExchange exchange;
+    private final ProviderInvoker invoker;
+    /**
+     * 协议编解码器，流式请求体在调用线程上先由它编码。
+     */
+    private final OpenAiCompatibleChatCodec codec = new OpenAiCompatibleChatCodec();
     /**
      * 承载阻塞式流读取的执行器，由调用方创建与关闭。
      */
@@ -81,6 +86,9 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
      * @throws IllegalArgumentException 任一依赖为 null 或上限非正时
      */
     public OpenAiCompatibleStreamingChatModel(OpenAiCompatibleChatConfig config, ProviderHttpTransport transport, ProviderCredentialResolver credentials, ExecutorService executor, int maxToolCalls, int maxAccumulatedChars) {
+        if (config == null) {
+            throw new IllegalArgumentException("config must not be null");
+        }
         if (executor == null) {
             throw new IllegalArgumentException("executor must not be null");
         }
@@ -88,7 +96,7 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
             throw new IllegalArgumentException("stream limits must be positive");
         }
         this.config = config;
-        this.exchange = new OpenAiCompatibleChatExchange(config, transport, credentials);
+        this.invoker = new ProviderInvoker(config.getProvider(), config.getSecretRef(), transport, credentials);
         this.executor = executor;
         this.maxToolCalls = maxToolCalls;
         this.maxAccumulatedChars = maxAccumulatedChars;
@@ -110,8 +118,8 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
             throw new IllegalArgumentException("request and observer must not be null");
         }
         request.getContext().getCancellationToken().throwIfCancellationRequested(request.getContext().getTraceId());
-        final byte[] payload = exchange.encode(request, true);
-        final AsyncStreamHandle handle = new AsyncStreamHandle(request);
+        final byte[] payload = codec.encode(request, config, true);
+        final AsyncStreamHandle handle = new AsyncStreamHandle(request.getContext());
         Future<?> future = executor.submit(() -> execute(request, observer, payload));
         handle.setFuture(future);
         return handle;
@@ -121,7 +129,7 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
      * 在执行器线程中完成一次完整的流式调用。
      *
      * <p>把每个 SSE 事件交给累加器并推送增量，读取结束后校验流已收尾；任何异常都会转换为 ERROR 事件。
-     * 凭据的解析与清零由 {@link OpenAiCompatibleChatExchange#send} 负责，本类不接触密钥。
+     * 凭据的解析与清零由 {@link ProviderInvoker} 负责，本类不接触密钥。
      *
      * @param request  对话请求
      * @param observer 流事件观察者
@@ -131,7 +139,8 @@ public final class OpenAiCompatibleStreamingChatModel implements StreamingChatMo
         final EventEmitter emitter = new EventEmitter(observer);
         try {
             final OpenAiCompatibleStreamAccumulator accumulator = new OpenAiCompatibleStreamAccumulator(config, maxToolCalls, maxAccumulatedChars);
-            exchange.send(request, payload, event -> {
+            invoker.exchangeStreaming(request, request.getContext(),
+                    new OpenAiCompatibleChatExchange(config, codec, payload, true), event -> {
                 if (!"message".equals(event.getEvent())) {
                     throw ExceptionUtils.protocolError(config.getProvider());
                 }

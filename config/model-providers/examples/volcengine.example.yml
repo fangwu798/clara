@@ -25,6 +25,10 @@ transport:
   maxResponseBytes: 33554432
   # 是否允许 HTTP 明文地址；生产环境应保持 false。
   allowHttp: false
+  # 平台级默认请求头，仅用于补充：适配器自己设置的同名头（如 Authorization、Content-Type、Accept）优先，
+  # 这里配置的同名头不会生效；头名不能是 host、content-length、connection、transfer-encoding。
+  # headers:
+  #   X-Client-Request-Id: clara-volcengine
 
 # 本平台启用的模型能力，不使用的能力节点可以删除。
 capabilities:

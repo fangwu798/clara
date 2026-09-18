@@ -9,13 +9,13 @@ import com.clara.model.api.media.TranscriptionSegment;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.impl.ProviderInvoker;
 import com.clara.model.provider.media.MediaJson;
 import com.clara.model.provider.media.MultipartBody;
 import com.clara.model.provider.media.ProviderMediaAssetBridge;
-import com.clara.model.provider.media.ProviderMediaErrors;
-import com.clara.model.provider.media.ProviderMediaHttp;
 import com.clara.model.runtime.ModelCapabilityGuard;
 import com.clara.model.runtime.ProviderModelDescriptor;
+import com.clara.model.utils.ExceptionUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,7 +29,7 @@ public final class OpenAiAudioTranscriptionModel implements AudioTranscriptionMo
     private final OpenAiMediaConfig config;
     private final ProviderModelDescriptor descriptor;
     private final ProviderMediaAssetBridge assets;
-    private final ProviderMediaHttp http;
+    private final ProviderInvoker invoker;
     private final MediaJson json = new MediaJson(ModelProvider.OPENAI);
     private final ModelCapabilityGuard guard = new ModelCapabilityGuard();
 
@@ -44,7 +44,7 @@ public final class OpenAiAudioTranscriptionModel implements AudioTranscriptionMo
             throw new IllegalArgumentException("descriptor does not match config");
         }
         this.config = config; this.descriptor = descriptor; this.assets = assets;
-        this.http = new ProviderMediaHttp(ModelProvider.OPENAI, config.getSecretRef(), transport, credentials);
+        this.invoker = new ProviderInvoker(ModelProvider.OPENAI, config.getSecretRef(), transport, credentials);
     }
     public AudioTranscriptionResult transcribe(AudioTranscriptionRequest request) {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
@@ -54,7 +54,7 @@ public final class OpenAiAudioTranscriptionModel implements AudioTranscriptionMo
             throw new IllegalArgumentException("provider options do not match provider");
         }
         if (request.getPrompt() != null && request.getPrompt().length() > config.getMaxTextChars()) {
-            throw ProviderMediaErrors.tooLarge(ModelProvider.OPENAI);
+            throw ExceptionUtils.requestTooLarge(ModelProvider.OPENAI);
         }
         String boundary = "ClaraAudioBoundary00000001";
         MultipartBody body = new MultipartBody(boundary);
@@ -65,18 +65,18 @@ public final class OpenAiAudioTranscriptionModel implements AudioTranscriptionMo
         body.file("file", "audio.bin", "application/octet-stream",
                 assets.inputBytes(request.getAudioAssetId(), MediaType.AUDIO,
                         config.getMaxInputBytes(), request.getContext()));
-        ProviderHttpResponse response = http.execute("POST", config.getEndpoint(), body.contentType(),
-                body.finish(), request.getContext(), null);
+        ProviderHttpResponse response = invoker.execute("POST", config.getEndpoint(), body.contentType(),
+                body.finish(), null, request.getContext());
         JsonNode root = json.read(response.getBody());
         String text = MediaJson.requiredText(root, "text", ModelProvider.OPENAI);
         Long duration = seconds(root.get("duration"));
         List<TranscriptionSegment> segments = new ArrayList<TranscriptionSegment>();
         JsonNode values = root.get("segments");
         if (values != null) {
-            if (!values.isArray()) { throw ProviderMediaErrors.protocol(ModelProvider.OPENAI); }
+            if (!values.isArray()) { throw ExceptionUtils.protocolError(ModelProvider.OPENAI); }
             for (JsonNode value : values) {
                 Long start = seconds(value.get("start")); Long end = seconds(value.get("end"));
-                if (start == null || end == null) { throw ProviderMediaErrors.protocol(ModelProvider.OPENAI); }
+                if (start == null || end == null) { throw ExceptionUtils.protocolError(ModelProvider.OPENAI); }
                 segments.add(new TranscriptionSegment(start.longValue(), end.longValue(),
                         MediaJson.requiredText(value, "text", ModelProvider.OPENAI)));
             }
@@ -85,12 +85,12 @@ public final class OpenAiAudioTranscriptionModel implements AudioTranscriptionMo
         metadata.put("provider", ModelProvider.OPENAI.name()); metadata.put("model", config.getModelId());
         String language = root.hasNonNull("language") ? root.get("language").asText() : request.getLanguage();
         try { return new AudioTranscriptionResult(text, language, duration, segments, metadata); }
-        catch (IllegalArgumentException failure) { throw ProviderMediaErrors.protocol(ModelProvider.OPENAI); }
+        catch (IllegalArgumentException failure) { throw ExceptionUtils.protocolError(ModelProvider.OPENAI); }
     }
     private static Long seconds(JsonNode value) {
         if (value == null || value.isNull()) return null;
         if (!value.isNumber() || value.doubleValue() < 0 || Double.isInfinite(value.doubleValue())
-                || Double.isNaN(value.doubleValue())) { throw ProviderMediaErrors.protocol(ModelProvider.OPENAI); }
+                || Double.isNaN(value.doubleValue())) { throw ExceptionUtils.protocolError(ModelProvider.OPENAI); }
         return Long.valueOf(Math.round(value.doubleValue() * 1000.0d));
     }
 }

@@ -9,13 +9,13 @@ import com.clara.model.api.media.ImageGenerationRequest;
 import com.clara.model.api.media.VideoGenerationRequest;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.impl.ProviderInvoker;
 import com.clara.model.provider.media.AbstractJsonMediaJobOperation;
 import com.clara.model.provider.media.MediaJson;
 import com.clara.model.provider.media.ProviderMediaAssetBridge;
-import com.clara.model.provider.media.ProviderMediaErrors;
-import com.clara.model.provider.media.ProviderMediaHttp;
 import com.clara.model.runtime.ModelCapabilityGuard;
 import com.clara.model.runtime.ProviderModelDescriptor;
+import com.clara.model.utils.ExceptionUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URI;
 import java.util.ArrayList;
@@ -31,7 +31,7 @@ public final class AlibabaNativeMediaJobFactory {
     private final AlibabaNativeTaskConfig config;
     private final ProviderModelDescriptor descriptor;
     private final ProviderMediaAssetBridge assets;
-    private final ProviderMediaHttp http;
+    private final ProviderInvoker invoker;
     private final MediaJson json = new MediaJson(ModelProvider.ALIBABA);
     private final ModelCapabilityGuard guard = new ModelCapabilityGuard();
 
@@ -46,7 +46,7 @@ public final class AlibabaNativeMediaJobFactory {
             throw new IllegalArgumentException("descriptor does not match config");
         }
         this.config = config; this.descriptor = descriptor; this.assets = assets;
-        this.http = new ProviderMediaHttp(ModelProvider.ALIBABA, config.getSecretRef(), transport, credentials);
+        this.invoker = new ProviderInvoker(ModelProvider.ALIBABA, config.getSecretRef(), transport, credentials);
     }
     public MediaJobProviderOperation create(ImageGenerationRequest request) {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
@@ -54,7 +54,7 @@ public final class AlibabaNativeMediaJobFactory {
         if (config.getOutputType() != MediaType.IMAGE) { throw new IllegalArgumentException("config is not for images"); }
         if (request.getPrompt().length() > config.getMaxPromptChars()
                 || request.getSourceImageAssetIds().size() > config.getMaxInputImages()) {
-            throw ProviderMediaErrors.tooLarge(ModelProvider.ALIBABA);
+            throw ExceptionUtils.requestTooLarge(ModelProvider.ALIBABA);
         }
         Map<String, Object> input = new LinkedHashMap<String, Object>(); input.put("prompt", request.getPrompt());
         addImages(input, request.getSourceImageAssetIds(), request.getContext());
@@ -78,7 +78,7 @@ public final class AlibabaNativeMediaJobFactory {
                 + (request.getLastFrameAssetId() == null ? 0 : 1);
         if (request.getPrompt().length() > config.getMaxPromptChars()
                 || imageCount > config.getMaxInputImages()) {
-            throw ProviderMediaErrors.tooLarge(ModelProvider.ALIBABA);
+            throw ExceptionUtils.requestTooLarge(ModelProvider.ALIBABA);
         }
         Map<String, Object> input = new LinkedHashMap<String, Object>(); input.put("prompt", request.getPrompt());
         addImages(input, request.getReferenceImageAssetIds(), request.getContext());
@@ -106,7 +106,7 @@ public final class AlibabaNativeMediaJobFactory {
         input.put(ids.size() == 1 ? "img_url" : "img_urls", ids.size() == 1 ? refs.get(0) : refs);
     }
     private MediaJobProviderOperation operation(Map<String, Object> body, InvocationContext context) {
-        return new Operation(config, json.write(body), context, assets, http);
+        return new Operation(config, json.write(body), context, assets, invoker);
     }
     private static void providerOptions(com.clara.model.api.ProviderOptions options) {
         if (options != null && options.getProvider() != ModelProvider.ALIBABA) {
@@ -119,8 +119,8 @@ public final class AlibabaNativeMediaJobFactory {
     private static final class Operation extends AbstractJsonMediaJobOperation {
         private final URI queryEndpoint;
         Operation(AlibabaNativeTaskConfig config, byte[] body, InvocationContext context,
-                ProviderMediaAssetBridge assets, ProviderMediaHttp http) {
-            super(ModelProvider.ALIBABA, config.getSubmitEndpoint(), body, context, assets, http,
+                ProviderMediaAssetBridge assets, ProviderInvoker invoker) {
+            super(ModelProvider.ALIBABA, config.getSubmitEndpoint(), body, context, assets, invoker,
                     config.getOutputType(), config.getOutputMimeType());
             this.queryEndpoint = config.getTaskQueryEndpoint();
         }
@@ -142,7 +142,7 @@ public final class AlibabaNativeMediaJobFactory {
             if ("SUCCEEDED".equals(value) || "SUCCESS".equals(value)) return MediaProviderJobStatus.SUCCEEDED;
             if ("FAILED".equals(value) || "UNKNOWN".equals(value)) return MediaProviderJobStatus.FAILED;
             if ("CANCELED".equals(value) || "CANCELLED".equals(value)) return MediaProviderJobStatus.CANCELLED;
-            throw ProviderMediaErrors.protocol(provider());
+            throw ExceptionUtils.protocolError(provider());
         }
         protected String outputUrl(JsonNode root) {
             JsonNode output = root.get("output");
@@ -151,7 +151,7 @@ public final class AlibabaNativeMediaJobFactory {
             JsonNode results = output == null ? null : output.get("results");
             if (results != null && results.isArray() && results.size() > 0)
                 return MediaJson.requiredText(results.get(0), "url", provider());
-            throw ProviderMediaErrors.protocol(provider());
+            throw ExceptionUtils.protocolError(provider());
         }
         protected int progress(JsonNode root, MediaProviderJobStatus status) {
             JsonNode output = root.get("output"); JsonNode value = output == null ? null : output.get("progress");

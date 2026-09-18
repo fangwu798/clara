@@ -14,9 +14,12 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 基于 JDK 8 {@link HttpURLConnection} 实现的服务提供商 HTTP 传输器，同时支持同步与 SSE 流式调用。
@@ -146,7 +149,7 @@ public final class Jdk8ProviderHttpTransport implements ProviderHttpTransport {
             connection.setReadTimeout(effectiveTimeout(context, config.getReadTimeoutMillis()));
             connection.setRequestMethod(request.getMethod());
             connection.setUseCaches(false);
-            for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
+            for (Map.Entry<String, String> header : requestHeaders(request).entrySet()) {
                 connection.setRequestProperty(header.getKey(), header.getValue());
             }
             if (body.length > 0) {
@@ -171,6 +174,35 @@ public final class Jdk8ProviderHttpTransport implements ProviderHttpTransport {
         } finally {
             if (connection != null) connection.disconnect();
         }
+    }
+
+    /**
+     * 合并平台级默认请求头与请求自带请求头。
+     *
+     * <p>配置在 {@code transport.headers} 中的头作为默认值，适配器自己拼装的同名头（忽略大小写）优先，
+     * 配置头不会覆盖它们；未配置默认头时直接复用请求自带的映射，避免多余的拷贝。
+     *
+     * @param request HTTP 请求
+     * @return 实际写入连接的有序请求头映射
+     */
+    private Map<String, String> requestHeaders(ProviderHttpRequest request) {
+        Map<String, String> configured = config.getHeaders();
+        Map<String, String> requestSpecific = request.getHeaders();
+        if (configured.isEmpty()) {
+            return requestSpecific;
+        }
+        Set<String> overridden = new HashSet<>();
+        for (String name : requestSpecific.keySet()) {
+            overridden.add(name.toLowerCase(Locale.ROOT));
+        }
+        Map<String, String> merged = new LinkedHashMap<>();
+        for (Map.Entry<String, String> header : configured.entrySet()) {
+            if (!overridden.contains(header.getKey().toLowerCase(Locale.ROOT))) {
+                merged.put(header.getKey(), header.getValue());
+            }
+        }
+        merged.putAll(requestSpecific);
+        return merged;
     }
 
     /**

@@ -48,7 +48,7 @@ public final class ProviderYamlConfigurationLoader {
     /**
      * transport 节点允许出现的字段集合。
      */
-    private static final Set<String> TRANSPORT_FIELDS = JsonNodeUtils.fieldSet("allowedOrigins", "connectTimeoutMillis", "readTimeoutMillis", "maxRequestBytes", "maxResponseBytes", "allowHttp");
+    private static final Set<String> TRANSPORT_FIELDS = JsonNodeUtils.fieldSet("allowedOrigins", "connectTimeoutMillis", "readTimeoutMillis", "maxRequestBytes", "maxResponseBytes", "allowHttp", "headers");
     /**
      * capability 节点允许出现的字段集合。
      */
@@ -179,7 +179,33 @@ public final class ProviderYamlConfigurationLoader {
                 JsonNodeUtils.requiredInt(node, "readTimeoutMillis"),
                 JsonNodeUtils.requiredInt(node, "maxRequestBytes"),
                 JsonNodeUtils.requiredInt(node, "maxResponseBytes"),
-                JsonNodeUtils.optionalBoolean(node, "allowHttp", false));
+                JsonNodeUtils.optionalBoolean(node, "allowHttp", false),
+                headers(node.get("headers")));
+    }
+
+    /**
+     * 解析 transport.headers 节点，仅接受字符串值。
+     *
+     * <p>这些请求头是平台级默认值，只在适配器未设置同名头时生效；头名与头值的合法性由
+     * {@code ProviderHttpTransportConfig} 统一校验。
+     *
+     * @param node headers 节点，可为 null
+     * @return 头名到头值的映射，节点缺失或为空时返回空映射
+     */
+    private Map<String, String> headers(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return Collections.emptyMap();
+        }
+        if (!node.isObject()) {
+            throw JsonNodeUtils.invalidConfig("transport.headers must be an object", null);
+        }
+        Map<String, String> result = new LinkedHashMap<String, String>();
+        Iterator<Map.Entry<String, JsonNode>> entries = node.fields();
+        while (entries.hasNext()) {
+            Map.Entry<String, JsonNode> entry = entries.next();
+            result.put(entry.getKey(), entry.getValue().toString());
+        }
+        return result;
     }
 
     /**

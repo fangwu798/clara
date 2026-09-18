@@ -173,7 +173,7 @@ InvocationContext child = context.child(
 | Anthropic | 对话协议适配 | 使用独立的 Anthropic 消息协议 |
 | OpenAI | 对话、图片、语音等能力 | 具体可用能力仍取决于账号、模型和端点配置 |
 | DeepSeek | 对话与流式对话 | 通过 OpenAI-compatible 配置接入 |
-| 火山引擎 | 对话、图片及异步视频任务 | 异步任务需装配媒体任务存储和轮询调度 |
+| 火山引擎 | 对话、图片（含流式生图）及异步视频任务 | 异步任务需装配媒体任务存储和轮询调度；流式生图受具体模型支持范围限制 |
 | 阿里云 | 对话、Embedding、图片、音频及视频 | 不同能力可能使用兼容接口或供应商原生接口 |
 
 “代码中存在适配器”不等于目标账号已开通对应模型。上线前应对具体区域、模型 ID、限额、计费状态和响应格式进行真实环境验证。
@@ -217,6 +217,7 @@ YAML 顶层结构如下：
 | `transport.maxRequestBytes` | 单次 HTTP 请求体最大字节数 |
 | `transport.maxResponseBytes` | 单次 HTTP 响应体最大字节数 |
 | `transport.allowHttp` | 是否允许明文 HTTP；生产环境必须为 `false` |
+| `transport.headers` | 平台级默认请求头（键值对），只做补充，不覆盖适配器自己设置的同名头 |
 | `capabilities.<name>.endpoint` | 具体能力的完整 API 地址 |
 | `capabilities.<name>.taskQueryEndpoint` | 异步媒体任务的查询地址，仅相关能力需要 |
 | `capabilities.<name>.modelId` | 账号和区域实际可用的固定模型或 endpoint ID |
@@ -251,8 +252,10 @@ try (ProviderConfiguration provider = loader.load(
 
 - `toOpenAiCompatibleChatConfig`：OpenAI、DeepSeek、火山引擎和阿里兼容对话。
 - `toAnthropicChatConfig`：Anthropic Messages。
-- `toOpenAiMediaConfig`：OpenAI 图片、转写和语音合成。
-- `toVolcengineImageConfig` / `toVolcengineVideoConfig`：火山图片和视频。
+- `toOpenAiMediaConfig`：OpenAI 转写和语音合成。
+- `toOpenAiImageConfig` / `toVolcengineImageConfig`：OpenAI 兼容图片配置（OpenAI 与火山共用同一套骨架，
+  差异由 `OpenAiImageOptions` / `toVolcengineImageOptions` 表达）。
+- `toVolcengineImageOptions` / `toVolcengineVideoConfig`：火山图片选项和视频配置。
 - `toAlibabaAudioConfig` / `toAlibabaNativeTaskConfig`：阿里音频及原生图片/视频任务。
 
 加载器默认拒绝超过 1 MiB 的配置文件、符号链接、重复键、未知字段、多文档 YAML、不安全 URI 和非标量扩展参数。它不会扫描整个 `local` 目录，每次只加载明确指定的一个平台文件。
@@ -311,6 +314,8 @@ OpenAiCompatibleChatModel model = new OpenAiCompatibleChatModel(
 - 连接超时、读取超时、请求体上限和响应体上限都必须为正数，并根据宿主系统资源上限设置。
 - `secretRef` 是凭据引用，不是明文 API Key。凭据解析失败会返回稳定的配置错误。
 - 传输层不跟随重定向，避免白名单端点通过重定向绕过目标校验。
+- `transport.headers` 用于补充网关需要的请求头，同名时以适配器自己设置的头为准；头名不能是
+  `host`、`content-length`、`connection`、`transfer-encoding`，头值不能包含换行。
 - 流式模型应使用对应的 streaming 实现和 SSE 传输，并确保消费方正确处理取消、半包与流结束事件。
 
 ## 会话记忆
@@ -451,6 +456,9 @@ try (BoundedCachingConversationStore store =
 图片生成/编辑、语音识别、语音合成和视频等能力使用类型化请求；异步供应商任务通过媒体任务存储与调度器完成提交、轮询、取消、截止时间、幂等和结果落库。
 
 - 媒体二进制应通过受控资产存储传递，不要长期保留供应商临时 URL。
+- 生图有同步（`ImageGenerationModel`）与流式（`StreamingImageGenerationModel`）两种入口：同步一次返回汇总结果，
+  流式按事件逐张回调已落盘的资产 ID，单张失败不会中断整条流；但并非所有图片模型都支持流式，装配前需按
+  具体模型确认（如火山 Seedream 5.0 pro 在当前通道对 `stream=true` 返回 400，5.0 lite 正常）。
 - 回调入口必须校验签名、租户和任务状态，并使用回放存储拒绝重复回调。
 - 本地媒体任务存储适合单机模式；多实例生产部署需要共享、原子且可恢复的任务存储。
 - 轮询必须设置截止时间和退避策略，取消成功也应持久化终态。

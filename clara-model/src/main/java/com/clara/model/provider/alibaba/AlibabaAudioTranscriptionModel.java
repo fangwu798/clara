@@ -9,12 +9,12 @@ import com.clara.model.api.media.TranscriptionSegment;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.impl.ProviderInvoker;
 import com.clara.model.provider.media.MediaJson;
 import com.clara.model.provider.media.ProviderMediaAssetBridge;
-import com.clara.model.provider.media.ProviderMediaErrors;
-import com.clara.model.provider.media.ProviderMediaHttp;
 import com.clara.model.runtime.ModelCapabilityGuard;
 import com.clara.model.runtime.ProviderModelDescriptor;
+import com.clara.model.utils.ExceptionUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,7 +29,7 @@ public final class AlibabaAudioTranscriptionModel implements AudioTranscriptionM
     private final AlibabaAudioConfig config;
     private final ProviderModelDescriptor descriptor;
     private final ProviderMediaAssetBridge assets;
-    private final ProviderMediaHttp http;
+    private final ProviderInvoker invoker;
     private final MediaJson json = new MediaJson(ModelProvider.ALIBABA);
     private final ModelCapabilityGuard guard = new ModelCapabilityGuard();
 
@@ -38,13 +38,13 @@ public final class AlibabaAudioTranscriptionModel implements AudioTranscriptionM
             ProviderCredentialResolver credentials) {
         require(config, descriptor, assets);
         this.config = config; this.descriptor = descriptor; this.assets = assets;
-        this.http = new ProviderMediaHttp(ModelProvider.ALIBABA, config.getSecretRef(), transport, credentials);
+        this.invoker = new ProviderInvoker(ModelProvider.ALIBABA, config.getSecretRef(), transport, credentials);
     }
     public AudioTranscriptionResult transcribe(AudioTranscriptionRequest request) {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         guard.require(descriptor, request); options(request.getProviderOptions());
         if (request.getPrompt() != null && request.getPrompt().length() > config.getMaxTextChars()) {
-            throw ProviderMediaErrors.tooLarge(ModelProvider.ALIBABA);
+            throw ExceptionUtils.requestTooLarge(ModelProvider.ALIBABA);
         }
         Map<String, Object> input = new LinkedHashMap<String, Object>();
         input.put("audio", assets.inputReference(request.getAudioAssetId(), MediaType.AUDIO, request.getContext()));
@@ -55,8 +55,8 @@ public final class AlibabaAudioTranscriptionModel implements AudioTranscriptionM
         if (request.getResponseFormat() != null) parameters.put("result_format", request.getResponseFormat());
         Map<String, Object> body = new LinkedHashMap<String, Object>();
         body.put("model", config.getModelId()); body.put("input", input); body.put("parameters", parameters);
-        ProviderHttpResponse response = http.execute("POST", config.getEndpoint(), "application/json",
-                json.write(body), request.getContext(), null);
+        ProviderHttpResponse response = invoker.execute("POST", config.getEndpoint(), "application/json",
+                json.write(body), null, request.getContext());
         JsonNode root = json.read(response.getBody()); JsonNode output = root.get("output");
         String text = text(output);
         String language = output != null && output.hasNonNull("language") ? output.get("language").asText() : request.getLanguage();
@@ -64,7 +64,7 @@ public final class AlibabaAudioTranscriptionModel implements AudioTranscriptionM
         List<TranscriptionSegment> segments = segments(output == null ? null : output.get("segments"));
         Map<String, String> metadata = metadata();
         try { return new AudioTranscriptionResult(text, language, duration, segments, metadata); }
-        catch (IllegalArgumentException failure) { throw ProviderMediaErrors.protocol(ModelProvider.ALIBABA); }
+        catch (IllegalArgumentException failure) { throw ExceptionUtils.protocolError(ModelProvider.ALIBABA); }
     }
     private String text(JsonNode output) {
         if (output != null && output.hasNonNull("text")) return output.get("text").asText();
@@ -73,11 +73,11 @@ public final class AlibabaAudioTranscriptionModel implements AudioTranscriptionM
                 ? choices.get(0).path("message").get("content") : null;
         if (content != null && content.isArray())
             for (JsonNode item : content) if (item.hasNonNull("text")) return item.get("text").asText();
-        throw ProviderMediaErrors.protocol(ModelProvider.ALIBABA);
+        throw ExceptionUtils.protocolError(ModelProvider.ALIBABA);
     }
     private List<TranscriptionSegment> segments(JsonNode values) {
         if (values == null || values.isNull()) return Collections.emptyList();
-        if (!values.isArray()) { throw ProviderMediaErrors.protocol(ModelProvider.ALIBABA); }
+        if (!values.isArray()) { throw ExceptionUtils.protocolError(ModelProvider.ALIBABA); }
         List<TranscriptionSegment> result = new ArrayList<TranscriptionSegment>();
         for (JsonNode value : values) result.add(new TranscriptionSegment(requiredLong(value, "start_time"),
                 requiredLong(value, "end_time"), MediaJson.requiredText(value, "text", ModelProvider.ALIBABA)));
@@ -86,13 +86,13 @@ public final class AlibabaAudioTranscriptionModel implements AudioTranscriptionM
     private static long requiredLong(JsonNode value, String field) {
         JsonNode number = value.get(field);
         if (number == null || !number.canConvertToLong() || number.longValue() < 0) {
-            throw ProviderMediaErrors.protocol(ModelProvider.ALIBABA);
+            throw ExceptionUtils.protocolError(ModelProvider.ALIBABA);
         }
         return number.longValue();
     }
     private static Long millis(JsonNode value) {
         if (value == null || value.isNull()) return null;
-        if (!value.isNumber() || value.doubleValue() < 0) { throw ProviderMediaErrors.protocol(ModelProvider.ALIBABA); }
+        if (!value.isNumber() || value.doubleValue() < 0) { throw ExceptionUtils.protocolError(ModelProvider.ALIBABA); }
         return Long.valueOf(Math.round(value.doubleValue() * 1000.0d));
     }
     private Map<String, String> metadata() {

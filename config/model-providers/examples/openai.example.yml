@@ -26,6 +26,10 @@ transport:
   maxResponseBytes: 33554432
   # 是否允许 HTTP 明文地址。生产环境应保持 false；设为 true 也必须匹配 allowedOrigins。
   allowHttp: false
+  # 平台级默认请求头，仅用于补充：适配器自己设置的同名头（如 Authorization、Content-Type、Accept）优先，
+  # 这里配置的同名头不会生效；头名不能是 host、content-length、connection、transfer-encoding。
+  # headers:
+  #   OpenAI-Beta: assistants=v2
 
 # 本平台启用的模型能力；不使用的能力可以连同对应节点一起删除。
 capabilities:
@@ -60,6 +64,8 @@ capabilities:
       maxInputBytes: 8388608
       # 单次请求允许生成的最大结果数量。
       maxOutputs: 4
+      # 单次请求允许携带的最大源图数量，0 表示不使用源图。
+      maxSourceImages: 4
 
   # 音频转写能力配置。
   transcription:

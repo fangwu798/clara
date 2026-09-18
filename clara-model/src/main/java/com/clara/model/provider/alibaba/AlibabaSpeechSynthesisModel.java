@@ -8,12 +8,12 @@ import com.clara.model.api.media.SpeechSynthesisResult;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.impl.ProviderInvoker;
 import com.clara.model.provider.media.MediaJson;
 import com.clara.model.provider.media.ProviderMediaAssetBridge;
-import com.clara.model.provider.media.ProviderMediaErrors;
-import com.clara.model.provider.media.ProviderMediaHttp;
 import com.clara.model.runtime.ModelCapabilityGuard;
 import com.clara.model.runtime.ProviderModelDescriptor;
+import com.clara.model.utils.ExceptionUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,7 +23,7 @@ import java.util.Map;
  */
 public final class AlibabaSpeechSynthesisModel implements SpeechSynthesisModel {
     private final AlibabaAudioConfig config; private final ProviderModelDescriptor descriptor;
-    private final ProviderMediaAssetBridge assets; private final ProviderMediaHttp http;
+    private final ProviderMediaAssetBridge assets; private final ProviderInvoker invoker;
     private final MediaJson json = new MediaJson(ModelProvider.ALIBABA);
     private final ModelCapabilityGuard guard = new ModelCapabilityGuard();
     public AlibabaSpeechSynthesisModel(AlibabaAudioConfig config, ProviderModelDescriptor descriptor,
@@ -33,7 +33,7 @@ public final class AlibabaSpeechSynthesisModel implements SpeechSynthesisModel {
             throw new IllegalArgumentException("descriptor does not match config");
         }
         this.config = config; this.descriptor = descriptor; this.assets = assets;
-        this.http = new ProviderMediaHttp(ModelProvider.ALIBABA, config.getSecretRef(), transport, credentials);
+        this.invoker = new ProviderInvoker(ModelProvider.ALIBABA, config.getSecretRef(), transport, credentials);
     }
     public SpeechSynthesisResult synthesize(SpeechSynthesisRequest request) {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
@@ -41,7 +41,7 @@ public final class AlibabaSpeechSynthesisModel implements SpeechSynthesisModel {
         if (request.getProviderOptions() != null && request.getProviderOptions().getProvider() != ModelProvider.ALIBABA) {
             throw new IllegalArgumentException("provider options do not match provider");
         }
-        if (request.getText().length() > config.getMaxTextChars()) { throw ProviderMediaErrors.tooLarge(ModelProvider.ALIBABA); }
+        if (request.getText().length() > config.getMaxTextChars()) { throw ExceptionUtils.requestTooLarge(ModelProvider.ALIBABA); }
         Map<String, Object> input = new LinkedHashMap<String, Object>(); input.put("text", request.getText());
         Map<String, Object> parameters = new LinkedHashMap<String, Object>();
         if (request.getVoice() != null) parameters.put("voice", request.getVoice());
@@ -51,8 +51,8 @@ public final class AlibabaSpeechSynthesisModel implements SpeechSynthesisModel {
         if (request.getSpeed() != null) parameters.put("speech_rate", request.getSpeed());
         Map<String, Object> body = new LinkedHashMap<String, Object>(); body.put("model", config.getModelId());
         body.put("input", input); body.put("parameters", parameters);
-        ProviderHttpResponse response = http.execute("POST", config.getEndpoint(), "application/json",
-                json.write(body), request.getContext(), null);
+        ProviderHttpResponse response = invoker.execute("POST", config.getEndpoint(), "application/json",
+                json.write(body), null, request.getContext());
         JsonNode output = json.read(response.getBody()).get("output");
         JsonNode audio = output == null ? null : output.get("audio");
         String url = audio != null && audio.hasNonNull("url") ? audio.get("url").asText()

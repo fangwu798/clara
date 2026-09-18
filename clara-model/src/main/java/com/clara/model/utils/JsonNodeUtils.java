@@ -161,6 +161,25 @@ public final class JsonNodeUtils {
     }
 
     /**
+     * 读取可选的整数字段，区分「缺失」与「值为 0」。
+     *
+     * <p>与 {@link #getIntValue(JsonNode, String)} 的区别：字段缺失、非整数或超出 int 范围时返回 null，
+     * 适用于“平台未提供时应当推导或忽略”的计数类字段（如 token 用量里的总量与缓存命中量），
+     * 避免把缺失当成 0 而丢掉上层推导逻辑。
+     *
+     * @param parent 父节点
+     * @param field  字段名
+     * @return 整数值；字段缺失、非整数或超出 int 范围时返回 null
+     */
+    public static Integer optionalIntValue(JsonNode parent, String field) {
+        JsonNode value = parent.get(field);
+        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()) {
+            return null;
+        }
+        return Integer.valueOf(value.intValue());
+    }
+
+    /**
      * 读取可选的布尔字段。
      *
      * @param parent   父节点

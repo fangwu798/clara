@@ -10,15 +10,11 @@ import com.clara.model.api.StreamObserver;
 import com.clara.model.api.StreamingChatModel;
 import com.clara.model.api.ToolCallContent;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.impl.ProviderHttpRequest;
-import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.event.ProviderSseEvent;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.provider.http.impl.ProviderInvoker;
 import com.clara.model.provider.http.ProviderSseListener;
 import com.clara.model.utils.ExceptionUtils;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
@@ -29,13 +25,13 @@ import java.util.concurrent.Future;
  * {@link StreamObserver} 顺序消费事件，并通过返回的 {@link StreamHandle} 取消或查询状态。
  *
  * <p>注意：内容块数量和累计字符数必须设置上限；事件顺序、工具参数及结束原因会被严格校验，不完整的流按
- * 协议错误处理。凭据仅在调用期间解析并清理，执行器生命周期仍由调用方负责。异常统一由
+ * 协议错误处理。凭据解析、鉴权头（{@code x-api-key} 与 {@code anthropic-version}）、发送与状态码映射
+ * 由 {@link ProviderInvoker} 统一负责，并在其中清理密钥副本；执行器生命周期仍由调用方负责。异常统一由
  * {@link ExceptionUtils} 构造，本类不自行拼装错误码与错误类别。
  */
 public final class AnthropicStreamingChatModel implements StreamingChatModel {
     private final AnthropicChatConfig config;
-    private final ProviderHttpTransport transport;
-    private final ProviderCredentialResolver credentials;
+    private final ProviderInvoker invoker;
     private final ExecutorService executor;
     private final int maxContentBlocks;
     private final int maxAccumulatedChars;
@@ -44,15 +40,14 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
     public AnthropicStreamingChatModel(AnthropicChatConfig config,
                                        ProviderHttpTransport transport, ProviderCredentialResolver credentials,
                                        ExecutorService executor, int maxContentBlocks, int maxAccumulatedChars) {
-        if (config == null || transport == null || credentials == null || executor == null) {
+        if (config == null || executor == null) {
             throw new IllegalArgumentException("dependencies must not be null");
         }
         if (maxContentBlocks <= 0 || maxAccumulatedChars <= 0) {
             throw new IllegalArgumentException("stream limits must be positive");
         }
         this.config = config;
-        this.transport = transport;
-        this.credentials = credentials;
+        this.invoker = new ProviderInvoker(ModelProvider.ANTHROPIC, config.getSecretRef(), transport, credentials);
         this.executor = executor;
         this.maxContentBlocks = maxContentBlocks;
         this.maxAccumulatedChars = maxAccumulatedChars;
@@ -74,23 +69,11 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
 
     private void execute(final ChatRequest request, final StreamObserver observer, byte[] payload) {
         final Emitter emitter = new Emitter(observer);
-        char[] secret = null;
         try {
-            char[] resolved = credentials.resolve(request.getContext().getTenantId(), config.getSecretRef());
-            if (resolved == null || resolved.length == 0) {
-                throw ExceptionUtils.credentialUnavailable(ModelProvider.ANTHROPIC);
-            }
-            secret = resolved.clone();
-            Map<String, String> headers = new LinkedHashMap<String, String>();
-            headers.put("x-api-key", new String(secret));
-            headers.put("anthropic-version", config.getApiVersion());
-            headers.put("Content-Type", "application/json");
-            headers.put("Accept", "text/event-stream");
             final AnthropicStreamAccumulator accumulator = new AnthropicStreamAccumulator(
                     config, maxContentBlocks, maxAccumulatedChars);
-            ProviderHttpResponse response = transport.execute(new ProviderHttpRequest("POST",
-                    config.getEndpoint(), headers, payload), request.getContext(),
-                    new ProviderSseListener() {
+            invoker.exchangeStreaming(request, request.getContext(),
+                    new AnthropicChatExchange(config, codec, payload, true), new ProviderSseListener() {
                         public boolean onEvent(ProviderSseEvent event) {
                             AnthropicStreamChunk chunk = accumulator.accept(
                                     event.getEvent(), event.getData());
@@ -98,17 +81,11 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
                             return !chunk.isComplete();
                         }
                     });
-            if (response == null) throw ExceptionUtils.protocolError(ModelProvider.ANTHROPIC);
-            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
-                throw ExceptionUtils.providerFailure(ModelProvider.ANTHROPIC, response.getStatusCode());
-            }
             if (!accumulator.isComplete()) throw ExceptionUtils.protocolError(ModelProvider.ANTHROPIC);
         } catch (ClaraException exception) {
             emitter.error(exception.getError());
         } catch (RuntimeException exception) {
             emitter.error(ExceptionUtils.protocolError(ModelProvider.ANTHROPIC).getError());
-        } finally {
-            if (secret != null) Arrays.fill(secret, '\0');
         }
     }
 

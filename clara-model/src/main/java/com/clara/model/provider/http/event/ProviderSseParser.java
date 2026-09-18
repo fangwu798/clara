@@ -29,6 +29,8 @@ import java.nio.charset.CharacterCodingException;
  *   <li>每行以第一个冒号拆分为字段名与字段值，冒号后的单个前导空格会去掉；无冒号时整行视为字段名、
  *       值为空；以冒号开头的行是注释行（常见于心跳），直接忽略。</li>
  *   <li>空行表示一个事件块的结束：若该块累积过 {@code data} 就派发事件，否则按规范静默丢弃。</li>
+ *   <li>到达流末尾时，未以空行收尾的事件块与行尾缺少换行符的残行一律丢弃，不派发也不按行解析——
+ *       宁可丢弃可能被截断的尾部，也不把半截事件当成有效事件。</li>
  *   <li>字段语义：多行 {@code data} 用换行符拼接；{@code event} 缺失或为空时使用默认事件名
  *       {@code message}；含 NUL 字符的 {@code id} 按规范忽略；{@code retry} 仅接受纯数字，
  *       非法值按未设置（null）处理而不报错。</li>
@@ -160,18 +162,10 @@ public final class ProviderSseParser {
                 }
             }
             checkContext(context);
-            // 流结束时最后一行可能没有换行符，按规范仍需当作完整一行处理
-            if (line.size() > 0) {
-                String decoded = StringUtils.decodeUtf8Strict(line.toByteArray());
-                if (firstLine && decoded.length() > 0 && decoded.charAt(0) == '\ufeff') {
-                    decoded = decoded.substring(1);
-                }
-                if (!accept(decoded, state, listener)) {
-                    return state.events;
-                }
-            }
-            // 流结束：派发最后一个未以空行收尾的事件块（无 data 时由 dispatch 内部忽略）
-            dispatch(state, listener);
+            // 流结束：按规范丢弃一切未收尾的内容——行尾缺少换行符的残行，以及未以空行收尾的事件块都不派发，
+            // 也不对残行做 UTF-8 解码与体积校验（它根本不算完整一行）。
+            // 代价是平台若漏发收尾空行，最后一块（例如带 finish_reason 或 usage 的块）会被丢掉；这是规范行为，
+            // 宁可让上游按协议错误暴露出来，也不能把可能被截断的半截事件当成有效事件交给调用方。
             return state.events;
         } catch (ClaraException exception) {
             // 已是带错误码与重试语义的领域异常，直接向上抛出，不再包装

@@ -1,6 +1,7 @@
 package com.clara.model.provider.media;
 
 import com.clara.model.api.ModelProvider;
+import com.clara.model.utils.ExceptionUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,24 +23,26 @@ public final class MediaJson {
         try {
             return mapper.writeValueAsBytes(value);
         } catch (JsonProcessingException failure) {
-            throw ProviderMediaErrors.protocol(provider);
+            throw ExceptionUtils.protocolError(provider);
         }
     }
 
     public JsonNode read(byte[] value) {
         try {
             JsonNode node = mapper.readTree(value);
-            if (node == null) { throw ProviderMediaErrors.protocol(provider); }
+            if (node == null) {
+                throw ExceptionUtils.protocolError(provider);
+            }
             return node;
         } catch (IOException failure) {
-            throw ProviderMediaErrors.protocol(provider);
+            throw ExceptionUtils.protocolError(provider);
         }
     }
 
     public static String requiredText(JsonNode parent, String field, ModelProvider provider) {
         JsonNode value = parent == null ? null : parent.get(field);
         if (value == null || !value.isTextual() || value.textValue().trim().isEmpty()) {
-            throw ProviderMediaErrors.protocol(provider);
+            throw ExceptionUtils.protocolError(provider);
         }
         return value.textValue();
     }

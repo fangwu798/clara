@@ -47,6 +47,30 @@ public final class ExceptionUtils {
     }
 
     /**
+     * 构造请求体超出配置上限、并归因到具体平台的异常。
+     *
+     * <p>媒体类接口（图片、语音、视频）的体积上限由各平台配置决定，超限时归因到平台便于排查。
+     *
+     * @param provider 平台，可为 null（表示不归因到具体平台）
+     * @return 资源限制类、不可重试的异常
+     */
+    public static ClaraException requestTooLarge(ModelProvider provider) {
+        return fail(ErrorCodes.MODEL_REQUEST_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false, provider);
+    }
+
+    /**
+     * 构造“当前传输器不支持该媒体调用”的异常。
+     *
+     * <p>典型场景：媒体接口需要上传文件或接收二进制响应，而配置的传输器只支持 JSON 往返。
+     *
+     * @param provider 平台，可为 null（表示不归因到具体平台）
+     * @return 配置类、不可重试的异常
+     */
+    public static ClaraException mediaTransportUnsupported(ModelProvider provider) {
+        return fail(ErrorCodes.MEDIA_TRANSPORT_NOT_SUPPORTED, ErrorCategory.CONFIGURATION, false, provider);
+    }
+
+    /**
      * 构造响应体或 SSE 事件超出配置上限的异常。
      *
      * @return 资源限制类、不可重试的异常
@@ -128,11 +152,23 @@ public final class ExceptionUtils {
      * @return 映射后的异常
      */
     public static ClaraException providerFailure(ModelProvider provider, int status) {
-        ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION
-                : status == 403 ? ErrorCategory.AUTHORIZATION
-                : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
-        return fail(ErrorCodes.MODEL_PROVIDER_FAILED, category, status == 429 || status >= 500,
-                provider, String.valueOf(status));
+        ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION : status == 403 ? ErrorCategory.AUTHORIZATION : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
+        return fail(ErrorCodes.MODEL_PROVIDER_FAILED, category, status == 429 || status >= 500, provider, String.valueOf(status));
+    }
+
+    /**
+     * 按平台在事件流中自报的错误构造异常。
+     *
+     * <p>典型场景：流式接口在事件里下发 {@code error{code,message}}（如生图流中单张图片失败、整条流
+     * 因参数非法而终止）。这类错误的可重试性无法从平台码推断，因此统一按外部服务、不可重试处理；
+     * 平台原始错误码写入 providerCode 便于排查，平台返回的文本不入异常，避免泄露平台内容。
+     *
+     * @param provider     平台，可为 null（表示不归因到具体平台）
+     * @param providerCode 平台侧原始错误码，可为 null
+     * @return 外部服务类、不可重试的异常
+     */
+    public static ClaraException providerEventFailure(ModelProvider provider, String providerCode) {
+        return fail(ErrorCodes.MODEL_PROVIDER_FAILED, ErrorCategory.EXTERNAL_SERVICE, false, provider, providerCode);
     }
 
     /**

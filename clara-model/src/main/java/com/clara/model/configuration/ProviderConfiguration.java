@@ -6,9 +6,10 @@ import com.clara.model.provider.alibaba.AlibabaAudioConfig;
 import com.clara.model.provider.alibaba.AlibabaNativeTaskConfig;
 import com.clara.model.provider.anthropic.AnthropicChatConfig;
 import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
+import com.clara.model.provider.compatible.image.OpenAiCompatibleImageConfig;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.openai.OpenAiMediaConfig;
-import com.clara.model.provider.volcengine.VolcengineImageConfig;
+import com.clara.model.provider.volcengine.VolcengineImageOptions;
 import com.clara.model.provider.volcengine.VolcengineVideoConfig;
 import lombok.Data;
 
@@ -177,7 +178,9 @@ public final class ProviderConfiguration implements Closeable {
     }
 
     /**
-     * 按能力名称构造 OpenAI 媒体配置。
+     * 按能力名称构造 OpenAI 媒体配置，用于转写与语音合成能力。
+     *
+     * <p>图片能力不再使用本方法，改用 {@link #toOpenAiImageConfig(String)}——它与火山共用兼容图片骨架。
      *
      * @param name 能力名称
      * @return OpenAI 媒体配置
@@ -192,19 +195,51 @@ public final class ProviderConfiguration implements Closeable {
     }
 
     /**
-     * 按能力名称构造火山引擎图片生成配置。
+     * 按能力名称构造 OpenAI 兼容图片配置。
+     *
+     * <p>OpenAI 与火山引擎的图片接口共用同一套兼容协议，因此都产出兼容图片配置，差异由
+     * {@link #toVolcengineImageOptions(String)} 或 {@code OpenAiImageOptions} 表达；两边能力参数的命名
+     * 不同（OpenAI 用 {@code maxTextChars}/{@code maxOutputs}，火山用
+     * {@code maxPromptChars}/{@code maxImages}），在此统一映射。
      *
      * @param name 能力名称
-     * @return 火山引擎图片生成配置
+     * @return OpenAI 兼容图片配置
+     * @throws IllegalArgumentException 平台不是 OpenAI 时
+     */
+    public OpenAiCompatibleImageConfig toOpenAiImageConfig(String name) {
+        requireProvider(ModelProvider.OPENAI);
+        ProviderCapabilityConfiguration capability = getCapability(name);
+        return new OpenAiCompatibleImageConfig(ModelProvider.OPENAI, capability.getEndpoint(),
+                capability.requireModelId(), credential.getSecretRef(), capability.requireInt("maxTextChars"),
+                capability.requireInt("maxOutputs"), capability.requireInt("maxSourceImages"),
+                capability.requireInt("maxInputBytes"));
+    }
+
+    /**
+     * 按能力名称构造火山引擎图片配置。
+     *
+     * @param name 能力名称
+     * @return OpenAI 兼容图片配置
      * @throws IllegalArgumentException 平台不是 Volcengine 时
      */
-    public VolcengineImageConfig toVolcengineImageConfig(String name) {
+    public OpenAiCompatibleImageConfig toVolcengineImageConfig(String name) {
         requireProvider(ModelProvider.VOLCENGINE);
         ProviderCapabilityConfiguration capability = getCapability(name);
-        return new VolcengineImageConfig(capability.getEndpoint(), capability.requireModelId(),
-                credential.getSecretRef(), capability.requireInt("maxPromptChars"),
-                capability.requireInt("maxImages"), capability.requireInt("maxSourceImages"),
-                capability.requireBoolean("watermark"));
+        return new OpenAiCompatibleImageConfig(ModelProvider.VOLCENGINE, capability.getEndpoint(),
+                capability.requireModelId(), credential.getSecretRef(), capability.requireInt("maxPromptChars"),
+                capability.requireInt("maxImages"), capability.requireInt("maxSourceImages"), 0);
+    }
+
+    /**
+     * 按能力名称构造火山引擎图片选项。
+     *
+     * @param name 能力名称
+     * @return 火山引擎图片选项
+     * @throws IllegalArgumentException 平台不是 Volcengine 时
+     */
+    public VolcengineImageOptions toVolcengineImageOptions(String name) {
+        requireProvider(ModelProvider.VOLCENGINE);
+        return new VolcengineImageOptions(getCapability(name).requireBoolean("watermark"));
     }
 
     /**

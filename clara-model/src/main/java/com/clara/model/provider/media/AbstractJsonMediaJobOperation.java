@@ -9,6 +9,7 @@ import com.clara.media.job.MediaJobProviderOperation;
 import com.clara.media.job.MediaProviderJobSnapshot;
 import com.clara.media.job.MediaProviderJobStatus;
 import com.clara.model.api.ModelProvider;
+import com.clara.model.provider.http.impl.ProviderInvoker;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.net.URI;
@@ -27,7 +28,7 @@ public abstract class AbstractJsonMediaJobOperation implements MediaJobProviderO
     private final byte[] submitBody;
     private final InvocationContext context;
     private final ProviderMediaAssetBridge assets;
-    private final ProviderMediaHttp http;
+    private final ProviderInvoker invoker;
     private final MediaJson json;
     private final MediaType outputType;
     private final String outputMimeType;
@@ -38,8 +39,8 @@ public abstract class AbstractJsonMediaJobOperation implements MediaJobProviderO
             byte[] submitBody,
             InvocationContext context,
             ProviderMediaAssetBridge assets,
-            ProviderMediaHttp http) {
-        this(provider, submitEndpoint, submitBody, context, assets, http, MediaType.VIDEO, "video/mp4");
+            ProviderInvoker invoker) {
+        this(provider, submitEndpoint, submitBody, context, assets, invoker, MediaType.VIDEO, "video/mp4");
     }
 
     protected AbstractJsonMediaJobOperation(
@@ -48,11 +49,11 @@ public abstract class AbstractJsonMediaJobOperation implements MediaJobProviderO
             byte[] submitBody,
             InvocationContext context,
             ProviderMediaAssetBridge assets,
-            ProviderMediaHttp http,
+            ProviderInvoker invoker,
             MediaType outputType,
             String outputMimeType) {
         if (provider == null || submitEndpoint == null || submitBody == null || context == null
-                || assets == null || http == null || outputType == null || outputMimeType == null) {
+                || assets == null || invoker == null || outputType == null || outputMimeType == null) {
             throw new IllegalArgumentException("dependencies must not be null");
         }
         this.provider = provider;
@@ -60,7 +61,7 @@ public abstract class AbstractJsonMediaJobOperation implements MediaJobProviderO
         this.submitBody = submitBody.clone();
         this.context = context;
         this.assets = assets;
-        this.http = http;
+        this.invoker = invoker;
         this.json = new MediaJson(provider);
         this.outputType = outputType;
         this.outputMimeType = outputMimeType;
@@ -75,8 +76,8 @@ public abstract class AbstractJsonMediaJobOperation implements MediaJobProviderO
         headers.put(idempotencyHeader(), idempotencyKey);
         headers.putAll(submitHeaders());
         try {
-            JsonNode root = json.read(http.execute("POST", submitEndpoint, "application/json",
-                    submitBody, context, headers).getBody());
+            JsonNode root = json.read(invoker.execute("POST", submitEndpoint, "application/json",
+                    submitBody, headers, context).getBody());
             return taskId(root);
         } catch (ClaraException failure) {
             throw mapped(failure, true);
@@ -85,8 +86,8 @@ public abstract class AbstractJsonMediaJobOperation implements MediaJobProviderO
 
     public MediaProviderJobSnapshot poll(String providerJobId) {
         try {
-            JsonNode root = json.read(http.execute("GET", taskEndpoint(providerJobId), null,
-                    new byte[0], context, null).getBody());
+            JsonNode root = json.read(invoker.execute("GET", taskEndpoint(providerJobId), null,
+                    new byte[0], null, context).getBody());
             MediaProviderJobStatus status = status(root);
             int progress = progress(root, status);
             if (status == MediaProviderJobStatus.SUCCEEDED) {
@@ -106,7 +107,7 @@ public abstract class AbstractJsonMediaJobOperation implements MediaJobProviderO
         URI endpoint = cancelEndpoint(providerJobId);
         if (endpoint == null) return;
         try {
-            http.execute("DELETE", endpoint, null, new byte[0], context, null);
+            invoker.execute("DELETE", endpoint, null, new byte[0], null, context);
         } catch (ClaraException failure) {
             throw mapped(failure, false);
         }

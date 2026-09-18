@@ -4,7 +4,9 @@ import com.clara.model.provider.http.impl.ProviderHttpTransportConfig;
 import lombok.Data;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -42,6 +44,10 @@ public final class ProviderTransportConfiguration {
      * 是否允许使用明文 HTTP。
      */
     private final boolean allowHttp;
+    /**
+     * 平台级默认请求头，仅用于补充，同名时以适配器自己设置的请求头为准。
+     */
+    private final Map<String, String> headers;
 
     /**
      * 创建传输配置。
@@ -55,13 +61,31 @@ public final class ProviderTransportConfiguration {
      * @throws IllegalArgumentException 参数不满足底层传输配置校验时
      */
     public ProviderTransportConfiguration(Set<String> allowedOrigins, int connectTimeoutMillis, int readTimeoutMillis, int maxRequestBytes, int maxResponseBytes, boolean allowHttp) {
-        ProviderHttpTransportConfig validated = new ProviderHttpTransportConfig(allowedOrigins, connectTimeoutMillis, readTimeoutMillis, maxRequestBytes, maxResponseBytes, allowHttp);
+        this(allowedOrigins, connectTimeoutMillis, readTimeoutMillis, maxRequestBytes, maxResponseBytes, allowHttp,
+                Collections.<String, String>emptyMap());
+    }
+
+    /**
+     * 创建带平台级默认请求头的传输配置。
+     *
+     * @param allowedOrigins       源白名单，不可为空
+     * @param connectTimeoutMillis 连接超时时间，单位毫秒
+     * @param readTimeoutMillis    读取超时时间，单位毫秒
+     * @param maxRequestBytes      请求体最大字节数
+     * @param maxResponseBytes     响应体最大字节数
+     * @param allowHttp            是否允许使用明文 HTTP
+     * @param headers              平台级默认请求头，可为空
+     * @throws IllegalArgumentException 参数或请求头不满足底层传输配置校验时
+     */
+    public ProviderTransportConfiguration(Set<String> allowedOrigins, int connectTimeoutMillis, int readTimeoutMillis, int maxRequestBytes, int maxResponseBytes, boolean allowHttp, Map<String, String> headers) {
+        ProviderHttpTransportConfig validated = new ProviderHttpTransportConfig(allowedOrigins, connectTimeoutMillis, readTimeoutMillis, maxRequestBytes, maxResponseBytes, allowHttp, headers);
         this.allowedOrigins = Collections.unmodifiableSet(new LinkedHashSet<>(validated.getAllowedOrigins()));
         this.connectTimeoutMillis = connectTimeoutMillis;
         this.readTimeoutMillis = readTimeoutMillis;
         this.maxRequestBytes = maxRequestBytes;
         this.maxResponseBytes = maxResponseBytes;
         this.allowHttp = allowHttp;
+        this.headers = Collections.unmodifiableMap(new LinkedHashMap<>(validated.getHeaders()));
     }
 
     /**
@@ -70,6 +94,6 @@ public final class ProviderTransportConfiguration {
      * @return 等价的 JDK 8 传输配置
      */
     public ProviderHttpTransportConfig toHttpTransportConfig() {
-        return new ProviderHttpTransportConfig(allowedOrigins, connectTimeoutMillis, readTimeoutMillis, maxRequestBytes, maxResponseBytes, allowHttp);
+        return new ProviderHttpTransportConfig(allowedOrigins, connectTimeoutMillis, readTimeoutMillis, maxRequestBytes, maxResponseBytes, allowHttp, headers);
     }
 }

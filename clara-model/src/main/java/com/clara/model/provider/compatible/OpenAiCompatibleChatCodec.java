@@ -111,9 +111,13 @@ final class OpenAiCompatibleChatCodec {
      * <p>编码时按角色映射消息、转换工具声明与调用、映射采样参数；平台特有字段（如 DeepSeek 前缀补全的
      * {@code prefix} 与 {@code reasoning_content}）由平台选项实现 {@link OpenAiCompatibleOptions} 自行写入。
      *
+     * <p>置流式标记时会一并写入 {@code stream_options.include_usage=true}：兼容家族多数平台（火山方舟、
+     * OpenAI 等）默认不在流式响应里回传 {@code usage}，只有显式开启该开关后才会在收尾块补一段
+     * {@code choices} 为空、仅带 {@code usage} 的数据，否则上游拿不到 token 用量。
+     *
      * @param request 对话请求
      * @param config  对话配置
-     * @param stream  是否在请求体中置 {@code stream=true}
+     * @param stream  是否在请求体中置 {@code stream=true} 并开启 {@code stream_options.include_usage}
      * @return UTF-8 编码的请求体
      * @throws IllegalArgumentException 请求或配置为 null、平台选项与配置不匹配、模型不一致、消息内容非法时
      * @throws ClaraException           含平台不支持的参数（如 topK、媒体内容）或序列化失败时
@@ -133,6 +137,7 @@ final class OpenAiCompatibleChatCodec {
         root.put("messages", messages);
         if (stream) {
             root.put("stream", Boolean.TRUE);
+            root.put("stream_options", Collections.singletonMap("include_usage", Boolean.TRUE));
         }
         parameters(root, request.getParameters());
 
@@ -491,12 +496,12 @@ final class OpenAiCompatibleChatCodec {
     /**
      * 解析 token 用量。
      *
-     * <p>必填 {@code prompt_tokens} 与 {@code completion_tokens}；可选 {@code total_tokens} 与缓存命中量，
-     * 可选字段缺失时对应值记为 null，存在但非法（非整数或为负）则按协议错误处理。
+     * <p>必填 {@code prompt_tokens} 与 {@code completion_tokens}，缺失时按 0 处理；可选
+     * {@code total_tokens} 与缓存命中量按「缺失即 null」读取，以便上层按输入加输出推导总量，
+     * 而不是把平台未提供误当成 0。
      *
-     * @param value    usage 节点，可为 null
+     * @param value usage 节点，可为 null
      * @return token 用量，节点缺失时返回 null
-     * @throws ClaraException 字段缺失、非整数或为负时
      */
     private static TokenUsage usage(JsonNode value) {
         if (value == null || value.isNull()) {
@@ -505,8 +510,8 @@ final class OpenAiCompatibleChatCodec {
         return new TokenUsage(
                 JsonNodeUtils.getIntValue(value, "prompt_tokens"),   //提示词输入token大小
                 JsonNodeUtils.getIntValue(value, "completion_tokens"),//当前响应token大小
-                JsonNodeUtils.getIntValue(value, "total_tokens"),//当前会话token总大小
-                JsonNodeUtils.getIntValue(value, "cached_tokens") //当前请求命中缓存token大小
+                JsonNodeUtils.optionalIntValue(value, "total_tokens"),//当前会话token总大小，缺失时为 null
+                JsonNodeUtils.optionalIntValue(value, "cached_tokens") //当前请求命中缓存token大小，缺失时为 null
         );
     }
 }
