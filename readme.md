@@ -250,9 +250,7 @@ try (ProviderConfiguration provider = loader.load(
 `ProviderConfiguration` 还提供以下类型化转换方法：
 
 - `toOpenAiCompatibleChatConfig`：OpenAI、DeepSeek、火山引擎和阿里兼容对话。
-- `toOpenAiCompatibleEmbeddingConfig`：OpenAI 和阿里兼容 Embedding。
 - `toAnthropicChatConfig`：Anthropic Messages。
-- `toDeepSeekModelCatalogConfig`：DeepSeek 模型目录。
 - `toOpenAiMediaConfig`：OpenAI 图片、转写和语音合成。
 - `toVolcengineImageConfig` / `toVolcengineVideoConfig`：火山图片和视频。
 - `toAlibabaAudioConfig` / `toAlibabaNativeTaskConfig`：阿里音频及原生图片/视频任务。

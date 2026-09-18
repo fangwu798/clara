@@ -7,6 +7,8 @@ import com.clara.model.api.TextContent;
 import com.clara.model.api.TokenUsage;
 import com.clara.model.api.ToolCallContent;
 import java.net.URI;
+
+import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
 import org.junit.Test;
 import static org.junit.Assert.*;
 

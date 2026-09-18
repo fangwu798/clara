@@ -43,25 +43,6 @@ capabilities:
       # 默认最大输出 Token 数，不应超过模型上限。
       maxTokens: 4096
 
-  # 通过 OpenAI 兼容模式调用文本向量模型。
-  embedding:
-    # DashScope OpenAI 兼容模式的 Embeddings 完整接口地址。
-    endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings
-    # 实际调用的向量模型 ID。
-    modelId: replace-with-embedding-model-id
-    # OpenAI 兼容向量协议适配器标识。
-    apiProfile: openai-compatible-embeddings
-    # 向量能力参数及客户端输入限制。
-    parameters:
-      # 返回向量维度，必须与模型输出和后续向量库索引维度一致。
-      dimension: 1024
-      # 单次请求允许包含的最大文本条数。
-      maxInputs: 25
-      # 单条输入允许的最大字符数；字符数不等同于 Token 数。
-      maxTextChars: 8192
-      # 单次请求所有文本合计允许的最大字符数。
-      maxTotalChars: 65536
-
   # DashScope 原生图片生成异步任务配置。
   image:
     # 创建图片生成任务的完整接口地址。

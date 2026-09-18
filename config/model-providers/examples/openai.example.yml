@@ -44,25 +44,6 @@ capabilities:
       # 默认最大输出 Token 数，不应超过所选模型的输出上限。
       maxTokens: 4096
 
-  # 文本向量化能力配置。
-  embedding:
-    # Embeddings 完整接口地址，源站必须存在于 allowedOrigins 中。
-    endpoint: https://api.openai.com/v1/embeddings
-    # 实际调用的向量模型 ID。
-    modelId: replace-with-embedding-model-id
-    # 请求协议适配器标识；OpenAI Embeddings 使用 embeddings-v1。
-    apiProfile: embeddings-v1
-    # 向量能力参数及客户端输入限制。
-    parameters:
-      # 返回向量的维度，必须与所选模型及后续向量库索引维度一致。
-      dimension: 1536
-      # 单次请求允许包含的最大文本条数。
-      maxInputs: 64
-      # 单条输入允许的最大字符数；这是客户端保护限制，不等同于 Token 数。
-      maxTextChars: 8192
-      # 单次请求所有输入文本合计允许的最大字符数。
-      maxTotalChars: 65536
-
   # 图片生成能力配置。
   image:
     # Images Generations 完整接口地址。

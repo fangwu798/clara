@@ -34,4 +34,21 @@ public final class MapUtils {
         }
         return Collections.unmodifiableMap(result);
     }
+
+    /**
+     * 值非 null 时写入映射。
+     *
+     * <p>用于拼装请求体或响应元数据：调用方不必重复写 if 判空，值为 null 时静默跳过，
+     * 避免把 null 写进映射后再被序列化或透传给上层。
+     *
+     * @param target 目标映射，不可为 null
+     * @param key    字段名，不可为 null
+     * @param value  字段值，为 null 时不写入
+     * @param <V>    值类型
+     */
+    public static <V> void putIfNotNull(Map<String, V> target, String key, V value) {
+        if (value != null) {
+            target.put(key, value);
+        }
+    }
 }

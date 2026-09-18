@@ -10,6 +10,7 @@ import com.clara.model.api.ModelProvider;
 import com.clara.model.api.ProviderOptions;
 import com.clara.model.api.Role;
 import com.clara.model.api.TextContent;
+import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
 import com.clara.model.provider.deepseek.DeepSeekChatOptions;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.impl.ProviderHttpRequest;

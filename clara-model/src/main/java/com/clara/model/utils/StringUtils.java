@@ -45,6 +45,19 @@ public final class StringUtils {
     }
 
     /**
+     * 将空内容转换为 null。
+     *
+     * <p>与 {@link #blankToNull(String)} 的区别：本方法只看长度，仅含空白的内容会原样返回，
+     * 适用于区分「未出现」与「出现但为空」的场景，例如流式累积缓冲的读取。
+     *
+     * @param value 待处理的内容，可为 null
+     * @return 长度大于 0 时返回其字符串形式；为 null 或长度为 0 时返回 null
+     */
+    public static String emptyToNull(CharSequence value) {
+        return value == null || value.length() == 0 ? null : value.toString();
+    }
+
+    /**
      * 计算字符串按 UTF-8 编码后的字节长度。
      *
      * <p>用于以字节为单位的大小限制校验，例如 SSE 的单行与单事件体积统计。

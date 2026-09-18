@@ -111,8 +111,7 @@ public final class Jdk8ProviderHttpTransport implements ProviderHttpTransport {
      * @throws UnsupportedOperationException 传入监听器但本实例未配置 SSE 上限（使用了单参构造函数）时
      * @throws ClaraException                端点被拒绝、请求过大、超时、传输失败或触发协议/资源上限错误时
      */
-    public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context,
-                                        ProviderSseListener listener) {
+    public ProviderHttpResponse execute(ProviderHttpRequest request, InvocationContext context, ProviderSseListener listener) {
         if (listener != null && parser == null) {
             throw new UnsupportedOperationException("this transport is not configured for SSE streaming");
         }

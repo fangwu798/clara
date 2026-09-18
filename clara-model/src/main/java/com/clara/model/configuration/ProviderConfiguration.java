@@ -5,9 +5,7 @@ import com.clara.model.api.ModelProvider;
 import com.clara.model.provider.alibaba.AlibabaAudioConfig;
 import com.clara.model.provider.alibaba.AlibabaNativeTaskConfig;
 import com.clara.model.provider.anthropic.AnthropicChatConfig;
-import com.clara.model.provider.compatible.OpenAiCompatibleChatConfig;
-import com.clara.model.provider.compatible.OpenAiCompatibleEmbeddingConfig;
-import com.clara.model.provider.deepseek.DeepSeekModelCatalogConfig;
+import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.openai.OpenAiMediaConfig;
 import com.clara.model.provider.volcengine.VolcengineImageConfig;
@@ -164,21 +162,6 @@ public final class ProviderConfiguration implements Closeable {
     }
 
     /**
-     * 按能力名称构造 OpenAI 兼容嵌入配置。
-     *
-     * @param name 能力名称
-     * @return OpenAI 兼容嵌入配置
-     */
-    public OpenAiCompatibleEmbeddingConfig toOpenAiCompatibleEmbeddingConfig(String name) {
-        ProviderCapabilityConfiguration capability = getCapability(name);
-        return new OpenAiCompatibleEmbeddingConfig(provider, capability.getEndpoint(),
-                capability.requireModelId(), capability.requireApiProfile(),
-                credential.getSecretRef(), capability.requireInt("dimension"),
-                capability.requireInt("maxInputs"), capability.requireInt("maxTextChars"),
-                capability.requireInt("maxTotalChars"));
-    }
-
-    /**
      * 按能力名称构造 Anthropic 对话配置。
      *
      * @param name 能力名称
@@ -191,21 +174,6 @@ public final class ProviderConfiguration implements Closeable {
         return new AnthropicChatConfig(capability.getEndpoint(), capability.requireModelId(),
                 capability.requireApiProfile(), capability.requireString("apiVersion"),
                 credential.getSecretRef(), capability.requireInt("defaultMaxTokens"));
-    }
-
-    /**
-     * 按能力名称构造 DeepSeek 模型目录配置。
-     *
-     * @param name 能力名称
-     * @return DeepSeek 模型目录配置
-     * @throws IllegalArgumentException 平台不是 DeepSeek 时
-     */
-    public DeepSeekModelCatalogConfig toDeepSeekModelCatalogConfig(String name) {
-        requireProvider(ModelProvider.DEEPSEEK);
-        ProviderCapabilityConfiguration capability = getCapability(name);
-        return new DeepSeekModelCatalogConfig(capability.getEndpoint(),
-                capability.requireApiProfile(), credential.getSecretRef(),
-                capability.requireInt("maxModels"), capability.requireInt("maxModelIdChars"));
     }
 
     /**

@@ -1,8 +1,7 @@
 package com.clara.model.configuration;
 
 import com.clara.model.api.ModelProvider;
-import com.clara.model.provider.compatible.OpenAiCompatibleChatConfig;
-import com.clara.model.provider.compatible.OpenAiCompatibleEmbeddingConfig;
+import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
@@ -36,10 +35,6 @@ public class ProviderYamlConfigurationLoaderTest {
                     configuration.toOpenAiCompatibleChatConfig("chat");
             assertEquals("chat-model", chat.getModelId());
             assertEquals("local-secret", chat.getSecretRef());
-
-            OpenAiCompatibleEmbeddingConfig embedding =
-                    configuration.toOpenAiCompatibleEmbeddingConfig("embedding");
-            assertEquals(1536, embedding.getDimension());
             assertFalse(configuration.getTransport().isAllowHttp());
 
             ProviderCredentialResolver resolver = configuration.credentialResolver();
@@ -62,12 +57,12 @@ public class ProviderYamlConfigurationLoaderTest {
     public void rejectsMultipleDocumentsAndFractionalIntegerLimits() throws Exception {
         assertInvalid(validYaml() + "---\nprovider: OPENAI\n", "exactly one YAML document");
         ProviderConfiguration configuration = load(
-                validYaml().replace("dimension: 1536", "dimension: 1536.5"));
+                validYaml().replace("maxTextChars: 4096", "maxTextChars: 4096.5"));
         try {
-            configuration.toOpenAiCompatibleEmbeddingConfig("embedding");
+            configuration.toOpenAiMediaConfig("media");
             fail("expected integer parameter validation failure");
         } catch (IllegalArgumentException expected) {
-            assertEquals("dimension must be an integer", expected.getMessage());
+            assertEquals("maxTextChars must be an integer", expected.getMessage());
         } finally {
             configuration.close();
         }
@@ -152,14 +147,13 @@ public class ProviderYamlConfigurationLoaderTest {
                 + "    endpoint: https://api.example.com/v1/chat/completions\n"
                 + "    modelId: chat-model\n"
                 + "    apiProfile: chat-v1\n"
-                + "  embedding:\n"
-                + "    endpoint: https://api.example.com/v1/embeddings\n"
-                + "    modelId: embedding-model\n"
-                + "    apiProfile: embedding-v1\n"
+                + "  media:\n"
+                + "    endpoint: https://api.example.com/v1/images/generations\n"
+                + "    modelId: media-model\n"
+                + "    apiProfile: images-v1\n"
                 + "    parameters:\n"
-                + "      dimension: 1536\n"
-                + "      maxInputs: 16\n"
-                + "      maxTextChars: 8192\n"
-                + "      maxTotalChars: 32768\n";
+                + "      maxTextChars: 4096\n"
+                + "      maxInputBytes: 8192\n"
+                + "      maxOutputs: 4\n";
     }
 }

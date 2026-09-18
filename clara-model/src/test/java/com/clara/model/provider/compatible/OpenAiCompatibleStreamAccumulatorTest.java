@@ -13,6 +13,8 @@ import com.clara.model.api.ModelProvider;
 import com.clara.model.api.Role;
 import com.clara.model.api.TextContent;
 import com.clara.model.api.ToolCallContent;
+import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
+import com.clara.model.provider.compatible.tool.StreamChunk;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -43,18 +45,18 @@ public class OpenAiCompatibleStreamAccumulatorTest {
                 + "\"index\":0,\"id\":\"call-\",\"type\":\"function\",\"function\":{"
                 + "\"name\":\"weath\",\"arguments\":\"ARG\"}}]},\"finish_reason\":null}]}")
                 .replace("ARG", "{");
-        OpenAiCompatibleStreamChunk first = accumulator.accept(firstJson);
+        StreamChunk first = accumulator.accept(firstJson);
         String secondJson = ("{\"id\":\"r1\",\"model\":\"fixed-model\",\"choices\":[{\"index\":0,"
                 + "\"delta\":{\"content\":\"lo\",\"reasoning_content\":\"ing\","
                 + "\"tool_calls\":[{\"index\":0,\"id\":\"1\",\"function\":{\"name\":\"er\","
                 + "\"arguments\":\"ARG\"}}]},\"finish_reason\":null}]}")
                 .replace("ARG", "\\\"city\\\":\\\"HZ\\\"}");
-        OpenAiCompatibleStreamChunk second = accumulator.accept(secondJson);
+        StreamChunk second = accumulator.accept(secondJson);
         accumulator.accept("{\"choices\":[{\"index\":0,\"delta\":{},"
                 + "\"finish_reason\":\"tool_calls\"}]}");
         accumulator.accept("{\"choices\":[],\"usage\":{\"prompt_tokens\":7,"
                 + "\"completion_tokens\":5}}");
-        OpenAiCompatibleStreamChunk done = accumulator.accept("[DONE]");
+        StreamChunk done = accumulator.accept("[DONE]");
 
         assertEquals("Hel", first.getTextDelta());
         assertEquals("think", first.getReasoningDelta());

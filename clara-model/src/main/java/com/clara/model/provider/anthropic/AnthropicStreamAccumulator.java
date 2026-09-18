@@ -183,8 +183,9 @@ final class AnthropicStreamAccumulator {
         put(metadata, "stopSequence", stopSequence);
         metadata.put("provider", ModelProvider.ANTHROPIC.name());
         metadata.put("apiProfile", config.getApiProfile());
+        // Anthropic 只返回输入/输出 token：既不返回总量，也暂未映射 cache_read_input_tokens
         ChatResponse response = new ChatResponse(new ChatMessage(Role.ASSISTANT, contents,
-                null, null), new TokenUsage(inputTokens.intValue(), outputTokens.intValue()),
+                null, null), new TokenUsage(inputTokens.intValue(), outputTokens.intValue(), null, null),
                 finishReason, metadata);
         complete = true;
         return new AnthropicStreamChunk(null, null, null, null, null, response);

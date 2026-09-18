@@ -1,83 +1,73 @@
 package com.clara.model.provider.compatible;
 
-import com.clara.kernel.ClaraError;
 import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
 import com.clara.model.api.ChatModel;
 import com.clara.model.api.ChatRequest;
 import com.clara.model.api.ChatResponse;
+import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
 import com.clara.model.provider.http.ProviderCredentialResolver;
-import com.clara.model.provider.http.impl.ProviderHttpRequest;
-import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import com.clara.model.provider.http.impl.ProviderHttpResponse;
+import com.clara.model.utils.ExceptionUtils;
 
 /**
- * 提供OpenAI兼容对话模型能力。
+ * 提供 OpenAI 兼容协议的对话模型能力（同步调用）。
+ *
+ * <p>用途：把 {@link ChatRequest} 编码为 OpenAI 兼容的 {@code /chat/completions} 请求体，经
+ * {@link ProviderHttpTransport} 同步发出并解码响应。支持文本、工具声明、工具调用与工具调用结果消息，
+ * 并对响应结构做严格校验；OpenAI、DeepSeek、火山引擎、阿里云等平台共用本实现，差异由
+ * {@link OpenAiCompatibleChatConfig} 中的平台与协议档位决定。
+ *
+ * <p>与流式的分工：编码、凭据解析、请求头、发送与状态码映射等与流式共用的部分由
+ * {@link OpenAiCompatibleChatExchange} 承载，本类只负责同步响应处理——一次性解码出完整
+ * {@link ChatResponse}。流式调用见 {@link OpenAiCompatibleStreamingChatModel}。
+ *
+ * <p>使用方式：
+ * <pre>{@code
+ * ChatModel model = new OpenAiCompatibleChatModel(config, transport, provider.credentialResolver());
+ * ChatResponse response = model.chat(request);
+ * }</pre>
+ *
+ * <p>注意：凭据在每次调用时按租户解析，并在 {@code finally} 中清零副本；响应非 2xx 时映射为
+ * {@code MODEL_PROVIDER_FAILED}（401/403/429 分别归入鉴权、授权、限流，429 与 5xx 标记为可重试）；
+ * 请求内容或响应结构不符合协议时抛 {@code MODEL_PROTOCOL_ERROR}。异常统一由 {@link ExceptionUtils}
+ * 构造，本类不自行拼装错误码与错误类别。
  */
 public final class OpenAiCompatibleChatModel implements ChatModel {
-    private final OpenAiCompatibleChatConfig config;
-    private final ProviderHttpTransport transport;
-    private final ProviderCredentialResolver credentials;
-    private final OpenAiCompatibleChatCodec codec;
+    /**
+     * 编解码与一次往返请求的共用执行体，同时持有配置、传输器与凭据解析器。
+     */
+    private final OpenAiCompatibleChatExchange exchange;
 
-    public OpenAiCompatibleChatModel(OpenAiCompatibleChatConfig config,
-            ProviderHttpTransport transport, ProviderCredentialResolver credentials) {
-        if (config == null || transport == null || credentials == null) {
-            throw new IllegalArgumentException("dependencies must not be null");
-        }
-        this.config = config;
-        this.transport = transport;
-        this.credentials = credentials;
-        this.codec = new OpenAiCompatibleChatCodec();
+    /**
+     * 创建对话模型。
+     *
+     * @param config      对话配置，不可为 null
+     * @param transport   HTTP 传输器，不可为 null
+     * @param credentials 凭据解析器，不可为 null
+     * @throws IllegalArgumentException 任一依赖为 null 时
+     */
+    public OpenAiCompatibleChatModel(OpenAiCompatibleChatConfig config, ProviderHttpTransport transport, ProviderCredentialResolver credentials) {
+        this.exchange = new OpenAiCompatibleChatExchange(config, transport, credentials);
     }
 
+    /**
+     * 执行一次同步对话调用。
+     *
+     * <p>流程：校验取消状态 → 编码请求体 → 由 {@link OpenAiCompatibleChatExchange#send} 解析凭据、发送并
+     * 校验状态码 → 解码响应；凭据副本在发送过程中清零，本类不接触密钥。
+     *
+     * @param request 对话请求，包含消息、参数与调用上下文，不可为 null
+     * @return 平台返回的对话响应
+     * @throws IllegalArgumentException 请求为 null，或消息内容不符合协议（如平台不支持的媒体内容）时
+     * @throws ClaraException           凭据不可用、请求被取消、传输失败、平台返回非 2xx 或响应结构非法时
+     */
     public ChatResponse chat(ChatRequest request) {
-        if (request == null) { throw new IllegalArgumentException("request must not be null"); }
-        request.getContext().getCancellationToken()
-                .throwIfCancellationRequested(request.getContext().getTraceId());
-        byte[] payload = codec.encode(request, config);
-        char[] resolved = credentials.resolve(request.getContext().getTenantId(), config.getSecretRef());
-        if (resolved == null || resolved.length == 0) credentialUnavailable();
-        char[] secret = resolved.clone();
-        try {
-            Map<String, String> headers = new LinkedHashMap<String, String>();
-            headers.put("Authorization", "Bearer " + new String(secret));
-            headers.put("Content-Type", "application/json");
-            headers.put("Accept", "application/json");
-            ProviderHttpRequest httpRequest = new ProviderHttpRequest("POST", config.getEndpoint(),
-                    headers, payload);
-            ProviderHttpResponse response = transport.execute(httpRequest, request.getContext());
-            if (response == null) protocol();
-            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300)
-                providerFailure(response.getStatusCode());
-            return codec.decode(response.getBody(), config);
-        } finally {
-            Arrays.fill(secret, '\0');
+        if (request == null) {
+            throw new IllegalArgumentException("request must not be null");
         }
-    }
-
-    private void credentialUnavailable() {
-        throw error(ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null);
-    }
-    private void protocol() {
-        throw error(ErrorCodes.MODEL_PROTOCOL_ERROR, ErrorCategory.EXTERNAL_SERVICE, false, null);
-    }
-    private void providerFailure(int status) {
-        ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION
-                : status == 403 ? ErrorCategory.AUTHORIZATION
-                : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
-        boolean retryable = status == 429 || status >= 500;
-        throw error(ErrorCodes.MODEL_PROVIDER_FAILED, category, retryable, String.valueOf(status));
-    }
-    private ClaraException error(String code, ErrorCategory category, boolean retryable,
-            String providerCode) {
-        return new ClaraException(new ClaraError(code, category, code, retryable,
-                null, config.getProvider().name(), providerCode, null,
-                Collections.<String, String>emptyMap()));
+        request.getContext().getCancellationToken().throwIfCancellationRequested(request.getContext().getTraceId());
+        ProviderHttpResponse response = exchange.send(request, exchange.encode(request, false), null);
+        return exchange.decode(response.getBody());
     }
 }

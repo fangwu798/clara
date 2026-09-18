@@ -13,8 +13,16 @@ import java.util.Set;
 /**
  * 提供严格模式下的 JSON 节点读取与校验工具。
  *
- * <p>集中处理配置解析中通用的字段读取、未知字段拒绝、安全 URI 校验与非法配置异常构造，
- * 供各配置加载器复用，使加载器只需关注具体业务映射。
+ * <p>集中处理通用的字段读取、未知字段拒绝、安全 URI 校验与非法配置异常构造，供各配置加载器与协议编解码器
+ * 复用，使调用方只需关注具体业务映射。
+ *
+ * <p>读取方法分两类，取值的宽严程度不同，按场景选择：
+ * <ul>
+ *   <li>配置解析：{@link #requiredText(JsonNode, String)}、{@link #optionalText(JsonNode, String)} 会拒绝
+ *       空白值，类型不符抛 {@link IllegalArgumentException}；</li>
+ *   <li>协议解析：{@link #textOrNull(JsonNode)} 宽松（类型不符按缺失处理），
+ *       {@link #strictTextOrNull(JsonNode)} 严格（类型不符直接报错），两者都允许空串。</li>
+ * </ul>
  */
 public final class JsonNodeUtils {
     /**
@@ -69,6 +77,56 @@ public final class JsonNodeUtils {
     }
 
     /**
+     * 读取节点自身的文本值（宽松模式）。
+     *
+     * <p>与 {@link #optionalText(JsonNode, String)} 的区别：本方法不做任何校验，节点为 null、NullNode
+     * 或类型不是文本时一律返回 null，适用于读取可选的元数据字段，由调用方自行决定缺失是否可接受。
+     *
+     * @param node 待读取的节点，可为 null
+     * @return 文本值；节点为 null、NullNode 或非文本时返回 null
+     */
+    public static String textOrNull(JsonNode node) {
+        return node != null && node.isTextual() ? node.textValue() : null;
+    }
+
+    /**
+     * 读取节点自身的文本值（严格模式）。
+     *
+     * <p>与 {@link #textOrNull(JsonNode)} 的区别：节点存在但类型不是文本时直接报错，而不是宽松地按缺失处理，
+     * 适合协议解析——字段类型不符属于数据非法，不能静默吞掉。节点为 null 或 NullNode 时仍返回 null，
+     * 由调用方决定缺失是否可接受；空串属于合法文本，原样返回，因此与面向配置、拒绝空白值的
+     * {@link #optionalText(JsonNode, String)} 不同。
+     *
+     * @param node 待读取的节点，可为 null
+     * @return 文本值；节点为 null 或 NullNode 时返回 null
+     * @throws IllegalArgumentException 节点存在但不是文本时
+     */
+    public static String strictTextOrNull(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (!node.isTextual()) {
+            throw invalidConfig("value must be a text", null);
+        }
+        return node.textValue();
+    }
+
+    /**
+     * 读取指定字段的文本值（严格模式）。
+     *
+     * <p>等价于 {@code strictTextOrNull(parent.get(field))}：字段缺失或为 null 时返回 null，
+     * 字段存在但不是文本时报错。
+     *
+     * @param parent 父节点
+     * @param field  字段名
+     * @return 字段文本值；字段缺失或为 null 时返回 null
+     * @throws IllegalArgumentException 字段存在但不是文本时
+     */
+    public static String strictTextOrNull(JsonNode parent, String field) {
+        return strictTextOrNull(parent.get(field));
+    }
+
+    /**
      * 读取必填的整数字段。
      *
      * @param parent 父节点
@@ -80,6 +138,24 @@ public final class JsonNodeUtils {
         JsonNode value = parent.get(field);
         if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()) {
             throw invalidConfig(field + " must be an integer", null);
+        }
+        return value.intValue();
+    }
+
+    /**
+     * 读取整数字段（宽松模式），字段缺失或不是 int 范围内的整数时返回 0。
+     *
+     * <p>与 {@link #requiredInt(JsonNode, String)} 的区别：本方法不校验、不抛异常，适用于可选的计数类
+     * 字段，由调用方自行决定 0 与“缺失”是否等价。
+     *
+     * @param parent 父节点
+     * @param field  字段名
+     * @return 整数值；字段缺失、非整数或超出 int 范围时返回 0
+     */
+    public static int getIntValue(JsonNode parent, String field) {
+        JsonNode value = parent.get(field);
+        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()) {
+            return 0;
         }
         return value.intValue();
     }

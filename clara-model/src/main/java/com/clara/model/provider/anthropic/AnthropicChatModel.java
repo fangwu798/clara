@@ -1,9 +1,5 @@
 package com.clara.model.provider.anthropic;
 
-import com.clara.kernel.ClaraError;
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
 import com.clara.model.api.ChatModel;
 import com.clara.model.api.ChatRequest;
 import com.clara.model.api.ChatResponse;
@@ -12,13 +8,17 @@ import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.impl.ProviderHttpRequest;
 import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.ProviderHttpTransport;
+import com.clara.model.utils.ExceptionUtils;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * 提供Anthropic对话模型能力。
+ *
+ * <p>注意：凭据在每次调用时按租户解析，并在 {@code finally} 中清零副本；响应非 2xx 时映射为
+ * {@code MODEL_PROVIDER_FAILED}（401/403/429 分别归入鉴权、授权、限流，429 与 5xx 标记为可重试）。
+ * 异常统一由 {@link ExceptionUtils} 构造，本类不自行拼装错误码与错误类别。
  */
 public final class AnthropicChatModel implements ChatModel {
     private final AnthropicChatConfig config;
@@ -42,7 +42,9 @@ public final class AnthropicChatModel implements ChatModel {
                 .throwIfCancellationRequested(request.getContext().getTraceId());
         byte[] payload = codec.encode(request, config);
         char[] resolved = credentials.resolve(request.getContext().getTenantId(), config.getSecretRef());
-        if (resolved == null || resolved.length == 0) credentialUnavailable();
+        if (resolved == null || resolved.length == 0) {
+            throw ExceptionUtils.credentialUnavailable(ModelProvider.ANTHROPIC);
+        }
         char[] secret = resolved.clone();
         try {
             Map<String, String> headers = new LinkedHashMap<String, String>();
@@ -52,30 +54,12 @@ public final class AnthropicChatModel implements ChatModel {
             headers.put("Accept", "application/json");
             ProviderHttpResponse response = transport.execute(new ProviderHttpRequest("POST",
                     config.getEndpoint(), headers, payload), request.getContext());
-            if (response == null) { throw error(ErrorCodes.MODEL_PROTOCOL_ERROR,
-                    ErrorCategory.EXTERNAL_SERVICE, false, null); }
+            if (response == null) throw ExceptionUtils.protocolError(ModelProvider.ANTHROPIC);
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300)
-                providerFailure(response.getStatusCode());
+                throw ExceptionUtils.providerFailure(ModelProvider.ANTHROPIC, response.getStatusCode());
             return codec.decode(response.getBody(), config);
         } finally {
             Arrays.fill(secret, '\0');
         }
-    }
-
-    private void credentialUnavailable() {
-        throw error(ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null);
-    }
-    private void providerFailure(int status) {
-        ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION
-                : status == 403 ? ErrorCategory.AUTHORIZATION
-                : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
-        throw error(ErrorCodes.MODEL_PROVIDER_FAILED, category,
-                status == 429 || status >= 500, String.valueOf(status));
-    }
-    private ClaraException error(String code, ErrorCategory category, boolean retryable,
-            String providerCode) {
-        return new ClaraException(new ClaraError(code, category, code, retryable, null,
-                ModelProvider.ANTHROPIC.name(), providerCode, null,
-                Collections.<String, String>emptyMap()));
     }
 }

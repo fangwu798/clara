@@ -16,8 +16,7 @@ public final class ChatMessage {
     private final String name;
     private final Map<String, String> metadata;
 
-    public ChatMessage(Role role, List<Content> contents, String name,
-            Map<String, String> metadata) {
+    public ChatMessage(Role role, List<Content> contents, String name, Map<String, String> metadata) {
         if (role == null) { throw new IllegalArgumentException("role must not be null"); }
         if (contents == null || contents.isEmpty()) {
             throw new IllegalArgumentException("contents must not be empty");

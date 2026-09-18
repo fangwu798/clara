@@ -2,9 +2,8 @@ package com.clara.model.provider.anthropic;
 
 import com.clara.kernel.ClaraError;
 import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
 import com.clara.model.api.ChatRequest;
+import com.clara.model.api.ModelProvider;
 import com.clara.model.api.StreamEvent;
 import com.clara.model.api.StreamHandle;
 import com.clara.model.api.StreamObserver;
@@ -16,8 +15,8 @@ import com.clara.model.provider.http.impl.ProviderHttpResponse;
 import com.clara.model.provider.http.event.ProviderSseEvent;
 import com.clara.model.provider.http.ProviderHttpTransport;
 import com.clara.model.provider.http.ProviderSseListener;
+import com.clara.model.utils.ExceptionUtils;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -30,7 +29,8 @@ import java.util.concurrent.Future;
  * {@link StreamObserver} 顺序消费事件，并通过返回的 {@link StreamHandle} 取消或查询状态。
  *
  * <p>注意：内容块数量和累计字符数必须设置上限；事件顺序、工具参数及结束原因会被严格校验，不完整的流按
- * 协议错误处理。凭据仅在调用期间解析并清理，执行器生命周期仍由调用方负责。
+ * 协议错误处理。凭据仅在调用期间解析并清理，执行器生命周期仍由调用方负责。异常统一由
+ * {@link ExceptionUtils} 构造，本类不自行拼装错误码与错误类别。
  */
 public final class AnthropicStreamingChatModel implements StreamingChatModel {
     private final AnthropicChatConfig config;
@@ -77,8 +77,9 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
         char[] secret = null;
         try {
             char[] resolved = credentials.resolve(request.getContext().getTenantId(), config.getSecretRef());
-            if (resolved == null || resolved.length == 0) { throw error(
-                    ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, null); }
+            if (resolved == null || resolved.length == 0) {
+                throw ExceptionUtils.credentialUnavailable(ModelProvider.ANTHROPIC);
+            }
             secret = resolved.clone();
             Map<String, String> headers = new LinkedHashMap<String, String>();
             headers.put("x-api-key", new String(secret));
@@ -97,15 +98,15 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
                             return !chunk.isComplete();
                         }
                     });
-            if (response == null) { throw protocol(); }
+            if (response == null) throw ExceptionUtils.protocolError(ModelProvider.ANTHROPIC);
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
-                throw providerFailure(response.getStatusCode());
+                throw ExceptionUtils.providerFailure(ModelProvider.ANTHROPIC, response.getStatusCode());
             }
-            if (!accumulator.isComplete()) { throw protocol(); }
+            if (!accumulator.isComplete()) throw ExceptionUtils.protocolError(ModelProvider.ANTHROPIC);
         } catch (ClaraException exception) {
             emitter.error(exception.getError());
         } catch (RuntimeException exception) {
-            emitter.error(protocol().getError());
+            emitter.error(ExceptionUtils.protocolError(ModelProvider.ANTHROPIC).getError());
         } finally {
             if (secret != null) Arrays.fill(secret, '\0');
         }
@@ -125,24 +126,6 @@ public final class AnthropicStreamingChatModel implements StreamingChatModel {
             emitter.emit(StreamEvent.Type.RESPONSE_COMPLETE,
                     chunk.getResponse().getFinishReason().name(), null, null,
                     chunk.getResponse(), null);
-    }
-
-    private ClaraException providerFailure(int status) {
-        ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION
-                : status == 403 ? ErrorCategory.AUTHORIZATION
-                : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
-        return error(ErrorCodes.MODEL_PROVIDER_FAILED, category,
-                status == 429 || status >= 500, String.valueOf(status));
-    }
-
-    private ClaraException protocol() {
-        return error(ErrorCodes.MODEL_PROTOCOL_ERROR, ErrorCategory.EXTERNAL_SERVICE, false, null);
-    }
-
-    private ClaraException error(String code, ErrorCategory category, boolean retryable,
-            String providerCode) {
-        return new ClaraException(new ClaraError(code, category, code, retryable, null,
-                "ANTHROPIC", providerCode, null, Collections.<String, String>emptyMap()));
     }
 
     /**

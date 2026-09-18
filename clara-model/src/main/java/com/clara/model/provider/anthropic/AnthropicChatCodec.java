@@ -219,7 +219,8 @@ final class AnthropicChatCodec {
         JsonNode output = usage.get("output_tokens");
         if (input == null || output == null || !input.canConvertToInt() || !output.canConvertToInt()
                 || input.intValue() < 0 || output.intValue() < 0) { throw protocol(); }
-        return new TokenUsage(input.intValue(), output.intValue());
+        // Anthropic 只返回输入/输出 token：既不返回总量，也暂未映射 cache_read_input_tokens
+        return new TokenUsage(input.intValue(), output.intValue(), null, null);
     }
 
     private static FinishReason finish(String reason) {

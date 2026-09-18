@@ -13,6 +13,7 @@ import com.clara.model.api.StreamHandle;
 import com.clara.model.api.StreamObserver;
 import com.clara.model.api.TextContent;
 import com.clara.model.api.ToolCallContent;
+import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.ProviderHttpTransport;
 import com.clara.model.provider.http.impl.ProviderHttpRequest;

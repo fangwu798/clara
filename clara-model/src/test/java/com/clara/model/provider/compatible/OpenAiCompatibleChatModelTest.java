@@ -16,6 +16,7 @@ import com.clara.model.api.ProviderOptions;
 import com.clara.model.api.Role;
 import com.clara.model.api.TextContent;
 import com.clara.model.api.ToolCallContent;
+import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
 import com.clara.model.provider.http.ProviderCredentialResolver;
 import com.clara.model.provider.http.impl.ProviderHttpRequest;
 import com.clara.model.provider.http.impl.ProviderHttpResponse;
