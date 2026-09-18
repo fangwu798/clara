@@ -1,7 +1,8 @@
 provider: OPENAI
 credential:
   secretRef: openai-novel
-  environmentVariable: CLARA_OPENAI_API_KEY
+  apiKey: sk-0xx7JaDgKXMF8pKLcUUoksTx5rhxccLMbElhO8PT2xF3iPxt
+  #environmentVariable: CLARA_OPENAI_API_KEY
 transport:
   allowedOrigins:
     - https://new.aicontrol.top/
@@ -13,10 +14,10 @@ transport:
 capabilities:
   chat:
     endpoint: https://new.aicontrol.top/v1/chat/completions
-    modelId: gpt-4o-mini
+    modelId: gpt-5.6-sol
     apiProfile: chat-completions-v1
     parameters:
-      maxTokens: 6000
+      maxTokens: 60000
   image:
     endpoint: https://new.aicontrol.top/v1/images/generations
     modelId: gpt-image-1
