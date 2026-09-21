@@ -12,17 +12,17 @@ transport:
   maxResponseBytes: 33554432
   allowHttp: false
 capabilities:
-  chat:
+  CHAT:
     endpoint: https://new.aicontrol.top/v1/chat/completions
     modelId: gpt-5.6-sol
     apiProfile: chat-completions-v1
     parameters:
       maxTokens: 60000
-  image:
+  IMAGE:
     endpoint: https://new.aicontrol.top/v1/images/generations
     modelId: gpt-image-1
     apiProfile: images-v1
     parameters:
-      maxTextChars: 12000
+      maxPromptChars: 12000
       maxInputBytes: 33554432
       maxOutputs: 1

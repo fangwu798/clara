@@ -1,6 +1,6 @@
 package com.clara.adapter.rest;
 
-import com.clara.kernel.*;
+import com.clara.kernel.exception.ClaraError;
 
 /**
  * 集中创建REST相关的领域错误。

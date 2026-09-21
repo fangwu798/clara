@@ -12,36 +12,18 @@ transport:
   maxResponseBytes: 33554432
   allowHttp: false
 capabilities:
-  chat:
+  CHAT:
     endpoint: https://ark.cn-beijing.volces.com/api/v3/chat/completions
     modelId: doubao-seed-2-1-pro-260628
     apiProfile: ark-v3-chat
     parameters:
       maxTokens: 20000
-  image:
+  IMAGE:
     endpoint: https://ark.cn-beijing.volces.com/api/v3/images/generations
     modelId: doubao-seedream-5-0-pro-260628
     apiProfile: ark-v3-images
     parameters:
       maxPromptChars: 32000
-      maxImages: 1
-      maxSourceImages: 0
-      watermark: false
-  image-fast:
-    endpoint: https://ark.cn-beijing.volces.com/api/v3/images/generations
-    modelId: doubao-seedream-5-0-260128
-    apiProfile: ark-v3-images
-    parameters:
-      maxPromptChars: 32000
-      maxImages: 1
-      maxSourceImages: 0
-      watermark: false
-  image-quality:
-    endpoint: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
-    modelId: doubao-seedance-1-5-pro-251215
-    apiProfile: ark-v3-images
-    parameters:
-      maxPromptChars: 32000
-      maxImages: 1
+      maxOutputs: 1
       maxSourceImages: 0
       watermark: false

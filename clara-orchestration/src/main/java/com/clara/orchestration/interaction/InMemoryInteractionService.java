@@ -1,7 +1,7 @@
 package com.clara.orchestration.interaction;
 
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ErrorCategory;
+import com.clara.kernel.exception.ErrorCodes;
 
 import java.util.ArrayList;
 import java.util.Collection;

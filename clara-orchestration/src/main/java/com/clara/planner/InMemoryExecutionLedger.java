@@ -1,7 +1,7 @@
 package com.clara.planner;
 
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ErrorCategory;
+import com.clara.kernel.exception.ErrorCodes;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;

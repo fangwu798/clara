@@ -31,9 +31,11 @@ transport:
   #   X-DashScope-WorkSpace: replace-with-workspace-id
 
 # 本平台启用的模型能力，不使用的能力节点可以删除。
+# 节点名必须是能力种类枚举名（CHAT / IMAGE / VIDEO / AUDIO_TRANSCRIPTION / SPEECH，大小写不敏感），
+# 同一平台每种能力最多一个节点；用了枚举以外的名字会在加载期直接报「配置项 capabilities 类型不符」。
 capabilities:
   # 通过 OpenAI 兼容模式调用文本对话模型。
-  chat:
+  CHAT:
     # DashScope OpenAI 兼容模式的 Chat Completions 完整接口地址。
     endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
     # 实际调用的对话模型 ID，应替换为账号当前可用的模型名称。
@@ -48,7 +50,7 @@ capabilities:
       maxTokens: 4096
 
   # DashScope 原生图片生成异步任务配置。
-  image:
+  IMAGE:
     # 创建图片生成任务的完整接口地址。
     endpoint: https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation
     # 查询异步任务状态的基础地址，运行时会按任务 ID 组装查询地址。
@@ -66,10 +68,10 @@ capabilities:
       # 图片提示词允许的最大字符数。
       maxPromptChars: 32000
       # 单次请求允许附带的最大输入图片数量。
-      maxInputImages: 4
+      maxSourceImages: 4
 
   # DashScope 原生视频生成异步任务配置。
-  video:
+  VIDEO:
     # 创建视频生成任务的完整接口地址。
     endpoint: https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis
     # 查询异步任务状态的基础地址，运行时会按任务 ID 组装查询地址。
@@ -87,10 +89,10 @@ capabilities:
       # 视频提示词允许的最大字符数。
       maxPromptChars: 32000
       # 单次请求允许附带的最大输入图片数量。
-      maxInputImages: 4
+      maxReferenceImages: 4
 
   # DashScope 原生音频转写能力配置。
-  transcription:
+  AUDIO_TRANSCRIPTION:
     # 提交音频转写请求的完整接口地址。
     endpoint: https://dashscope.aliyuncs.com/api/v1/services/audio/asr/transcription
     # 实际调用的语音识别模型 ID。
@@ -103,7 +105,7 @@ capabilities:
       maxTextChars: 8192
 
   # DashScope 原生语音合成能力配置。
-  speech:
+  SPEECH:
     # 提交语音合成请求的完整接口地址。
     endpoint: https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation
     # 实际调用的语音合成模型 ID。

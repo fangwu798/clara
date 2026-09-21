@@ -1,6 +1,6 @@
 package com.clara.adapter.rest;
 
-import com.clara.kernel.ClaraException;
+import com.clara.kernel.exception.ClaraException;
 import com.clara.orchestration.interaction.*;
 
 import java.util.List;

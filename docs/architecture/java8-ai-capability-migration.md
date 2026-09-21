@@ -390,7 +390,7 @@ clara-application
 - `ChatMessage`：`role`、`contents`、`name`、`metadata`，支持 SYSTEM/USER/ASSISTANT/TOOL。
 - `ChatRequest`：消息、`ModelParameters`、工具规格、调用上下文。
 - `ModelParameters`：`model`、`temperature`、`topP`、`topK`、`maxTokens`、`stop`、惩罚项、响应格式。
-- `ProviderOptions`：供应商扩展参数；按 Provider 使用类型化子类，未知字段才进入受控 `Map<String,Object>`。
+- 平台专属参数：供应商扩展参数由平台派生请求子类承载（如 `request.compatible.deepseek.DeepSeekChatRequest`）。
 - `ChatResponse`：最终消息、Token 用量、结束原因、供应商元数据。
 - `StreamEvent`：文本增量、思考增量、工具参数增量、工具调用完成、响应完成、错误。
 

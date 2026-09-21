@@ -1,9 +1,10 @@
 package com.clara.adapter.document;
 
-import com.clara.kernel.*;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCategory;
+import com.clara.kernel.exception.ErrorCodes;
 import com.clara.workspace.api.*;
 
-import java.io.*;
 import java.util.*;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -55,7 +56,7 @@ public final class PdfBoxDocumentParser implements DocumentParser {
             } finally {
                 document.close();
             }
-        } catch (com.clara.kernel.ClaraException e) {
+        } catch (ClaraException e) {
             throw e;
         } catch (Exception e) {
             String name = e.getClass().getName();

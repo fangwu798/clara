@@ -1,144 +1,107 @@
 package com.clara.model.provider.deepseek;
 
-import com.clara.kernel.CancellationToken;
-import com.clara.kernel.ClaraError;
-import com.clara.kernel.InvocationContext;
-import com.clara.media.MediaType;
-import com.clara.media.MediaUpload;
-import com.clara.model.api.ChatMessage;
-import com.clara.model.api.ChatModel;
-import com.clara.model.api.ChatRequest;
-import com.clara.model.api.ChatResponse;
-import com.clara.model.api.Content;
-import com.clara.model.api.FinishReason;
-import com.clara.model.api.ModelCapability;
-import com.clara.model.api.ModelParameters;
-import com.clara.model.api.Role;
-import com.clara.model.api.StreamEvent;
-import com.clara.model.api.StreamHandle;
-import com.clara.model.api.StreamObserver;
-import com.clara.model.api.TextContent;
-import com.clara.model.api.ToolCallContent;
-import com.clara.model.api.media.ImageGenerationEvent;
-import com.clara.model.api.media.ImageGenerationObserver;
-import com.clara.model.api.media.ImageGenerationRequest;
-import com.clara.model.api.media.ImageGenerationResult;
-import com.clara.model.configuration.ProviderConfiguration;
+import com.clara.context.ConvContext;
+import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.FinishReasonEnum;
+import com.clara.kernel.api.IStreamModel;
+import com.clara.kernel.config.ModelConfig;
+import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.http.HttpRequest;
+import com.clara.kernel.http.HttpResponse;
+import com.clara.kernel.http.RawHttpResponse;
+import com.clara.kernel.http.execute.Jdk8HttpTransport;
+import com.clara.kernel.message.IContent;
+import com.clara.kernel.message.delta.ImageItem;
+import com.clara.kernel.message.impl.ToolContent;
+import com.clara.kernel.message.impl.UserContent;
+import com.clara.kernel.stream.IStreamHandle;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
-import com.clara.model.provider.compatible.OpenAiCompatibleChatModel;
-import com.clara.model.provider.compatible.OpenAiCompatibleStreamingChatModel;
-import com.clara.model.provider.compatible.config.OpenAiCompatibleChatConfig;
-import com.clara.model.provider.compatible.image.OpenAiCompatibleImageConfig;
-import com.clara.model.provider.compatible.image.OpenAiCompatibleImageModel;
-import com.clara.model.provider.compatible.image.OpenAiCompatibleStreamingImageModel;
-import com.clara.model.provider.http.impl.Jdk8ProviderHttpTransport;
-import com.clara.model.provider.media.ProviderMediaAssetBridge;
-import com.clara.model.runtime.ProviderModelDescriptor;
+import com.clara.model.provider.CompatibleStream;
+import com.clara.model.stream.RecordingObserver;
+import com.clara.tool.ToolCall;
+import com.clara.tool.ToolCallContent;
+import com.clara.tool.ToolContext;
 import com.clara.tool.ToolSpecification;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Assume;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * 加载真实平台配置、直接调用真实接口的用例（不使用任何模拟）。
  *
- * <p>覆盖场景：
+ * <p>覆盖场景，按平台分组：
  * <ul>
- *   <li>{@link #nonStreamingChat()}：非流式对话；</li>
- *   <li>{@link #nonStreamingToolCallRoundTrip()}：非流式工具调用往返（声明工具 → 返回 tool_calls → 回填结果）；</li>
- *   <li>{@link #streamingChat()}：流式对话；</li>
- *   <li>{@link #streamingToolCallRoundTrip()}：流式工具调用往返；</li>
- *   <li>{@link #nonStreamingImageGeneration()}：非流式文生图；</li>
- *   <li>{@link #streamingImageGeneration()}：流式文生图（逐张产出事件）。</li>
+ *   <li>DeepSeek 对话：{@link #deepseekChatNonStreaming()} 非流式、{@link #deepseekChatStreaming()} 流式；</li>
+ *   <li>DeepSeek 工具调用：{@link #deepseekToolCallNonStreaming()} 非流式、
+ *       {@link #deepseekToolCallStreaming()} 流式（声明工具 → 收到 tool_calls → 回填结果 → 拿到最终回答）；</li>
+ *   <li>火山方舟对话：{@link #volcengineChatNonStreaming()} 非流式、{@link #volcengineChatStreaming()} 流式；</li>
+ *   <li>火山方舟工具调用：{@link #volcengineToolCallNonStreaming()} 非流式、
+ *       {@link #volcengineToolCallStreaming()} 流式；</li>
+ *   <li>火山方舟生图：{@link #volcengineImageGeneration()} 非流式文生图（并把结果真正下载下来）。</li>
  * </ul>
  *
- * <p>对话用例加载 {@code config/model-providers/deepseek.yml}，生图用例加载
- * {@code config/model-providers/volcengine.yml}——对话平台没有图片能力，两者各取所长。
+ * <p>对话用例加载 {@code config/model-providers/deepseek.yml} 与 {@code volcengine.yml}，生图用例加载
+ * {@code volcengine.yml}——DeepSeek 没有图片能力，图片只能打在火山方舟上。
+ *
+ * <p>调用链固定为统一入口，不含任何平台分支：
+ * {@code CompatibleStream#chat} → {@code Jdk8HttpTransport} → {@code HttpRequest#toRequest()}
+ * （按 {@code @ProviderAdapter} 筛字段编码）→ 真实 HTTP → 按 {@code @ResponseAdapter} 解码为
+ * {@link HttpResponse}。平台与能力由 {@link ConvContext} 承载，所以每个用例都要先绑定上下文再调用；
+ * 流式用例统一用 {@link RecordingObserver} 收事件，不再各自实现观察者。
  *
  * <p>运行前置条件：
  * <ol>
  *   <li>上述两个配置文件存在，且所用能力指向账号可用的模型；</li>
  *   <li>配置文件 {@code credential} 里声明的环境变量<b>在当前进程可见</b>，或已内联 {@code apiKey}；
- *       环境变量在当前进程不可见时用例会被 {@link Assume} 跳过：进程环境是启动时的快照，系统里设置后必须
- *       重启 IDE，或在运行配置的环境变量里注入。</li>
+ *       进程环境是启动时的快照，系统里设置后必须重启 IDE，或在运行配置的环境变量里注入。</li>
  * </ol>
  * 任一条件不满足时用例会被 {@link Assume} 跳过，不会让常规构建失败；条件满足时是真实网络调用，
  * 会产生真实计费。
- *
- * <p>调试建议断点：{@code ProviderYamlConfigurationLoader#load} →
- * {@code OpenAiCompatibleChatExchange#encode/#send} → {@code OpenAiCompatibleChatCodec#decode}
- * （非流式对话）或 {@code OpenAiCompatibleStreamAccumulator#accept/#complete}（流式对话）→
- * {@code OpenAiCompatibleStreamingChatModel#emitChunk}；
- * 生图链路为 {@code OpenAiCompatibleImageCodec#encodeJson/#decode}（非流式）或
- * {@code OpenAiCompatibleImageStreamAccumulator#accept} →
- * {@code OpenAiCompatibleStreamingImageModel#execute}（流式）。
  */
 public class DeepSeekChatLiveTest {
+
     /**
-     * 平台配置文件名，与 {@code config/model-providers/} 下的约定一致。
+     * DeepSeek 平台配置文件名。
      */
-    private static final String CONFIG_FILE = "deepseek.yml";
+    private static final String DEEPSEEK_CONFIG = "deepseek.yml";
     /**
-     * 生图用例的平台配置文件名：对话平台的配置里没有图片能力。
+     * 火山方舟平台配置文件名。
      */
-    private static final String IMAGE_CONFIG_FILE = "volcengine.yml";
+    private static final String VOLCENGINE_CONFIG = "volcengine.yml";
     /**
-     * 非流式生图使用的能力名称：Seedream 5.0 pro 与 5.0 lite（快速版）。
-     */
-    private static final List<String> IMAGE_CAPABILITIES = Collections.unmodifiableList(
-            Arrays.asList("image", "image-fast"));
-    /**
-     * 流式生图使用的能力名称：在当前通道只有 5.0 lite 支持 {@code stream=true}。
-     *
-     * <p>实测 Seedream 5.0 pro 对 {@code stream=true} 返回 400，5.0 lite 正常返回
-     * {@code image_generation.*} 事件流，因此流式用例只跑 lite；pro 的流式一旦开放，把它加回本列表即可。
-     */
-    private static final List<String> STREAMING_IMAGE_CAPABILITIES = Collections.unmodifiableList(
-            Arrays.asList("image-fast"));
-    /**
-     * 对话能力名称，对应 YAML 中 {@code capabilities} 的键。
-     */
-    private static final String CAPABILITY = "chat";
-    /**
-     * 提示词，两条链路共用。
+     * 对话提示词。
      */
     private static final String PROMPT = "用一句话介绍你自己";
     /**
-     * 单次调用允许的最大输出长度，避免调试时产生过多用量。
+     * 单次调用允许的最大输出长度；思考模式会额外消耗 token，取值要留出余量。
      */
-    private static final int MAX_TOKENS = 256;
+    private static final int MAX_TOKENS = 1024;
     /**
      * 等待流式结束的上限，秒；应大于配置中的 readTimeoutMillis。
      */
     private static final long STREAM_TIMEOUT_SECONDS = 200L;
-    /**
-     * 生图用例的提示词，明确要求单张、无文字，便于肉眼核对结果。
-     */
-    private static final String IMAGE_PROMPT = "一只戴着圆框墨镜的柴犬，坐在沙滩上，写实摄影风格，画面中不要出现任何文字";
     /**
      * 工具调用场景的提示词：明确要求先调用工具，避免模型直接作答。
      */
@@ -150,288 +113,337 @@ public class DeepSeekChatLiveTest {
     /**
      * 工具声明：入参是一个必填的 city。
      */
-    private static final ToolSpecification WEATHER_TOOL = new ToolSpecification(WEATHER_TOOL_NAME, "查询指定城市的当前天气", weatherSchema());
+    private static final ToolSpecification WEATHER_TOOL =
+            new ToolSpecification(WEATHER_TOOL_NAME, "查询指定城市的当前天气", weatherSchema());
+    /**
+     * 工具执行结果，回填给模型的第二轮回执。
+     */
+    private static final String TOOL_RESULT = "{\"city\":\"杭州\",\"weather\":\"晴\",\"temperature\":\"26℃\"}";
+    /**
+     * 生图提示词，明确要求不要出现文字，便于肉眼核对结果。
+     */
+    private static final String IMAGE_PROMPT = "一只戴着圆框墨镜的柴犬，坐在沙滩上，写实摄影风格，画面中不要出现任何文字";
+    /**
+     * 生图尺寸，显式给定以免依赖平台默认值。
+     */
+    private static final String IMAGE_SIZE = "2048x2048";
     /**
      * 解析工具调用参数用的映射器。
      */
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    // ------------------------------------------------------------------ DeepSeek 对话
+
     /**
-     * 非流式调用：一次拿到完整响应，便于逐字段检查解码结果。
+     * DeepSeek 非流式对话：一次拿到完整响应，检查文本、结束原因与 token 用量。
      *
      * @throws Exception 读取配置或解析响应时
      */
     @Test
-    public void nonStreamingChat() throws Exception {
-        Path file = configFile();
-        try (ProviderConfiguration provider = new ProviderYamlConfigurationLoader().load(file)) {
+    public void deepseekChatNonStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(DEEPSEEK_CONFIG)) {
             skipWhenCredentialMissing(provider);
-            OpenAiCompatibleChatConfig config = provider.toOpenAiCompatibleChatConfig(CAPABILITY);
-            ChatModel model = new OpenAiCompatibleChatModel(config, new Jdk8ProviderHttpTransport(provider.getTransport().toHttpTransportConfig()), provider.credentialResolver());
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                HttpResponse response = model.chat(
+                        request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
 
-            System.out.println("[非流式] endpoint=" + config.getEndpoint() + " model=" + config.getModelId());
-            ChatResponse response = model.chat(request());
-
-            System.out.println("[非流式] 文本=" + textOf(response));
-            System.out.println("[非流式] 结束原因=" + response.getFinishReason() + " 元数据=" + response.getProviderMetadata());
-            System.out.println("[非流式] 用量=" + describeUsage(response));
-
-            assertFalse("响应没有文本内容", textOf(response).isEmpty());
-            assertEquals(provider.getProvider().toString(), response.getProviderMetadata().get("provider").toString());
-            assertNotNull("真实响应应带 usage", response.getTokenUsage());
-            assertTrue(response.getTokenUsage().getInputTokens() > 0);
+                System.out.println("[DeepSeek 非流式] model=" + config.getModelId() + " " + describe(response));
+                assertSuccess(response);
+                assertFalse("响应没有正文", isBlank(response.getContent()));
+                assertEquals(FinishReasonEnum.STOP, response.getFinishReason());
+                assertNotNull("真实响应应带 token 用量", response.getInputTokens());
+                assertTrue("输入 token 应大于 0", response.getInputTokens() > 0);
+            }
         }
     }
 
     /**
-     * 非流式工具调用往返：声明工具 → 模型返回结构化 {@code tool_calls} → 回填工具结果 → 模型给出最终回答。
+     * DeepSeek 流式对话：按事件观察增量，交叉验证累加结果与终态响应一致。
      *
-     * <p>重点验证三件事：工具声明与调用结果的编码、{@code finish_reason=tool_calls} 与
-     * {@code ToolCallContent} 的解码、以及 {@code tool} 角色消息把工具结果按 {@code tool_call_id} 回填。
-     *
-     * @throws Exception 读取配置、解析参数时
+     * @throws Exception 读取配置或等待事件时
      */
     @Test
-    public void nonStreamingToolCallRoundTrip() throws Exception {
-        Path file = configFile();
-        try (ProviderConfiguration provider = new ProviderYamlConfigurationLoader().load(file)) {
+    public void deepseekChatStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(DEEPSEEK_CONFIG)) {
             skipWhenCredentialMissing(provider);
-            OpenAiCompatibleChatConfig config = provider.toOpenAiCompatibleChatConfig(CAPABILITY);
-            ChatModel model = new OpenAiCompatibleChatModel(config, new Jdk8ProviderHttpTransport(provider.getTransport().toHttpTransportConfig()), provider.credentialResolver());
-            System.out.println("[工具调用] endpoint=" + config.getEndpoint() + " model=" + config.getModelId() + " 工具=" + WEATHER_TOOL_NAME);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                RecordingObserver<HttpResponse> observer = observer("DeepSeek 流式");
+                IStreamHandle handle = model.chat(
+                        request(config.getModelId(), userMessages(PROMPT), null, true),
+                        HttpResponse.class, observer);
 
-            // 第一次调用：只给工具声明，要求模型先调用工具
-            ChatResponse first = model.chat(new ChatRequest(
-                    Collections.singletonList(text(Role.USER, TOOL_PROMPT)),
-                    parameters(),
-                    Collections.singletonList(WEATHER_TOOL),
-                    null,
-                    context())
-            );
-            System.out.println("[工具调用] 第一次结束原因=" + first.getFinishReason() + " 内容=" + first.getMessage().getContents() + " 用量=" + describeUsage(first));
+                System.out.println("[DeepSeek 流式] model=" + config.getModelId());
+                HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                assertFinished(handle);
 
-            assertEquals("模型没有按要求调用工具，实际文本=" + textOf(first), FinishReason.TOOL_CALLS, first.getFinishReason());
-            ToolCallContent call = onlyToolCall(first);
-            JsonNode arguments = JSON.readTree(call.getArguments());
-            System.out.println("[工具调用] 工具=" + call.getName() + " id=" + call.getId() + " 参数=" + arguments);
-            assertEquals(WEATHER_TOOL_NAME, call.getName());
-            assertTrue("工具参数缺少 city", arguments.has("city"));
-
-            // 第二次调用：把工具执行结果按 tool 角色回填，tool_call_id 通过 ChatMessage.name 承载
-            List<ChatMessage> messages = Arrays.asList(text(Role.USER, TOOL_PROMPT),
-                    first.getMessage(),
-                    new ChatMessage(Role.TOOL, Collections.<Content>singletonList(new TextContent(
-                            "{\"city\":\"杭州\",\"weather\":\"晴\",\"temperature\":\"26℃\"}")),
-                            call.getId(), null));
-            ChatResponse second = model.chat(new ChatRequest(messages, parameters(),
-                    Collections.<ToolSpecification>singletonList(WEATHER_TOOL), null, context()));
-            System.out.println("[工具调用] 第二次结束原因=" + second.getFinishReason()
-                    + " 最终回答=" + textOf(second) + " 用量=" + describeUsage(second));
-
-            assertFalse("工具结果回填后模型没有给出回答", textOf(second).isEmpty());
-            assertEquals(FinishReason.STOP, second.getFinishReason());
+                System.out.println("[DeepSeek 流式] 事件数=" + observer.eventCount()
+                        + " 增量文本长度=" + observer.text().length() + " " + describe(completed));
+                assertFalse("响应没有正文", isBlank(completed.getContent()));
+                assertFalse("没有收到任何文本增量事件", observer.text().isEmpty());
+                assertEquals("增量拼接结果应与终态响应一致", completed.getContent(), observer.text());
+                assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
+                assertStreamingUsage(completed);
+            }
         }
     }
 
     /**
-     * 流式调用：按事件逐个观察增量，并检查终态响应与统计。
+     * DeepSeek 非流式工具调用往返：声明工具 → 解码 {@code tool_calls} → 回填结果 → 模型给出最终回答。
      *
-     * @throws Exception 读取配置、等待事件或解析响应时
+     * <p>重点验证入参侧的 {@code tools} 编码、出参侧的 {@code tool_calls} 解码，以及
+     * {@code role=tool} + {@code tool_call_id} 的回填链路。
+     *
+     * @throws Exception 读取配置或解析工具参数时
      */
     @Test
-    public void streamingChat() throws Exception {
-        Path file = configFile();
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        try (ProviderConfiguration provider = new ProviderYamlConfigurationLoader().load(file)) {
+    public void deepseekToolCallNonStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(DEEPSEEK_CONFIG)) {
             skipWhenCredentialMissing(provider);
-            OpenAiCompatibleChatConfig config = provider.toOpenAiCompatibleChatConfig(CAPABILITY);
-            OpenAiCompatibleStreamingChatModel model = streamingModel(provider, config, executor);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
 
-            System.out.println("[流式] endpoint=" + config.getEndpoint()
-                    + " model=" + config.getModelId());
-            DebugObserver observer = new DebugObserver("流式");
-            StreamHandle handle = model.chat(request(), observer);
+                HttpResponse first = model.chat(request(config.getModelId(), userMessages(TOOL_PROMPT),
+                        tools(), false), HttpResponse.class);
+                System.out.println("[DeepSeek 工具 非流式] 第一轮 " + describe(first));
+                ToolCall call = requireToolCall(first);
 
-            assertTrue("等待流式结束超时", observer.terminal.await(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-            assertFinished(handle);
-            assertNull("流以错误收尾: " + (observer.failure == null ? null : observer.failure.getError()), observer.failure);
-            assertNotNull(observer.completed);
-            assertFalse("响应没有文本内容", observer.text.toString().isEmpty());
-            assertEquals(provider.getProvider().toString(), observer.completed.getProviderMetadata().get("provider").toString());
-            assertTrue(observer.completed.getTokenUsage().getInputTokens() > 0);
-        } finally {
-            executor.shutdownNow();
+                List<IContent> messages = toolResultMessages(call);
+                HttpResponse second = model.chat(request(config.getModelId(), messages, tools(), false),
+                        HttpResponse.class);
+                System.out.println("[DeepSeek 工具 非流式] 第二轮 " + describe(second));
+                assertSuccess(second);
+                assertFalse("工具结果回填后模型没有给出回答", isBlank(second.getContent()));
+                assertEquals(FinishReasonEnum.STOP, second.getFinishReason());
+            }
         }
     }
 
     /**
-     * 流式工具调用往返：工具参数以增量事件下发 → 拼装出完整 {@code tool_calls} → 回填工具结果
-     * → 再流式调用一次拿到最终回答。
+     * DeepSeek 流式工具调用往返：工具参数以增量片段下发，由 {@link RecordingObserver} 按 index 拼装成完整
+     * tool_calls，再回填结果并流式拿到最终回答。
      *
-     * <p>重点验证：{@code TOOL_ARGUMENT_DELTA} 片段顺序拼装的结果与终态响应里的参数完全一致、
-     * {@code TOOL_CALL_COMPLETE} 在收尾时补齐、以及工具结果按 {@code tool_call_id} 回填后模型能继续作答。
-     *
-     * @throws Exception 读取配置、等待事件或解析参数时
+     * @throws Exception 读取配置、等待事件或解析工具参数时
      */
     @Test
-    public void streamingToolCallRoundTrip() throws Exception {
-        Path file = configFile();
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        try (ProviderConfiguration provider = new ProviderYamlConfigurationLoader().load(file)) {
+    public void deepseekToolCallStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(DEEPSEEK_CONFIG)) {
             skipWhenCredentialMissing(provider);
-            OpenAiCompatibleChatConfig config = provider.toOpenAiCompatibleChatConfig(CAPABILITY);
-            OpenAiCompatibleStreamingChatModel model = streamingModel(provider, config, executor);
-            System.out.println("[流式工具] endpoint=" + config.getEndpoint() + " model=" + config.getModelId() + " 工具=" + WEATHER_TOOL_NAME);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
 
-            // 第一次：流式拿工具调用，参数以增量片段拼起来
-            DebugObserver firstObserver = new DebugObserver("流式工具");
-            StreamHandle firstHandle = model.chat(new ChatRequest(
-                    Collections.singletonList(text(Role.USER, TOOL_PROMPT)), parameters(),
-                    Collections.singletonList(WEATHER_TOOL), null, context()),
-                    firstObserver);
-            assertTrue("等待流式结束超时", firstObserver.terminal.await(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-            assertFinished(firstHandle);
-            assertNull("流以错误收尾: " + (firstObserver.failure == null ? null : firstObserver.failure.getError()), firstObserver.failure);
+                RecordingObserver<HttpResponse> first = observer("DeepSeek 流式工具");
+                IStreamHandle firstHandle = model.chat(request(config.getModelId(), userMessages(TOOL_PROMPT),
+                        tools(), true), HttpResponse.class, first);
+                first.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                assertFinished(firstHandle);
 
-            ChatResponse first = firstObserver.completed;
-            assertNotNull(first);
-            assertEquals("模型没有按要求调用工具，实际文本=" + firstObserver.text, FinishReason.TOOL_CALLS, first.getFinishReason());
-            ToolCallContent call = onlyToolCall(first);
-            JsonNode arguments = JSON.readTree(call.getArguments());
-            System.out.println("[流式工具] 终态拼装结果 工具=" + call.getName() + " id=" + call.getId() + " 参数=" + arguments);
-            assertEquals(WEATHER_TOOL_NAME, call.getName());
-            assertTrue("工具参数缺少 city", arguments.has("city"));
-            assertEquals("增量片段拼装结果应与终态参数一致", call.getArguments(), firstObserver.toolArguments.toString());
+                System.out.println("[DeepSeek 流式工具] 参数片段数=" + first.toolArgumentFragments()
+                        + " 拼装结果=" + first.toolCalls());
+                ToolCall call = requireToolCall(first.toolCalls());
 
-            // 第二次：把工具结果按 tool 角色回填后再流式调用
-            List<ChatMessage> messages = Arrays.asList(text(Role.USER, TOOL_PROMPT),
-                    first.getMessage(),
-                    new ChatMessage(Role.TOOL, Collections.<Content>singletonList(new TextContent(
-                            "{\"city\":\"杭州\",\"weather\":\"晴\",\"temperature\":\"26℃\"}")),
-                            call.getId(), null));
-            DebugObserver secondObserver = new DebugObserver("流式工具");
-            StreamHandle secondHandle = model.chat(new ChatRequest(messages, parameters(),
-                    Collections.<ToolSpecification>singletonList(WEATHER_TOOL), null, context()),
-                    secondObserver);
-            assertTrue("等待流式结束超时", secondObserver.terminal.await(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-            assertFinished(secondHandle);
-            assertNull("流以错误收尾: " + (secondObserver.failure == null ? null : secondObserver.failure.getError()), secondObserver.failure);
+                RecordingObserver<HttpResponse> second = observer("DeepSeek 流式工具");
+                IStreamHandle secondHandle = model.chat(request(config.getModelId(),
+                        toolResultMessages(call), tools(), true), HttpResponse.class, second);
+                HttpResponse completed = second.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                assertFinished(secondHandle);
 
-            assertEquals(FinishReason.STOP, secondObserver.completed.getFinishReason());
-            assertFalse("工具结果回填后模型没有给出回答", secondObserver.text.toString().isEmpty());
-        } finally {
-            executor.shutdownNow();
+                System.out.println("[DeepSeek 流式工具] 第二轮 " + describe(completed));
+                assertFalse("工具结果回填后模型没有给出回答", isBlank(completed.getContent()));
+                assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
+                assertStreamingUsage(completed);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ 火山方舟对话
+
+    /**
+     * 火山方舟非流式对话。
+     *
+     * @throws Exception 读取配置或解析响应时
+     */
+    @Test
+    public void volcengineChatNonStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
+            skipWhenCredentialMissing(provider);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                HttpResponse response = model.chat(
+                        request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
+
+                System.out.println("[火山 非流式] model=" + config.getModelId() + " " + describe(response));
+                assertSuccess(response);
+                assertFalse("响应没有正文", isBlank(response.getContent()));
+                assertEquals(FinishReasonEnum.STOP, response.getFinishReason());
+                assertNotNull("真实响应应带 token 用量", response.getInputTokens());
+            }
         }
     }
 
     /**
-     * 非流式文生图：对每个图片能力各调用一次，拿到汇总结果并把图片真正下载落盘。
+     * 火山方舟流式对话。
      *
-     * <p>验证的是整条非流式链路：配置加载 → 请求编码（{@code model}/{@code prompt}/{@code n}/{@code size}
-     * 加平台字段）→ 真实调用 → {@code data[].url} 解析 → 资源层下载落盘。
+     * @throws Exception 读取配置或等待事件时
+     */
+    @Test
+    public void volcengineChatStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
+            skipWhenCredentialMissing(provider);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                RecordingObserver<HttpResponse> observer = observer("火山 流式");
+                IStreamHandle handle = model.chat(
+                        request(config.getModelId(), userMessages(PROMPT), null, true),
+                        HttpResponse.class, observer);
+
+                System.out.println("[火山 流式] model=" + config.getModelId());
+                HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                assertFinished(handle);
+
+                System.out.println("[火山 流式] 事件数=" + observer.eventCount()
+                        + " 增量文本长度=" + observer.text().length() + " " + describe(completed));
+                assertFalse("响应没有正文", isBlank(completed.getContent()));
+                assertEquals("增量拼接结果应与终态响应一致", completed.getContent(), observer.text());
+                assertStreamingUsage(completed);
+            }
+        }
+    }
+
+    /**
+     * 火山方舟非流式工具调用往返。
+     *
+     * @throws Exception 读取配置或解析工具参数时
+     */
+    @Test
+    public void volcengineToolCallNonStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
+            skipWhenCredentialMissing(provider);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+
+                HttpResponse first = model.chat(request(config.getModelId(), userMessages(TOOL_PROMPT),
+                        tools(), false), HttpResponse.class);
+                System.out.println("[火山 工具 非流式] 第一轮 " + describe(first));
+                ToolCall call = requireToolCall(first);
+
+                HttpResponse second = model.chat(request(config.getModelId(),
+                        toolResultMessages(call), tools(), false), HttpResponse.class);
+                System.out.println("[火山 工具 非流式] 第二轮 " + describe(second));
+                assertSuccess(second);
+                assertFalse("工具结果回填后模型没有给出回答", isBlank(second.getContent()));
+                assertEquals(FinishReasonEnum.STOP, second.getFinishReason());
+            }
+        }
+    }
+
+    /**
+     * 火山方舟流式工具调用往返。
+     *
+     * @throws Exception 读取配置、等待事件或解析工具参数时
+     */
+    @Test
+    public void volcengineToolCallStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
+            skipWhenCredentialMissing(provider);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+
+                RecordingObserver<HttpResponse> first = observer("火山 流式工具");
+                IStreamHandle firstHandle = model.chat(request(config.getModelId(), userMessages(TOOL_PROMPT),
+                        tools(), true), HttpResponse.class, first);
+                first.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                assertFinished(firstHandle);
+
+                System.out.println("[火山 流式工具] 参数片段数=" + first.toolArgumentFragments()
+                        + " 拼装结果=" + first.toolCalls());
+                ToolCall call = requireToolCall(first.toolCalls());
+
+                RecordingObserver<HttpResponse> second = observer("火山 流式工具");
+                IStreamHandle secondHandle = model.chat(request(config.getModelId(),
+                        toolResultMessages(call), tools(), true), HttpResponse.class, second);
+                HttpResponse completed = second.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                assertFinished(secondHandle);
+
+                System.out.println("[火山 流式工具] 第二轮 " + describe(completed));
+                assertFalse("工具结果回填后模型没有给出回答", isBlank(completed.getContent()));
+                assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
+                assertStreamingUsage(completed);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ 火山方舟生图
+
+    /**
+     * 火山方舟非流式文生图：一次拿到汇总结果，并把返回的图片真正下载下来。
+     *
+     * <p>验证整条生图链路：配置加载 → 请求编码（{@code model}/{@code prompt}/{@code size}/{@code watermark}/
+     * {@code response_format}）→ 真实调用 → {@code data[]} 解码为 {@link ImageItem} → 链接可下载。
      *
      * @throws Exception 读取配置或下载结果时
      */
     @Test
-    public void nonStreamingImageGeneration() throws Exception {
-        Path file = configFile(IMAGE_CONFIG_FILE);
-        try (ProviderConfiguration provider = new ProviderYamlConfigurationLoader().load(file)) {
+    public void volcengineImageGeneration() throws Exception {
+        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
             skipWhenCredentialMissing(provider);
-            for (String capability : IMAGE_CAPABILITIES) {
-                OpenAiCompatibleImageConfig config = provider.toVolcengineImageConfig(capability);
-                DownloadingAssets assets = new DownloadingAssets();
-                OpenAiCompatibleImageModel model = new OpenAiCompatibleImageModel(config,
-                        provider.toVolcengineImageOptions(capability), imageDescriptor(config), assets,
-                        new Jdk8ProviderHttpTransport(provider.getTransport().toHttpTransportConfig()),
-                        provider.credentialResolver());
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.IMAGE);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.IMAGE))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                HttpRequest request = HttpRequest.builder()
+                        .model(config.getModelId())
+                        .prompt(IMAGE_PROMPT)
+                        .size(IMAGE_SIZE)
+                        .watermark(Boolean.FALSE)
+                        .responseFormat("url")
+                        .stream(Boolean.FALSE)
+                        .build();
 
-                System.out.println("[非流式生图] 能力=" + capability + " endpoint=" + config.getEndpoint() + " model=" + config.getModelId());
-                ImageGenerationResult result = model.generate(imageRequest());
+                System.out.println("[火山 生图] model=" + config.getModelId() + " size=" + IMAGE_SIZE);
+                HttpResponse response = model.chat(request, HttpResponse.class);
+                System.out.println("[火山 生图] 请求标识=" + response.getId()
+                        + " 生成张数=" + response.getGeneratedImages() + " 模型=" + response.getModel());
+                assertSuccess(response);
 
-                System.out.println("[非流式生图] 请求标识=" + result.getRequestId() + " 资产=" + result.getAssetIds() + " 元数据=" + result.getProviderMetadata());
-                System.out.println("[非流式生图] " + assets.describe());
+                List<ImageItem> images = response.getImages();
+                assertNotNull("响应里没有 data 节点", images);
+                assertFalse("没有返回任何图片", images.isEmpty());
+                for (ImageItem image : images) {
+                    assertTrue("图片既没有 url 也没有 b64_json",
+                            !isBlank(image.getUrl()) || !isBlank(image.getB64Json()));
+                }
+                if (response.getGeneratedImages() != null) {
+                    assertEquals("生成张数与 data 长度不一致",
+                            Integer.valueOf(images.size()), response.getGeneratedImages());
+                }
 
-                assertFalse("没有返回任何图片", result.getAssetIds().isEmpty());
-                assertEquals(config.getModelId(), result.getProviderMetadata().get("model"));
-                assets.assertDownloaded();
+                ImageItem first = images.get(0);
+                System.out.println("[火山 生图] 首图尺寸=" + first.getSize() + " url=" + first.getUrl());
+                assertFalse("图片内容为空", download(first.getUrl()) == 0);
             }
         }
     }
 
-    /**
-     * 流式文生图：对每个图片能力各调用一次，逐张观察事件并交叉验证终态汇总。
-     *
-     * <p>验证的是流式链路：请求置 {@code stream=true} → 平台按事件推送 → 每张图立即落盘并回调
-     * {@code IMAGE} → 终态 {@code RESPONSE_COMPLETE} 的资产数量与逐张回调的数量一致。
-     *
-     * <p>所用能力见 {@link #STREAMING_IMAGE_CAPABILITIES}——并非所有图片模型都支持流式。
-     *
-     * @throws Exception 读取配置、等待事件或下载结果时
-     */
-    @Test
-    public void streamingImageGeneration() throws Exception {
-        Path file = configFile(IMAGE_CONFIG_FILE);
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        try (ProviderConfiguration provider = new ProviderYamlConfigurationLoader().load(file)) {
-            skipWhenCredentialMissing(provider);
-            for (String capability : STREAMING_IMAGE_CAPABILITIES) {
-                OpenAiCompatibleImageConfig config = provider.toVolcengineImageConfig(capability);
-                DownloadingAssets assets = new DownloadingAssets();
-                OpenAiCompatibleStreamingImageModel model = new OpenAiCompatibleStreamingImageModel(config,
-                        provider.toVolcengineImageOptions(capability), imageDescriptor(config), assets,
-                        new Jdk8ProviderHttpTransport(provider.getTransport().toHttpTransportConfig(),
-                                8192, 65536, 100000),
-                        provider.credentialResolver(), executor);
-
-                System.out.println("[流式生图] 能力=" + capability + " endpoint=" + config.getEndpoint()
-                        + " model=" + config.getModelId());
-                ImageObserver observer = new ImageObserver("流式生图-" + capability);
-                StreamHandle handle = model.generate(imageRequest(), observer);
-
-                assertTrue("等待流式结束超时", observer.terminal.await(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-                assertFinished(handle);
-                assertNull("流以错误收尾: " + (observer.failure == null ? null : describeError(observer.failure.getError())),
-                        observer.failure);
-                assertNotNull(observer.completed);
-                assertFalse("没有返回任何图片", observer.completed.getAssetIds().isEmpty());
-                assertEquals("逐张回调的图片数与终态汇总不一致",
-                        observer.imageCount, observer.completed.getAssetIds().size());
-
-                System.out.println("[流式生图] 请求标识=" + observer.completed.getRequestId()
-                        + " 资产=" + observer.completed.getAssetIds()
-                        + " 元数据=" + observer.completed.getProviderMetadata());
-                System.out.println("[流式生图] " + assets.describe());
-                assets.assertDownloaded();
-            }
-        } finally {
-            executor.shutdownNow();
-        }
-    }
+    // ------------------------------------------------------------------ 通用装配
 
     /**
-     * 构造流式对话模型：SSE 传输 + 调用方提供的执行器。
+     * 加载平台配置文件。
      *
-     * @param provider 已加载的平台配置
-     * @param config   对话配置
-     * @param executor 承载流读取的执行器
-     * @return 流式对话模型
-     */
-    private static OpenAiCompatibleStreamingChatModel streamingModel(ProviderConfiguration provider,
-            OpenAiCompatibleChatConfig config, ExecutorService executor) {
-        return new OpenAiCompatibleStreamingChatModel(config,
-                new Jdk8ProviderHttpTransport(provider.getTransport().toHttpTransportConfig(),
-                        8192, 65536, 100000),
-                provider.credentialResolver(), executor, 8, 1000000);
-    }
-
-    /**
-     * 定位对话用例的平台配置文件。
-     *
-     * @return 配置文件路径
+     * @param fileName {@code config/model-providers/} 下的文件名
+     * @return 平台配置，非 null，由调用方负责关闭
      * @throws Exception 解析代码位置时
      */
-    private static Path configFile() throws Exception {
-        return configFile(CONFIG_FILE);
+    private static ProviderConfiguration load(String fileName) throws Exception {
+        return new ProviderYamlConfigurationLoader().load(configFile(fileName));
     }
 
     /**
@@ -466,69 +478,236 @@ public class DeepSeekChatLiveTest {
         }
         String value = System.getenv(environmentVariable);
         boolean visible = value != null && !value.trim().isEmpty();
-        System.out.println("[凭据] 配置声明的环境变量=" + environmentVariable
-                + "，当前进程可见=" + visible);
+        System.out.println("[凭据] 配置声明的环境变量=" + environmentVariable + "，当前进程可见=" + visible);
         if (!visible) {
             System.out.println("[凭据] 若已在系统里设置该变量，说明当前进程没继承到："
-                    + "进程环境是启动时快照，需重启 IDE，或在运行配置的环境变量里显式注入；"
-                    + "也可改用配置文件内联 apiKey（见 config/model-providers/local/README.md）。");
+                    + "进程环境是启动时快照，需重启 IDE，或在运行配置的环境变量里显式注入。");
         }
-        Assume.assumeTrue("环境变量 " + environmentVariable
-                + " 在当前进程不可见（设置后需重启 IDE/终端，或在运行配置中注入）", visible);
-    }
-
-    private static ChatRequest request() {
-        return new ChatRequest(Collections.singletonList(text(Role.USER, PROMPT)), parameters(), null, null, context());
-    }
-
-    private static ChatMessage text(Role role, String value) {
-        return new ChatMessage(role, Collections.<Content>singletonList(new TextContent(value)),
-                null, null);
-    }
-
-    private static ModelParameters parameters() {
-        return new ModelParameters(null, null, null, Integer.valueOf(MAX_TOKENS), null, false);
+        Assume.assumeTrue("环境变量 " + environmentVariable + " 在当前进程不可见", visible);
     }
 
     /**
-     * 按图片配置派生模型登记项：真实平台由注册表提供描述符，用例里只要能力集合与配置一致即可。
+     * 创建会话上下文：一次真实调用需要它携带平台配置与能力种类，否则编码与解码都取不到上下文。
      *
-     * @param config 图片配置
-     * @return 只声明图片生成能力的描述符
+     * @param provider 平台配置
+     * @param kind     本次调用的能力种类
+     * @return 会话上下文
      */
-    private static ProviderModelDescriptor imageDescriptor(OpenAiCompatibleImageConfig config) {
-        return new ProviderModelDescriptor(config.getProvider(), config.getModelId(), config.getModelId(),
-                null, null, null, EnumSet.of(ModelCapability.IMAGE_GENERATION));
+    private static ConvContext context(ProviderConfiguration provider, CapabilityKindEnum kind) {
+        return new ConvContext("live-user", "live-conversation", provider, kind);
     }
 
     /**
-     * 构造文生图请求：单张、不带源图，尺寸交给平台默认值。
+     * 创建带控制台日志的流事件观察者。
      *
-     * @return 图片请求
+     * @param tag 日志前缀
+     * @return 观察者
      */
-    private static ImageGenerationRequest imageRequest() {
-        return new ImageGenerationRequest(IMAGE_PROMPT, Collections.<String>emptyList(), null, 1,
-                null, null, null, null, null, null, null, null, context());
-    }
-
-    private static InvocationContext context() {
-        return new InvocationContext("local-debug", null, null, "trace-live",
-                System.currentTimeMillis() + 300000L, new CancellationToken());
+    private static RecordingObserver<HttpResponse> observer(String tag) {
+        return new RecordingObserver<HttpResponse>(HttpResponse.class, System.out, tag);
     }
 
     /**
-     * 取出响应中唯一的工具调用，便于断言与回填结果。
+     * 构造对话请求。
+     *
+     * @param modelId  模型 ID，取自平台配置
+     * @param messages 消息列表
+     * @param tools    工具声明，可为 null
+     * @param stream   是否流式
+     * @return 请求对象
+     */
+    private static HttpRequest request(String modelId, List<IContent> messages, List<ToolContext> tools, boolean stream) {
+        return HttpRequest.builder()
+                .model(modelId)
+                .messages(messages)
+                .tools(tools)
+                .maxTokens(Integer.valueOf(MAX_TOKENS))
+                .stream(Boolean.valueOf(stream))
+                .build();
+    }
+
+    /**
+     * 构造只含一条用户消息的消息列表。
+     *
+     * @param text 用户文本
+     * @return 消息列表
+     */
+    private static List<IContent> userMessages(String text) {
+        return new ArrayList<IContent>(Collections.<IContent>singletonList(new UserContent(text)));
+    }
+
+    /**
+     * 构造工具回填用的消息列表：用户提问 → 助手要求调用工具 → 工具结果。
+     *
+     * @param call 模型返回的工具调用
+     * @return 消息列表
+     */
+    private static List<IContent> toolResultMessages(ToolCall call) {
+        List<IContent> messages = new ArrayList<IContent>();
+        messages.add(new UserContent(TOOL_PROMPT));
+        messages.add(new ToolCallContent(Collections.singletonList(call)));
+        messages.add(new ToolContent(call.getId(), TOOL_RESULT));
+        return messages;
+    }
+
+    /**
+     * 构造工具声明列表。
+     *
+     * @return 只含天气查询工具的声明列表
+     */
+    private static List<ToolContext> tools() {
+        return Collections.singletonList(new ToolContext(WEATHER_TOOL));
+    }
+
+    /**
+     * 断言平台调用成功，并取出首个工具调用校验名称与参数。
      *
      * @param response 模型响应
-     * @return 工具调用内容
+     * @return 首个工具调用
+     * @throws Exception 参数不是合法 JSON 时
      */
-    private static ToolCallContent onlyToolCall(ChatResponse response) {
-        for (Content content : response.getMessage().getContents()) {
-            if (content instanceof ToolCallContent) {
-                return (ToolCallContent) content;
-            }
+    private static ToolCall requireToolCall(HttpResponse response) throws Exception {
+        assertSuccess(response);
+        assertEquals("模型没有按要求调用工具，实际正文=" + response.getContent(),
+                FinishReasonEnum.TOOL_CALLS, response.getFinishReason());
+        return requireToolCall(response.getToolCalls());
+    }
+
+    /**
+     * 校验工具调用列表非空，并打印首个调用的名称与参数。
+     *
+     * @param calls 工具调用列表，可为 null
+     * @return 首个工具调用
+     * @throws Exception 参数不是合法 JSON 时
+     */
+    private static ToolCall requireToolCall(List<ToolCall> calls) throws Exception {
+        assertNotNull("响应里没有 tool_calls 节点", calls);
+        assertFalse("tool_calls 为空数组", calls.isEmpty());
+        ToolCall call = calls.get(0);
+        JsonNode arguments = JSON.readTree(call.getFunction().getArguments());
+        System.out.println("    工具=" + call.getFunction().getName() + " id=" + call.getId()
+                + " 参数=" + arguments);
+        assertEquals(WEATHER_TOOL_NAME, call.getFunction().getName());
+        assertTrue("工具参数缺少 city", arguments.has("city"));
+        return call;
+    }
+
+    /**
+     * 断言平台返回 2xx，否则把状态码与响应体一起抛出——真实接口的报错原因就在响应体里。
+     *
+     * @param response 已解码的响应
+     */
+    private static void assertSuccess(HttpResponse response) {
+        RawHttpResponse raw = response.getRaw();
+        assertNotNull("响应没有回填原始 HTTP 响应", raw);
+        int status = raw.getStatusCode();
+        if (status < 200 || status >= 300) {
+            fail("平台返回非 2xx：status=" + status + " 响应体=" + body(raw));
         }
-        throw new AssertionError("响应中没有工具调用");
+    }
+
+    /**
+     * 断言流式响应带回 token 用量。
+     *
+     * <p>OpenAI 兼容家族的流式响应默认不回传 usage，必须靠请求里的 {@code stream_options.include_usage}
+     * 开启，所以这条断言同时也在守住「流式必须带上 stream_options」这个协议要求。
+     *
+     * @param response 终态累积响应
+     */
+    private static void assertStreamingUsage(HttpResponse response) {
+        assertNotNull("流式响应没有 token 用量：请求需带 stream_options.include_usage", response.getInputTokens());
+        assertTrue("流式响应的输入 token 应大于 0", response.getInputTokens() > 0);
+    }
+
+    /**
+     * 汇总响应要点，便于在控制台比对。
+     *
+     * @param response 模型响应
+     * @return 可读描述
+     */
+    private static String describe(HttpResponse response) {
+        if (response == null) {
+            return "无响应";
+        }
+        RawHttpResponse raw = response.getRaw();
+        return "status=" + (raw == null ? "?" : raw.getStatusCode())
+                + " 结束原因=" + response.getFinishReason()
+                + " 正文=" + response.getContent()
+                + " 工具调用数=" + (response.getToolCalls() == null ? 0 : response.getToolCalls().size())
+                + " 用量=" + describeUsage(response);
+    }
+
+    /**
+     * 汇总 token 用量。
+     *
+     * @param response 模型响应
+     * @return 可读描述
+     */
+    private static String describeUsage(HttpResponse response) {
+        return "输入=" + response.getInputTokens() + " 输出=" + response.getOutputTokens()
+                + " 合计=" + response.getTotalTokens() + " 缓存=" + response.getCachedTokens();
+    }
+
+    /**
+     * 读取响应体文本。
+     *
+     * @param response 原始响应
+     * @return UTF-8 文本
+     */
+    private static String body(RawHttpResponse response) {
+        return new String(response.getBody(), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 下载图片并返回字节数，用于确认返回的链接真的可用。
+     *
+     * @param url 图片地址，可为 null
+     * @return 字节数；地址为空时返回 0
+     * @throws Exception 下载失败时
+     */
+    private static int download(String url) throws Exception {
+        if (isBlank(url)) {
+            return 0;
+        }
+        URLConnection connection = new URL(url).openConnection();
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(60000);
+        InputStream input = connection.getInputStream();
+        try {
+            byte[] chunk = new byte[8192];
+            int total = 0;
+            int count;
+            while ((count = input.read(chunk)) >= 0) {
+                total += count;
+            }
+            return total;
+        } finally {
+            input.close();
+        }
+    }
+
+    /**
+     * 等待句柄进入终态。
+     *
+     * @param handle 流式句柄
+     * @throws InterruptedException 等待被中断时
+     */
+    private static void assertFinished(IStreamHandle handle) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5000L;
+        while (!handle.isDone() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10L);
+        }
+        assertTrue("流式任务未结束", handle.isDone());
+    }
+
+    /**
+     * 判断文本是否为空。
+     *
+     * @param value 待判断文本
+     * @return 为 null 或全空白时返回 true
+     */
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     /**
@@ -547,318 +726,5 @@ public class DeepSeekChatLiveTest {
         schema.put("properties", properties);
         schema.put("required", Collections.singletonList("city"));
         return schema;
-    }
-
-    private static String textOf(ChatResponse response) {
-        StringBuilder text = new StringBuilder();
-        for (Content content : response.getMessage().getContents()) {
-            if (content instanceof TextContent) {
-                text.append(((TextContent) content).getText());
-            }
-        }
-        return text.toString();
-    }
-
-    private static String describeUsage(ChatResponse response) {
-        if (response.getTokenUsage() == null) {
-            return "无";
-        }
-        return "输入=" + response.getTokenUsage().getInputTokens()
-                + " 输出=" + response.getTokenUsage().getOutputTokens()
-                + " 合计=" + response.getTokenUsage().getTotalTokens()
-                + " 缓存=" + response.getTokenUsage().getCacheTokens();
-    }
-
-    /**
-     * 展开领域错误：错误对象默认的 {@code toString} 看不出任何信息，控制台里需要它的码与归因字段。
-     *
-     * @param error 错误信息，可为 null
-     * @return 可读描述
-     */
-    private static String describeError(ClaraError error) {
-        if (error == null) {
-            return "无";
-        }
-        return "码=" + error.getCode() + " 类别=" + error.getCategory()
-                + " 平台=" + error.getProvider() + " 平台码=" + error.getProviderCode()
-                + " 可重试=" + error.isRetryable();
-    }
-
-    private static void assertFinished(StreamHandle handle) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5000L;
-        while (!handle.isDone() && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10L);
-        }
-        assertTrue("流式任务未结束", handle.isDone());
-    }
-
-    /**
-     * 调试用观察者：打印每个流事件，并聚合文本与工具参数片段，记录终态事件与错误。
-     *
-     * <p>工具参数片段按到达顺序拼接，因此 {@link #toolArguments} 只在「本次流只有一个工具调用」时
-     * 与终态响应里的参数一致；用例正是用它交叉验证增量拼装是否与终态结果相同。
-     */
-    private static final class DebugObserver implements StreamObserver {
-        /**
-         * 日志前缀，用于区分同一用例里的多次流式调用。
-         */
-        private final String tag;
-        /**
-         * 已累积的文本增量。
-         */
-        private final StringBuilder text = new StringBuilder();
-        /**
-         * 已累积的工具参数片段。
-         */
-        private final StringBuilder toolArguments = new StringBuilder();
-        /**
-         * 终态事件（完成或错误）到达时放行。
-         */
-        private final CountDownLatch terminal = new CountDownLatch(1);
-        /**
-         * 终态响应，仅在 {@code RESPONSE_COMPLETE} 时写入。
-         */
-        private ChatResponse completed;
-        /**
-         * 错误事件，仅在 {@code ERROR} 时写入。
-         */
-        private StreamEvent failure;
-
-        private DebugObserver(String tag) {
-            this.tag = tag;
-        }
-
-        public void onEvent(StreamEvent event) {
-            switch (event.getType()) {
-                case TEXT_DELTA:
-                    text.append(event.getPayload());
-                    System.out.println("[" + tag + "] TEXT_DELTA " + event.getPayload());
-                    break;
-                case REASONING_DELTA:
-                    System.out.println("[" + tag + "] REASONING_DELTA " + event.getPayload());
-                    break;
-                case TOOL_ARGUMENT_DELTA:
-                    toolArguments.append(event.getPayload());
-                    System.out.println("[" + tag + "] TOOL_ARGUMENT_DELTA id=" + event.getToolCallId()
-                            + " name=" + event.getToolName() + " 片段=" + event.getPayload());
-                    break;
-                case TOOL_CALL_COMPLETE:
-                    System.out.println("[" + tag + "] TOOL_CALL_COMPLETE id=" + event.getToolCallId()
-                            + " name=" + event.getToolName() + " 参数=" + event.getPayload());
-                    break;
-                case RESPONSE_COMPLETE:
-                    completed = event.getResponse();
-                    System.out.println("[" + tag + "] RESPONSE_COMPLETE 文本=" + text
-                            + " 结束原因=" + event.getResponse().getFinishReason()
-                            + " 用量=" + describeUsage(event.getResponse()));
-                    terminal.countDown();
-                    break;
-                default:
-                    failure = event;
-                    System.out.println("[" + tag + "] ERROR " + event.getPayload()
-                            + " 详情=" + event.getError());
-                    terminal.countDown();
-                    break;
-            }
-        }
-    }
-
-    /**
-     * 调试用图片流观察者：打印每个事件，记录逐张落盘的图片数与终态结果。
-     *
-     * <p>{@link #imageCount} 用来交叉验证「逐张回调」与「终态汇总」是否一致——这正是流式链路最容易出错的
-     * 地方（漏发、重发或收尾时少算）。
-     */
-    private static final class ImageObserver implements ImageGenerationObserver {
-        /**
-         * 日志前缀，用于区分同一用例里的多次调用。
-         */
-        private final String tag;
-        /**
-         * 终态事件（完成或错误）到达时放行。
-         */
-        private final CountDownLatch terminal = new CountDownLatch(1);
-        /**
-         * 逐张回调的图片数量。
-         */
-        private int imageCount;
-        /**
-         * 终态结果，仅在 {@code RESPONSE_COMPLETE} 时写入。
-         */
-        private ImageGenerationResult completed;
-        /**
-         * 错误事件，仅在 {@code ERROR} 时写入。
-         */
-        private ImageGenerationEvent failure;
-
-        private ImageObserver(String tag) {
-            this.tag = tag;
-        }
-
-        public void onEvent(ImageGenerationEvent event) {
-            switch (event.getType()) {
-                case IMAGE:
-                    imageCount++;
-                    System.out.println("[" + tag + "] IMAGE 序号=" + event.getImageIndex()
-                            + " 资产=" + event.getAssetId());
-                    break;
-                case IMAGE_FAILED:
-                    System.out.println("[" + tag + "] IMAGE_FAILED 序号=" + event.getImageIndex()
-                            + " 错误=" + describeError(event.getError()));
-                    break;
-                case RESPONSE_COMPLETE:
-                    completed = event.getResult();
-                    System.out.println("[" + tag + "] RESPONSE_COMPLETE 图片数="
-                            + event.getResult().getAssetIds().size());
-                    terminal.countDown();
-                    break;
-                default:
-                    failure = event;
-                    System.out.println("[" + tag + "] ERROR " + describeError(event.getError()));
-                    terminal.countDown();
-                    break;
-            }
-        }
-    }
-
-    /**
-     * 最小可用的资源桥：把平台返回的图片真正下载下来写到临时文件，用文件路径当资产 ID。
-     *
-     * <p>生产环境的资源桥在 application 层（含对象存储与签名 URL），这里只需要「能看到字节」，
-     * 因此刻意只实现图片落盘需要的那三个方法，其余方法一律拒绝调用。
-     */
-    private static final class DownloadingAssets implements ProviderMediaAssetBridge {
-        /**
-         * 已落盘的文件，顺序与下载顺序一致。
-         */
-        private final List<Path> files = new ArrayList<Path>();
-        /**
-         * 与 {@link #files} 一一对应的字节数，用于断言内容非空。
-         */
-        private final List<Long> sizes = new ArrayList<Long>();
-
-        public String inputReference(String assetId, MediaType expectedType, InvocationContext context) {
-            throw new UnsupportedOperationException("文生图用例不涉及源图");
-        }
-
-        public byte[] inputBytes(String assetId, MediaType expectedType, int maxBytes, InvocationContext context) {
-            throw new UnsupportedOperationException("文生图用例不涉及源图");
-        }
-
-        public String storeRemote(String sourceUrl, MediaType type, String mimeType, InvocationContext context) {
-            try {
-                URLConnection connection = new URL(sourceUrl).openConnection();
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(60000);
-                try (InputStream input = connection.getInputStream()) {
-                    // 平台给的是签名 URL，后缀不一定可靠，优先按响应声明的类型决定落盘扩展名
-                    return persist(readAll(input), extension(connection.getContentType(), sourceUrl));
-                }
-            } catch (IOException exception) {
-                throw new IllegalStateException("下载平台返回的图片失败: " + sourceUrl, exception);
-            }
-        }
-
-        public MediaUpload remoteUpload(String sourceUrl, MediaType type, String mimeType,
-                InvocationContext context) {
-            throw new UnsupportedOperationException("生图用例不使用上传通道");
-        }
-
-        public String storeBytes(byte[] content, MediaType type, String mimeType, InvocationContext context) {
-            return persist(content, extension(mimeType, null));
-        }
-
-        /**
-         * 把字节写到临时文件并记录，返回文件绝对路径。
-         *
-         * @param content 图片字节
-         * @param suffix  文件扩展名，以点开头
-         * @return 文件绝对路径
-         */
-        private String persist(byte[] content, String suffix) {
-            try {
-                Path file = Files.createTempFile("clara-live-image-", suffix);
-                Files.write(file, content);
-                files.add(file);
-                sizes.add(Long.valueOf(content.length));
-                return file.toAbsolutePath().toString();
-            } catch (IOException exception) {
-                throw new IllegalStateException("写入生成结果失败", exception);
-            }
-        }
-
-        /**
-         * 推断落盘扩展名，让临时文件可以直接用看图工具打开。
-         *
-         * <p>顺序：先看声明的 MIME 类型，其次看 URL 路径的后缀，都判断不出来才退回 {@code .bin}。
-         *
-         * @param contentType 响应头或调用方给出的 MIME 类型，可为 null
-         * @param sourceUrl   结果地址，可为 null
-         * @return 以点开头的扩展名
-         */
-        private static String extension(String contentType, String sourceUrl) {
-            String mime = contentType == null ? "" : contentType.toLowerCase();
-            if (mime.contains("jpeg") || mime.contains("jpg")) {
-                return ".jpg";
-            }
-            if (mime.contains("png")) {
-                return ".png";
-            }
-            if (mime.contains("webp")) {
-                return ".webp";
-            }
-            if (mime.contains("gif")) {
-                return ".gif";
-            }
-            if (sourceUrl != null) {
-                String path = sourceUrl.split("\\?")[0].toLowerCase();
-                for (String candidate : Arrays.asList(".jpg", ".jpeg", ".png", ".webp", ".gif")) {
-                    if (path.endsWith(candidate)) {
-                        return candidate;
-                    }
-                }
-            }
-            return ".bin";
-        }
-
-        /**
-         * 逐块读完全部字节（Java 8 没有 {@code InputStream#readAllBytes}）。
-         *
-         * @param input 输入流
-         * @return 全部字节
-         * @throws IOException 读取失败时
-         */
-        private static byte[] readAll(InputStream input) throws IOException {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            byte[] chunk = new byte[8192];
-            int count;
-            while ((count = input.read(chunk)) >= 0) {
-                buffer.write(chunk, 0, count);
-            }
-            return buffer.toByteArray();
-        }
-
-        /**
-         * 描述落盘结果，便于在控制台比对大小。
-         *
-         * @return 可读描述
-         */
-        private String describe() {
-            StringBuilder text = new StringBuilder("落盘文件=");
-            for (int index = 0; index < files.size(); index++) {
-                text.append(files.get(index)).append('(').append(sizes.get(index)).append(" 字节) ");
-            }
-            return text.toString();
-        }
-
-        /**
-         * 断言至少落盘一张图片且内容非空。
-         */
-        private void assertDownloaded() {
-            assertFalse("没有任何图片落盘", files.isEmpty());
-            for (int index = 0; index < files.size(); index++) {
-                assertTrue("落盘的图片内容为空: " + files.get(index), sizes.get(index).longValue() > 0L);
-            }
-        }
     }
 }

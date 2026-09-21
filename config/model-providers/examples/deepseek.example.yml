@@ -31,9 +31,11 @@ transport:
   #   X-Client-Request-Id: clara-deepseek
 
 # 本平台启用的模型能力，不需要的能力节点可以删除。
+# 节点名必须是能力种类枚举名（CHAT / IMAGE / VIDEO / AUDIO_TRANSCRIPTION / SPEECH，大小写不敏感），
+# 同一平台每种能力最多一个节点；用了枚举以外的名字会在加载期直接报「配置项 capabilities 类型不符」。
 capabilities:
   # 文本对话能力配置。
-  chat:
+  CHAT:
     # Chat Completions 完整接口地址，源站必须存在于 allowedOrigins 中。
     endpoint: https://api.deepseek.com/chat/completions
     # 实际调用的固定模型 ID，例如账号当前开放的 chat 或 reasoner 模型。

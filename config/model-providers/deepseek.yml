@@ -12,7 +12,7 @@ transport:
   maxResponseBytes: 33554432
   allowHttp: false
 capabilities:
-  chat:
+  CHAT:
     endpoint: https://api.deepseek.com/chat/completions
     modelId: deepseek-v4-pro
     apiProfile: chat-completions-v1

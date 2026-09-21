@@ -1,7 +1,7 @@
 package com.clara.planner;
 
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCodes;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;

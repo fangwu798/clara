@@ -1,7 +1,7 @@
 package com.clara.media.validation;
 
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCodes;
 import com.clara.media.MediaContentSafetyScanner;
 import com.clara.media.MediaInput;
 import com.clara.media.MediaMetadata;

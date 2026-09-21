@@ -1,6 +1,7 @@
 package com.clara.workspace.runtime;
 
-import com.clara.kernel.*;
+import com.clara.kernel.exception.ErrorCategory;
+import com.clara.kernel.exception.ErrorCodes;
 import com.clara.workspace.api.*;
 
 import java.nio.*;

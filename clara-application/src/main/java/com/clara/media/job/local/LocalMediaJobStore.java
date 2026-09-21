@@ -1,9 +1,9 @@
 package com.clara.media.job.local;
 
-import com.clara.kernel.ClaraError;
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ClaraError;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCategory;
+import com.clara.kernel.exception.ErrorCodes;
 import com.clara.media.job.MediaJob;
 import com.clara.media.job.MediaJobStatus;
 import com.clara.media.job.MediaJobStore;

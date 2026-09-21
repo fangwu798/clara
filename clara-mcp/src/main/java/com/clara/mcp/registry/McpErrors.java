@@ -1,8 +1,8 @@
 package com.clara.mcp.registry;
 
-import com.clara.kernel.ClaraError;
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCategory;
+import com.clara.kernel.exception.ClaraError;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCategory;
 import java.util.Collections;
 
 /**

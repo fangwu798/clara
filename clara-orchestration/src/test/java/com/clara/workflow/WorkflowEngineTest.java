@@ -1,7 +1,7 @@
 package com.clara.workflow;
 
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCodes;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;

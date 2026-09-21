@@ -31,9 +31,11 @@ transport:
   #   X-Client-Request-Id: clara-volcengine
 
 # 本平台启用的模型能力，不使用的能力节点可以删除。
+# 节点名必须是能力种类枚举名（CHAT / IMAGE / VIDEO / AUDIO_TRANSCRIPTION / SPEECH，大小写不敏感），
+# 同一平台每种能力最多一个节点；用了枚举以外的名字会在加载期直接报「配置项 capabilities 类型不符」。
 capabilities:
   # 文本对话能力配置。
-  chat:
+  CHAT:
     # 方舟 Chat Completions 完整接口地址，源站必须存在于 allowedOrigins 中。
     endpoint: https://ark.cn-beijing.volces.com/api/v3/chat/completions
     # 实际调用的推理接入点 ID 或模型 ID，以方舟控制台显示值为准。
@@ -48,7 +50,7 @@ capabilities:
       maxTokens: 4096
 
   # 图片生成能力配置。
-  image:
+  IMAGE:
     # 方舟 Images Generations 完整接口地址。
     endpoint: https://ark.cn-beijing.volces.com/api/v3/images/generations
     # 图片模型对应的推理接入点 ID 或模型 ID。
@@ -60,14 +62,14 @@ capabilities:
       # 图片提示词允许的最大字符数。
       maxPromptChars: 32000
       # 单次请求允许生成的最大图片数量。
-      maxImages: 4
+      maxOutputs: 4
       # 单次请求允许附带的最大参考图片数量。
       maxSourceImages: 4
       # 是否默认在生成图片中添加平台水印；合规要求优先于本地配置。
       watermark: false
 
   # 视频生成异步任务配置。
-  video:
+  VIDEO:
     # 创建视频生成任务的完整接口地址。
     endpoint: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
     # 视频模型对应的推理接入点 ID 或模型 ID。

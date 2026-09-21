@@ -1,6 +1,8 @@
 package com.clara.adapter.document;
 
-import com.clara.kernel.*;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ClaraError;
+import com.clara.kernel.exception.ErrorCategory;
 
 import java.util.Collections;
 

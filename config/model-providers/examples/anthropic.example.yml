@@ -31,9 +31,11 @@ transport:
   #   anthropic-beta: prompt-caching-2024-07-31
 
 # 本平台启用的模型能力。
+# 节点名必须是能力种类枚举名（CHAT / IMAGE / VIDEO / AUDIO_TRANSCRIPTION / SPEECH，大小写不敏感），
+# 同一平台每种能力最多一个节点；用了枚举以外的名字会在加载期直接报「配置项 capabilities 类型不符」。
 capabilities:
   # Anthropic Messages 文本对话能力配置。
-  chat:
+  CHAT:
     # Messages 完整接口地址，源站必须存在于 allowedOrigins 中。
     endpoint: https://api.anthropic.com/v1/messages
     # 实际调用的 Anthropic 模型 ID，应使用账号当前可用的固定版本名称。

@@ -1,9 +1,9 @@
 package com.clara.media.job.callback;
 
-import com.clara.kernel.ClaraError;
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ClaraError;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCategory;
+import com.clara.kernel.exception.ErrorCodes;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;

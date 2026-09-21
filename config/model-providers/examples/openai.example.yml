@@ -32,9 +32,11 @@ transport:
   #   OpenAI-Beta: assistants=v2
 
 # 本平台启用的模型能力；不使用的能力可以连同对应节点一起删除。
+# 节点名必须是能力种类枚举名（CHAT / IMAGE / VIDEO / AUDIO_TRANSCRIPTION / SPEECH，大小写不敏感），
+# 同一平台每种能力最多一个节点；用了枚举以外的名字会在加载期直接报「配置项 capabilities 类型不符」。
 capabilities:
   # 文本对话能力配置。
-  chat:
+  CHAT:
     # Chat Completions 完整接口地址，源站必须存在于 allowedOrigins 中。
     endpoint: https://api.openai.com/v1/chat/completions
     # 实际调用的对话模型 ID，应替换为账号当前可用的固定模型名称。
@@ -49,7 +51,7 @@ capabilities:
       maxTokens: 4096
 
   # 图片生成能力配置。
-  image:
+  IMAGE:
     # Images Generations 完整接口地址。
     endpoint: https://api.openai.com/v1/images/generations
     # 实际调用的图片生成模型 ID。
@@ -59,7 +61,7 @@ capabilities:
     # 图片请求的客户端限制。
     parameters:
       # 图片提示词允许的最大字符数。
-      maxTextChars: 32000
+      maxPromptChars: 32000
       # 输入媒体的最大字节数；当前值为 8 MiB。
       maxInputBytes: 8388608
       # 单次请求允许生成的最大结果数量。
@@ -68,7 +70,7 @@ capabilities:
       maxSourceImages: 4
 
   # 音频转写能力配置。
-  transcription:
+  AUDIO_TRANSCRIPTION:
     # Audio Transcriptions 完整接口地址。
     endpoint: https://api.openai.com/v1/audio/transcriptions
     # 实际调用的语音识别模型 ID。
@@ -85,7 +87,7 @@ capabilities:
       maxOutputs: 1
 
   # 语音合成能力配置。
-  speech:
+  SPEECH:
     # Audio Speech 完整接口地址。
     endpoint: https://api.openai.com/v1/audio/speech
     # 实际调用的语音合成模型 ID。

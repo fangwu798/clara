@@ -1,6 +1,6 @@
 package com.clara.adapter.rest;
 
-import com.clara.kernel.ClaraError;
+import com.clara.kernel.exception.ClaraError;
 
 /**
  * 封装REST操作的响应数据。

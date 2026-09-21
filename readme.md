@@ -254,8 +254,8 @@ try (ProviderConfiguration provider = loader.load(
 - `toAnthropicChatConfig`：Anthropic Messages。
 - `toOpenAiMediaConfig`：OpenAI 转写和语音合成。
 - `toOpenAiImageConfig` / `toVolcengineImageConfig`：OpenAI 兼容图片配置（OpenAI 与火山共用同一套骨架，
-  差异由 `OpenAiImageOptions` / `toVolcengineImageOptions` 表达）。
-- `toVolcengineImageOptions` / `toVolcengineVideoConfig`：火山图片选项和视频配置。
+  平台差异由各自派生请求类与 codec 表达）。
+- `toVolcengineVideoConfig`：火山视频配置。
 - `toAlibabaAudioConfig` / `toAlibabaNativeTaskConfig`：阿里音频及原生图片/视频任务。
 
 加载器默认拒绝超过 1 MiB 的配置文件、符号链接、重复键、未知字段、多文档 YAML、不安全 URI 和非标量扩展参数。它不会扫描整个 `local` 目录，每次只加载明确指定的一个平台文件。

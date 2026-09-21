@@ -1,7 +1,7 @@
 package com.clara.mcp.transport.http;
 
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ErrorCategory;
+import com.clara.kernel.exception.ErrorCodes;
 import com.clara.mcp.client.JsonRpcNotification;
 import com.clara.mcp.client.JsonRpcRequest;
 import com.clara.mcp.client.JsonRpcResponse;

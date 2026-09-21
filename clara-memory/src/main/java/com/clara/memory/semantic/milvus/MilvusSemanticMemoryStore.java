@@ -1,9 +1,9 @@
 package com.clara.memory.semantic.milvus;
 
-import com.clara.kernel.ClaraError;
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCategory;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ClaraError;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCategory;
+import com.clara.kernel.exception.ErrorCodes;
 import com.clara.memory.semantic.api.MemoryEntry;
 import com.clara.memory.semantic.api.MemoryMatch;
 import com.clara.memory.semantic.api.SemanticMemoryQuery;

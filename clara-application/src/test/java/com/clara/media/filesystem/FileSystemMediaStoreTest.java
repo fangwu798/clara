@@ -1,7 +1,7 @@
 package com.clara.media.filesystem;
 
-import com.clara.kernel.ClaraException;
-import com.clara.kernel.ErrorCodes;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ErrorCodes;
 import com.clara.media.MediaAsset;
 import com.clara.media.MediaInput;
 import com.clara.media.MediaContentSafetyScanner;
@@ -18,9 +18,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;

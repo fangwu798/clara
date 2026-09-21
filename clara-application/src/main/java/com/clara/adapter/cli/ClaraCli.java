@@ -1,6 +1,7 @@
 package com.clara.adapter.cli;
 
-import com.clara.kernel.*;
+import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.exception.ClaraError;
 import com.clara.orchestration.interaction.InteractionRequest;
 import com.clara.workspace.application.*;
 import com.fasterxml.jackson.core.type.TypeReference;
