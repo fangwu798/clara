@@ -21,7 +21,8 @@ import com.clara.utils.deserialize.ProviderResponseDecoder;
  *   <li>同步：{@code HttpResponse response = transport.execute(request, HttpResponse.class);}</li>
  *   <li>流式：{@code IStreamHandle handle = transport.stream(request, HttpResponse.class, event -> {...});}
  *       然后轮询 {@code handle.isDone()} 或等终态事件，结束后用 {@code handle.result()} 取完整响应；</li>
- *   <li>需要原始字节时改用低层的 {@link #execute(IRequest, ISseListener)}。</li>
+ *   <li>需要原始响应（不解码）时用 {@link #execute(IRequest)}；只是想要原始字节、分批拿到 SSE 事件时
+ *       用低层的 {@link #execute(IRequest, ISseListener)}。</li>
  * </ol>
  *
  * <p>实现约定：低层方法负责端点白名单、超时、体积上限、取消检查与错误码映射；高层方法不得被实现覆盖成
@@ -36,12 +37,13 @@ public interface IHttpExecute {
     /**
      * 低层执行：{@code listener} 为 null 时同步读取完整响应体，否则按 SSE 流式解析并回调原始事件。
      *
-     * @param request  HTTP 请求，非 null
-     * @param listener SSE 原始事件监听器；为 null 时执行同步调用
+     * @param request  请求对象，非 null；发送前由实现调用其 {@link IRequest#toRequest()} 编码
+     * @param listener SSE 原始事件监听器；为 null 时执行同步调用（因此本参数允许为 null）
      * @return 同步调用返回包含完整响应体的响应；流式调用成功时响应体为空、非 2xx 时携带错误响应体；非 null
-     * @throws IllegalArgumentException      参数不合法时（任一参数为 null、端点不在白名单内、请求体超限）
+     * @throws IllegalArgumentException      请求为 null，或编码阶段入参不合法时
      * @throws UnsupportedOperationException 传入监听器（流式调用）但实现不支持 SSE 时
-     * @throws com.clara.kernel.exception.ClaraException 超时、传输失败、取消或触发协议 / 资源上限错误时
+     * @throws com.clara.kernel.exception.ClaraException 端点被白名单拒绝、请求体超限、超时、传输失败、取消，
+     *                                                   或触发协议 / 资源上限错误时
      */
     RawHttpResponse execute(IRequest request, ISseListener listener);
 
@@ -66,7 +68,7 @@ public interface IHttpExecute {
      * @param <R>          响应类型，需实现 {@link IResponse}
      * @return 已填充的响应对象，非 null
      * @throws IllegalArgumentException 入参为 null 或响应类型不可实例化时
-     * @throws IllegalStateException    线程上下文未绑定平台配置或能力种类时
+     * @throws IllegalStateException    注解解码步骤发现线程上下文未绑定平台配置或能力种类时
      * @throws com.clara.kernel.exception.ClaraException 平台返回非法结构、必需路径缺失或类型不符时
      */
     default <R extends IResponse> R execute(IRequest request, Class<R> responseType) {
@@ -79,13 +81,14 @@ public interface IHttpExecute {
     /**
      * 流式调用：立即返回句柄，解码后的增量事件通过 {@code observer} 回调，终态事件携带累积响应。
      *
-     * @param request      请求对象，非 null；其 {@code stream} 字段应置为 true，否则平台按非流式返回
+     * @param request      请求对象，非 null；其 {@code stream} 字段应置为 true，否则平台按非流式返回，
+     *                     传输层会因响应内容类型不是 {@code text/event-stream} 而按协议错误失败
      * @param responseType 响应类型，必须有可访问的无参构造器，不可为 null
      * @param observer     领域事件接收方，不可为 null
      * @param <R>          响应类型，需实现 {@link IResponse}
      * @return 可用于取消与查询的句柄，非 null
      * @throws IllegalArgumentException 入参为 null 或响应类型不可实例化时
-     * @throws IllegalStateException    线程上下文未绑定平台配置或能力种类时
+     * @throws IllegalStateException    注解编解码步骤（流式链路构造）发现线程上下文未绑定平台配置或能力种类时
      */
     default <R extends IResponse> IStreamHandle stream(IRequest request, Class<R> responseType, IStreamObserver observer) {
         return new StreamHandle(this, request, responseType, observer).start();

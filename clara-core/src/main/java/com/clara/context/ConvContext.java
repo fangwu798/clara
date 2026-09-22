@@ -16,18 +16,19 @@ import java.util.function.Supplier;
  * <p>是什么、在哪一层：本类属于内核的上下文包（{@code com.clara.context}），是会话级上下文值对象。
  * 它回答「这是哪个会话」，而 {@link CallContext} 回答「这是哪一次调用」：会话标识（{@code convId}）跨请求
  * 稳定，与对话记忆（clara-memory）中的会话标识同源同值；{@code historyCall} 则记录该会话内已经登记过的
- * 调用上下文，供模型层通过 {@link #currentCall()} 取回「最近一次登记」的那一份。
+ * 调用上下文，{@link #currentCall()} 返回其中登记时间最晚的那一份。
  *
- * <p>谁创建谁调用：由会话入口（宿主应用的 Agent / CLI / 请求适配器）创建，随后随该会话的每次模型、媒体、
- * MCP 或技能请求向下传递；模型实现、编解码层与 HTTP 层只读取，不修改。媒体请求（图片 / 视频 / 音频）在
- * 构造时另行显式携带 {@link CallContext}，因此不依赖本类中的 {@code historyCall}。
+ * <p>谁创建谁调用：由发起调用的业务代码（宿主应用的 Agent / CLI / 请求适配器）按「会话标识 + 平台配置 +
+ * 能力种类」创建，随后用 {@link #open(ConvContext)} 等绑定到当前线程；编解码层与模型实现只从线程上下文里读
+ * 平台配置与能力种类，传输层（{@code Jdk8HttpTransport}）在真正发出请求时调 {@link #newCall(long)} 登记本次
+ * 调用并取回 {@link CallContext}。
  *
  * <p>使用方法：
  * <ol>
- *   <li>只关心会话标识时使用两参构造器 {@code new ConvContext(userId, convId)}，此时
- *       {@link #currentCall()} 返回 {@code null}（后台任务、媒体轮询等场景）；</li>
- *   <li>需要让模型层读到跟踪标识与取消令牌时，每轮对话调一次
-
+ *   <li>不需要预先登记调用上下文时使用四参构造器
+ *       {@code new ConvContext(userId, convId, providerConfiguration, capabilityKind)}（{@code historyCall}
+ *       为空），此时 {@link #currentCall()} 返回 {@code null}（后台任务、媒体轮询等场景）；</li>
+ *   <li>需要让模型层读到跟踪标识与取消令牌时，每轮对话调一次 {@link #newCall(long)}：
  *       它生成新的 {@code traceId}、复用本会话的取消令牌，并把新的 {@link CallContext} 登记进会话调用历史，
  *       会话内多次调用按登记顺序累积，{@link #currentCall()} 返回最近一次登记的那一份；</li>
  *   <li>需要终止本会话（用户取消、客户端断开、CLI 中断）时，任意层调
@@ -42,7 +43,7 @@ import java.util.function.Supplier;
  * </ol>
  *
  * <p>生命周期与线程安全：除调用历史外字段全部 final，可安全跨线程共享；{@code historyCall} 在构造时拷贝
-
+ * 入参（入参为 null 时视为空 map），之后由 {@link #newCall(long)} 追加、{@link #currentCall()} 读取，
  * 两者在同一把锁上同步，因此同一个会话实例可以被多个线程并发登记调用。
  *
  * <p>线程绑定：绑定存放在 {@link ThreadLocal} 中，<b>只对绑定的那个线程可见</b>，不向子线程继承，也不跨
@@ -69,7 +70,9 @@ public final class ConvContext {
      */
     private final String convId;
     /**
-     * 该会话内已登记的调用上下文历史，键为 {@code traceId}，按登记顺序排列；构造时拷贝入参，之后由
+     * 该会话内已登记的调用上下文历史，键为 {@code traceId}、按登记顺序排列（{@code LinkedHashMap}）；
+     * 构造时拷贝入参（入参为 null 时视为空 map），之后由 {@link #newCall(long)} 追加、{@link #currentCall()}
+     * 读取。
      */
     private final Map<String, CallContext> historyCall;
     /**
@@ -78,12 +81,13 @@ public final class ConvContext {
     private static final ThreadLocal<ConvContext> CURRENT = new ThreadLocal<>();
 
     /**
-     * 当前调用的模型对应的 网络设置信息
+     * 本会话所属平台的配置：传输参数与各能力配置，平台标识与能力端点由它取得；可为 null。
      */
     private final ProviderConfiguration providerConfiguration;
 
     /**
-     * 当前调用的模型的类型
+     * 本会话对应的能力种类（对话 / 图片 / 视频 / 语音等），字段上的适配注解按它决定当前字段是否下发、
+     * 从哪条路径取值；可为 null。
      */
     private final CapabilityKindEnum capabilityKind;
 
@@ -94,12 +98,12 @@ public final class ConvContext {
 
 
     /**
-     * 创建不携带调用上下文的会话上下文，等价于 {@code historyCall} 为空 map。
+     * 创建不携带调用上下文历史的会话上下文，等价于 {@code historyCall} 为空 map；取消令牌由本类自建。
      *
      * @param userId                用户或服务主体标识，可为 null
      * @param convId                会话标识，不可为 null 或空白
-     * @param providerConfiguration
-     * @param capabilityKind
+     * @param providerConfiguration 本会话所属平台的配置，可为 null（编解码阶段取值时需要它）
+     * @param capabilityKind        本会话的能力种类，可为 null（编解码阶段匹配适配规则时需要它）
      * @throws IllegalArgumentException convId 为 null 或空白时
      */
     public ConvContext(String userId, String convId, ProviderConfiguration providerConfiguration, CapabilityKindEnum capabilityKind) {
@@ -107,12 +111,14 @@ public final class ConvContext {
     }
 
     /**
-     * 创建会话上下文。
+     * 创建会话上下文，并接受调用方已有的调用上下文历史；取消令牌由本类自建。
      *
-     * @param userId      用户或服务主体标识，可为 null
-     * @param convId      会话标识，不可为 null 或空白
-     * @param historyCall 该会话已登记的调用上下文历史，可为 null 或空（表示暂时没有可用的调用上下文）；
-     *                    键建议使用 {@code traceId}；本类会拷贝一份并接管其可变性，之后由
+     * @param userId                用户或服务主体标识，可为 null
+     * @param convId                会话标识，不可为 null 或空白
+     * @param historyCall           该会话已登记的调用上下文历史，可为 null 或空（表示暂时没有可用的调用上下
+     *                              文）；键建议使用 {@code traceId}，本类会拷贝一份，null 视为空 map
+     * @param providerConfiguration 本会话所属平台的配置，可为 null（编解码阶段取值时需要它）
+     * @param capabilityKind        本会话的能力种类，可为 null（编解码阶段匹配适配规则时需要它）
      * @throws IllegalArgumentException convId 为 null 或空白时
      */
     public ConvContext(String userId, String convId, Map<String, CallContext> historyCall, ProviderConfiguration providerConfiguration, CapabilityKindEnum capabilityKind) {
@@ -125,12 +131,12 @@ public final class ConvContext {
      * <p>什么时候需要显式传入：上层已经持有取消信号（例如 Web 层把「客户端断开」映射成同一个令牌）时，
      * 用它构造会话就能让「客户端断开」直接终止本会话内所有进行中的调用；不传则本类自建一个。
      *
-     * @param userId              用户或服务主体标识，可为 null
-     * @param convId              会话标识，不可为 null 或空白
-     * @param historyCall         该会话已登记的调用上下文历史，可为 null 或空；本类会拷贝一份
-     * @param providerConfiguration 平台配置，可为 null（此时按传输配置推导截止时间的重载不可用）
-     * @param capabilityKind      本次会话的能力种类，可为 null
-     * @param cancellationToken   本会话的取消令牌，不可为 null
+     * @param userId                用户或服务主体标识，可为 null
+     * @param convId                会话标识，不可为 null 或空白
+     * @param historyCall           该会话已登记的调用上下文历史，可为 null 或空；本类会拷贝一份，null 视为空 map
+     * @param providerConfiguration 本会话所属平台的配置，可为 null（编解码阶段取值时需要它）
+     * @param capabilityKind        本会话的能力种类，可为 null（编解码阶段匹配适配规则时需要它）
+     * @param cancellationToken     本会话的取消令牌，不可为 null
      * @throws IllegalArgumentException convId 为 null 或空白，或 cancellationToken 为 null 时
      */
     public ConvContext(String userId, String convId, Map<String, CallContext> historyCall, ProviderConfiguration providerConfiguration, CapabilityKindEnum capabilityKind, CancellationToken cancellationToken) {
@@ -295,6 +301,11 @@ public final class ConvContext {
          */
         private boolean closed;
 
+        /**
+         * 记录打开作用域之前当前线程的绑定。
+         *
+         * @param previous 打开前当前线程的绑定，可为 null（表示此前没有绑定）
+         */
         private Scope(ConvContext previous) {
             this.previous = previous;
         }
@@ -346,6 +357,9 @@ public final class ConvContext {
     /**
      * 按本会话的传输配置推导一次调用的截止时间。
      *
+     * <p>当前没有调用方：传输层直接用传输配置里的读取超时调 {@link #newCall(long)}，因此本方法不影响实际
+     * 生效的调用超时。
+     *
      * @return 建连超时与读取超时之和，单位毫秒
      * @throws IllegalStateException 会话未携带平台配置时
      */
@@ -375,6 +389,12 @@ public final class ConvContext {
         }
     }
 
+    /**
+     * 判断字符串是否为 null 或全空白。
+     *
+     * @param value 待判断的字符串，可为 null
+     * @return 为 null、空串或全空白时返回 {@code true}
+     */
     private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }

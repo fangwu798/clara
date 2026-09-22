@@ -15,16 +15,16 @@ import java.net.SocketTimeoutException;
 import java.nio.charset.CharacterCodingException;
 
 /**
- * 将 SSE 字节流解析为 {@link SseEvent} 并回调监听器的解析器。
+ * SSE 解析器：将 SSE 字节流解析为 {@link SseEvent} 并逐个回调监听器。
  *
- * <p>是什么与所属层：本类属于 {@code clara-model} 的公共 HTTP 层（{@code com.clara.model.http.sse}），
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.kernel.http.execute.sse}），
  * 是实现层工具，不是模型 API 契约；它按 SSE 规范逐行解析服务提供商的流式响应体，处理
  * {@code data}/{@code event}/{@code id}/{@code retry} 字段、以冒号开头的注释行、CRLF 换行与首个 BOM，
  * 并在解析过程中执行取消、超时与各项体积/数量上限检查，使传输器只负责建立连接与收发字节，无需关心事件
  * 语法细节。
  *
- * <p>谁创建谁调用：由传输实现（{@code impl.Jdk8HttpTransport}）在装配流式能力时创建并持有；由传输实现
- * 在每次流式调用的读取线程中调用 {@link #parse}，业务适配器不直接使用本类。
+ * <p>谁创建谁调用：由传输实现（{@code Jdk8HttpTransport}）在构造时创建并持有；由传输实现在每次流式调用的
+ * 读取线程中调用 {@link #parse}，业务适配器不直接使用本类。
  *
  * <p>使用方法：装配阶段构造实例——多数场景直接用无参构造器 {@link #SseParser()}（四项上限取类内默认值），
  * 需要与传输层响应体上限对齐时用四参构造器显式指定 → 流式调用时把响应体输入流传给
@@ -53,7 +53,7 @@ import java.nio.charset.CharacterCodingException;
  *       换行符），{@code maxTotalBytes} 限制整次读取的总字节数，{@code maxEvents} 限制派发的事件数量；
  *       任一项超出都以资源超限错误中断（见 {@link ExceptionUtils#responseTooLarge()}），避免被超长流
  *       拖垮内存。</li>
- *   <li>读取过程中逐字节通过 {@code call} 检查取消与剩余超时，命中即抛出超时错误。</li>
+ *   <li>读取过程中逐字节通过 {@code call} 检查取消与剩余超时，命中即抛出对应的取消或超时错误。</li>
  *   <li>错误分为三类：超时与传输 IO 错误标记为可重试；资源超限与协议错误不建议重试；
  *       参数校验失败直接抛 {@link IllegalArgumentException}。</li>
  * </ul>

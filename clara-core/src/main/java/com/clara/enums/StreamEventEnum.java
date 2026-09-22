@@ -3,16 +3,16 @@ package com.clara.enums;
 import com.clara.kernel.stream.StreamEvent;
 
 /**
- * 对话流事件类型。
+ * 对话流事件类型：{@link StreamEvent#getType()} 的取值。
  *
- * <p>位置：契约层（{@code com.clara.model.api}）；原为 {@code StreamEvent} 的内部枚举，现提升为顶层枚举，
- * 供 {@link StreamEvent#getType()} 的调用方按类型分派处理。
+ * <p>位置：内核共享枚举包（{@code com.clara.enums}）；由流式链路（{@code StreamHandle}）构造事件时写入，
+ * 调用方按类型分派处理。
  *
  * <p>取值与使用场景：
  * <ul>
- *   <li>前三个增量取值（{@code TEXT_DELTA} / {@code REASONING_DELTA} / {@code TOOL_ARGUMENT_DELTA}）只在流
+ *   <li>{@code TEXT_DELTA} / {@code REASONING_DELTA} / {@code TOOL_ARGUMENT_DELTA} 是增量取值，只在流
  *       进行中出现，用于即时展示；</li>
- *   <li>{@code TOOL_CALL_COMPLETE} 用于在流内先执行工具调用；</li>
+ *   <li>{@code TOOL_CALL_COMPLETE} 表示某个工具调用的参数已拼装完整；</li>
  *   <li>{@code LOG} 是观测用的旁路事件（请求过程日志），非终态、可出现在任意位置，接收方可忽略；</li>
  *   <li>{@code RESPONSE_COMPLETE} 与 {@code ERROR} 是终态取值，一次流中只出现其中一个，且只出现一次。</li>
  * </ul>
@@ -35,10 +35,10 @@ public enum StreamEventEnum {
      */
     TOOL_CALL_COMPLETE,
     /**
-     * 请求过程日志事件：负载为一条  可出现在流的任意位置，包括终态之后。
+     * 请求过程日志事件：观测用的旁路事件，负载为一条日志文本，可出现在流的任意位置，包括终态之后。
      *
-     * <p>只有配置开启日志档位且调用方在 {@code CallContext} 上设置了日志观察者时才会产生；接收方不关心
-     * 日志时按类型过滤忽略即可，不影响 {@code RESPONSE_COMPLETE} / {@code ERROR} 的终态语义。
+     * <p>接收方不关心日志时按类型过滤忽略即可，它不影响 {@code RESPONSE_COMPLETE} / {@code ERROR} 的
+     * 终态语义。
      */
     LOG,
     /**

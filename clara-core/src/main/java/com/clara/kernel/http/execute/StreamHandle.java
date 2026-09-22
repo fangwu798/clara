@@ -36,10 +36,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <ol>
  *   <li>调用方实现 {@link IStreamObserver} 接收增量事件；</li>
  *   <li>入口返回本句柄后，调用方轮询 {@link #isDone()} 或等待终态事件；</li>
- *   <li>需要中断时调 {@link #cancel()}——它同时置位会话取消令牌（传输层逐字节检查），
- *       正在进行的读取会在下一个检查点终止，并以 {@code RESPONSE_COMPLETE}（payload 为
- *       {@link FinishReasonEnum#CANCELLED}）收尾；</li>
- *   <li>结束后用 {@link #result()} 取累积响应（已取消或失败时为 null）。</li>
+ *   <li>需要中断时调 {@link #cancel()}——它置位会话取消令牌（传输层逐字节检查）、中断读取线程并立即进入
+ *       终态，以 {@code RESPONSE_COMPLETE}（payload 为 {@link FinishReasonEnum#CANCELLED}）收尾；</li>
+ *   <li>结束后用 {@link #result()} 取累积响应（未结束、已取消或失败时为 null）。</li>
  * </ol>
  *
  * <p>事件语义：一次流中 {@code RESPONSE_COMPLETE} 与 {@code ERROR} 只会出现其中一个且只出现一次；
@@ -175,7 +174,8 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      * 接收传输层解析出的原始 SSE 事件：映射为领域事件、累加增量，并在终态路径命中时收尾。
      *
      * @param event SSE 事件，可为 null（视为空数据）
-     * @return 是否继续接收后续事件
+     * @return 是否继续接收后续事件；已进入终态或本次数据命中结束标记时返回 false
+     * @throws ClaraException 数据块不是合法 JSON 或字段类型不符时（由读取线程捕获并以 {@code ERROR} 事件收尾）
      */
     @Override
     public boolean onEvent(SseEvent event) {
@@ -194,9 +194,11 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
     }
 
     /**
-     * 取消本次流：置位会话取消令牌并中断读取线程，最终以完成事件收尾。
+     * 取消本次流：置位会话取消令牌、中断读取线程并立即以完成事件收尾。
      *
-     * @return 本次调用是否真正触发取消
+     * <p>终态事件为 {@code RESPONSE_COMPLETE}，payload 为 {@link FinishReasonEnum#CANCELLED}。
+     *
+     * @return 本次调用是否真正触发取消；已结束或此前已取消时返回 false
      */
     @Override
     public boolean cancel() {
@@ -216,6 +218,13 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
         return done.get();
     }
 
+    /**
+     * 取回累积完成的响应。
+     *
+     * <p>仅在流正常结束（已 {@code done} 且未取消、未失败）时返回累加结果。
+     *
+     * @return 累积响应；未结束、已取消或失败时为 null
+     */
     @Override
     public IResponse result() {
         return done.get() && !cancelled.get() && !failed.get() ? assembler.result() : null;

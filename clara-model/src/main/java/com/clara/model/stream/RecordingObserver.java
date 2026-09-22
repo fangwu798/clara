@@ -185,17 +185,13 @@ public final class RecordingObserver<R extends IResponse> implements IStreamObse
      */
     public R awaitResponse(long timeout, TimeUnit unit) throws InterruptedException {
         if (!awaitTerminal(timeout, unit)) {
-            throw new IllegalStateException("waiting for the stream to finish timed out after "
-                    + timeout + " " + unit);
+            throw new IllegalStateException("waiting for the stream to finish timed out after " + timeout + " " + unit);
         }
         if (error != null) {
-            throw new IllegalStateException("the stream failed: code=" + error.getCode()
-                    + " category=" + error.getCategory() + " provider=" + error.getProvider()
-                    + " providerCode=" + error.getProviderCode() + " retryable=" + error.isRetryable());
+            throw new IllegalStateException("the stream failed: code=" + error.getCode() + " category=" + error.getCategory() + " provider=" + error.getProvider() + " providerCode=" + error.getProviderCode() + " retryable=" + error.isRetryable());
         }
         if (response == null) {
-            throw new IllegalStateException("no response of type " + responseType.getName()
-                    + " was carried by the terminal event");
+            throw new IllegalStateException("no response of type " + responseType.getName() + " was carried by the terminal event");
         }
         return response;
     }

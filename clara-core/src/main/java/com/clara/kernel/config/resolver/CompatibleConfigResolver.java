@@ -16,13 +16,14 @@ import java.util.Set;
 /**
  * OpenAI 兼容协议家族的配置解析器，覆盖对话与图片生成两种能力种类。
  *
- * <p>用途与位置：实现层组件，负责 OPENAI / DEEPSEEK / VOLCENGINE / ALIBABA 四家在
+ * <p>用途与位置：配置层组件（{@code com.clara.kernel.config.resolver}），负责 OPENAI / DEEPSEEK /
+ * VOLCENGINE / ALIBABA 四家在
  * {@link CapabilityKindEnum#CHAT} 与 {@link CapabilityKindEnum#IMAGE} 上的配置解析——这四家的对话接口
  * （{@code /chat/completions}）与图片生成接口（{@code /images/generations}）都走 OpenAI 兼容协议，
  * 所需字段也完全相同（端点、模型 ID、协议档位、凭据引用），因此共用同一份解析逻辑。
  *
  * <p>使用方法：由 {@link ConfigResolvers} 在类初始化时构造并登记，调用方不直接 new——
- * 通过 {@code ProviderConfiguration#toConfig(CapabilityKind)} 间接使用。本类无状态，
+ * 通过 {@code ProviderConfiguration#toConfig(CapabilityKindEnum)} 间接使用。本类无状态，
  * 可被多线程并发调用，无需 {@code close()}。
  *
  * <p>失败语义：能力节点未配置，或缺少 {@code modelId} / {@code apiProfile} 等必填参数时抛

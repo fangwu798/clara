@@ -78,8 +78,7 @@ public final class StreamEvent {
      * @param error      错误信息，仅错误事件非 null
      * @throws IllegalArgumentException 类型为 null 或序号为负时
      */
-    public StreamEvent(StreamEventEnum type, long sequence, String payload, String toolCallId, String toolName,
-            IResponse response, ClaraError error) {
+    public StreamEvent(StreamEventEnum type, long sequence, String payload, String toolCallId, String toolName, IResponse response, ClaraError error) {
         if (type == null) {
             throw new IllegalArgumentException("type must not be null");
         }

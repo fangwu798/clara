@@ -9,13 +9,21 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 在调用大模型之前需要对公共参数进行模型适配
- * 不同的模型对参数的要求有一些细微的差异
- * 所有定义如下适配器来进行字段级别的适配
+ * 入参适配：声明「请求对象的某个字段，在哪个平台、哪种能力下怎么下发」。
+ *
+ * <p>是什么、在哪一层：注解层（{@code com.clara.annoation}）的字段级入参适配注解，由编码器
+ * {@link com.clara.utils.deserialize.ProviderRequestEncoder} 在序列化请求体时反射读取。平台差异全部收敛到
+ * 注解声明里，编码器不含平台分支，因此同一份参数类可以承载所有平台的请求体。
+ *
+ * <p>谁创建、谁调用：由参数类（如 {@code ModelParameters} / {@code ImageParameters} / {@code Thinking}）
+ * 在字段上标注，只被读取方使用；同一字段需要多条规则时由 {@link ProviderAdapters} 承载。
  *
  * <p>维度说明（各维度之间是补充关系，未声明的维度表示不约束）：
  * <ul>
- *   <li>{@link #name()}：该平台 + 该能力下的线格式名，空串表示沿用字段上的 {@code @JsonProperty} 或字段名；</li>
+ *   <li>{@link #type()}：本规则生效的平台；</li>
+ *   <li>{@link #capability()}：本规则生效的能力种类（使用类型），默认文本对话；</li>
+ *   <li>{@link #name()}：该平台 + 该能力下的线格式名（可含点号表示嵌套层级），空串表示沿用字段上的
+ *       {@code @JsonProperty} 或字段名；</li>
  *   <li>{@link #supported()}：平台是否支持该字段；{@code false} 表示下发前必须丢弃；</li>
  *   <li>{@link #streamingOnly()}：是否只在流式请求（{@code stream = true}）时下发；</li>
  *   <li>{@link #defaultValue()}：平台默认值，字段缺省时按该值下发；空串表示沿用平台自身默认值；</li>
@@ -25,6 +33,12 @@ import java.lang.annotation.Target;
  *   <li>{@link #note()}：上面维度表达不了的额外约束（如「深度思考模型不支持该字段」）。</li>
  * </ul>
  *
+ * <p>编码器只读取 {@code type} / {@code capability} / {@code name} / {@code supported} /
+ * {@code streamingOnly} / {@code defaultValue}：{@code type} 与 {@code capability} 都等于当前平台与能力的那
+ * 一条规则才生效，没有命中、或命中的规则 {@code supported = false} 时该字段不下发；{@code allowed} /
+ * {@code min} / {@code max} / {@code maxCount} / {@code note} 是声明性约束，编码器不做二次校验，只作文档
+ * 与人工核对之用。
+ *
  * <p>同一字段需要适配多个平台时可直接重复标注（由 {@link ProviderAdapters} 承载）。
  */
 @Retention(RetentionPolicy.RUNTIME)
@@ -33,16 +47,16 @@ import java.lang.annotation.Target;
 public @interface ProviderAdapter {
 
     /**
-     * 适配平台
+     * 本规则生效的平台。
      *
-     * @return
+     * @return 平台枚举值，非 null；只有与当前平台相等时本规则才会被采用
      */
     ModelProviderEnum type() default ModelProviderEnum.DEEPSEEK;
 
     /**
-     * 适配场景 文本对话 生成图片  生成音频  生成适配
+     * 本规则生效的能力种类（使用类型）。
      *
-     * @return
+     * @return 能力枚举值，非 null；只有与当前能力相等时本规则才会被采用
      */
     CapabilityKindEnum capability() default CapabilityKindEnum.CHAT;
 

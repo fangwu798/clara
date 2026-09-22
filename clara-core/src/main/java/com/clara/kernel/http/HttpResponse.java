@@ -31,7 +31,8 @@ import java.util.List;
  *   <li>{@code content} / {@code reasoning}：正文与思维链，OpenAI 兼容家族在 {@code choices[0]} 下，
  *       流式对应 {@code delta} 子路径；</li>
  *   <li>{@code toolCalls}：工具调用数组，元素结构见 {@link ToolCall}；</li>
- *   <li>{@code finishReason}：结束原因，同时充当流式终态标记；</li>
+ *   <li>{@code finishReason}：结束原因；流式下它只是结束状态字段，<b>不构成终止条件</b>——流的终止以 SSE 的
+ *       {@code [DONE]} 为准，在结束原因后平台还会补发只带 {@code usage} 的分片；</li>
  *   <li>{@code inputTokens} / {@code outputTokens} / {@code totalTokens} / {@code cachedTokens}：token 用量，
  *       缓存命中量的平台路径不同，两条规则按平台分别命中；</li>
  *   <li>{@code images} / {@code generatedImages} / {@code webSearchCount}：图片生成结果与用量
@@ -67,7 +68,10 @@ public class HttpResponse implements IResponse {
     private List<ToolCall> toolCalls;
 
     /**
-     * 结束原因；该路径出现非空值即视为流结束。
+     * 结束原因；同步按 {@code choices[0].finish_reason} 取值，流式命中 {@code terminalPath} 时写入。
+     *
+     * <p>命中只代表平台给出了结束原因，不代表流已结束：流以 SSE 的 {@code [DONE]} 终止，之后还可能有
+     * 只带 {@code usage} 的分片。
      */
     @ResponseAdapter(path = "choices[0].finish_reason", terminalPath = "choices[0].finish_reason")
     private FinishReasonEnum finishReason;

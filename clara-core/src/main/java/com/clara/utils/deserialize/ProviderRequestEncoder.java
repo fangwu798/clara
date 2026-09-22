@@ -91,8 +91,7 @@ public final class ProviderRequestEncoder {
             throw new IllegalArgumentException("values must not be null");
         }
         ModelProviderEnum provider = config.getProvider();
-        Map<String, String> authorization =
-                providerConfiguration.authorizationHeaders(config.getCapabilityEnum(), Boolean.TRUE.equals(request.getStream()));
+        Map<String, String> authorization = providerConfiguration.authorizationHeaders(config.getCapabilityEnum(), Boolean.TRUE.equals(request.getStream()));
         byte[] body = serialize(bodyOf(request, provider, config.getCapabilityEnum()), provider);
         return new RawHttpRequest("POST", config.getEndpoint(), mergedHeaders(authorization, transport), body);
     }
@@ -403,6 +402,9 @@ public final class ProviderRequestEncoder {
         }
         if (!hasHeaderNamed(merged, "Content-Type")) {
             merged.put("Content-Type", JSON_CONTENT_TYPE);
+        }
+        if (hasHeaderNamed(merged, "x-Transfer")) {
+            merged.remove("x-Transfer");
         }
         return merged;
     }

@@ -4,6 +4,8 @@ import com.clara.annoation.ProviderAdapter;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.kernel.api.IRequest;
+import com.clara.kernel.api.message.IContent;
+import com.clara.kernel.message.delta.Thinking;
 import com.clara.tool.ToolContext;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -32,6 +34,7 @@ public abstract class ModelParameters implements IRequest {
     /**
      * 对话的消息列表
      */
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT)
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT)
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT)
     private List<IContent> messages;
@@ -82,6 +85,7 @@ public abstract class ModelParameters implements IRequest {
      * 输出 token 与输入 token 的总长仍受模型上下文长度限制。
      */
     @JsonProperty("max_tokens")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT, min = 1d, note = "部分推理模型只接受 max_completion_tokens，被拒时改下发该字段")
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT, min = 1d, note = "默认值随模型与思考模式变化，未设置时由平台决定")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "4096", min = 1d)
     private Integer maxTokens;
@@ -231,6 +235,7 @@ public abstract class ModelParameters implements IRequest {
      * 图片生成场景仅 seedream-4.5 / 4.0 支持流式，按 SSE 逐张返回生成结果。
      */
     @JsonProperty("stream")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT, defaultValue = "false")
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT, defaultValue = "false")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "false")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "false", note = "仅 4.5/4.0 支持流式生图，按 SSE 逐张返回")
@@ -248,6 +253,7 @@ public abstract class ModelParameters implements IRequest {
      * <p>默认按开启处理（字段为空即下发 true）；确实不需要统计时显式置为 {@code false}。
      */
     @JsonProperty("stream_options.include_usage")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "不开启则流式响应不带 usage")
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "不开启则流式响应不带 usage")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "不开启则流式响应不带 usage")
     private Boolean includeUsage;

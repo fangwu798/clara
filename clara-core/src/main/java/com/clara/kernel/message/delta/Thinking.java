@@ -1,4 +1,4 @@
-package com.clara.kernel.message;
+package com.clara.kernel.message.delta;
 
 import com.clara.annoation.ProviderAdapter;
 import com.clara.enums.ModelProviderEnum;

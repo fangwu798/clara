@@ -34,8 +34,8 @@ public final class ErrorMessages {
     /**
      * 读取错误码对应的中文提示，不含变量。
      *
-     * @param code 错误码
-     * @return 中文提示；错误码未登记时返回错误码本身
+     * @param code 错误码，不可为 null 或空白
+     * @return 中文提示，非 null；错误码未登记时返回错误码本身
      * @throws IllegalArgumentException 错误码为 null 或空白时
      */
     public static String of(String code) {
@@ -48,9 +48,9 @@ public final class ErrorMessages {
      * <p>替换是单遍扫描，不会对变量值再次展开；模板中用到的占位符若未在 {@code args} 中提供，
      * 则原样保留 {@code {name}}，便于在测试中发现漏填。
      *
-     * @param code 错误码
+     * @param code 错误码，不可为 null 或空白
      * @param args 占位符名到值的映射，可为 null
-     * @return 插值后的中文提示；错误码未登记时返回错误码本身
+     * @return 插值后的中文提示，非 null；错误码未登记时返回错误码本身
      * @throws IllegalArgumentException 错误码为 null 或空白时
      */
     public static String of(String code, Map<String, String> args) {
@@ -80,9 +80,9 @@ public final class ErrorMessages {
     /**
      * 按占位符替换模板内容。
      *
-     * @param template 提示模板
-     * @param args     占位符取值
-     * @return 替换后的文本
+     * @param template 提示模板，非 null
+     * @param args     占位符取值，非 null（调用方已保证非空）
+     * @return 替换后的文本，非 null
      */
     private static String interpolate(String template, Map<String, String> args) {
         StringBuilder result = new StringBuilder(template.length() + 32);
@@ -114,7 +114,7 @@ public final class ErrorMessages {
     /**
      * 构造错误码到中文提示模板的不可变映射。
      *
-     * @return 模板映射
+     * @return 错误码到中文提示模板的不可变映射，非 null
      */
     private static Map<String, String> templates() {
         Map<String, String> messages = new LinkedHashMap<String, String>();

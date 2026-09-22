@@ -1,4 +1,4 @@
-package com.clara.model.provider.deepseek;
+package com.clara.model.provider.compatible;
 
 import com.clara.context.ConvContext;
 import com.clara.enums.CapabilityKindEnum;
@@ -10,10 +10,10 @@ import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.http.RawHttpResponse;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
-import com.clara.kernel.message.IContent;
+import com.clara.kernel.api.message.IContent;
 import com.clara.kernel.message.delta.ImageItem;
-import com.clara.kernel.message.impl.ToolContent;
-import com.clara.kernel.message.impl.UserContent;
+import com.clara.kernel.message.delta.ToolContent;
+import com.clara.kernel.message.delta.UserContent;
 import com.clara.kernel.stream.IStreamHandle;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.model.provider.CompatibleStream;
@@ -59,11 +59,12 @@ import static org.junit.Assert.fail;
  *   <li>火山方舟对话：{@link #volcengineChatNonStreaming()} 非流式、{@link #volcengineChatStreaming()} 流式；</li>
  *   <li>火山方舟工具调用：{@link #volcengineToolCallNonStreaming()} 非流式、
  *       {@link #volcengineToolCallStreaming()} 流式；</li>
+ *   <li>OpenAI 对话：{@link #openaiChatNonStreaming()} 非流式、{@link #openaiChatStreaming()} 流式；</li>
  *   <li>火山方舟生图：{@link #volcengineImageGeneration()} 非流式文生图（并把结果真正下载下来）。</li>
  * </ul>
  *
- * <p>对话用例加载 {@code config/model-providers/deepseek.yml} 与 {@code volcengine.yml}，生图用例加载
- * {@code volcengine.yml}——DeepSeek 没有图片能力，图片只能打在火山方舟上。
+ * <p>对话用例加载 {@code config/model-providers/deepseek.yml}、{@code volcengine.yml} 与
+ * {@code openai.yml}，生图用例加载 {@code volcengine.yml}——DeepSeek 没有图片能力，图片只能打在火山方舟上。
  *
  * <p>调用链固定为统一入口，不含任何平台分支：
  * {@code CompatibleStream#chat} → {@code Jdk8HttpTransport} → {@code HttpRequest#toRequest()}
@@ -80,7 +81,7 @@ import static org.junit.Assert.fail;
  * 任一条件不满足时用例会被 {@link Assume} 跳过，不会让常规构建失败；条件满足时是真实网络调用，
  * 会产生真实计费。
  */
-public class DeepSeekChatLiveTest {
+public class CompatibleTest {
 
     /**
      * DeepSeek 平台配置文件名。
@@ -90,6 +91,10 @@ public class DeepSeekChatLiveTest {
      * 火山方舟平台配置文件名。
      */
     private static final String VOLCENGINE_CONFIG = "volcengine.yml";
+    /**
+     * OpenAI 平台配置文件名。
+     */
+    private static final String OPENAI_CONFIG = "openai.yml";
     /**
      * 对话提示词。
      */
@@ -146,8 +151,7 @@ public class DeepSeekChatLiveTest {
             ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
             try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
                 IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-                HttpResponse response = model.chat(
-                        request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
+                HttpResponse response = model.chat(request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
 
                 System.out.println("[DeepSeek 非流式] model=" + config.getModelId() + " " + describe(response));
                 assertSuccess(response);
@@ -172,9 +176,7 @@ public class DeepSeekChatLiveTest {
             try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
                 IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
                 RecordingObserver<HttpResponse> observer = observer("DeepSeek 流式");
-                IStreamHandle handle = model.chat(
-                        request(config.getModelId(), userMessages(PROMPT), null, true),
-                        HttpResponse.class, observer);
+                IStreamHandle handle = model.chat(request(config.getModelId(), userMessages(PROMPT), null, true), HttpResponse.class, observer);
 
                 System.out.println("[DeepSeek 流式] model=" + config.getModelId());
                 HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -433,6 +435,67 @@ public class DeepSeekChatLiveTest {
         }
     }
 
+    // ------------------------------------------------------------------ OpenAI 对话
+
+    /**
+     * OpenAI 非流式对话：一次拿到完整响应，检查文本、结束原因与 token 用量。
+     *
+     * <p>该平台的配置走中转站（{@code transport.headers} 里声明了 {@code x-Transfer}），因此同时覆盖
+     * {@code ProviderConfiguration#authorizationHeaders} 的 OpenAI 分支——它会补上模拟 Codex 调用的请求头。
+     *
+     * @throws Exception 读取配置或解析响应时
+     */
+    @Test
+    public void openaiChatNonStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(OPENAI_CONFIG)) {
+            skipWhenCredentialMissing(provider);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                HttpResponse response = model.chat(request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
+
+                System.out.println("[OpenAI 非流式] model=" + config.getModelId() + " " + describe(response));
+                assertSuccess(response);
+                assertFalse("响应没有正文", isBlank(response.getContent()));
+                assertEquals(FinishReasonEnum.STOP, response.getFinishReason());
+                assertNotNull("真实响应应带 token 用量", response.getInputTokens());
+                assertTrue("输入 token 应大于 0", response.getInputTokens() > 0);
+            }
+        }
+    }
+
+    /**
+     * OpenAI 流式对话：按事件观察增量，交叉验证累加结果与终态响应一致。
+     *
+     * <p>与其它平台一样要求流式响应带回 token 用量，即请求里的 {@code stream_options.include_usage}
+     * 被平台接受并生效。
+     *
+     * @throws Exception 读取配置或等待事件时
+     */
+    @Test
+    public void openaiChatStreaming() throws Exception {
+        try (ProviderConfiguration provider = load(OPENAI_CONFIG)) {
+            skipWhenCredentialMissing(provider);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                RecordingObserver<HttpResponse> observer = observer("OpenAI 流式");
+                IStreamHandle handle = model.chat(request(config.getModelId(), userMessages(PROMPT), null, true), HttpResponse.class, observer);
+
+                System.out.println("[OpenAI 流式] model=" + config.getModelId());
+                HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                assertFinished(handle);
+
+                System.out.println("[OpenAI 流式] 事件数=" + observer.eventCount()
+                        + " 增量文本长度=" + observer.text().length() + " " + describe(completed));
+                assertFalse("响应没有正文", isBlank(completed.getContent()));
+                assertFalse("没有收到任何文本增量事件", observer.text().isEmpty());
+                assertEquals("增量拼接结果应与终态响应一致", completed.getContent(), observer.text());
+                assertStreamingUsage(completed);
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ 通用装配
 
     /**
@@ -454,7 +517,7 @@ public class DeepSeekChatLiveTest {
      * @throws Exception 解析代码位置时
      */
     private static Path configFile(String fileName) throws Exception {
-        Path classes = Paths.get(DeepSeekChatLiveTest.class.getProtectionDomain()
+        Path classes = Paths.get(CompatibleTest.class.getProtectionDomain()
                 .getCodeSource().getLocation().toURI());
         Path file = classes.getParent().getParent().getParent()
                 .resolve("config").resolve("model-providers").resolve(fileName);

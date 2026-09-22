@@ -7,14 +7,14 @@ import com.clara.kernel.api.execute.ISseListener;
 import lombok.Data;
 
 /**
- * 表示服务提供商 SSE 事件，对应 SSE 协议中的一个完整事件块。
+ * SSE 事件：表示服务提供商流式响应中的一个完整 SSE 事件块。
  *
- * <p>是什么与所属层：本类属于 {@code clara-model} 的公共 HTTP 层（{@code com.clara.model.http.sse}），
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.kernel.http.execute.sse}），
  * 是实现层值对象，不是模型 API 契约；它承载解析后的原始事件字段，作为 {@link SseParser} 的输出与
  * {@link ISseListener} 的输入，供上层适配器按事件名与数据完成协议解码。
  *
- * <p>谁创建谁调用：只由 {@link SseParser} 在解析过程中创建；由传输层（{@code impl.Jdk8HttpTransport}）
- * 转交给 {@link ISseListener} 的实现使用。适配器不自行构造本类的实例（测试除外）。
+ * <p>谁创建谁调用：只由 {@link SseParser} 在解析过程中创建；由传输实现（{@code Jdk8HttpTransport}）转交给
+ * {@link ISseListener} 的实现使用。适配器不自行构造本类的实例（测试除外）。
  *
  * <p>使用方法：实现 {@link ISseListener} 并在
  * {@link IHttpExecute#execute(IRequest request, ISseListener listener) 流式调用}中接收本对象，用 {@code getEvent()} 分派事件类型、
@@ -25,8 +25,7 @@ import lombok.Data;
  * 线程内回调传递，不跨线程共享；解析器在派发后即复用内部状态，因此回调结束后本实例仍然独立有效。
  *
  * <p>失败语义：本类不做任何校验，构造与读取都不会抛异常；字段非法（例如适配器预期的 JSON 无法解析）由
- * 监听器实现自行判定并按协议错误抛出。字段均允许为 null（{@code event} 例外，见字段说明），因此消费前
- * 必须按各自的空值语义处理。
+ * 监听器实现自行判定并按协议错误抛出。字段均允许为 null，消费前必须按各自的空值语义处理。
  *
  * <p>注意：其中 {@code event} 由解析器保证非空（服务端未声明时使用默认事件名），{@code retryMillis}
  * 仅在服务端声明了合法的数字 retry 时才非空。

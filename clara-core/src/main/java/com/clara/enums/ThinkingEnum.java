@@ -8,10 +8,16 @@ package com.clara.enums;
  */
 public enum ThinkingEnum {
 
-    /** 强制先思考再回答，线格式 {@code "enabled"}。 */
+    /**
+     * 强制先思考再回答，线格式 {@code "enabled"}。
+     */
     enabled,
-    /** 关闭思考，直接回答，线格式 {@code "disabled"}。 */
+    /**
+     * 关闭思考，直接回答，线格式 {@code "disabled"}。
+     */
     disabled,
-    /** 由模型自行判断是否需要思考，线格式 {@code "auto"}；仅火山方舟支持。 */
+    /**
+     * 由模型自行判断是否需要思考，线格式 {@code "auto"}；仅火山方舟支持。
+     */
     auto
 }

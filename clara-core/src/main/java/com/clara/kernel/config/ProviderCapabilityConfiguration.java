@@ -53,8 +53,8 @@ public final class ProviderCapabilityConfiguration {
      *
      * @param endpoint          能力调用端点（YAML 键 {@code endpoint}，必填），必须为安全的绝对 HTTP(S) URI
      * @param taskQueryEndpoint 异步任务查询端点（YAML 键 {@code taskQueryEndpoint}，可选），同步能力为 null
-     * @param modelId           模型 ID（YAML 键 {@code modelId}，可选），空字符串视为未配置
-     * @param apiProfile        API 协议档位（YAML 键 {@code apiProfile}，可选），空字符串视为未配置
+     * @param modelId           模型 ID（YAML 键 {@code modelId}，可选），空白视为未配置
+     * @param apiProfile        API 协议档位（YAML 键 {@code apiProfile}，可选），空白视为未配置
      * @param parameters        扩展标量参数（YAML 键 {@code parameters}，可选），可为 null
      */
     @JsonCreator

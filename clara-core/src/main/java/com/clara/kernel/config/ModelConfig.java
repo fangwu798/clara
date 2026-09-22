@@ -9,25 +9,26 @@ import lombok.Getter;
 import java.net.URI;
 
 /**
- * 能力配置的公共基类：描述一次能力调用所需的固定信息。
+ * 能力配置：描述一次能力调用所需的固定信息（平台、能力种类、端点、模型、协议档位与凭据引用）。
  *
- * <p>用途与位置：本类属于实现层的配置继承树根节点（包 {@code com.clara.model.configuration.config}）。
- * 它只承载所有能力共有的六个字段——平台、端点、模型 ID、协议档位、凭据引用名与生效的请求日志设置；各能力
- * 特有的限制由
- * 补充，平台专有字段再由派生类补充。模型实现类（如 {@code OpenAiCompatibleChatModel}）只读地消费它。
+ * <p>是什么、在哪一层：配置层（{@code com.clara.kernel.config}）的不可变值对象，也是配置解析的产出类型
+ * ——{@link com.clara.kernel.config.resolver.IConfigResolver} 把 {@link ProviderConfiguration} 中的能力
+ * 节点映射成本类。各能力的差异不用派生类表达：平台与能力种类由本类持有，字段级差异由请求 / 响应对象上的
+ * 适配注解按「平台 + 能力种类」声明，因此本类当前没有派生类。
  *
  * <p>使用方法：
  * <ol>
- *   <li>实例不由调用方 new——由 {@code com.clara.kernel.config.resolver} 下的
- *       {@code IConfigResolver} 从已加载的 {@code ProviderConfiguration} 派生，通常经
- *       {@code ProviderConfiguration#toConfig(CapabilityKindEnum)} 取得；</li>
- *   <li>把取得的实例交给平台模型实现的构造器（如
- *       {@code new OpenAiCompatibleChatModel(config, codec, transport, credentials)}）；</li>
- *   <li>只读使用：字段全部 final、无连接无缓冲，不需要 {@code close()}，实例可跨线程共享。</li>
+ *   <li>实例不由调用方 new——由 {@link com.clara.kernel.config.resolver.ConfigResolvers} 从已加载的
+ *       {@code ProviderConfiguration} 派生，通常经 {@code ProviderConfiguration#toConfig(CapabilityKindEnum)}
+ *       取得；</li>
+ *   <li>只读消费：{@code ProviderRequestEncoder} 用它取平台、能力种类与端点，调用方可另读模型 ID 与协议
+ *       档位做展示或校验；</li>
+ *   <li>字段全部 final、无连接无缓冲，不需要 {@code close()}，实例可跨线程共享。</li>
  * </ol>
  *
  * <p>失败语义：端点不是安全的绝对 HTTP(S) 地址、模型 ID / 协议档位 / 凭据引用为空白、平台为 null 时，
  * 构造期抛 {@link IllegalArgumentException}；配置问题在启动期暴露，不进入调用期，也不可重试。
+ * {@code capabilityEnum} 本类不校验，为空时会在编码阶段被拒绝。
  */
 @Getter
 @EqualsAndHashCode
@@ -38,7 +39,8 @@ public class ModelConfig {
     private final ModelProviderEnum provider;
 
     /**
-     * 模型类型
+     * 能力种类，取自解析时的能力节点键（{@code capabilities.<能力种类>}）；与 {@link #provider} 一起决定编码
+     * 时命中哪些字段适配规则。可为 null——本类不校验，编码器要求非 null。
      */
     private final CapabilityKindEnum capabilityEnum;
     /**
@@ -62,15 +64,16 @@ public class ModelConfig {
     private final String secretRef;
 
     /**
-     * 创建能力配置公共部分并校验必填字段。
+     * 创建能力配置并校验必填字段。
      *
      * @param provider       所属平台，不可为 null
-     * @param capabilityEnum
+     * @param capabilityEnum 能力种类，可为 null（本类不校验，编码阶段会要求非 null）
      * @param endpoint       能力调用端点，不可为 null，且必须为安全的绝对 HTTP(S) 地址
      * @param modelId        固定模型 ID，不可为 null 或空白
      * @param apiProfile     API 协议档位，不可为 null 或空白
      * @param secretRef      凭据引用名，不可为 null 或空白
-     * @throws IllegalArgumentException 任一字段为 null/空白，或端点不是安全的绝对 HTTP(S) 地址时
+     * @throws IllegalArgumentException provider 为 null、endpoint 非法，或 modelId / apiProfile / secretRef
+     *                                  为 null 或空白时
      */
     public ModelConfig(ModelProviderEnum provider, CapabilityKindEnum capabilityEnum, URI endpoint, String modelId, String apiProfile, String secretRef) {
         if (provider == null) {
@@ -85,7 +88,7 @@ public class ModelConfig {
     }
 
     /**
-     * 校验地址字段为安全的绝对 HTTP(S) URI，供子类校验异步任务查询端点等可选地址复用。
+     * 校验地址为安全的绝对 HTTP(S) URI，构造期用于校验 {@code endpoint}。
      *
      * @param value 待校验地址，不可为 null
      * @param field 字段名，用于错误提示，不可为 null

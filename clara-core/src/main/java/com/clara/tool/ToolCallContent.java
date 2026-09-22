@@ -1,7 +1,7 @@
 package com.clara.tool;
 
 import com.clara.enums.RoleEnum;
-import com.clara.kernel.message.IContent;
+import com.clara.kernel.api.message.IContent;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;

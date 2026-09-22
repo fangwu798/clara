@@ -6,6 +6,7 @@ import com.clara.kernel.api.IRequest;
 import com.clara.kernel.api.execute.IHttpExecute;
 import com.clara.kernel.api.execute.ISseListener;
 import com.clara.kernel.exception.ClaraException;
+import com.clara.kernel.http.RawHttpFormatter;
 import com.clara.kernel.http.RawHttpRequest;
 import com.clara.kernel.http.RawHttpResponse;
 import com.clara.kernel.http.TransportConfig;
@@ -26,8 +27,8 @@ import java.util.Map;
 /**
  * 基于 JDK 8 {@link HttpURLConnection} 实现的服务提供商 HTTP 传输器，同时支持同步与 SSE 流式调用。
  *
- * <p>是什么与所属层：本类属于 {@code clara-model} 的公共 HTTP 层实现子包
- * （{@code com.clara.model.http.impl}），是 {@link IHttpExecute} 的默认实现（final 类，不可继承），
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 执行子包
+ * （{@code com.clara.kernel.http.execute}），是 {@link IHttpExecute} 的唯一实现（final 类，不可继承），
  * 不是模型 API 契约；两种调用方式共用同一套请求处理流程——端点白名单校验、请求体上限、连接/读取超时、
  * 取消检查、请求头与请求体写入、非 2xx 错误响应读取；只有拿到响应之后的处理不同：
  * <ul>
@@ -36,30 +37,33 @@ import java.util.Map;
  *       {@link SseParser} 边读边解析并回调 {@link ISseListener}，成功时返回空响应体。</li>
  * </ul>
  *
- * <p>谁创建谁调用：由宿主应用或外层程序在装配阶段创建（例如 {@code clara-novel} 的启动类）；
- * 由 {@code ModelInvoker}（或包装本类的装饰器，如请求日志传输器）在每次往返时调用 {@link #execute}。
+ * <p>谁创建谁调用：由宿主应用在装配阶段用无参构造器创建（如 {@code clara-model} 的
+ * {@code CompatibleStream}），再交给需要发起模型调用的组件；上层通过 {@link IHttpExecute} 的默认方法
+ * （{@code execute(IRequest, Class)} / {@code stream(...)}，后者内部用 {@link StreamHandle}）间接调用
+ * {@link #execute}。
  *
- * <p>使用方法：用 {@link TransportConfig} 构造实例 → 注入 {@code ModelInvoker} 或包装后再注入 →
- * 每次调用由上层传入 {@link RawHttpRequest}、{@link CallContext} 与可选的 {@link ISseListener}。本类没有
- * close 或释放动作：每次调用自建连接并在 {@code finally} 中 {@code disconnect()}，实例与进程同生命周期。
+ * <p>使用方法：装配阶段 {@code new Jdk8HttpTransport()} 一次并复用 → 每次调用由上层传入 {@link IRequest}
+ * 与可选的 {@link ISseListener}；平台配置与调用上下文不在此处传入，而是调用时从 {@code ConvContext} 取。
+ * 本类没有 close 或释放动作：每次调用自建连接并在 {@code finally} 中 {@code disconnect()}，实例与进程同
+ * 生命周期。
  *
  * <p>使用规范：
  * <ul>
- *   <li>实例只保存不可变配置，线程安全，可被多个适配器共享；每次调用使用独立的连接。</li>
+ *   <li>实例只保存不可变的 SSE 解析器，线程安全，可被多个调用方共享；每次调用使用独立的连接。</li>
  *   <li>超时取“配置值”与“上下文剩余时间”的较小值，请求级截止时间不会被突破。</li>
  *   <li>失败时统一抛出 {@link ClaraException} 并携带明确的错误码与是否可重试标记（由
  *       {@link ExceptionUtils} 构造）。</li>
  * </ul>
  *
  * <p>失败语义：端点被拒绝、请求过大、超时、传输 IO 失败、响应超限与协议错误都抛出
- * {@link ClaraException}，其中超时与 IO 错误带可重试标记，资源超限与协议错误不建议重试；参数为 null
- * 抛 {@link IllegalArgumentException}；流式调用但实例未配置 SSE 时抛
- * {@link UnsupportedOperationException}。非 2xx 不抛异常，而是返回带错误响应体的 {@link RawHttpResponse}。
+ * {@link ClaraException}，其中超时与 IO 错误带可重试标记，资源超限与协议错误不建议重试；{@code iRequest}
+ * 为 null 抛 {@link IllegalArgumentException}。非 2xx 不抛异常，而是返回带错误响应体的
+ * {@link RawHttpResponse}。
  */
 public final class Jdk8HttpTransport implements IHttpExecute {
 
     /**
-     * SSE 事件解析器；仅在使用带 SSE 上限的构造函数时非空。
+     * SSE 事件解析器，只读、可复用；本类无参构造即创建，恒非 null。
      */
     private final SseParser parser;
 
@@ -95,12 +99,12 @@ public final class Jdk8HttpTransport implements IHttpExecute {
     /**
      * 执行调用：{@code listener} 为 null 时同步读取完整响应体，否则按 SSE 流式解析并回调监听器。
      *
-     * @param iRequest HTTP 请求，流式调用需声明接受 {@code text/event-stream}，非 null
+     * @param iRequest 请求对象，非 null；其线格式请求由 {@link IRequest#toRequest()} 编码，流式调用需让该
+     *                 对象声明接受 {@code text/event-stream}
      * @param listener 事件监听器；为 null 时执行同步调用
      * @return 同步调用返回包含完整响应体的响应；流式调用成功时响应体为空、非 2xx 时携带错误响应体；非 null
-     * @throws IllegalArgumentException      请求或调用上下文为 null 时
-     * @throws UnsupportedOperationException 传入监听器但本实例未配置 SSE 上限（使用了单参构造函数）时
-     * @throws ClaraException                端点被拒绝、请求过大、超时、传输失败或触发协议/资源上限错误时
+     * @throws IllegalArgumentException 请求为 null 时（调用上下文由本类内部经 {@code ConvContext} 创建）
+     * @throws ClaraException           端点被拒绝、请求过大、超时、传输失败或触发协议/资源上限错误时
      */
     @Override
     public RawHttpResponse execute(IRequest iRequest, ISseListener listener) {
@@ -113,6 +117,7 @@ public final class Jdk8HttpTransport implements IHttpExecute {
         TransportConfig config = ConvContext.current().getProviderConfiguration().getTransport();
         CallContext call = ConvContext.current().newCall(config.getReadTimeoutMillis());
         RawHttpRequest request = iRequest.toRequest();
+        System.out.println(RawHttpFormatter.format(request));
         call.getCancellationToken().throwIfCancellationRequested(call.getTraceId());
 
         if (!config.allows(request.getEndpoint())) {
@@ -139,13 +144,17 @@ public final class Jdk8HttpTransport implements IHttpExecute {
             int status = connection.getResponseCode();
             checkContext(call);
             Map<String, List<String>> headers = headers(connection);
+
             if (listener != null) {
                 return stream(status, headers, connection, call, listener);
             }
             // 同步：2xx 读正常流，其余读错误流，非 2xx 也作为结果返回由调用方判断
             InputStream input = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
             byte[] responseBody = input == null ? new byte[0] : read(input, config.getMaxResponseBytes(), call);
-            return new RawHttpResponse(status, headers, responseBody);
+            RawHttpResponse response = new RawHttpResponse(status, headers, responseBody);
+            System.out.println("\n");
+            System.out.println(RawHttpFormatter.format(response));
+            return response;
         } catch (SocketTimeoutException exception) {
             throw ExceptionUtils.requestTimeout();
         } catch (ClaraException exception) {
@@ -175,7 +184,11 @@ public final class Jdk8HttpTransport implements IHttpExecute {
             TransportConfig config = ConvContext.current().getProviderConfiguration().getTransport();
             InputStream error = connection.getErrorStream();
             byte[] errorBody = error == null ? new byte[0] : read(error, config.getMaxResponseBytes(), call);
-            return new RawHttpResponse(status, headers, errorBody);
+
+            RawHttpResponse response = new RawHttpResponse(status, headers, errorBody);
+            System.out.println("\n");
+            System.out.println(RawHttpFormatter.format(response));
+            return response;
         }
         if (!isEventStream(connection.getContentType())) {
             throw ExceptionUtils.protocolError();

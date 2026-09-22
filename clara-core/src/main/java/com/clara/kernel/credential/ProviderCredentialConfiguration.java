@@ -13,20 +13,20 @@ import java.io.Closeable;
 import java.util.Arrays;
 
 /**
- * 保存单个平台配置文件中的凭据来源，并生成 Clara 凭据解析器。
+ * 保存单个平台配置文件中的凭据来源，并按引用名生成凭据解析器。
  *
  * <p>常规用法：生产环境优先配置环境变量名；仅在受控的、已被 Git 忽略的本地 YAML 中才配置
- * {@code apiKey}。模型适配器只持有 {@code secretRef}，调用时再通过 {@link #resolver()} 解析密钥。
+ * {@code apiKey}。平台配置只持有 {@code secretRef}（引用名），组装请求头时再通过 {@link #resolver()} 解析密钥。
  *
  * <p>注意：环境变量与内联密钥必须且只能配置一种。本类适用于单机或单租户配置，
- * {@link #resolver()} 返回的解析器忽略会话上下文里的租户标识，不会按租户切换密钥；多租户系统应使用外部
+ * {@link #resolver()} 返回的解析器只按引用名匹配，不按会话上下文里的租户标识切换密钥；多租户系统应使用外部
  * 密钥服务实现 {@link ICredentialResolver}。使用结束后调用
  * {@link #close()} 清零内联密钥副本，但 JVM 中的 YAML 解析过程仍无法保证明文从未形成字符串对象。
  */
 @Getter
 public final class ProviderCredentialConfiguration implements Closeable {
     /**
-     * 凭据引用名，模型适配器只持有该引用。
+     * 凭据引用名，平台配置只持有该引用。
      */
     private final String secretRef;
     /**
@@ -49,8 +49,8 @@ public final class ProviderCredentialConfiguration implements Closeable {
      *
      * @param secretRef           凭据引用名，不可为空（YAML 键 {@code secretRef}，必填）
      * @param environmentVariable 环境变量名（YAML 键 {@code environmentVariable}，可选），与 apiKey 二选一
-     * @param apiKey              内联密钥（YAML 键 {@code apiKey}，可选），与 environmentVariable 二选一；
-     * @throws IllegalArgumentException secretRef 为空，或环境变量与内联密钥未配置且仅配置一种时
+     * @param apiKey              内联密钥（YAML 键 {@code apiKey}，可选），与 environmentVariable 二选一；传入后会被克隆一份保存
+     * @throws IllegalArgumentException secretRef 为空白，或环境变量与内联密钥同时配置、同时未配置时
      */
     @JsonCreator
     public ProviderCredentialConfiguration(
@@ -72,7 +72,7 @@ public final class ProviderCredentialConfiguration implements Closeable {
     /**
      * 创建凭据解析器。
      *
-     * <p>返回的解析器忽略会话上下文中的租户标识，只按引用名匹配；解析出的密钥由调用方负责清零。
+     * <p>返回的解析器忽略会话上下文中的租户标识，只按引用名匹配；解析出的密钥由调用方负责清零。解析器与本对象共享生命周期：本对象 {@link #close()} 之后再解析会抛 {@link IllegalStateException}。
      *
      * @return 仅在引用名匹配时返回密钥的解析器，非 null
      */

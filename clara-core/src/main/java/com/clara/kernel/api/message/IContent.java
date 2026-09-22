@@ -1,4 +1,4 @@
-package com.clara.kernel.message;
+package com.clara.kernel.api.message;
 
 import com.clara.enums.RoleEnum;
 

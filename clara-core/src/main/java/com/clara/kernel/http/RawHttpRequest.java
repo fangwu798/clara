@@ -11,18 +11,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 封装服务提供商HTTP操作的输入参数。
+ * 线格式请求：封装一次服务提供商 HTTP 请求的方法、端点、请求头与请求体。
  *
- * <p>是什么与所属层：本类属于 {@code clara-model} 的公共 HTTP 层（{@code com.clara.model.http}），是
- * 实现层不可变值对象，不是模型 API 契约；它对一次 HTTP 请求的方法、端点、请求头与请求体做一次性校验，
- * 使传输实现只面对已合法化的输入。
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.kernel.http}），是实现层
+ * 不可变值对象，不是模型 API 契约；它对一次 HTTP 请求的方法、端点、请求头与请求体做一次性校验，使传输实现
+ * 只面对已合法化的输入。
  *
- * <p>谁创建谁调用：只由 {@link ModelInvoker} 创建（命令式往返时先由 {@link RawCallSpec} 描述，同步与
- * 流式往返由 {@link ICallSpec} 描述），再交给 {@link IHttpTransport} 的实现读取。适配器不自行构造本类。
+ * <p>谁创建谁调用：由请求对象的 {@link com.clara.kernel.api.IRequest#toRequest()} 创建（实现里交给
+ * {@code ProviderRequestEncoder} 按字段注解编码），再交给传输实现读取（如
+ * {@link com.clara.kernel.http.execute.Jdk8HttpTransport}）。适配器不自行构造本类。
  *
- * <p>使用方法：{@link ModelInvoker} 依次调用 {@code getMethod()}、{@code getEndpoint()}、
- * {@code getHeaders()}、{@code getBody()} 组装连接 → 传输层发送。本类没有 close 或释放动作，也不持有
- * 连接、流等需要回收的资源，构造完成即可安全传递；{@code getBody()} 每次返回副本，用完即可丢弃。
+ * <p>使用方法：传输实现依次调用 {@code getMethod()}、{@code getEndpoint()}、{@code getHeaders()}、
+ * {@code getBody()} 组装连接并发送。本类没有 close 或释放动作，也不持有连接、流等需要回收的资源，构造完成
+ * 即可安全传递；{@code getBody()} 每次返回副本，用完即可丢弃。
  *
  * <p>生命周期与线程安全：实例不可变（字段均为 final，请求头被冻结为不可修改映射，请求体在构造时拷贝、
  * 取值时再次拷贝），构造完成后可安全跨线程共享。

@@ -1,9 +1,9 @@
 package com.clara.kernel.http.execute.sse;
 
 /**
- * 表示 SSE 单个事件在解析过程中的可变状态，从 {@link SseParser} 中独立出来。
+ * SSE 解析状态：承载单个事件在逐行解析过程中的可变字段与计数。
  *
- * <p>是什么与所属层：本类属于 {@code clara-model} 的公共 HTTP 层（{@code com.clara.model.http.sse}），
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.kernel.http.execute.sse}），
  * 是包私有（package-private）的实现细节，仅供同包的 {@link SseParser} 使用；它承载逐行解析时当前事件的
  * {@code data}/{@code event}/{@code id}/{@code retry} 字段，以及事件体积与已派发数量的计数。
  *

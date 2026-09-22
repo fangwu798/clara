@@ -26,8 +26,7 @@ import java.net.URISyntaxException;
  *
  * <p>生命周期与线程安全：无状态，Jackson 可复用同一实例；不存在需要释放的资源。
  *
- * <p>失败语义：值缺失、非文本或不符合上述任一规则时抛 {@link InvalidFormatException}（消息为中文，
- * 由 {@link com.clara.model.configuration.StrictYamlBinder} 附加字段路径与行号后向上抛出），
+ * <p>失败语义：值缺失、非文本或不符合上述任一规则时抛 {@link InvalidFormatException}
  * 属于配置错误，不可重试。
  */
 public final class SafeHttpUriDeserializer extends JsonDeserializer<URI> {

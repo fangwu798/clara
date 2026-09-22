@@ -9,17 +9,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 封装服务提供商HTTP操作的响应数据。
+ * 线格式响应：封装一次服务提供商 HTTP 响应的状态码、响应头与响应体。
  *
- * <p>是什么与所属层：本类属于 {@code clara-model} 的公共 HTTP 层（{@code com.clara.model.http}），是
- * 实现层不可变值对象，不是模型 API 契约；它承载传输层读取到的状态码、响应头与响应体，供
- * {@link ModelInvoker} 判定成功与否、供 {@link ICallExchange#decode} 解析成领域对象。
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.kernel.http}），是实现层
+ * 不可变值对象，不是模型 API 契约；它承载传输实现读取到的状态码、响应头与响应体，供调用方判定成败、供
+ * {@code ProviderResponseDecoder} 按字段注解解析成领域响应对象。
  *
- * <p>谁创建谁调用：只由 {@link IHttpTransport} 的实现创建（如 {@code impl.Jdk8HttpTransport}）；由
- * {@link ModelInvoker} 读取状态码，再由适配器的 {@link ICallExchange} 实现读取响应头与响应体。
+ * <p>谁创建谁调用：由传输实现创建（如
+ * {@link com.clara.kernel.http.execute.Jdk8HttpTransport}）；由
+ * {@link com.clara.kernel.api.execute.IHttpExecute} 的默认方法读取——同步时交给 {@code ProviderResponseDecoder}
+ * 解码，再由响应对象的 {@code raw} 字段回填；流式时只用于判状态码与错误响应体。
  *
- * <p>使用方法：调用
- * {@link IHttpTransport#execute(RawHttpRequest, CallContext)} 或流式重载拿到本对象 →
+ * <p>使用方法：调用 {@link com.clara.kernel.api.execute.IHttpExecute} 的
+ * {@code execute(IRequest, ISseListener)} 拿到本对象 →
  * 先用 {@code getStatusCode()} 判断成败（2xx 才有完整业务响应体）→ 再用 {@code getHeaders()}、
  * {@code getBody()} 解析。本类没有 close 或释放动作，也不持有连接与流；{@code getBody()} 每次返回副本。
  *
@@ -30,8 +32,8 @@ import java.util.Map;
  * null），属于调用方编程错误；构造时不会因为响应头含 null 而失败——这类条目被静默丢弃。构造成功后的读取
  * 方法不会抛异常，也不会返回 null。
  *
- * <p>注意：流式调用成功时 {@code body} 为空数组，事件已由 {@link com.clara.model.http.sse.ISseListener}
- * 消费；非 2xx 时响应体是错误响应体，本类不做任何错误映射。
+ * <p>注意：流式调用成功时 {@code body} 为空数组，事件已由
+ * {@link com.clara.kernel.api.execute.ISseListener} 消费；非 2xx 时响应体是错误响应体，本类不做任何错误映射。
  */
 @Data
 public final class RawHttpResponse {

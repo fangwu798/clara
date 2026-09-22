@@ -1,6 +1,7 @@
 package com.clara.kernel.config;
 
 
+import com.clara.context.ConvContext;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.kernel.api.credential.ICredentialResolver;
@@ -8,6 +9,7 @@ import com.clara.kernel.config.resolver.ConfigResolvers;
 import com.clara.kernel.credential.ProviderCredentialConfiguration;
 import com.clara.kernel.exception.ClaraException;
 import com.clara.kernel.http.TransportConfig;
+import com.clara.utils.CodexTuiGenerator;
 import com.clara.utils.ExceptionUtils;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -98,7 +100,7 @@ public final class ProviderConfiguration implements Closeable {
      *
      * <p>绑定走本构造器，因此下面的校验就是配置加载期的校验：YAML 缺少 {@code provider} /
      * {@code credential} / {@code transport} / {@code capabilities} 任一项时由绑定器报「缺失」，
-     * 传入 null 或能力表为空时由本构造器报错；{@code observability} 可省略，省略即取默认设置。
+     * 传入 null 或能力表为空时由本构造器报错。
      *
      * @param provider     所属模型平台，不可为空
      * @param credential   凭据配置，不可为空；本对象拥有其生命周期
@@ -175,9 +177,9 @@ public final class ProviderConfiguration implements Closeable {
      * 组装一次调用的授权请求头，并按「流式 / 非流式」给出请求体内容类型与期望响应类型的头。
      *
      * <p>为什么把 {@code Content-Type} 与 {@code Accept} 一起返回：它们与鉴权头同属「一次往返固定要带的
-     * 头」——{@code Content-Type} 决定请求体怎么被解析，{@code Accept} 决定响应怎么被解析（流式不声明
-     * {@code Accept: text/event-stream} 会被传输层按协议错误拒绝），放在一起组装可避免各调用方各拼一遍、
-     * 拼错一处就整次调用失败。
+     * 头」——{@code Content-Type} 决定请求体怎么被解析，{@code Accept} 决定平台按什么格式返回（流式必须
+     * 声明 {@code text/event-stream}，否则平台按非流式返回，传输层会因响应内容类型不符而报协议错误），
+     * 放在一起组装可避免各调用方各拼一遍、拼错一处就整次调用失败。
      *
      * <p>鉴权头形状随平台而定：
      * <ul>
@@ -192,7 +194,7 @@ public final class ProviderConfiguration implements Closeable {
      * @param kind      能力种类，用于读取平台专有头参数（如 Anthropic 的 {@code apiVersion}），不可为 null
      * @param streaming 本次调用是否为流式；决定 {@code Accept} 的值
      * @return 不可修改的请求头映射，非 null，包含鉴权头、{@code Content-Type: application/json} 与
-     *         {@code Accept}
+     * {@code Accept}
      * @throws IllegalArgumentException kind 为 null、该能力未配置，或平台专有头参数缺失 / 类型不符时
      * @throws ClaraException           密钥不可用（引用名不匹配或环境变量未设置）时，错误码
      *                                  {@code MODEL_CREDENTIAL_UNAVAILABLE}，配置问题不可重试
@@ -211,7 +213,7 @@ public final class ProviderConfiguration implements Closeable {
      * @param streaming   本次调用是否为流式；决定 {@code Accept} 的值
      * @param contentType 请求体内容类型，可为 null（表示本次请求不带请求体，不下发该头）
      * @return 不可修改的请求头映射，非 null，包含鉴权头、{@code Accept}，以及 contentType 非 null 时的
-     *         {@code Content-Type}
+     * {@code Content-Type}
      * @throws IllegalArgumentException kind 为 null、该能力未配置，或平台专有头参数缺失 / 类型不符时
      * @throws ClaraException           密钥不可用（引用名不匹配或环境变量未设置）时，错误码
      *                                  {@code MODEL_CREDENTIAL_UNAVAILABLE}，配置问题不可重试
@@ -232,6 +234,20 @@ public final class ProviderConfiguration implements Closeable {
             } else {
                 headers.put("Authorization", "Bearer " + new String(secret));
             }
+            //调用OPENAI的时候如果使用了中转站的时候 中转站可能禁止API调用需要模拟codex的调用
+            if (provider == ModelProviderEnum.OPENAI) {
+                Map<String, String> headerConfig = ConvContext.current().getProviderConfiguration().getTransport().getHeaders();
+                if (headerConfig.containsKey("x-Transfer")) {
+                    CodexTuiGenerator generator = new CodexTuiGenerator();
+                    Map<String, String> codexHeaders = generator.buildHeaders();
+                    for (String key : codexHeaders.keySet()) {
+                        if (!headers.containsKey(key)) {
+                            headers.put(key, codexHeaders.get(key));
+                        }
+                    }
+                }
+
+            }
             if (contentType != null) {
                 headers.put("Content-Type", contentType);
             }
@@ -249,7 +265,7 @@ public final class ProviderConfiguration implements Closeable {
      * 因此新增平台/能力不影响本类。解析只做映射与构造期校验，不发起任何网络调用。
      *
      * @param kind 能力种类，不可为 null；决定返回的具体配置类型与参数键名
-     * @return 具体能力配置，非 null；静态类型为 {@link ModelConfig}，调用方按需强转为平台派生类
+     * @return 具体能力配置，非 null；当前实现返回 {@link ModelConfig} 本身，含平台、能力种类、端点、模型 ID、协议档位与凭据引用
      * @throws IllegalArgumentException 该能力未配置、必填参数缺失或类型不符时
      * @throws ClaraException           该平台不支持该能力种类时（错误码 {@code CAPABILITY_NOT_SUPPORTED}，不可重试）
      */

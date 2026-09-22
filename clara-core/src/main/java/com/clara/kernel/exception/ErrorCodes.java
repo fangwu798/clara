@@ -9,7 +9,8 @@ import com.clara.kernel.exception.ClaraError;
  * <ul>
  *   <li>常量名与字符串值一致，且作为 {@link ClaraError} 的错误码对外暴露，属于稳定契约——只能新增，
  *       不要改名或改值，否则会破坏按错误码分支的上层逻辑与日志比对；</li>
- *   <li>命名前缀表示归属模块：{@code MODEL_} 模型调用、{@code MCP_} MCP 协议与注册、{@code WORKFLOW_} /
+ *   <li>命名前缀表示归属模块：{@code MODEL_} 模型调用、{@code MCP_} MCP 协议与注册、{@code CONVERSATION_}
+ *       会话与存储、{@code WORKFLOW_} /
  *       {@code PLAN_} / {@code BUDGET_} / {@code EXECUTION_} / {@code INTERACTION_} 编排与执行、
  *       {@code SKILL_} 技能、{@code WORKSPACE_} / {@code DOCUMENT_} / {@code CHANGESET_} 工作区与文本编辑、
  *       {@code SEMANTIC_MEMORY_} 语义记忆、{@code MEDIA_} 媒体资产与生成任务；</li>

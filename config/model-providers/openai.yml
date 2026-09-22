@@ -11,9 +11,11 @@ transport:
   maxRequestBytes: 8388608
   maxResponseBytes: 33554432
   allowHttp: false
+  headers:
+    x-Transfer: true
 capabilities:
   CHAT:
-    endpoint: https://new.aicontrol.top/v1/chat/completions
+    endpoint: https://new.aicontrol.top/v1/responses
     modelId: gpt-5.6-sol
     apiProfile: chat-completions-v1
     parameters:

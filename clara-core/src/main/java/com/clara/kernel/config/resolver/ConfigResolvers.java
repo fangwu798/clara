@@ -18,14 +18,15 @@ import java.util.List;
 /**
  * 配置解析器注册表：按「平台 × 能力种类」查找唯一负责的 {@link IConfigResolver}。
  *
- * <p>用途与位置：实现层组件，是配置解析的唯一入口。{@code ProviderConfiguration#toConfig(CapabilityKind)}
+ * <p>用途与位置：配置层组件（{@code com.clara.kernel.config.resolver}），是配置解析的唯一入口。
+ * {@code ProviderConfiguration#toConfig(CapabilityKindEnum)}
  * 直接委托本类，因此新增平台或能力只需要新增一个 resolver 并登记到 {@link #RESOLVERS}，
  * {@code ProviderConfiguration} 不再改动。
  *
  * <p>使用方法：
  * <ol>
  *   <li>无需实例化——构造器私有，全部方法为 {@code static}；</li>
- *   <li>常规路径：{@code providerConfiguration.toConfig(CapabilityKind.CHAT)}；</li>
+ *   <li>常规路径：{@code providerConfiguration.toConfig(CapabilityKindEnum.CHAT)}；</li>
  *   <li>需要先确认组合是否受支持时：{@link #forProvider(ModelProviderEnum, CapabilityKindEnum)}
  *       返回唯一实现，或在不受支持时抛配置异常；</li>
  *   <li>无状态、线程安全（解析器列表初始化后只读），无需 {@code close()}
@@ -43,7 +44,8 @@ import java.util.List;
  */
 public final class ConfigResolvers {
     /**
-     * 已登记的平台解析器，按「先兼容协议对话、再平台专有能力」的顺序排列；初始化后只读，不可变。
+     * 已登记的解析器，按登记顺序线性查找；初始化后只读、不可变。当前只登记了
+     * {@link CompatibleConfigResolver}（覆盖 OpenAI 兼容家族的对话与图片）。
      */
     private static final List<IConfigResolver> RESOLVERS = Collections.unmodifiableList(
             Arrays.<IConfigResolver>asList(

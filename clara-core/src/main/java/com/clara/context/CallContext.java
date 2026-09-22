@@ -3,38 +3,36 @@ package com.clara.context;
 import lombok.Getter;
 
 /**
- * 承载一次具体调用的跟踪标识、截止时间、取消信号与可选的日志事件接收方。
+ * 调用上下文：承载一次具体调用的跟踪标识、截止时间与取消信号。
  *
  * <p>是什么、在哪一层：本类属于内核的上下文包（{@code com.clara.context}），是调用级上下文值对象，
- * 不是模型 API 契约；它随一次调用（而不是一个会话）从调用方向下贯穿到 HTTP 层，让每一层都能读到同一份
- * 跟踪标识、截止时间、取消信号，并让日志事件能实时回流给调用方。
+ * 不是模型 API 契约；它随一次调用（而不是一个会话）向下贯穿到传输层的读取循环与 SSE 解析，让每一层都能读到
+ * 同一份跟踪标识、截止时间与取消信号。
  *
- * <p>谁创建谁调用：由最终发起调用的业务代码创建（通常是宿主应用的 Agent / CLI），随后放进请求对象
- * （如 {@code ChatRequest}）随调用链向下传递；HTTP 层（{@code ModelInvoker}、日志发射器、SSE 解析）
- * 只读取，不修改。
+ * <p>谁创建谁调用：由 {@link ConvContext#newCall(long)} 在传输层真正发出请求时创建
+ * （见 {@code com.clara.kernel.http.execute.Jdk8HttpTransport}），随后作为参数传给读取循环与
+ * SSE 解析器（{@code SseParser}）；这些层只读取，不修改。
  *
  * <p>使用方法（典型序列）：
  * <ol>
- *   <li>每次调用新建一个，{@code traceId} 每次不同，便于在日志与观测中区分单次请求：</li>
- *   <li>{@code CallContext call = new CallContext(traceId, deadlineEpochMillis, token);} 不关心日志时
- *       使用三参构造器；</li>
- *   <li>需要实时接收日志事件时改用四参构造器并传入日志观察者（
- *       {@code new CallContext(traceId, deadlineEpochMillis, token, logObserver)}），日志事件以
- *       {@code StreamEvent(LOG, …)} 的形式回调该观察者；不传表示日志只走 SLF4J；</li>
- *   <li>把它交给请求对象，长耗时操作在循环中同时检查 {@link #remainingMillis(long)} 与取消令牌。</li>
+ *   <li>一般不需要自行构造：传输层调 {@link ConvContext#newCall(long)}，由它生成新的 {@code traceId} 并按
+ *       「当前时间 + 超时」算出截止时间，同时登记进会话调用历史；</li>
+ *   <li>需要在链路之外自造时用唯一的三参构造器
+ *       {@code new CallContext(traceId, deadlineEpochMillis, cancellationToken)}；</li>
+ *   <li>长耗时操作在循环中同时看两个信号：{@link #remainingMillis(long)} 换算出的剩余时间与
+ *       {@code getCancellationToken()} 的取消状态，任一触发即中断本次调用。</li>
  * </ol>
  *
  * <p>生命周期与线程安全：实例不可变（字段全部 final），可安全跨线程传递与长期持有；无资源需要释放。
- * 日志观察者由调用方提供，其线程安全性由实现方保证——流式调用会在读取线程上回调它。
+ * 取消令牌的线程安全由 {@link CancellationToken} 自身保证。
  *
  * <p>失败语义：跟踪标识为空白、取消令牌为 null 时构造抛 {@link IllegalArgumentException}，属于调用方
- * 编程错误，不可重试；本类不校验截止时间是否已过期（过期只在被检查时体现为剩余时间为零），也不校验
- * 日志观察者是否为 null（null 表示不接收日志事件）。
+ * 编程错误，不可重试；本类不校验截止时间是否已过期（过期只在被检查时体现为剩余时间为零）。
  */
 @Getter
 public final class CallContext {
     /**
-     * 端到端观测使用的跟踪标识；必填，每次调用重新生成。
+     * 端到端观测使用的跟踪标识；必填、不可为空白，由 {@link ConvContext#newCall(long)} 每次调用重新生成。
      */
     private final String traceId;
     /**

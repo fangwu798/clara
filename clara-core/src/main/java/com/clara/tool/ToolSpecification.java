@@ -1,5 +1,7 @@
 package com.clara.tool;
 
+import lombok.Data;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,6 +30,7 @@ import java.util.Map;
  * <p>失败语义：{@code name} 为 null 或空白、{@code parameters} 为 null 时构造抛
  * {@link IllegalArgumentException}，属调用方编程错误，不可重试；{@code description} 可为 null。
  */
+@Data
 public final class ToolSpecification {
 
     /**
@@ -63,33 +66,6 @@ public final class ToolSpecification {
         }
         this.name = name;
         this.description = description;
-        this.parameters = Collections.unmodifiableMap(new LinkedHashMap<String, Object>(parameters));
-    }
-
-    /**
-     * 读取函数名。
-     *
-     * @return 非空函数名
-     */
-    public String getName() {
-        return name;
-    }
-
-    /**
-     * 读取功能描述。
-     *
-     * @return 功能描述，可为 null
-     */
-    public String getDescription() {
-        return description;
-    }
-
-    /**
-     * 读取入参 JSON Schema。
-     *
-     * @return 只读的 JSON Schema 映射，非 null
-     */
-    public Map<String, Object> getParameters() {
-        return parameters;
+        this.parameters = Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
     }
 }

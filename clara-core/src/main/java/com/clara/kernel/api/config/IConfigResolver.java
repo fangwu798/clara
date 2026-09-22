@@ -8,11 +8,12 @@ import com.clara.kernel.config.resolver.ConfigResolvers;
 
 
 /**
- * 能力配置解析契约：把 YAML 能力节点映射为具体的 {@link ModelConfig} 派生对象。
+ * 能力配置解析契约：把 YAML 能力节点映射为具体的 {@link ModelConfig}。
  *
- * <p>用途与位置：实现层 SPI，位于 {@code com.clara.kernel.config.resolver}，只被
- * {@link ConfigResolvers} 注册表与 {@code ProviderConfiguration#toConfig(CapabilityKindEnum)}
- * 使用。每个实现负责一组「平台 × 能力种类」组合（例如 OpenAI 兼容家族的对话与图片），
+ * <p>用途与位置：配置解析 SPI，实现位于 {@code com.clara.kernel.config.resolver}（当前唯一实现为
+ * {@link com.clara.kernel.config.resolver.CompatibleConfigResolver}），只被 {@link ConfigResolvers}
+ * 注册表使用；{@code ProviderConfiguration#toConfig(CapabilityKindEnum)} 也是经注册表间接调它。
+ * 每个实现负责一组「平台 × 能力种类」组合（例如 OpenAI 兼容家族的对话与图片），
  * 组合之间不得重叠——{@link ConfigResolvers} 在类初始化时校验唯一性，重复注册直接失败。
  *
  * <p>实现方必须保证的语义：
@@ -45,7 +46,8 @@ public interface IConfigResolver {
      *
      * @param provider       已加载的平台配置，不可为 null；其平台必须与 {@link #supports} 匹配
      * @param kind           能力种类，不可为 null；决定取哪个能力节点，以及返回的具体配置类型与参数键名
-     * @return 具体配置对象，非 null（静态类型为 {@link ModelConfig}，调用方按需强转为平台派生类）
+     * @return 具体配置对象，非 null；当前实现返回 {@link ModelConfig} 本身（平台、能力种类、端点、模型 ID、
+     *         协议档位与凭据引用）
      * @throws IllegalArgumentException 该能力未配置、必填参数缺失或类型不符时
      */
     ModelConfig resolve(ProviderConfiguration provider, CapabilityKindEnum kind);

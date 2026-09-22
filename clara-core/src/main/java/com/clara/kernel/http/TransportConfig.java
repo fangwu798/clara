@@ -16,18 +16,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 定义JDK 8服务提供商HTTP传输器的配置。
+ * 传输配置：定义一次平台 HTTP 往返的连接参数、安全边界与报文上限。
  *
- * <p>是什么与所属层：本类属于 {@code clara-model} 的公共 HTTP 层（{@code com.clara.model.http}），是
- * 实现层不可变值对象，不是模型 API 契约；它承载端点白名单、超时、报文上限与平台级默认请求头，构造时
- * 一次性校验并冻结，供传输实现读取。
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.kernel.http}），是实现层
+ * 不可变值对象，不是模型 API 契约；它按平台 YAML 的 {@code transport} 节点形状声明端点白名单、超时、
+ * 报文上限与平台级默认请求头，构造时一次性校验并冻结，供传输实现读取。
  *
- * <p>谁创建谁调用：由配置层（{@link com.clara.model.configuration.ProviderTransportConfiguration}）或
- * 宿主应用创建，再传给传输实现的构造函数（如 {@code impl.Jdk8HttpTransport}）；传输实现在每次往返时读取
- * 白名单与上限，无需在运行期修改本对象。
+ * <p>谁创建谁调用：由配置加载器在装配阶段从平台 YAML 绑定——它是 {@code ProviderConfiguration} 的
+ * {@code transport} 字段，绑定走带 {@code @JsonCreator} + {@code @JsonProperty} 的七参构造器
+ * （缺了这组注解，所有平台配置都会在加载期失败）；随后由传输实现在每次往返时读取白名单与上限，运行期不再
+ * 修改，{@link com.clara.kernel.http.execute.Jdk8HttpTransport} 通过 {@code ConvContext} 取得本对象。
  *
- * <p>使用方法：装配阶段构造一次并复用 → 注入传输实现 → 传输层用 {@link #allows(URI)} 做源站校验、用
- * getter 读取超时与体积上限和默认请求头。本类没有 close 或释放动作，实例与传输器同生命周期。
+ * <p>使用方法：配置层绑定一次并复用 → 传输层用 {@link #allows(URI)} 做源站校验、用 getter 读取超时、
+ * 体积上限与默认请求头。本类没有 close 或释放动作，实例与平台配置同生命周期。
  *
  * <p>除源白名单、超时与报文上限外，还支持一组平台级默认请求头：它们在发送时先写入连接，再由
  * 适配器自己拼装的请求头覆盖同名项，因此适合补充网关需要的追踪、路由或产品标识类请求头。
@@ -78,8 +79,8 @@ public final class TransportConfig {
     /**
      * 响应体最大字节数。
      *
-     * <p>取值：正数，单位字节，必填；超出时传输层按响应超限错误中断；无默认值。SSE 的单事件上限必须不
-     * 大于该值。
+     * <p>取值：正数，单位字节，必填；超出时传输层按响应超限错误中断；无默认值。SSE 解析器的单事件上限
+     * 按约定不应大于该值（本类不校验，由使用方保证）。
      */
     private final int maxResponseBytes;
     /**
