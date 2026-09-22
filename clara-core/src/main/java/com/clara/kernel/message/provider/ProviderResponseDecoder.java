@@ -1,4 +1,4 @@
-package com.clara.utils.deserialize;
+package com.clara.kernel.message.provider;
 
 import com.clara.context.ConvContext;
 import com.clara.enums.ProtocolEnum;
@@ -6,6 +6,8 @@ import com.clara.kernel.api.IResponse;
 import com.clara.kernel.api.execute.IResponseDecoder;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.http.RawHttpResponse;
+import com.clara.kernel.message.provider.completion.CompletionResponseDecoder;
+import com.clara.kernel.message.provider.response.ResponseResponseDecoder;
 
 /**
  * 响应解码的协议分派入口：按当前能力的协议档位选择 Chat Completions 或 Responses 解码器。

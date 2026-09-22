@@ -1,23 +1,17 @@
-package com.clara.utils.deserialize;
+package com.clara.kernel.message.provider;
 
 import com.clara.annoation.ResponseAdapter;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.kernel.api.IResponse;
 import com.clara.kernel.exception.ClaraException;
 import com.clara.kernel.stream.StreamEvent;
-import com.clara.tool.ResponsesToolCall;
-import com.clara.utils.ExceptionUtils;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.clara.utils.deserialize.ResponseDecoderSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 流式累加器：把 SSE 数据块解码为流事件，并把增量累加到同一个响应对象上。
@@ -189,9 +183,9 @@ public abstract class StreamAssembler<R extends IResponse> {
     /**
      * 字段与命中规则的组合。
      */
-    protected static final class Rule {
-        protected final Field field;
-        protected final ResponseAdapter adapter;
+    public static final class Rule {
+        public final Field field;
+        public final ResponseAdapter adapter;
         protected final String path;
         protected final String streamPath;
         protected final String streamEvent;

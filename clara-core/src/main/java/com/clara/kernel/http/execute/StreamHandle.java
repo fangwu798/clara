@@ -15,8 +15,8 @@ import com.clara.kernel.stream.IStreamHandle;
 import com.clara.kernel.stream.IStreamObserver;
 import com.clara.kernel.stream.StreamEvent;
 import com.clara.utils.ExceptionUtils;
-import com.clara.utils.deserialize.ProviderResponseDecoder;
-import com.clara.utils.deserialize.StreamAssembler;
+import com.clara.kernel.message.provider.ProviderResponseDecoder;
+import com.clara.kernel.message.provider.StreamAssembler;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;

@@ -6,7 +6,7 @@ import com.clara.kernel.http.RawHttpResponse;
 import com.clara.kernel.http.execute.StreamHandle;
 import com.clara.kernel.stream.IStreamHandle;
 import com.clara.kernel.stream.IStreamObserver;
-import com.clara.utils.deserialize.ProviderResponseDecoder;
+import com.clara.kernel.message.provider.ProviderResponseDecoder;
 
 /**
  * 执行一次服务提供商调用的统一入口，覆盖同步与 SSE 流式两种响应方式。

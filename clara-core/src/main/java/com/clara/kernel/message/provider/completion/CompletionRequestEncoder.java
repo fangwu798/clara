@@ -1,6 +1,7 @@
-package com.clara.utils.deserialize;
+package com.clara.kernel.message.provider.completion;
 
 import com.clara.enums.ModelProviderEnum;
+import com.clara.kernel.message.provider.AbstractRequestEncoder;
 
 import java.lang.reflect.Field;
 import java.util.Map;

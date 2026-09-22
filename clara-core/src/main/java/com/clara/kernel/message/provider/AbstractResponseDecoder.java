@@ -1,4 +1,4 @@
-package com.clara.utils.deserialize;
+package com.clara.kernel.message.provider;
 
 import com.clara.annoation.ProtocolResponse;
 import com.clara.annoation.ResponseAdapter;
@@ -9,6 +9,7 @@ import com.clara.kernel.api.IResponse;
 import com.clara.kernel.api.execute.IResponseDecoder;
 import com.clara.kernel.http.RawHttpResponse;
 import com.clara.utils.ExceptionUtils;
+import com.clara.utils.deserialize.ResponseDecoderSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.lang.reflect.Field;

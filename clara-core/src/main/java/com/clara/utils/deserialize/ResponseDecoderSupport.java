@@ -25,7 +25,7 @@ import java.util.List;
  *
  * <p>供响应解码器与流式累加器共用，避免两处各写一份。无状态、线程安全。
  */
-final class ResponseDecoderSupport {
+public final class ResponseDecoderSupport {
 
     private static final ObjectMapper MAPPER = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -35,7 +35,7 @@ final class ResponseDecoderSupport {
     /**
      * 按路径取值，支持 {@code a.b[0].c} 下标与 {@code a.b[type=xxx].c} 按 {@code type} 过滤两种形式。
      */
-    static JsonNode valueAt(JsonNode root, String path) {
+    public static JsonNode valueAt(JsonNode root, String path) {
         JsonNode current = root;
         for (String segment : path.split("\\.")) {
             if (current == null) {
@@ -84,7 +84,7 @@ final class ResponseDecoderSupport {
     /**
      * 判断节点是否算「有值」：非空、非 NullNode、非空字符串。
      */
-    static boolean present(JsonNode node) {
+    public static boolean present(JsonNode node) {
         if (node == null || node.isNull()) {
             return false;
         }
@@ -94,7 +94,7 @@ final class ResponseDecoderSupport {
     /**
      * 解析 JSON 文本为节点树。
      */
-    static JsonNode parse(String data, ModelProviderEnum provider) {
+    public static JsonNode parse(String data, ModelProviderEnum provider) {
         try {
             return MAPPER.readTree(data);
         } catch (IOException exception) {
@@ -105,7 +105,7 @@ final class ResponseDecoderSupport {
     /**
      * 写入字段值。
      */
-    static void write(Field field, Object target, Object value) {
+    public static void write(Field field, Object target, Object value) {
         if (value == null) {
             return;
         }
@@ -132,7 +132,7 @@ final class ResponseDecoderSupport {
     /**
      * 把文本增量追加到目标字段上。
      */
-    static void appendText(Field field, Object target, String text) {
+    public static void appendText(Field field, Object target, String text) {
         Object current = read(field, target);
         write(field, target, current == null ? text : ((String) current) + text);
     }
@@ -140,7 +140,7 @@ final class ResponseDecoderSupport {
     /**
      * 按目标类型转换节点值。
      */
-    static Object convert(Type type, JsonNode node, ModelProviderEnum provider) {
+    public static Object convert(Type type, JsonNode node, ModelProviderEnum provider) {
         Class<?> raw = type instanceof Class ? (Class<?>) type : null;
         if (raw == String.class) {
             return node.isTextual() ? node.textValue() : node.asText();
@@ -191,7 +191,7 @@ final class ResponseDecoderSupport {
     /**
      * 创建响应对象。
      */
-    static <R extends IResponse> R newInstance(Class<R> responseType) {
+    public static <R extends IResponse> R newInstance(Class<R> responseType) {
         try {
             Constructor<R> constructor = responseType.getDeclaredConstructor();
             constructor.setAccessible(true);
@@ -204,7 +204,7 @@ final class ResponseDecoderSupport {
     /**
      * 取响应类型及父类的实例字段，父类字段在前。
      */
-    static List<Field> fields(Class<?> type) {
+    public static List<Field> fields(Class<?> type) {
         List<Class<?>> hierarchy = new ArrayList<Class<?>>();
         for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
             hierarchy.add(0, current);
@@ -224,7 +224,7 @@ final class ResponseDecoderSupport {
     /**
      * 在字段的规则里找出当前平台与能力对应的第一条。
      */
-    static ResponseAdapter match(Field field, ModelProviderEnum provider, CapabilityKindEnum capability) {
+    public static ResponseAdapter match(Field field, ModelProviderEnum provider, CapabilityKindEnum capability) {
         for (ResponseAdapter adapter : field.getDeclaredAnnotationsByType(ResponseAdapter.class)) {
             if (adapter.capability() != capability) {
                 continue;

@@ -4,7 +4,7 @@ import com.clara.context.ConvContext;
 import com.clara.kernel.api.IRequest;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.ImageParameters;
-import com.clara.utils.deserialize.ProviderRequestEncoder;
+import com.clara.kernel.message.provider.ProviderRequestEncoder;
 import lombok.Data;
 import lombok.experimental.SuperBuilder;
 

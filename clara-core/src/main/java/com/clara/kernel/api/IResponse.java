@@ -1,6 +1,7 @@
 package com.clara.kernel.api;
 
 import com.clara.kernel.http.RawHttpResponse;
+import com.clara.kernel.message.provider.ProviderResponseDecoder;
 
 /**
  * 响应对象契约：一次能力调用的出参根接口，字段与平台 JSON 的对应关系由字段注解声明。
@@ -10,7 +11,7 @@ import com.clara.kernel.http.RawHttpResponse;
  * {@code @ResponseAdapter} 注解按「平台 + 能力种类」分别声明同步取值路径与流式增量路径，因此响应侧也不
  * 需要为每个平台写实现类。
  *
- * <p>谁创建、谁调用：由 {@link com.clara.utils.deserialize.ProviderResponseDecoder} 在解码时实例化并
+ * <p>谁创建、谁调用：由 {@link ProviderResponseDecoder} 在解码时实例化并
  * 逐个字段回填（要求响应类型有无参构造器），注解匹配所需的平台与能力取自线程上下文
  * （{@link com.clara.context.ConvContext}）；调用方只读取字段，不自行构造，也不跨线程共享同一实例。
  */

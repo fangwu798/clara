@@ -1,8 +1,11 @@
-package com.clara.utils.deserialize;
+package com.clara.kernel.message.provider.completion;
 
 import com.clara.annoation.ProtocolResponse;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.kernel.api.IResponse;
+import com.clara.kernel.message.provider.AbstractResponseDecoder;
+import com.clara.kernel.message.provider.StreamAssembler;
+import com.clara.utils.deserialize.ResponseDecoderSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.lang.reflect.Field;

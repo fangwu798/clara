@@ -17,14 +17,14 @@ import java.util.Map;
  * Responses 协议工具调用的转换工具：把 {@code output[]} 里的 {@code function_call} 过滤并反序列化为独立类型
  * {@link ResponsesToolCall}，以及把工具调用序列化回 {@code tool_calls[]} 约定供观察者拼装。
  */
-final class ResponseToolCallSupport {
+public final class ResponseToolCallSupport {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private ResponseToolCallSupport() {
     }
 
-    static boolean isResponsesToolCallList(Field field) {
+    public static boolean isResponsesToolCallList(Field field) {
         Type type = field.getGenericType();
         if (!(type instanceof ParameterizedType)) {
             return false;
@@ -35,7 +35,7 @@ final class ResponseToolCallSupport {
                 && parameterized.getActualTypeArguments()[0] == ResponsesToolCall.class;
     }
 
-    static List<ResponsesToolCall> convertResponsesToolCalls(JsonNode node) {
+    public static List<ResponsesToolCall> convertResponsesToolCalls(JsonNode node) {
         if (node == null || !node.isArray()) {
             return null;
         }
@@ -52,7 +52,7 @@ final class ResponseToolCallSupport {
         return result.isEmpty() ? null : result;
     }
 
-    static String toolCallsPayload(List<ResponsesToolCall> calls) {
+    public static String toolCallsPayload(List<ResponsesToolCall> calls) {
         List<Map<String, Object>> items = new ArrayList<Map<String, Object>>();
         int index = 0;
         for (ResponsesToolCall call : calls) {

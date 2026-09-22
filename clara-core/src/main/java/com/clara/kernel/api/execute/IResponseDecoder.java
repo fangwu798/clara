@@ -2,7 +2,7 @@ package com.clara.kernel.api.execute;
 
 import com.clara.kernel.api.IResponse;
 import com.clara.kernel.http.RawHttpResponse;
-import com.clara.utils.deserialize.StreamAssembler;
+import com.clara.kernel.message.provider.StreamAssembler;
 
 /**
  * 响应解码器契约：把平台返回的原始响应 / SSE 流解码为统一响应对象。

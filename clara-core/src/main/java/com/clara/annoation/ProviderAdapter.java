@@ -2,6 +2,8 @@ package com.clara.annoation;
 
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
+import com.clara.kernel.message.provider.ProviderRequestEncoder;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
@@ -12,7 +14,7 @@ import java.lang.annotation.Target;
  * 入参适配：声明「请求对象的某个字段，在哪个平台、哪种能力下怎么下发」。
  *
  * <p>是什么、在哪一层：注解层（{@code com.clara.annoation}）的字段级入参适配注解，由编码器
- * {@link com.clara.utils.deserialize.ProviderRequestEncoder} 在序列化请求体时反射读取。平台差异全部收敛到
+ * {@link ProviderRequestEncoder} 在序列化请求体时反射读取。平台差异全部收敛到
  * 注解声明里，编码器不含平台分支，因此同一份参数类可以承载所有平台的请求体。
  *
  * <p>谁创建、谁调用：由参数类（如 {@code ModelParameters} / {@code ImageParameters} / {@code Thinking}）
