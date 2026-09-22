@@ -14,7 +14,8 @@ transport:
 capabilities:
   CHAT:
     endpoint: https://api.deepseek.com/chat/completions
+    #endpoint: https://api.deepseek.com/chat/responses
     modelId: deepseek-v4-pro
-    apiProfile: chat-completions-v1
+    apiProfile: Completion
     parameters:
       maxTokens: 30000

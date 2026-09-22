@@ -154,6 +154,7 @@ public final class Jdk8HttpTransport implements IHttpExecute {
             RawHttpResponse response = new RawHttpResponse(status, headers, responseBody);
             System.out.println("\n");
             System.out.println(RawHttpFormatter.format(response));
+            System.out.println("\n");
             return response;
         } catch (SocketTimeoutException exception) {
             throw ExceptionUtils.requestTimeout();
@@ -188,6 +189,7 @@ public final class Jdk8HttpTransport implements IHttpExecute {
             RawHttpResponse response = new RawHttpResponse(status, headers, errorBody);
             System.out.println("\n");
             System.out.println(RawHttpFormatter.format(response));
+            System.out.println("\n");
             return response;
         }
         if (!isEventStream(connection.getContentType())) {

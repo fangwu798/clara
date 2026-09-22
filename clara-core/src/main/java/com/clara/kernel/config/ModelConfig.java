@@ -2,6 +2,7 @@ package com.clara.kernel.config;
 
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
+import com.clara.enums.ProtocolEnum;
 import com.clara.utils.StringUtils;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -58,6 +59,11 @@ public class ModelConfig {
      */
     private final String apiProfile;
     /**
+     * 调用协议枚举，决定编解码阶段采用哪套协议专属规则，未配置时默认为
+     * {@link ProtocolEnum#COMPLETION}。对应 YAML 键 {@code capabilities.<能力种类>.protocol}，可选。
+     */
+    private final ProtocolEnum protocol;
+    /**
      * 凭据引用名，非空白。本类只持有引用，真实密钥由凭据解析器在每次调用时解析，因此日志与异常中不会出现密钥。
      * 对应 YAML 键 {@code credential.secretRef}，必填。
      */
@@ -71,11 +77,12 @@ public class ModelConfig {
      * @param endpoint       能力调用端点，不可为 null，且必须为安全的绝对 HTTP(S) 地址
      * @param modelId        固定模型 ID，不可为 null 或空白
      * @param apiProfile     API 协议档位，不可为 null 或空白
+     * @param protocol       调用协议枚举，不可为 null（未配置时由调用方传入 {@link ProtocolEnum#COMPLETION}）
      * @param secretRef      凭据引用名，不可为 null 或空白
      * @throws IllegalArgumentException provider 为 null、endpoint 非法，或 modelId / apiProfile / secretRef
      *                                  为 null 或空白时
      */
-    public ModelConfig(ModelProviderEnum provider, CapabilityKindEnum capabilityEnum, URI endpoint, String modelId, String apiProfile, String secretRef) {
+    public ModelConfig(ModelProviderEnum provider, CapabilityKindEnum capabilityEnum, URI endpoint, String modelId, String apiProfile, ProtocolEnum protocol, String secretRef) {
         if (provider == null) {
             throw new IllegalArgumentException("provider must not be null");
         }
@@ -83,6 +90,7 @@ public class ModelConfig {
         this.endpoint = requireHttpEndpoint(endpoint, "endpoint");
         this.modelId = StringUtils.requireNotBlank(modelId, "modelId");
         this.apiProfile = StringUtils.requireNotBlank(apiProfile, "apiProfile");
+        this.protocol = protocol == null ? ProtocolEnum.COMPLETION : protocol;
         this.secretRef = StringUtils.requireNotBlank(secretRef, "secretRef");
         this.capabilityEnum = capabilityEnum;
     }

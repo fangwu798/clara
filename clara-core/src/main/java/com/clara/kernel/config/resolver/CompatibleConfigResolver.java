@@ -70,6 +70,7 @@ public final class CompatibleConfigResolver implements IConfigResolver {
                 capability.getEndpoint(),
                 capability.requireModelId(),
                 capability.requireApiProfile(),
+                capability.getProtocol(),
                 provider.getCredential().getSecretRef());
     }
 }

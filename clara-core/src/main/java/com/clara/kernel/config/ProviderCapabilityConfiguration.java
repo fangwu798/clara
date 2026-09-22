@@ -1,5 +1,6 @@
 package com.clara.kernel.config;
 
+import com.clara.enums.ProtocolEnum;
 import com.clara.utils.MapUtils;
 import com.clara.utils.StringUtils;
 import com.clara.utils.deserialize.SafeHttpUriDeserializer;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Getter;
 
 import java.net.URI;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -41,6 +43,11 @@ public final class ProviderCapabilityConfiguration {
      */
     private final String apiProfile;
     /**
+     * 调用协议枚举，用于编解码阶段选择字段名 / 取值路径的协议专属规则，未配置时默认为
+     * {@link ProtocolEnum#COMPLETION}。
+     */
+    private final ProtocolEnum protocol;
+    /**
      * 扩展标量参数，只读且不可变。
      */
     private final Map<String, Object> parameters;
@@ -55,6 +62,7 @@ public final class ProviderCapabilityConfiguration {
      * @param taskQueryEndpoint 异步任务查询端点（YAML 键 {@code taskQueryEndpoint}，可选），同步能力为 null
      * @param modelId           模型 ID（YAML 键 {@code modelId}，可选），空白视为未配置
      * @param apiProfile        API 协议档位（YAML 键 {@code apiProfile}，可选），空白视为未配置
+     * @param protocol          调用协议枚举（YAML 键 {@code protocol}，可选），未配置时为 null（按 COMPLETION 处理）
      * @param parameters        扩展标量参数（YAML 键 {@code parameters}，可选），可为 null
      */
     @JsonCreator
@@ -65,6 +73,7 @@ public final class ProviderCapabilityConfiguration {
             @JsonDeserialize(using = SafeHttpUriDeserializer.class) URI taskQueryEndpoint,
             @JsonProperty("modelId") String modelId,
             @JsonProperty("apiProfile") String apiProfile,
+            @JsonProperty("protocol") ProtocolEnum protocol,
             @JsonProperty("parameters")
             @JsonDeserialize(using = ScalarMapDeserializer.class) Map<String, Object> parameters) {
         if (endpoint == null || !endpoint.isAbsolute()) {
@@ -77,7 +86,24 @@ public final class ProviderCapabilityConfiguration {
         this.taskQueryEndpoint = taskQueryEndpoint;
         this.modelId = StringUtils.blankToNull(modelId);
         this.apiProfile = StringUtils.blankToNull(apiProfile);
+        this.protocol = protocol != null ? protocol : deriveProtocol(this.apiProfile);
         this.parameters = MapUtils.unmodifiableScalarMap(parameters);
+    }
+
+    /**
+     * 从 API 协议档位字符串推导协议枚举。
+     *
+     * <p>未显式配置 {@code protocol} 时，用 {@code apiProfile} 推导：含 {@code response}（忽略大小写）视为
+     * Responses 协议，否则视为 Chat Completions 兼容协议。这样只改 {@code apiProfile} 也能切换线格式，
+     * 避免两个字段口径不一致导致发错协议。
+     *
+     * @param apiProfile API 协议档位字符串，可为 null
+     * @return 协议枚举，非 null
+     */
+    private static ProtocolEnum deriveProtocol(String apiProfile) {
+        return apiProfile != null && apiProfile.toUpperCase(Locale.ROOT).contains("RESPONSE")
+                ? ProtocolEnum.RESPONSE
+                : ProtocolEnum.COMPLETION;
     }
 
     /**

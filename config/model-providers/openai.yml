@@ -17,7 +17,8 @@ capabilities:
   CHAT:
     endpoint: https://new.aicontrol.top/v1/responses
     modelId: gpt-5.6-sol
-    apiProfile: chat-completions-v1
+    apiProfile: responses-v1
+    protocol: RESPONSE
     parameters:
       maxTokens: 60000
   IMAGE:

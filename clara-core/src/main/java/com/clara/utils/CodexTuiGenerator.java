@@ -1,12 +1,16 @@
 package com.clara.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -97,6 +101,59 @@ public class CodexTuiGenerator {
         headers.put("user-agent", USER_AGENT);
 
         return headers;
+    }
+
+    /**
+     * 从已生成的 codex 请求头里提取请求体顶层的 {@code client_metadata}。
+     *
+     * <p>中转接口要求请求体顶层携带与请求头一致的 codex 会话标识（session / thread / window / turn）。
+     * 本方法直接从 {@link #buildHeaders()} 的返回头里取回这些值，保证请求头与请求体同一轮生成、取值一致；
+     * 缺少 {@code x-codex-turn-metadata} 头（未启用 codex 模拟）时返回空映射。
+     *
+     * @param headers 已生成的请求头，可为 null
+     * @return client_metadata 映射；未启用 codex 模拟时为空映射
+     */
+    public static Map<String, String> buildClientMetadata(Map<String, String> headers) {
+        String turnMetadata = headers == null ? null : headers.get("x-codex-turn-metadata");
+        if (turnMetadata == null || turnMetadata.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> meta = new LinkedHashMap<String, String>();
+        String installationId = null;
+        String turnId = null;
+        String rootTurnId = null;
+        try {
+            JsonNode node = new ObjectMapper().readTree(turnMetadata);
+            installationId = textOf(node.get("installation_id"));
+            turnId = textOf(node.get("turn_id"));
+            rootTurnId = textOf(node.get("root_turn_id"));
+        } catch (IOException ignored) {
+            // 解析失败时仅缺失安装 / 轮次标识，其余字段仍可用
+        }
+        putIfPresent(meta, "x-codex-installation-id", installationId);
+        putIfPresent(meta, "x-codex-window-id", headers.get("x-codex-window-id"));
+        putIfPresent(meta, "x-codex-turn-metadata", turnMetadata);
+        putIfPresent(meta, "thread_id", headers.get("thread-id"));
+        putIfPresent(meta, "session_id", headers.get("session-id"));
+        putIfPresent(meta, "turn_id", turnId);
+        putIfPresent(meta, "root_turn_id", rootTurnId);
+        return meta;
+    }
+
+    /**
+     * 取节点文本值，节点缺失或非文本时返回 null。
+     */
+    private static String textOf(JsonNode node) {
+        return node != null && node.isTextual() ? node.textValue() : null;
+    }
+
+    /**
+     * 值非空时写入映射。
+     */
+    private static void putIfPresent(Map<String, String> meta, String key, String value) {
+        if (value != null && !value.isEmpty()) {
+            meta.put(key, value);
+        }
     }
 
     /**

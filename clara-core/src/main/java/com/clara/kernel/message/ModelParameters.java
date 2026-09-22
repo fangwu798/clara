@@ -1,8 +1,10 @@
 package com.clara.kernel.message;
 
 import com.clara.annoation.ProviderAdapter;
+import com.clara.annoation.ProtocolField;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
+import com.clara.enums.ProtocolEnum;
 import com.clara.kernel.api.IRequest;
 import com.clara.kernel.api.message.IContent;
 import com.clara.kernel.message.delta.Thinking;
@@ -37,6 +39,7 @@ public abstract class ModelParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT)
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT)
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT)
+    @ProtocolField(protocol = ProtocolEnum.RESPONSE, name = "input")
     private List<IContent> messages;
     /**
      * 控制思考模式与非思考模式的转换。
@@ -88,6 +91,7 @@ public abstract class ModelParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT, min = 1d, note = "部分推理模型只接受 max_completion_tokens，被拒时改下发该字段")
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT, min = 1d, note = "默认值随模型与思考模式变化，未设置时由平台决定")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "4096", min = 1d)
+    @ProtocolField(protocol = ProtocolEnum.RESPONSE, name = "max_output_tokens")
     private Integer maxTokens;
 
     /**
@@ -110,8 +114,10 @@ public abstract class ModelParameters implements IRequest {
      * {@code minimal} 等同关闭思考）。
      */
     @JsonProperty("reasoning_effort")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT, defaultValue = "medium", note = "Responses 协议下映射为 reasoning.effort")
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT, defaultValue = "high", allowed = {"high", "max"}, note = "low/medium 按 high 处理，xhigh 按 max 处理")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "medium", allowed = {"minimal", "low", "medium", "high"}, note = "minimal 等同关闭思考")
+    @ProtocolField(protocol = ProtocolEnum.RESPONSE, name = "reasoning.effort")
     private String reasoningEffort;
 
     /**
@@ -256,6 +262,7 @@ public abstract class ModelParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "不开启则流式响应不带 usage")
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "不开启则流式响应不带 usage")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "不开启则流式响应不带 usage")
+    @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private Boolean includeUsage;
 
     /**
@@ -269,6 +276,7 @@ public abstract class ModelParameters implements IRequest {
      * （如商品、天气），会带来一定时延，实际搜索次数见响应 {@code usage.tool_usage.web_search}。
      * 仅 Seedream 5.0 lite 支持联网搜索（5.0 pro / 4.5 / 4.0 不支持）。
      */
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.CHAT, note = "Responses 协议下由协议转换器摊平为 function 声明")
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT, maxCount = 128)
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, note = "方舟对话接口的 function 工具；能否下发 tool_choice 以模型能力文档为准")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, note = "图片生成侧仅支持联网搜索工具 {\"type\":\"web_search\"}，且仅 Seedream 5.0 lite 支持")

@@ -3,6 +3,7 @@ package com.clara.kernel.http;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 将 {@link RawHttpRequest} / {@link RawHttpResponse} 渲染为 HTTP 线格式（raw）字符串的辅助工具。
@@ -46,7 +47,11 @@ public final class RawHttpFormatter {
 
         appendHost(out, request.getEndpoint());
         for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
-            out.append(header.getKey()).append(": ").append(header.getValue()).append(CRLF);
+            if (Objects.equals(header.getKey(), "Authorization")) {
+                out.append(header.getKey()).append(": ").append("Bearer {模型密钥不做明文展示}").append(CRLF);
+            } else {
+                out.append(header.getKey()).append(": ").append(header.getValue()).append(CRLF);
+            }
         }
 
         out.append(CRLF);
@@ -98,30 +103,54 @@ public final class RawHttpFormatter {
      */
     private static String reasonPhrase(int statusCode) {
         switch (statusCode) {
-            case 200: return "OK";
-            case 201: return "Created";
-            case 202: return "Accepted";
-            case 204: return "No Content";
-            case 206: return "Partial Content";
-            case 301: return "Moved Permanently";
-            case 302: return "Found";
-            case 304: return "Not Modified";
-            case 400: return "Bad Request";
-            case 401: return "Unauthorized";
-            case 403: return "Forbidden";
-            case 404: return "Not Found";
-            case 405: return "Method Not Allowed";
-            case 408: return "Request Timeout";
-            case 409: return "Conflict";
-            case 413: return "Payload Too Large";
-            case 415: return "Unsupported Media Type";
-            case 422: return "Unprocessable Entity";
-            case 429: return "Too Many Requests";
-            case 500: return "Internal Server Error";
-            case 502: return "Bad Gateway";
-            case 503: return "Service Unavailable";
-            case 504: return "Gateway Timeout";
-            default: return "";
+            case 200:
+                return "OK";
+            case 201:
+                return "Created";
+            case 202:
+                return "Accepted";
+            case 204:
+                return "No Content";
+            case 206:
+                return "Partial Content";
+            case 301:
+                return "Moved Permanently";
+            case 302:
+                return "Found";
+            case 304:
+                return "Not Modified";
+            case 400:
+                return "Bad Request";
+            case 401:
+                return "Unauthorized";
+            case 403:
+                return "Forbidden";
+            case 404:
+                return "Not Found";
+            case 405:
+                return "Method Not Allowed";
+            case 408:
+                return "Request Timeout";
+            case 409:
+                return "Conflict";
+            case 413:
+                return "Payload Too Large";
+            case 415:
+                return "Unsupported Media Type";
+            case 422:
+                return "Unprocessable Entity";
+            case 429:
+                return "Too Many Requests";
+            case 500:
+                return "Internal Server Error";
+            case 502:
+                return "Bad Gateway";
+            case 503:
+                return "Service Unavailable";
+            case 504:
+                return "Gateway Timeout";
+            default:
+                return "";
         }
     }
 }

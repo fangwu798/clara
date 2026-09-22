@@ -1,12 +1,15 @@
 package com.clara.kernel.http;
 
 import com.clara.annoation.ResponseAdapter;
+import com.clara.annoation.ProtocolResponse;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.FinishReasonEnum;
 import com.clara.enums.ModelProviderEnum;
+import com.clara.enums.ProtocolEnum;
 import com.clara.enums.StreamEventEnum;
 import com.clara.kernel.api.IResponse;
 import com.clara.kernel.message.delta.ImageItem;
+import com.clara.tool.ResponsesToolCall;
 import com.clara.tool.ToolCall;
 import lombok.Data;
 
@@ -53,12 +56,14 @@ public class HttpResponse implements IResponse {
      * 正文内容：同步取 {@code choices[0].message.content}，流式累加 {@code choices[0].delta.content}。
      */
     @ResponseAdapter(path = "choices[0].message.content", streamPath = "choices[0].delta.content", event = StreamEventEnum.TEXT_DELTA)
+    @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "output[type=message].content[0].text", streamPath = "delta", streamEvent = "response.output_text.delta")
     private String content;
 
     /**
      * 思维链内容：DeepSeek 思考模式返回 {@code reasoning_content}，流式为 {@code delta.reasoning_content}。
      */
     @ResponseAdapter(path = "choices[0].message.reasoning_content", streamPath = "choices[0].delta.reasoning_content", event = StreamEventEnum.REASONING_DELTA)
+    @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "output[type=reasoning].content[0].text", streamPath = "delta", streamEvent = "response.reasoning_text.delta")
     private String reasoning;
 
     /**
@@ -68,12 +73,21 @@ public class HttpResponse implements IResponse {
     private List<ToolCall> toolCalls;
 
     /**
+     * Responses 协议的工具调用列表；流式下在 {@code response.completed} 事件里从 {@code response.output} 一次性
+     * 解析 {@code function_call} 条目，类型为 {@link ResponsesToolCall}（{@code type=function_call}）。
+     */
+    @ResponseAdapter(event = StreamEventEnum.TOOL_ARGUMENT_DELTA)
+    @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "output", streamPath = "response.output", streamEvent = "response.completed")
+    private List<ResponsesToolCall> responsesToolCalls;
+
+    /**
      * 结束原因；同步按 {@code choices[0].finish_reason} 取值，流式命中 {@code terminalPath} 时写入。
      *
      * <p>命中只代表平台给出了结束原因，不代表流已结束：流以 SSE 的 {@code [DONE]} 终止，之后还可能有
      * 只带 {@code usage} 的分片。
      */
     @ResponseAdapter(path = "choices[0].finish_reason", terminalPath = "choices[0].finish_reason")
+    @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "status", terminalPath = "status")
     private FinishReasonEnum finishReason;
 
     /**
@@ -92,18 +106,21 @@ public class HttpResponse implements IResponse {
      * 输入 token 数。
      */
     @ResponseAdapter(path = "usage.prompt_tokens")
+    @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "usage.input_tokens")
     private Integer inputTokens;
 
     /**
      * 输出 token 数。
      */
     @ResponseAdapter(path = "usage.completion_tokens")
+    @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "usage.output_tokens")
     private Integer outputTokens;
 
     /**
      * 总 token 数；平台未提供时为空，由调用方按输入加输出推导。
      */
     @ResponseAdapter(path = "usage.total_tokens")
+    @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "usage.total_tokens")
     private Integer totalTokens;
 
     /**
@@ -111,6 +128,7 @@ public class HttpResponse implements IResponse {
      */
     @ResponseAdapter(type = {ModelProviderEnum.DEEPSEEK}, path = "usage.prompt_cache_hit_tokens", note = "DeepSeek 用 prompt_cache_hit_tokens")
     @ResponseAdapter(type = {ModelProviderEnum.VOLCENGINE, ModelProviderEnum.OPENAI, ModelProviderEnum.ALIBABA}, path = "usage.prompt_tokens_details.cached_tokens", note = "方舟 / OpenAI / 通义用 prompt_tokens_details.cached_tokens")
+    @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "usage.input_tokens_details.cached_tokens")
     private Integer cachedTokens;
 
     /**

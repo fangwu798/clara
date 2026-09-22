@@ -14,7 +14,9 @@ import com.clara.kernel.http.execute.sse.SseEvent;
 import com.clara.kernel.stream.IStreamHandle;
 import com.clara.kernel.stream.IStreamObserver;
 import com.clara.kernel.stream.StreamEvent;
+import com.clara.utils.ExceptionUtils;
 import com.clara.utils.deserialize.ProviderResponseDecoder;
+import com.clara.utils.deserialize.StreamAssembler;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -65,7 +67,7 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
     /**
      * 响应累加器，负责按注解把增量解到响应对象上。
      */
-    private final ProviderResponseDecoder.StreamAssembler<? extends IResponse> assembler;
+    private final StreamAssembler<? extends IResponse> assembler;
     /**
      * 领域事件接收方。
      */
@@ -112,8 +114,7 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      * @throws IllegalArgumentException 任一入参为 null，或响应类型缺少无参构造器时
      * @throws IllegalStateException    线程上下文未绑定平台配置或能力种类时
      */
-    public StreamHandle(IHttpExecute transport, IRequest request, Class<? extends IResponse> responseType,
-            IStreamObserver observer) {
+    public StreamHandle(IHttpExecute transport, IRequest request, Class<? extends IResponse> responseType, IStreamObserver observer) {
         if (transport == null || request == null || responseType == null || observer == null) {
             throw new IllegalArgumentException("values must not be null");
         }
@@ -182,12 +183,17 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
         if (done.get()) {
             return false;
         }
-        List<StreamEvent> deltas = assembler.accept(event == null ? null : event.getData());
+        List<StreamEvent> deltas = assembler.accept(event == null ? null : event.getEvent(), event == null ? null : event.getData());
         for (StreamEvent delta : deltas) {
             emit(delta.getType(), delta.getPayload(), null, delta.getToolCallId(), delta.getToolName(), null);
         }
         if (assembler.isTerminated()) {
-            complete();
+            ClaraException failure = assembler.failure();
+            if (failure != null) {
+                fail(failure);
+            } else {
+                complete();
+            }
             return false;
         }
         return true;
@@ -263,7 +269,10 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      * @return 领域错误；非 {@link ClaraException} 时返回 null
      */
     private static ClaraError errorOf(RuntimeException exception) {
-        return exception instanceof ClaraException ? ((ClaraException) exception).getError() : null;
+        if (exception instanceof ClaraException) {
+            return ((ClaraException) exception).getError();
+        }
+        return ExceptionUtils.protocolError().getError();
     }
 
     /**

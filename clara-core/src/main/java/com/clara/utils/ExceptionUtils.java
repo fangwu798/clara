@@ -186,6 +186,35 @@ public final class ExceptionUtils {
     }
 
     /**
+     * 按平台在事件流中自报的错误构造异常，并把平台返回的错误提示写入安全细节。
+     *
+     * <p>与 {@link #providerEventFailure(ModelProviderEnum, String)} 的区别：平台错误码仍写入 providerCode 便于
+     * 排查；平台返回的提示文本写入 {@code safeDetails} 的 {@code providerMessage} 键，供上层展示具体的失败原因
+     * （如限流、并发超限等），不进入面向使用者的默认文案，避免把不可控的平台文本当成本地文案。
+     *
+     * @param provider        平台，可为 null（表示不归因到具体平台）
+     * @param providerCode    平台侧原始错误码，可为 null
+     * @param providerMessage 平台侧返回的错误提示文本，可为 null
+     * @return 外部服务类、不可重试的异常
+     */
+    public static ClaraException providerEventFailure(ModelProviderEnum provider, String providerCode, String providerMessage) {
+        Map<String, String> details = new LinkedHashMap<String, String>();
+        if (providerMessage != null && !providerMessage.trim().isEmpty()) {
+            details.put("providerMessage", providerMessage);
+        }
+        return new ClaraException(new ClaraError(
+                ErrorCodes.MODEL_PROVIDER_FAILED,
+                ErrorCategory.EXTERNAL_SERVICE,
+                message(ErrorCodes.MODEL_PROVIDER_FAILED, provider, providerCode),
+                false,
+                null,
+                provider == null ? null : provider.name(),
+                providerCode,
+                null,
+                details));
+    }
+
+    /**
      * 按错误码、类别与可重试标记构造模型调用异常。
      *
      * <p>消息由 {@link ErrorMessages} 按错误码生成中文提示，未登记的错误码退化为错误码本身，

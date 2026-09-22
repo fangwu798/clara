@@ -20,9 +20,19 @@ import com.clara.kernel.stream.StreamEvent;
  * <p>枚举不可变、天然线程安全，可直接用 {@code ==} 比较，无需释放。
  */
 public enum StreamEventEnum {
-    /** 正文文本的增量片段，片段内容放在 {@link StreamEvent#getPayload()}。 */
+    /**
+     * 正文文本的增量片段，片段内容放在 {@link StreamEvent#getPayload()}。
+     *
+     * <p>两种协议来源：Chat Completions 为 {@code choices[0].delta.content}；Responses 为
+     * {@code response.output_text.delta} 事件的 {@code delta}。
+     */
     TEXT_DELTA,
-    /** 推理内容的增量片段（如 DeepSeek 返回的 {@code reasoning_content}），片段内容放在 {@link StreamEvent#getPayload()}。 */
+    /**
+     * 推理内容的增量片段，片段内容放在 {@link StreamEvent#getPayload()}。
+     *
+     * <p>两种协议来源：Chat Completions 为 {@code choices[0].delta.reasoning_content}；Responses 为
+     * {@code response.reasoning_text.delta} 事件的 {@code delta}。
+     */
     REASONING_DELTA,
     /**
      * 工具调用参数的增量片段，片段内容放在 {@link StreamEvent#getPayload()}；

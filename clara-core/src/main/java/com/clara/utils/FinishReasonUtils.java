@@ -28,18 +28,19 @@ public final class FinishReasonUtils {
     /**
      * 映射结束原因。
      *
-     * <p>取值约定：{@code stop} → {@link FinishReasonEnum#STOP}、{@code length} → {@link FinishReasonEnum#LENGTH}、
+     * <p>取值约定：Chat Completions 的 {@code stop} / Responses 的 {@code completed} → {@link FinishReasonEnum#STOP}、
+     * {@code length} / {@code incomplete} → {@link FinishReasonEnum#LENGTH}、
      * {@code tool_calls} 与 {@code function_call} → {@link FinishReasonEnum#TOOL_CALLS}、
-     * {@code content_filter} → {@link FinishReasonEnum#CONTENT_FILTER}。
+     * {@code content_filter} → {@link FinishReasonEnum#CONTENT_FILTER}、{@code failed} → {@link FinishReasonEnum#ERROR}。
      *
-     * @param value 平台返回的 {@code finish_reason}，可为 null
+     * @param value 平台返回的 {@code finish_reason} 或 Responses 的 {@code status}，可为 null
      * @return 领域结束原因；未知取值或缺失时为 {@link FinishReasonEnum#ERROR}
      */
     public static FinishReasonEnum of(String value) {
-        if ("stop".equals(value)) {
+        if ("stop".equals(value) || "completed".equals(value)) {
             return FinishReasonEnum.STOP;
         }
-        if ("length".equals(value)) {
+        if ("length".equals(value) || "incomplete".equals(value)) {
             return FinishReasonEnum.LENGTH;
         }
         if ("tool_calls".equals(value) || "function_call".equals(value)) {
