@@ -35,11 +35,11 @@ import java.lang.annotation.Target;
  *   <li>{@link #note()}：上面维度表达不了的额外约束（如「深度思考模型不支持该字段」）。</li>
  * </ul>
  *
- * <p>编码器只读取 {@code type} / {@code capability} / {@code name} / {@code supported} /
+ * <p>编码器读取 {@code type} / {@code capability} / {@code name} / {@code supported} /
  * {@code streamingOnly} / {@code defaultValue}：{@code type} 与 {@code capability} 都等于当前平台与能力的那
  * 一条规则才生效，没有命中、或命中的规则 {@code supported = false} 时该字段不下发；{@code allowed} /
- * {@code min} / {@code max} / {@code maxCount} / {@code note} 是声明性约束，编码器不做二次校验，只作文档
- * 与人工核对之用。
+ * {@code min} / {@code max} / {@code maxCount} 在写请求体前做本地校验，违规抛 {@link IllegalArgumentException}；
+ * {@code note} 为声明性说明，仅供人工核对。
  *
  * <p>同一字段需要适配多个平台时可直接重复标注（由 {@link ProviderAdapters} 承载）。
  */

@@ -3,6 +3,9 @@ package com.clara.tool;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * 工具声明条目：告诉模型「有哪些工具可用」，是 {@code ModelParameters.tools} 的元素。
  *
@@ -63,5 +66,44 @@ public class ToolContext {
             this.type = type;
         }
         this.function = function;
+    }
+
+    /**
+     * Chat Completions 协议：渲染为嵌套 function 声明。
+     *
+     * @return 线格式声明节点 {@code {"type":"function","function":{...}}}，非 null
+     */
+    public Map<String, Object> toCompletionTool() {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("type", type);
+        if (function != null) {
+            Map<String, Object> fn = new LinkedHashMap<>();
+            fn.put("name", function.getName());
+            if (function.getDescription() != null) {
+                fn.put("description", function.getDescription());
+            }
+            fn.put("parameters", function.getParameters());
+            item.put("function", fn);
+        }
+        return item;
+    }
+
+    /**
+     * Responses 协议：渲染为扁平 function 声明（默认严格模式）。
+     *
+     * @return 线格式声明节点 {@code {"type":"function","name",...,"strict":true}}，非 null
+     */
+    public Map<String, Object> toResponseTool() {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("type", type);
+        if (function != null) {
+            item.put("name", function.getName());
+            if (function.getDescription() != null) {
+                item.put("description", function.getDescription());
+            }
+            item.put("parameters", function.getParameters());
+            item.put("strict", true);
+        }
+        return item;
     }
 }

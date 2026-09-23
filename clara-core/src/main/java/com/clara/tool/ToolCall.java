@@ -25,7 +25,7 @@ import lombok.Data;
  * 流式调用下同一 {@code id} 的参数会分片到达，分片的合并由调用方处理。
  */
 @Data
-public class ToolCall {
+public class ToolCall implements IToolInvocation {
 
     /**
      * 工具调用 ID，用于把工具执行结果回填给平台。
@@ -46,4 +46,19 @@ public class ToolCall {
      * 函数调用详情：函数名与 JSON 字符串形式的入参。
      */
     private ToolCallFunction function;
+
+    @Override
+    public String callId() {
+        return id;
+    }
+
+    @Override
+    public String name() {
+        return function == null ? null : function.getName();
+    }
+
+    @Override
+    public String arguments() {
+        return function == null ? null : function.getArguments();
+    }
 }

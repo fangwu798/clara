@@ -5,14 +5,15 @@ import com.clara.annoation.ProviderAdapter;
 import com.clara.context.ConvContext;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
+import com.clara.enums.ThinkingEnum;
 import com.clara.kernel.api.IRequest;
 import com.clara.kernel.api.execute.IRequestEncoder;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.http.RawHttpRequest;
 import com.clara.kernel.http.TransportConfig;
+import com.clara.kernel.message.delta.Thinking;
 import com.clara.utils.ExceptionUtils;
-import com.clara.utils.deserialize.ResponseInputConverter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +21,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +32,8 @@ import java.util.Map;
  * 把「协议差异」（字段名映射、字段值结构转换、平台补充字段）留给子类覆盖。
  *
  * <p>子类按协议实现 {@link #protocolName(Field, String)} 与 {@link #protocolValue(Field, Object)}：
- * Chat Completions 不做协议化覆盖，Responses 用 {@link ProtocolField} 映射字段名并用
- * {@link ResponseInputConverter} 转换消息 / 工具结构。
+ * Chat Completions 不做协议化覆盖，Responses 用 {@link ProtocolField} 映射字段名，消息与工具结构由
+ * 消息 / 工具类自行按协议渲染。
  */
 public abstract class AbstractRequestEncoder implements IRequestEncoder {
 
@@ -57,7 +60,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
         ModelProviderEnum provider = config.getProvider();
         Map<String, String> authorization = providerConfiguration.authorizationHeaders(config.getCapabilityEnum(), Boolean.TRUE.equals(request.getStream()));
         Map<String, Object> body = bodyOf(request, provider, config.getCapabilityEnum());
-        postProcessBody(body, provider, authorization);
+        postProcessBody(body, request, provider, authorization);
         byte[] bodyBytes = serialize(body, provider);
         return new RawHttpRequest("POST", config.getEndpoint(), mergedHeaders(authorization, transport), bodyBytes);
     }
@@ -83,11 +86,12 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
     /**
      * 序列化前的请求体补充：用于平台 / 协议特有的顶层字段（如 Codex 模拟字段）。
      *
+     * @param request       请求对象，非 null
      * @param body          请求体映射，非 null
      * @param provider      当前平台，非 null
      * @param authorization 已组装的授权请求头，非 null
      */
-    protected abstract void postProcessBody(Map<String, Object> body, ModelProviderEnum provider, Map<String, String> authorization);
+    protected abstract void postProcessBody(Map<String, Object> body, IRequest request, ModelProviderEnum provider, Map<String, String> authorization);
 
     /**
      * 把请求对象的字段按适配规则收敛为请求体映射。
@@ -141,6 +145,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
             return;
         }
         if (value != null) {
+            validate(field, adapter, value);
             write(body, name, protocolValue(field, value));
             return;
         }
@@ -148,6 +153,67 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
         if (fallback != null) {
             write(body, name, protocolValue(field, fallback));
         }
+    }
+
+    /**
+     * 按注解声明的约束校验字段值，违规抛 IllegalArgumentException。
+     *
+     * <p>校验维度：{@code allowed}（枚举取值集合）、{@code min}/{@code max}（数值闭区间）、
+     * {@code maxCount}（数组元素个数上限）。{@code defaultValue} 兜底值由注解保证合法，不再校验。
+     */
+    private static void validate(Field field, ProviderAdapter adapter, Object value) {
+        String[] allowed = adapter.allowed();
+        if (allowed.length > 0) {
+            String actual = stringify(value);
+            if (actual != null && !contains(allowed, actual)) {
+                throw new IllegalArgumentException(
+                        "field " + field.getName() + " value \"" + actual + "\" is not allowed, expected " + Arrays.toString(allowed));
+            }
+        }
+        if (value instanceof Number) {
+            double number = ((Number) value).doubleValue();
+            if (adapter.min() != Double.NEGATIVE_INFINITY && number < adapter.min()) {
+                throw new IllegalArgumentException(
+                        "field " + field.getName() + " value " + number + " is below minimum " + adapter.min());
+            }
+            if (adapter.max() != Double.POSITIVE_INFINITY && number > adapter.max()) {
+                throw new IllegalArgumentException(
+                        "field " + field.getName() + " value " + number + " is above maximum " + adapter.max());
+            }
+        }
+        if (adapter.maxCount() > 0 && value instanceof Collection) {
+            int size = ((Collection<?>) value).size();
+            if (size > adapter.maxCount()) {
+                throw new IllegalArgumentException(
+                        "field " + field.getName() + " has " + size + " elements, exceeds maximum " + adapter.maxCount());
+            }
+        }
+    }
+
+    /**
+     * 把字段值提取为可比较的字符串（用于 allowed 校验）。
+     */
+    private static String stringify(Object value) {
+        if (value instanceof String) {
+            return (String) value;
+        }
+        if (value instanceof Enum) {
+            return ((Enum<?>) value).name();
+        }
+        if (value instanceof Thinking) {
+            ThinkingEnum type = ((Thinking) value).getType();
+            return type == null ? null : type.name();
+        }
+        return null;
+    }
+
+    private static boolean contains(String[] allowed, String actual) {
+        for (String item : allowed) {
+            if (item.equals(actual)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

@@ -3,6 +3,7 @@ package com.clara.kernel.http;
 import com.clara.context.ConvContext;
 import com.clara.kernel.api.IRequest;
 import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.message.BasicParameters;
 import com.clara.kernel.message.ImageParameters;
 import com.clara.kernel.message.provider.ProviderRequestEncoder;
 import lombok.Data;
@@ -12,7 +13,7 @@ import lombok.experimental.SuperBuilder;
  * HTTP 请求对象：直接承载平台 HTTP 接口线格式的请求参数，是 {@link ImageParameters} 的具体实现。
  *
  * <p>是什么、在哪一层：实现层（{@code com.clara.kernel.http}）的 {@link IRequest} 实现，继承链为
- * {@code HttpRequest} → {@link ImageParameters} → {@link com.clara.kernel.message.ModelParameters}，
+ * {@code HttpRequest} → {@link ImageParameters} → {@link BasicParameters}，
  * 因此同时具备对话通用参数与图片生成专有字段（{@code prompt} / {@code image} / {@code size} 等）；字段上的
  * {@code @ProviderAdapter} 注解决定编成哪种线格式，本类不含平台分支。与出参侧的 {@link HttpResponse} 对称。
  *

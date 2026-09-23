@@ -6,6 +6,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 工具结果消息：线格式为 {@code {"role":"tool","tool_call_id":"...","content":"..."}}。
  *
@@ -60,5 +65,23 @@ public final class ToolContent implements IContent {
     @JsonIgnore
     public RoleEnum getRoleType() {
         return RoleEnum.TOOL;
+    }
+
+    @Override
+    public Map<String, Object> toCompletionMessage() {
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("role", "tool");
+        message.put("tool_call_id", toolCallId);
+        message.put("content", content);
+        return message;
+    }
+
+    @Override
+    public List<Map<String, Object>> toResponseInputItems() {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("type", "function_call_output");
+        item.put("call_id", toolCallId);
+        item.put("output", content);
+        return Collections.singletonList(item);
     }
 }

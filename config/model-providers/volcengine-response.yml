@@ -1,0 +1,29 @@
+provider: VOLCENGINE
+credential:
+  secretRef: volcengine
+  # apiKey: xxx
+  environmentVariable: CLARA_VOLCENGINE_API_KEY
+transport:
+  allowedOrigins:
+    - https://ark.cn-beijing.volces.com
+  connectTimeoutMillis: 10000
+  readTimeoutMillis: 180000
+  maxRequestBytes: 16777216
+  maxResponseBytes: 33554432
+  allowHttp: false
+capabilities:
+  CHAT:
+    endpoint: https://ark.cn-beijing.volces.com/api/v3/responses
+    modelId: doubao-seed-2-1-pro-260628
+    apiProfile: RESPONSE
+    parameters:
+      maxTokens: 20000
+  IMAGE:
+    endpoint: https://ark.cn-beijing.volces.com/api/v3/images/generations
+    modelId: doubao-seedream-5-0-pro-260628
+    apiProfile: ark-v3-images
+    parameters:
+      maxPromptChars: 32000
+      maxOutputs: 1
+      maxSourceImages: 0
+      watermark: false

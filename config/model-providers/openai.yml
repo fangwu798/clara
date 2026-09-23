@@ -1,8 +1,8 @@
 provider: OPENAI
 credential:
-  secretRef: openai-novel
-  apiKey: sk-0xx7JaDgKXMF8pKLcUUoksTx5rhxccLMbElhO8PT2xF3iPxt
-  #environmentVariable: CLARA_OPENAI_API_KEY
+  secretRef: openai
+  # apiKey: xxx
+  environmentVariable: CLARA_OPENAI_API_KEY
 transport:
   allowedOrigins:
     - https://new.aicontrol.top/

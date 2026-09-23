@@ -50,30 +50,29 @@ import static org.junit.Assert.fail;
 /**
  * 加载真实平台配置、直接调用真实接口的用例（不使用任何模拟）。
  *
- * <p>覆盖场景，按平台分组：
+ * <p>用例按「平台 × 协议 × 是否调用工具 × 流式/非流式」四个维度展开，函数命名顺序即
+ * {@code [平台][协议][是否工具][流式]}：
  * <ul>
- *   <li>DeepSeek 对话：{@link #deepseekChatNonStreaming()} 非流式、{@link #deepseekChatStreaming()} 流式；</li>
- *   <li>DeepSeek 工具调用：{@link #deepseekToolCallNonStreaming()} 非流式、
- *       {@link #deepseekToolCallStreaming()} 流式（声明工具 → 收到 tool_calls → 回填结果 → 拿到最终回答）；</li>
- *   <li>火山方舟对话：{@link #volcengineChatNonStreaming()} 非流式、{@link #volcengineChatStreaming()} 流式；</li>
- *   <li>火山方舟工具调用：{@link #volcengineToolCallNonStreaming()} 非流式、
- *       {@link #volcengineToolCallStreaming()} 流式；</li>
- *   <li>OpenAI 对话： 非流式、{@link #openaiChatStreaming()} 流式；</li>
- *   <li>火山方舟生图：{@link #volcengineImageGeneration()} 非流式文生图（并把结果真正下载下来）。</li>
+ *   <li>平台：deepseek（DeepSeek）/ volcengine（火山方舟）/ kimi（月之暗面）；</li>
+ *   <li>协议：Completion（Chat Completions）/ Response（Responses）；</li>
+ *   <li>是否工具：Chat（纯对话）/ Tool（工具调用往返）；</li>
+ *   <li>流式：NonStreaming（非流式）/ Streaming（流式）。</li>
  * </ul>
  *
- * <p>对话用例加载 {@code config/model-providers/deepseek.yml}、{@code volcengine.yml} 与
- * {@code openai.yml}，生图用例加载 {@code volcengine.yml}——DeepSeek 没有图片能力，图片只能打在火山方舟上。
+ * <p>对话用例加载 {@code config/model-providers/<平台>-<协议>.yml}，生图用例加载火山方舟的
+ * {@code volcengine-response.yml}（含 IMAGE 能力）。每个平台各有 completion / response 两份配置，
+ * 端点与 {@code apiProfile} 不同，其余一致。
  *
  * <p>调用链固定为统一入口，不含任何平台分支：
  * {@code CompatibleStream#chat} → {@code Jdk8HttpTransport} → {@code HttpRequest#toRequest()}
- * （按 {@code @ProviderAdapter} 筛字段编码）→ 真实 HTTP → 按 {@code @ResponseAdapter} 解码为
- * {@link HttpResponse}。平台与能力由 {@link ConvContext} 承载，所以每个用例都要先绑定上下文再调用；
- * 流式用例统一用 {@link RecordingObserver} 收事件，不再各自实现观察者。
+ * （按 {@code @ProviderAdapter} / {@code @ProtocolField} 筛字段编码）→ 真实 HTTP →
+ * 按 {@code @ResponseAdapter} / {@code @ProtocolResponse} 解码为 {@link HttpResponse}。平台、能力与协议
+ * 由 {@link ConvContext} 承载，所以每个用例都要先绑定上下文再调用；流式用例统一用 {@link RecordingObserver}
+ * 收事件，不再各自实现观察者。
  *
  * <p>运行前置条件：
  * <ol>
- *   <li>上述两个配置文件存在，且所用能力指向账号可用的模型；</li>
+ *   <li>对应配置文件存在，且所用能力指向账号可用的模型；</li>
  *   <li>配置文件 {@code credential} 里声明的环境变量<b>在当前进程可见</b>，或已内联 {@code apiKey}；
  *       进程环境是启动时的快照，系统里设置后必须重启 IDE，或在运行配置的环境变量里注入。</li>
  * </ol>
@@ -82,306 +81,182 @@ import static org.junit.Assert.fail;
  */
 public class CompatibleTest {
 
-    /**
-     * DeepSeek 平台配置文件名。
-     */
-    private static final String DEEPSEEK_CONFIG = "deepseek.yml";
-    /**
-     * 火山方舟平台配置文件名。
-     */
-    private static final String VOLCENGINE_CONFIG = "volcengine.yml";
-    /**
-     * OpenAI 平台配置文件名。
-     */
-    private static final String OPENAI_CONFIG = "openai.yml";
-    /**
-     * 对话提示词。
-     */
+    /** DeepSeek Chat Completions 配置文件名。 */
+    private static final String DEEPSEEK_COMPLETION = "deepseek-completion.yml";
+    /** DeepSeek Responses 配置文件名。 */
+    private static final String DEEPSEEK_RESPONSE = "deepseek-response.yml";
+    /** 火山方舟 Chat Completions 配置文件名。 */
+    private static final String VOLCENGINE_COMPLETION = "volcengine-completion.yml";
+    /** 火山方舟 Responses 配置文件名。 */
+    private static final String VOLCENGINE_RESPONSE = "volcengine-response.yml";
+    /** Kimi Chat Completions 配置文件名。 */
+    private static final String KIMI_COMPLETION = "kimi-completion.yml";
+    /** Kimi Responses 配置文件名。 */
+    private static final String KIMI_RESPONSE = "kimi-response.yml";
+    /** 对话提示词。 */
     private static final String PROMPT = "用一句话介绍你自己";
-    /**
-     * 单次调用允许的最大输出长度；思考模式会额外消耗 token，取值要留出余量。
-     */
+    /** 单次调用允许的最大输出长度；思考模式会额外消耗 token，取值要留出余量。 */
     private static final int MAX_TOKENS = 1024;
-    /**
-     * 等待流式结束的上限，秒；应大于配置中的 readTimeoutMillis。
-     */
+    /** 等待流式结束的上限，秒；应大于配置中的 readTimeoutMillis。 */
     private static final long STREAM_TIMEOUT_SECONDS = 200L;
-    /**
-     * 工具调用场景的提示词：明确要求先调用工具，避免模型直接作答。
-     */
+    /** 工具调用场景的提示词：明确要求先调用工具，避免模型直接作答。 */
     private static final String TOOL_PROMPT = "杭州现在的天气怎么样？必须调用 get_weather 工具查询后再回答。";
-    /**
-     * 工具名。
-     */
+    /** 工具名。 */
     private static final String WEATHER_TOOL_NAME = "get_weather";
-    /**
-     * 工具声明：入参是一个必填的 city。
-     */
+    /** 工具声明：入参是一个必填的 city。 */
     private static final ToolSpecification WEATHER_TOOL =
             new ToolSpecification(WEATHER_TOOL_NAME, "查询指定城市的当前天气", weatherSchema());
-    /**
-     * 工具执行结果，回填给模型的第二轮回执。
-     */
+    /** 工具执行结果，回填给模型的第二轮回执。 */
     private static final String TOOL_RESULT = "{\"city\":\"杭州\",\"weather\":\"晴\",\"temperature\":\"26℃\"}";
-    /**
-     * 生图提示词，明确要求不要出现文字，便于肉眼核对结果。
-     */
+    /** 生图提示词，明确要求不要出现文字，便于肉眼核对结果。 */
     private static final String IMAGE_PROMPT = "一只戴着圆框墨镜的柴犬，坐在沙滩上，写实摄影风格，画面中不要出现任何文字";
-    /**
-     * 生图尺寸，显式给定以免依赖平台默认值。
-     */
+    /** 生图尺寸，显式给定以免依赖平台默认值。 */
     private static final String IMAGE_SIZE = "2048x2048";
-    /**
-     * 解析工具调用参数用的映射器。
-     */
+    /** 解析工具调用参数用的映射器。 */
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    // ------------------------------------------------------------------ DeepSeek 对话
+    // ---------------------------------------------------------------- DeepSeek Completion
 
-    /**
-     * DeepSeek 非流式对话：一次拿到完整响应，检查文本、结束原因与 token 用量。
-     *
-     * @throws Exception 读取配置或解析响应时
-     */
     @Test
-    public void deepseekChatNonStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(DEEPSEEK_CONFIG)) {
-            skipWhenCredentialMissing(provider);
-            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
-            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
-                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-                HttpResponse response = model.chat(request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
-
-                System.out.println("[DeepSeek 非流式] model=" + config.getModelId() + " " + describe(response));
-                assertSuccess(response);
-                assertFalse("响应没有正文", isBlank(response.getContent()));
-                assertEquals(FinishReasonEnum.STOP, response.getFinishReason());
-                assertNotNull("真实响应应带 token 用量", response.getInputTokens());
-                assertTrue("输入 token 应大于 0", response.getInputTokens() > 0);
-            }
-        }
+    public void _01_deepseekCompletionChatNonStreaming() throws Exception {
+        chat(DEEPSEEK_COMPLETION, "DeepSeek Completion 非流式对话", false);
     }
 
-    /**
-     * DeepSeek 流式对话：按事件观察增量，交叉验证累加结果与终态响应一致。
-     *
-     * @throws Exception 读取配置或等待事件时
-     */
     @Test
-    public void deepseekChatStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(DEEPSEEK_CONFIG)) {
-            skipWhenCredentialMissing(provider);
-            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
-            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
-                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-                RecordingObserver<HttpResponse> observer = observer("DeepSeek 流式");
-                IStreamHandle handle = model.chat(request(config.getModelId(), userMessages(PROMPT), null, true), HttpResponse.class, observer);
-
-                System.out.println("[DeepSeek 流式] model=" + config.getModelId());
-                HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                assertFinished(handle);
-
-                System.out.println("[DeepSeek 流式] 事件数=" + observer.eventCount()
-                        + " 增量文本长度=" + observer.text().length() + " " + describe(completed));
-                assertFalse("响应没有正文", isBlank(completed.getContent()));
-                assertFalse("没有收到任何文本增量事件", observer.text().isEmpty());
-                assertEquals("增量拼接结果应与终态响应一致", completed.getContent(), observer.text());
-                assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
-                assertStreamingUsage(completed);
-            }
-        }
+    public void _02_deepseekCompletionChatStreaming() throws Exception {
+        chat(DEEPSEEK_COMPLETION, "DeepSeek Completion 流式对话", true);
     }
 
-    /**
-     * DeepSeek 非流式工具调用往返：声明工具 → 解码 {@code tool_calls} → 回填结果 → 模型给出最终回答。
-     *
-     * <p>重点验证入参侧的 {@code tools} 编码、出参侧的 {@code tool_calls} 解码，以及
-     * {@code role=tool} + {@code tool_call_id} 的回填链路。
-     *
-     * @throws Exception 读取配置或解析工具参数时
-     */
     @Test
-    public void deepseekToolCallNonStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(DEEPSEEK_CONFIG)) {
-            skipWhenCredentialMissing(provider);
-            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
-            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
-                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-
-                HttpResponse first = model.chat(request(config.getModelId(), userMessages(TOOL_PROMPT), tools(), false), HttpResponse.class);
-                System.out.println("[DeepSeek 工具 非流式] 第一轮 " + describe(first));
-                ToolCall call = requireToolCall(first);
-
-                List<IContent> messages = toolResultMessages(call);
-                HttpResponse second = model.chat(request(config.getModelId(), messages, tools(), false), HttpResponse.class);
-                System.out.println("[DeepSeek 工具 非流式] 第二轮 " + describe(second));
-                assertSuccess(second);
-                assertFalse("工具结果回填后模型没有给出回答", isBlank(second.getContent()));
-                assertEquals(FinishReasonEnum.STOP, second.getFinishReason());
-            }
-        }
+    public void _03_deepseekCompletionToolNonStreaming() throws Exception {
+        tool(DEEPSEEK_COMPLETION, "DeepSeek Completion 非流式工具", false);
     }
 
-    /**
-     * DeepSeek 流式工具调用往返：工具参数以增量片段下发，由 {@link RecordingObserver} 按 index 拼装成完整
-     * tool_calls，再回填结果并流式拿到最终回答。
-     *
-     * @throws Exception 读取配置、等待事件或解析工具参数时
-     */
     @Test
-    public void deepseekToolCallStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(DEEPSEEK_CONFIG)) {
-            skipWhenCredentialMissing(provider);
-            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
-            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
-                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-
-                RecordingObserver<HttpResponse> first = observer("DeepSeek 流式工具");
-                IStreamHandle firstHandle = model.chat(request(config.getModelId(), userMessages(TOOL_PROMPT), tools(), true), HttpResponse.class, first);
-                first.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                assertFinished(firstHandle);
-
-                System.out.println("[DeepSeek 流式工具] 参数片段数=" + first.toolArgumentFragments() + " 拼装结果=" + first.toolCalls());
-                ToolCall call = requireToolCall(first.toolCalls());
-
-                RecordingObserver<HttpResponse> second = observer("DeepSeek 流式工具");
-                IStreamHandle secondHandle = model.chat(request(config.getModelId(), toolResultMessages(call), tools(), true), HttpResponse.class, second);
-                HttpResponse completed = second.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                assertFinished(secondHandle);
-
-                System.out.println("[DeepSeek 流式工具] 第二轮 " + describe(completed));
-                assertFalse("工具结果回填后模型没有给出回答", isBlank(completed.getContent()));
-                assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
-                assertStreamingUsage(completed);
-            }
-        }
+    public void _04_deepseekCompletionToolStreaming() throws Exception {
+        tool(DEEPSEEK_COMPLETION, "DeepSeek Completion 流式工具", true);
     }
 
-    // ------------------------------------------------------------------ 火山方舟对话
+    // ---------------------------------------------------------------- DeepSeek Response
 
-    /**
-     * 火山方舟非流式对话。
-     *
-     * @throws Exception 读取配置或解析响应时
-     */
     @Test
-    public void volcengineChatNonStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
-            skipWhenCredentialMissing(provider);
-            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
-            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
-                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-                HttpResponse response = model.chat(request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
-
-                System.out.println("[火山 非流式] model=" + config.getModelId() + " " + describe(response));
-                assertSuccess(response);
-                assertFalse("响应没有正文", isBlank(response.getContent()));
-                assertEquals(FinishReasonEnum.STOP, response.getFinishReason());
-                assertNotNull("真实响应应带 token 用量", response.getInputTokens());
-            }
-        }
+    public void deepseekResponseChatNonStreaming() throws Exception {
+        chat(DEEPSEEK_RESPONSE, "DeepSeek Response 非流式对话", false);
     }
 
-    /**
-     * 火山方舟流式对话。
-     *
-     * @throws Exception 读取配置或等待事件时
-     */
     @Test
-    public void volcengineChatStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
-            skipWhenCredentialMissing(provider);
-            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
-            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
-                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-                RecordingObserver<HttpResponse> observer = observer("火山 流式");
-                IStreamHandle handle = model.chat(request(config.getModelId(), userMessages(PROMPT), null, true), HttpResponse.class, observer);
-
-                System.out.println("[火山 流式] model=" + config.getModelId());
-                HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                assertFinished(handle);
-
-                System.out.println("[火山 流式] 事件数=" + observer.eventCount() + " 增量文本长度=" + observer.text().length() + " " + describe(completed));
-                assertFalse("响应没有正文", isBlank(completed.getContent()));
-                assertEquals("增量拼接结果应与终态响应一致", completed.getContent(), observer.text());
-                assertStreamingUsage(completed);
-            }
-        }
+    public void _06_deepseekResponseChatStreaming() throws Exception {
+        chat(DEEPSEEK_RESPONSE, "DeepSeek Response 流式对话", true);
     }
 
-    /**
-     * 火山方舟非流式工具调用往返。
-     *
-     * @throws Exception 读取配置或解析工具参数时
-     */
     @Test
-    public void volcengineToolCallNonStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
-            skipWhenCredentialMissing(provider);
-            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
-            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
-                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-
-                HttpResponse first = model.chat(request(config.getModelId(), userMessages(TOOL_PROMPT), tools(), false), HttpResponse.class);
-                System.out.println("[火山 工具 非流式] 第一轮 " + describe(first));
-                ToolCall call = requireToolCall(first);
-
-                HttpResponse second = model.chat(request(config.getModelId(), toolResultMessages(call), tools(), false), HttpResponse.class);
-                System.out.println("[火山 工具 非流式] 第二轮 " + describe(second));
-                assertSuccess(second);
-                assertFalse("工具结果回填后模型没有给出回答", isBlank(second.getContent()));
-                assertEquals(FinishReasonEnum.STOP, second.getFinishReason());
-            }
-        }
+    public void deepseekResponseToolNonStreaming() throws Exception {
+        tool(DEEPSEEK_RESPONSE, "DeepSeek Response 非流式工具", false);
     }
 
-    /**
-     * 火山方舟流式工具调用往返。
-     *
-     * @throws Exception 读取配置、等待事件或解析工具参数时
-     */
     @Test
-    public void volcengineToolCallStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
-            skipWhenCredentialMissing(provider);
-            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
-            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
-                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-
-                RecordingObserver<HttpResponse> first = observer("火山 流式工具");
-                IStreamHandle firstHandle = model.chat(request(config.getModelId(), userMessages(TOOL_PROMPT), tools(), true), HttpResponse.class, first);
-                first.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                assertFinished(firstHandle);
-
-                System.out.println("[火山 流式工具] 参数片段数=" + first.toolArgumentFragments() + " 拼装结果=" + first.toolCalls());
-                ToolCall call = requireToolCall(first.toolCalls());
-
-                RecordingObserver<HttpResponse> second = observer("火山 流式工具");
-                IStreamHandle secondHandle = model.chat(request(config.getModelId(), toolResultMessages(call), tools(), true), HttpResponse.class, second);
-                HttpResponse completed = second.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                assertFinished(secondHandle);
-
-                System.out.println("[火山 流式工具] 第二轮 " + describe(completed));
-                assertFalse("工具结果回填后模型没有给出回答", isBlank(completed.getContent()));
-                assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
-                assertStreamingUsage(completed);
-            }
-        }
+    public void _08_deepseekResponseToolStreaming() throws Exception {
+        tool(DEEPSEEK_RESPONSE, "DeepSeek Response 流式工具", true);
     }
 
-    // ------------------------------------------------------------------ 火山方舟生图
+    // ---------------------------------------------------------------- 火山方舟 Completion
+
+    @Test
+    public void _09_volcengineCompletionChatNonStreaming() throws Exception {
+        chat(VOLCENGINE_COMPLETION, "火山 Completion 非流式对话", false);
+    }
+
+    @Test
+    public void volcengineCompletionChatStreaming() throws Exception {
+        chat(VOLCENGINE_COMPLETION, "火山 Completion 流式对话", true);
+    }
+
+    @Test
+    public void _11_volcengineCompletionToolNonStreaming() throws Exception {
+        tool(VOLCENGINE_COMPLETION, "火山 Completion 非流式工具", false);
+    }
+
+    @Test
+    public void volcengineCompletionToolStreaming() throws Exception {
+        tool(VOLCENGINE_COMPLETION, "火山 Completion 流式工具", true);
+    }
+
+    // ---------------------------------------------------------------- 火山方舟 Response
+
+    @Test
+    public void _13_volcengineResponseChatNonStreaming() throws Exception {
+        chat(VOLCENGINE_RESPONSE, "火山 Response 非流式对话", false);
+    }
+
+    @Test
+    public void _14_volcengineResponseChatStreaming() throws Exception {
+        chat(VOLCENGINE_RESPONSE, "火山 Response 流式对话", true);
+    }
+
+    @Test
+    public void _15_volcengineResponseToolNonStreaming() throws Exception {
+        tool(VOLCENGINE_RESPONSE, "火山 Response 非流式工具", false);
+    }
+
+    @Test
+    public void _16_volcengineResponseToolStreaming() throws Exception {
+        tool(VOLCENGINE_RESPONSE, "火山 Response 流式工具", true);
+    }
+
+    // ---------------------------------------------------------------- Kimi Completion
+
+    @Test
+    public void _18_kimiCompletionChatNonStreaming() throws Exception {
+        chat(KIMI_COMPLETION, "Kimi Completion 非流式对话", false);
+    }
+
+    @Test
+    public void _19_kimiCompletionChatStreaming() throws Exception {
+        chat(KIMI_COMPLETION, "Kimi Completion 流式对话", true);
+    }
+
+    @Test
+    public void _20_kimiCompletionToolNonStreaming() throws Exception {
+        tool(KIMI_COMPLETION, "Kimi Completion 非流式工具", false);
+    }
+
+    @Test
+    public void _21_kimiCompletionToolStreaming() throws Exception {
+        tool(KIMI_COMPLETION, "Kimi Completion 流式工具", true);
+    }
+
+    // ---------------------------------------------------------------- Kimi Response
+
+    @Test
+    public void _22_kimiResponseChatNonStreaming() throws Exception {
+        chat(KIMI_RESPONSE, "Kimi Response 非流式对话", false);
+    }
+
+    @Test
+    public void _23_kimiResponseChatStreaming() throws Exception {
+        chat(KIMI_RESPONSE, "Kimi Response 流式对话", true);
+    }
+
+    @Test
+    public void kimiResponseToolNonStreaming() throws Exception {
+        tool(KIMI_RESPONSE, "Kimi Response 非流式工具", false);
+    }
+
+    @Test
+    public void _25_kimiResponseToolStreaming() throws Exception {
+        tool(KIMI_RESPONSE, "Kimi Response 流式工具", true);
+    }
+
+    // ---------------------------------------------------------------- 火山方舟生图
 
     /**
      * 火山方舟非流式文生图：一次拿到汇总结果，并把返回的图片真正下载下来。
      *
-     * <p>验证整条生图链路：配置加载 → 请求编码（{@code model}/{@code prompt}/{@code size}/{@code watermark}/
-     * {@code response_format}）→ 真实调用 → {@code data[]} 解码为 {@link ImageItem} → 链接可下载。
-     *
      * @throws Exception 读取配置或下载结果时
      */
     @Test
-    public void volcengineImageGeneration() throws Exception {
-        try (ProviderConfiguration provider = load(VOLCENGINE_CONFIG)) {
+    public void _17_volcengineImageGeneration() throws Exception {
+        try (ProviderConfiguration provider = load(VOLCENGINE_RESPONSE)) {
             skipWhenCredentialMissing(provider);
             ModelConfig config = provider.toConfig(CapabilityKindEnum.IMAGE);
             try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.IMAGE))) {
@@ -420,36 +295,92 @@ public class CompatibleTest {
         }
     }
 
-    // ------------------------------------------------------------------ OpenAI 对话
-
+    // ------------------------------------------------------------------ 通用测试执行
 
     /**
-     * OpenAI 流式对话：按事件观察增量，交叉验证累加结果与终态响应一致。
+     * 纯对话用例：非流式一次取回完整响应，流式按事件观察增量并交叉验证累加结果。
      *
-     * <p>与其它平台一样要求流式响应带回 token 用量，即请求里的 {@code stream_options.include_usage}
-     * 被平台接受并生效。
-     *
+     * @param configFile 平台配置文件
+     * @param tag        日志前缀
+     * @param stream     是否流式
      * @throws Exception 读取配置或等待事件时
      */
-    @Test
-    public void openaiChatStreaming() throws Exception {
-        try (ProviderConfiguration provider = load(OPENAI_CONFIG)) {
+    private static void chat(String configFile, String tag, boolean stream) throws Exception {
+        try (ProviderConfiguration provider = load(configFile)) {
             skipWhenCredentialMissing(provider);
             ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
             try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
                 IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
-                RecordingObserver<HttpResponse> observer = observer("OpenAI 流式");
-                IStreamHandle handle = model.chat(request(config.getModelId(), userMessages(PROMPT), null, true), HttpResponse.class, observer);
+                if (stream) {
+                    RecordingObserver<HttpResponse> observer = observer(tag);
+                    IStreamHandle handle = model.chat(request(config.getModelId(), userMessages(PROMPT), null, true), HttpResponse.class, observer);
+                    HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    assertFinished(handle);
+                    System.out.println("[" + tag + "] model=" + config.getModelId() + " 事件数=" + observer.eventCount() + " 增量文本长度=" + observer.text().length() + " " + describe(completed));
+                    assertFalse("响应没有正文", isBlank(completed.getContent()));
+                    assertFalse("没有收到任何文本增量事件", observer.text().isEmpty());
+                    assertEquals("增量拼接结果应与终态响应一致", completed.getContent(), observer.text());
+                    assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
+                    assertStreamingUsage(completed);
+                } else {
+                    HttpResponse response = model.chat(request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
+                    System.out.println("[" + tag + "] model=" + config.getModelId() + " " + describe(response));
+                    assertSuccess(response);
+                    assertFalse("响应没有正文", isBlank(response.getContent()));
+                    assertEquals(FinishReasonEnum.STOP, response.getFinishReason());
+                    assertNotNull("真实响应应带 token 用量", response.getInputTokens());
+                    assertTrue("输入 token 应大于 0", response.getInputTokens() > 0);
+                }
+            }
+        }
+    }
 
-                System.out.println("[OpenAI 流式] model=" + config.getModelId());
-                HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                assertFinished(handle);
+    /**
+     * 工具调用往返用例：声明工具 → 解码 tool_calls → 回填结果 → 模型给出最终回答。
+     *
+     * @param configFile 平台配置文件
+     * @param tag        日志前缀
+     * @param stream     是否流式
+     * @throws Exception 读取配置、等待事件或解析工具参数时
+     */
+    private static void tool(String configFile, String tag, boolean stream) throws Exception {
+        try (ProviderConfiguration provider = load(configFile)) {
+            skipWhenCredentialMissing(provider);
+            ModelConfig config = provider.toConfig(CapabilityKindEnum.CHAT);
+            try (ConvContext.Scope ignored = ConvContext.open(context(provider, CapabilityKindEnum.CHAT))) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                if (stream) {
+                    RecordingObserver<HttpResponse> first = observer(tag);
+                    IStreamHandle firstHandle = model.chat(
+                            request(config.getModelId(), userMessages(TOOL_PROMPT), tools(), true), HttpResponse.class, first);
+                    first.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    assertFinished(firstHandle);
+                    System.out.println("[" + tag + "] 参数片段数=" + first.toolArgumentFragments()
+                            + " 拼装结果=" + first.toolCalls());
+                    ToolCall call = requireToolCall(first.toolCalls());
 
-                System.out.println("[OpenAI 流式] 事件数=" + observer.eventCount() + " 增量文本长度=" + observer.text().length() + " " + describe(completed));
-                assertFalse("响应没有正文", isBlank(completed.getContent()));
-                assertFalse("没有收到任何文本增量事件", observer.text().isEmpty());
-                assertEquals("增量拼接结果应与终态响应一致", completed.getContent(), observer.text());
-                assertStreamingUsage(completed);
+                    RecordingObserver<HttpResponse> second = observer(tag);
+                    IStreamHandle secondHandle = model.chat(
+                            request(config.getModelId(), toolResultMessages(call), tools(), true), HttpResponse.class, second);
+                    HttpResponse completed = second.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    assertFinished(secondHandle);
+                    System.out.println("[" + tag + "] 第二轮 " + describe(completed));
+                    assertFalse("工具结果回填后模型没有给出回答", isBlank(completed.getContent()));
+                    assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
+                    assertStreamingUsage(completed);
+                } else {
+                    HttpResponse first = model.chat(
+                            request(config.getModelId(), userMessages(TOOL_PROMPT), tools(), false), HttpResponse.class);
+                    System.out.println("[" + tag + "] 第一轮 " + describe(first));
+                    ToolCall call = requireToolCall(first);
+
+                    HttpResponse second = model.chat(
+                            request(config.getModelId(), toolResultMessages(call), tools(), false), HttpResponse.class);
+                    System.out.println("[" + tag + "] 第二轮 " + describe(second));
+                    assertSuccess(second);
+                    assertFalse("工具结果回填后模型没有给出回答", isBlank(second.getContent()));
+                    assertEquals(FinishReasonEnum.STOP, second.getFinishReason());
+                }
             }
         }
     }
@@ -485,9 +416,6 @@ public class CompatibleTest {
 
     /**
      * 凭据来自环境变量且当前进程不可见时跳过用例，并打印排查提示。
-     *
-     * <p>进程环境是启动时的快照：设置完用户级/系统级环境变量后，已运行的 IDE 及其拉起的测试 JVM
-     * 仍然读不到，必须重启 IDE，或在运行配置里显式注入变量名与值。
      *
      * @param provider 已加载的平台配置
      */
@@ -652,9 +580,6 @@ public class CompatibleTest {
     /**
      * 断言流式响应带回 token 用量。
      *
-     * <p>OpenAI 兼容家族的流式响应默认不回传 usage，必须靠请求里的 {@code stream_options.include_usage}
-     * 开启，所以这条断言同时也在守住「流式必须带上 stream_options」这个协议要求。
-     *
      * @param response 终态累积响应
      */
     private static void assertStreamingUsage(HttpResponse response) {
@@ -673,10 +598,12 @@ public class CompatibleTest {
             return "无响应";
         }
         RawHttpResponse raw = response.getRaw();
+        int toolCalls = (response.getToolCalls() == null ? 0 : response.getToolCalls().size())
+                + (response.getResponsesToolCalls() == null ? 0 : response.getResponsesToolCalls().size());
         return "status=" + (raw == null ? "?" : raw.getStatusCode())
                 + " 结束原因=" + response.getFinishReason()
                 + " 正文=" + response.getContent()
-                + " 工具调用数=" + (response.getToolCalls() == null ? 0 : response.getToolCalls().size())
+                + " 工具调用数=" + toolCalls
                 + " 用量=" + describeUsage(response);
     }
 

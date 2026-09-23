@@ -1,8 +1,8 @@
 provider: DEEPSEEK
 credential:
-  secretRef: deepseek-novel
-  #environmentVariable: CLARA_DEEPSEEK_API_KEY
-  apiKey: sk-db00b0a4e4944a0ab16d272b500076d3
+  secretRef: deepseek
+  # apiKey: xxx
+  environmentVariable: CLARA_DEEPSEEK_API_KEY
 transport:
   allowedOrigins:
     - https://api.deepseek.com
@@ -13,9 +13,8 @@ transport:
   allowHttp: false
 capabilities:
   CHAT:
-    endpoint: https://api.deepseek.com/chat/completions
-    #endpoint: https://api.deepseek.com/chat/responses
+    endpoint: https://api.deepseek.com/responses
     modelId: deepseek-v4-pro
-    apiProfile: Completion
+    apiProfile: RESPONSE
     parameters:
       maxTokens: 30000

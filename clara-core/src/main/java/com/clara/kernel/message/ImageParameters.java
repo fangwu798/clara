@@ -11,7 +11,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.List;
 
 /**
- * 图片生成的参数：在 {@link ModelParameters} 的通用参数之上，补充火山方舟图片生成接口
+ * 图片生成的参数：在 {@link BasicParameters} 的通用参数之上，补充火山方舟图片生成接口
  * （{@code POST /api/v3/images/generations}，Seedream 系列）的专有字段。
  *
  *
@@ -26,7 +26,7 @@ import java.util.List;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
-public abstract class ImageParameters extends ModelParameters {
+public abstract class ImageParameters extends BasicParameters {
 
     /**
      * 提示词：图片生成场景<b>必选</b>，用于描述要生成的图像内容；图层拆分场景可选，用于指定拆分意图
@@ -37,6 +37,7 @@ public abstract class ImageParameters extends ModelParameters {
      */
     @JsonProperty("prompt")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, note = "图片生成场景必选；图层拆分场景可选；中文 ≤300 字 / 英文 ≤600 词")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, note = "必选；建议 ≤32000 字符")
     private String prompt;
 
     /**
@@ -60,6 +61,7 @@ public abstract class ImageParameters extends ModelParameters {
      */
     @JsonProperty("size")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "2048x2048", note = "档位或宽x高二选一；总像素 [921600, 16777216]、宽高比 [1/16, 16] 需同时满足")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, allowed = {"1024x1024", "1536x1024", "1024x1536", "auto"}, note = "gpt-image-1 系列支持 auto；dall-e-3 为 1024x1024/1792x1024/1024x1792")
     private String size;
 
     /**
@@ -122,6 +124,7 @@ public abstract class ImageParameters extends ModelParameters {
      */
     @JsonProperty("output_format")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "jpeg", allowed = {"jpeg", "png"}, note = "仅 5.0 pro / 5.0 lite 支持")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, defaultValue = "png", allowed = {"png", "jpeg", "webp"})
     private String outputFormat;
 
     /**
@@ -133,4 +136,52 @@ public abstract class ImageParameters extends ModelParameters {
     @JsonProperty("optimize_prompt_options.mode")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, allowed = {"standard", "fast"}, note = "线格式为 optimize_prompt_options.mode；仅 4.5（standard）/4.0 支持；平台默认 standard，不设置则不下发")
     private String optimizePromptMode;
+
+    /**
+     * 生成图片的数量（OpenAI Images API），取值 [1, 10]。
+     *
+     * <p>gpt-image-1 / gpt-image-1-mini 支持一次生成多张；dall-e-3 仅支持 1 张。
+     */
+    @JsonProperty("n")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, min = 1d, max = 10d, note = "gpt-image-1 系列支持 1-10；dall-e-3 仅 1")
+    private Integer n;
+
+    /**
+     * 渲染质量（OpenAI Images API）：{@code low} / {@code medium} / {@code high} / {@code auto}。
+     *
+     * <p>默认 {@code auto}（由模型自动选择）；gpt-image-1 系列支持，dall-e-3 用 standard/hd。
+     */
+    @JsonProperty("quality")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, defaultValue = "auto", allowed = {"low", "medium", "high", "auto"}, note = "gpt-image-1 系列；dall-e-3 用 standard/hd")
+    private String quality;
+
+    /**
+     * 背景处理（OpenAI Images API）：{@code transparent}（透明）/ {@code opaque}（不透明）/ {@code auto}。
+     *
+     * <p>仅 gpt-image-1 支持透明背景。
+     */
+    @JsonProperty("background")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, defaultValue = "auto", allowed = {"transparent", "opaque", "auto"}, note = "仅 gpt-image-1 支持 transparent")
+    private String background;
+
+    /**
+     * 内容审核强度（OpenAI Images API）：{@code low} / {@code medium} / {@code high} / {@code auto}。
+     */
+    @JsonProperty("moderation")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, defaultValue = "auto", allowed = {"low", "medium", "high", "auto"})
+    private String moderation;
+
+    /**
+     * 输出压缩级别（OpenAI Images API），取值 [0, 100]，仅对 jpeg / webp 生效。
+     */
+    @JsonProperty("output_compression")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, min = 0d, max = 100d, note = "仅 jpeg/webp 生效")
+    private Integer outputCompression;
+
+    /**
+     * 生成风格（OpenAI Images API，dall-e-3）：{@code vivid}（生动）/ {@code natural}（自然）。
+     */
+    @JsonProperty("style")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, allowed = {"vivid", "natural"}, note = "仅 dall-e-3 支持")
+    private String style;
 }

@@ -1,8 +1,8 @@
 provider: VOLCENGINE
 credential:
-  secretRef: volcengine-novel
-  apiKey: ark-8c19128f-7d86-4e68-85c9-d172312a6315-a17ef
-  #environmentVariable: CLARA_VOLCENGINE_API_KEY
+  secretRef: volcengine
+  # apiKey: xxx
+  environmentVariable: CLARA_VOLCENGINE_API_KEY
 transport:
   allowedOrigins:
     - https://ark.cn-beijing.volces.com
@@ -18,12 +18,3 @@ capabilities:
     apiProfile: ark-v3-chat
     parameters:
       maxTokens: 20000
-  IMAGE:
-    endpoint: https://ark.cn-beijing.volces.com/api/v3/images/generations
-    modelId: doubao-seedream-5-0-pro-260628
-    apiProfile: ark-v3-images
-    parameters:
-      maxPromptChars: 32000
-      maxOutputs: 1
-      maxSourceImages: 0
-      watermark: false

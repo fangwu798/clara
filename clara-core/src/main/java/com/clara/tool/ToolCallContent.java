@@ -6,7 +6,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 助手要求调用工具的消息：线格式为
@@ -80,5 +84,53 @@ public final class ToolCallContent implements IContent {
     @JsonIgnore
     public RoleEnum getRoleType() {
         return RoleEnum.TOOL_CALL;
+    }
+
+    @Override
+    public Map<String, Object> toCompletionMessage() {
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("role", "assistant");
+        message.put("content", content);
+        List<Map<String, Object>> calls = new ArrayList<>();
+        for (ToolCall call : toolCalls) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("id", call.getId());
+            c.put("type", call.getType());
+            Map<String, Object> fn = new LinkedHashMap<>();
+            ToolCallFunction function = call.getFunction();
+            if (function != null) {
+                fn.put("name", function.getName());
+                fn.put("arguments", function.getArguments());
+            }
+            c.put("function", fn);
+            calls.add(c);
+        }
+        message.put("tool_calls", calls);
+        return message;
+    }
+
+    @Override
+    public List<Map<String, Object>> toResponseInputItems() {
+        List<Map<String, Object>> items = new ArrayList<>();
+        if (content != null && !content.isEmpty()) {
+            Map<String, Object> part = new LinkedHashMap<>();
+            part.put("type", "output_text");
+            part.put("text", content);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("type", "message");
+            item.put("role", "assistant");
+            item.put("content", Collections.singletonList(part));
+            items.add(item);
+        }
+        for (ToolCall call : toolCalls) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("type", "function_call");
+            item.put("call_id", call.getId());
+            ToolCallFunction function = call.getFunction();
+            item.put("name", function == null ? null : function.getName());
+            item.put("arguments", function == null ? null : function.getArguments());
+            items.add(item);
+        }
+        return items;
     }
 }

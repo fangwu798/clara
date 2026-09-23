@@ -6,6 +6,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 系统消息：线格式为 {@code {"role":"system","content":"..."}}。
  *
@@ -47,5 +52,28 @@ public final class SystemContent implements IContent {
     @JsonIgnore
     public RoleEnum getRoleType() {
         return RoleEnum.SYSTEM;
+    }
+
+    @Override
+    public Map<String, Object> toCompletionMessage() {
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("role", "system");
+        message.put("content", content);
+        return message;
+    }
+
+    @Override
+    public List<Map<String, Object>> toResponseInputItems() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public boolean isSystemInstruction() {
+        return true;
+    }
+
+    @Override
+    public String instructionText() {
+        return content;
     }
 }

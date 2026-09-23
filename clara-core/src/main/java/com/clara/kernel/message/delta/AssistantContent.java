@@ -6,6 +6,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 助手消息：线格式为 {@code {"role":"assistant","content":"..."}}。
  *
@@ -48,5 +53,25 @@ public final class AssistantContent implements IContent {
     @JsonIgnore
     public RoleEnum getRoleType() {
         return RoleEnum.ASSISTANT;
+    }
+
+    @Override
+    public Map<String, Object> toCompletionMessage() {
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("role", "assistant");
+        message.put("content", content);
+        return message;
+    }
+
+    @Override
+    public List<Map<String, Object>> toResponseInputItems() {
+        Map<String, Object> part = new LinkedHashMap<>();
+        part.put("type", "output_text");
+        part.put("text", content);
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("type", "message");
+        item.put("role", "assistant");
+        item.put("content", Collections.singletonList(part));
+        return Collections.singletonList(item);
     }
 }

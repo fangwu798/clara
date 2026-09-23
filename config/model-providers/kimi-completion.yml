@@ -1,0 +1,20 @@
+provider: KIMI
+credential:
+  secretRef: kimi
+  # apiKey: xxx
+  environmentVariable: CLARA_KIMI_API_KEY
+transport:
+  allowedOrigins:
+    - https://api.moonshot.cn
+  connectTimeoutMillis: 10000
+  readTimeoutMillis: 180000
+  maxRequestBytes: 8388608
+  maxResponseBytes: 33554432
+  allowHttp: false
+capabilities:
+  CHAT:
+    endpoint: https://api.moonshot.cn/v1/chat/completions
+    modelId: kimi-k2.6
+    apiProfile: Completion
+    parameters:
+      maxTokens: 8192

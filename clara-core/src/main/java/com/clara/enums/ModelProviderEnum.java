@@ -8,14 +8,28 @@ package com.clara.enums;
  * （{@code @ProviderAdapter} / {@code @ModelProvider}）声明平台的取值类型。
  */
 public enum ModelProviderEnum {
-    /** OpenAI：OpenAI 兼容协议家族成员，鉴权头为 {@code Authorization: Bearer <密钥>}。 */
+    /**
+     * OpenAI：OpenAI 兼容协议家族成员，鉴权头为 {@code Authorization: Bearer <密钥>}。
+     */
     OPENAI,
-    /** 火山方舟：OpenAI 兼容协议家族成员，鉴权头同 {@code Authorization: Bearer <密钥>}。 */
+    /**
+     * 火山方舟：OpenAI 兼容协议家族成员，鉴权头同 {@code Authorization: Bearer <密钥>}。
+     */
     VOLCENGINE,
-    /** DeepSeek：OpenAI 兼容协议家族成员，鉴权头同 {@code Authorization: Bearer <密钥>}。 */
+    /**
+     * DeepSeek：OpenAI 兼容协议家族成员，鉴权头同 {@code Authorization: Bearer <密钥>}。
+     */
     DEEPSEEK,
-    /** 阿里通义：OpenAI 兼容协议家族成员，鉴权头同 {@code Authorization: Bearer <密钥>}。 */
+    /**
+     * 阿里通义：OpenAI 兼容协议家族成员，鉴权头同 {@code Authorization: Bearer <密钥>}。
+     */
     ALIBABA,
-    /** Anthropic：不走兼容家族，鉴权头为 {@code x-api-key} 加能力参数 {@code apiVersion}。 */
+    /**
+     * Kimi（月之暗面）：OpenAI 兼容协议家族成员，鉴权头同 {@code Authorization: Bearer <密钥>}。
+     */
+    KIMI,
+    /**
+     * Anthropic：不走兼容家族，鉴权头为 {@code x-api-key} 加能力参数 {@code apiVersion}。
+     */
     ANTHROPIC
 }

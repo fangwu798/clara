@@ -1,4 +1,4 @@
-package com.clara.tool;
+package com.clara.kernel.message.delta;
 
 import lombok.Data;
 import lombok.Getter;

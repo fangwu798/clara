@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
-public final class ResponsesToolCall {
+public final class ResponsesToolCall implements IToolInvocation {
 
     /**
      * 条目类型，恒为 {@code function_call}。
@@ -40,4 +40,19 @@ public final class ResponsesToolCall {
      */
     @JsonProperty("arguments")
     private String arguments;
+
+    @Override
+    public String callId() {
+        return callId;
+    }
+
+    @Override
+    public String name() {
+        return name;
+    }
+
+    @Override
+    public String arguments() {
+        return arguments;
+    }
 }

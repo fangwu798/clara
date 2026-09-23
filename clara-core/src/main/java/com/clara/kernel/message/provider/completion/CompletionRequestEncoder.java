@@ -1,9 +1,14 @@
 package com.clara.kernel.message.provider.completion;
 
 import com.clara.enums.ModelProviderEnum;
+import com.clara.kernel.api.IRequest;
+import com.clara.kernel.api.message.IContent;
 import com.clara.kernel.message.provider.AbstractRequestEncoder;
+import com.clara.tool.ToolContext;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -19,12 +24,35 @@ public final class CompletionRequestEncoder extends AbstractRequestEncoder {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     protected Object protocolValue(Field field, Object value) {
+        if (value == null || !(value instanceof List)) {
+            return value;
+        }
+        List<?> list = (List<?>) value;
+        if (list.isEmpty()) {
+            return value;
+        }
+        Object first = list.get(0);
+        if (first instanceof IContent) {
+            List<Map<String, Object>> messages = new ArrayList<>();
+            for (Object o : list) {
+                messages.add(((IContent) o).toCompletionMessage());
+            }
+            return messages;
+        }
+        if (first instanceof ToolContext) {
+            List<Map<String, Object>> tools = new ArrayList<>();
+            for (Object o : list) {
+                tools.add(((ToolContext) o).toCompletionTool());
+            }
+            return tools;
+        }
         return value;
     }
 
     @Override
-    protected void postProcessBody(Map<String, Object> body, ModelProviderEnum provider, Map<String, String> authorization) {
+    protected void postProcessBody(Map<String, Object> body, IRequest request, ModelProviderEnum provider, Map<String, String> authorization) {
         // Chat Completions 无补充字段
     }
 }

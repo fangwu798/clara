@@ -3,13 +3,15 @@ package com.clara.kernel.message.provider.response;
 import com.clara.annoation.ProtocolField;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.ProtocolEnum;
+import com.clara.kernel.api.IRequest;
 import com.clara.kernel.api.message.IContent;
+import com.clara.kernel.message.BasicParameters;
 import com.clara.kernel.message.provider.AbstractRequestEncoder;
 import com.clara.tool.ToolContext;
 import com.clara.utils.CodexTuiGenerator;
-import com.clara.utils.deserialize.ResponseInputConverter;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,7 +21,8 @@ import java.util.Map;
  * Responses 协议的请求编码器。
  *
  * <p>用 {@link ProtocolField} 映射字段名（如 {@code messages} → {@code input}、{@code max_tokens} →
- * {@code max_output_tokens}），用 {@link ResponseInputConverter} 转换消息 / 工具声明结构，并为 Codex 模拟补齐
+ * {@code max_output_tokens}），消息 / 工具声明结构由 {@link IContent} / {@link ToolContext} 自渲染，
+ * 系统指令提升为顶层 {@code instructions}，并为 Codex 模拟补齐
  * {@code reasoning.context} / {@code store} / {@code include} / {@code text} 等字段。
  */
 public final class ResponseRequestEncoder extends AbstractRequestEncoder {
@@ -49,16 +52,30 @@ public final class ResponseRequestEncoder extends AbstractRequestEncoder {
         }
         Object first = list.get(0);
         if (first instanceof IContent) {
-            return ResponseInputConverter.toInput((List<IContent>) value);
+            List<Map<String, Object>> input = new ArrayList<>();
+            for (Object o : list) {
+                IContent content = (IContent) o;
+                if (!content.isSystemInstruction()) {
+                    input.addAll(content.toResponseInputItems());
+                }
+            }
+            return input;
         }
         if (first instanceof ToolContext) {
-            return ResponseInputConverter.toTools((List<ToolContext>) value);
+            List<Map<String, Object>> tools = new ArrayList<>();
+            for (Object o : list) {
+                tools.add(((ToolContext) o).toResponseTool());
+            }
+            return tools;
         }
         return value;
     }
 
     @Override
-    protected void postProcessBody(Map<String, Object> body, ModelProviderEnum provider, Map<String, String> authorization) {
+    protected void postProcessBody(Map<String, Object> body, IRequest request, ModelProviderEnum provider, Map<String, String> authorization) {
+        if (request instanceof BasicParameters) {
+            injectInstructions(body, (BasicParameters) request);
+        }
         if (provider != ModelProviderEnum.OPENAI) {
             return;
         }
@@ -68,6 +85,22 @@ public final class ResponseRequestEncoder extends AbstractRequestEncoder {
         }
         body.put("client_metadata", clientMetadata);
         injectCodexFields(body);
+    }
+
+    private static void injectInstructions(Map<String, Object> body, BasicParameters request) {
+        List<IContent> messages = request.getMessages();
+        if (messages == null || messages.isEmpty()) {
+            return;
+        }
+        for (IContent message : messages) {
+            if (message.isSystemInstruction()) {
+                String instructions = message.instructionText();
+                if (instructions != null && !instructions.isEmpty()) {
+                    body.put("instructions", instructions);
+                }
+                return;
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")
