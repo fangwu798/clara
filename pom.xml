@@ -15,7 +15,6 @@
         <module>clara-orchestration</module>
         <module>clara-skill</module>
         <module>clara-application</module>
-        <module>clara-novel</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

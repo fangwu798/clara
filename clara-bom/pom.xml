@@ -46,11 +46,6 @@
                 <artifactId>clara-application</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>com.clara</groupId>
-                <artifactId>clara-novel</artifactId>
-                <version>${project.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>
