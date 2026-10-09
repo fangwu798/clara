@@ -1,1 +1,0 @@
-package com.clara.memory.semantic.api;import java.io.Closeable;import java.util.List;public interface SemanticMemoryStore extends Closeable {void upsert(List<MemoryEntry> entries);List<MemoryMatch> search(SemanticMemoryQuery query);void deleteByConversation(String tenantId,String conversationId);}

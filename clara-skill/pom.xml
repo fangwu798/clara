@@ -16,7 +16,7 @@
         </dependency>
         <dependency>
             <groupId>com.clara</groupId>
-            <artifactId>clara-orchestration</artifactId>
+            <artifactId>clara-model</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

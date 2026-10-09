@@ -1,5 +1,7 @@
 package com.clara.workspace.application;
 
+import com.clara.enums.ModelProviderEnum;
+
 import java.nio.file.Path;
 import java.util.*;
 
@@ -7,16 +9,17 @@ import java.util.*;
  * 封装工作区恢复操作的输入参数。
  */
 public final class WorkspaceResumeRequest {
-    private final String tenantId, userId, runId, interactionId, idempotencyKey;
+    private final String userId, runId, interactionId, idempotencyKey;
     private final Path workspace;
     private final long expectedInstanceVersion;
     private final Map<String, Object> answer;
+    private final ModelProviderEnum provider;
+    private final String model;
 
-    public WorkspaceResumeRequest(String tenant, String user, String run, Path workspace, String interaction, long expected, String key, Map<String, Object> answer) {
-        if (blank(tenant) || blank(user) || blank(run) || workspace == null || !workspace.isAbsolute() || blank(interaction) || expected < 0 || blank(key)) {
+    public WorkspaceResumeRequest(String user, String run, Path workspace, String interaction, long expected, String key, Map<String, Object> answer, ModelProviderEnum provider, String model) {
+        if (blank(user) || blank(run) || workspace == null || !workspace.isAbsolute() || blank(interaction) || expected < 0 || blank(key)) {
             throw new IllegalArgumentException("workspace resume request is invalid");
         }
-        tenantId = tenant;
         userId = user;
         runId = run;
         this.workspace = workspace.normalize();
@@ -24,10 +27,8 @@ public final class WorkspaceResumeRequest {
         expectedInstanceVersion = expected;
         idempotencyKey = key;
         this.answer = answer == null ? Collections.<String, Object>emptyMap() : Collections.unmodifiableMap(new LinkedHashMap<String, Object>(answer));
-    }
-
-    public String getTenantId() {
-        return tenantId;
+        this.provider = provider;
+        this.model = model;
     }
 
     public String getUserId() {
@@ -56,6 +57,14 @@ public final class WorkspaceResumeRequest {
 
     public Map<String, Object> getAnswer() {
         return answer;
+    }
+
+    public ModelProviderEnum getProvider() {
+        return provider;
+    }
+
+    public String getModel() {
+        return model;
     }
 
     private static boolean blank(String v) {

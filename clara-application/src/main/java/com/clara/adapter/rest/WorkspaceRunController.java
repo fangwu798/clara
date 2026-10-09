@@ -1,6 +1,6 @@
 package com.clara.adapter.rest;
 
-import com.clara.kernel.exception.ClaraException;
+import com.clara.exception.ClaraException;
 import com.clara.workspace.application.*;
 
 /**
@@ -34,9 +34,9 @@ public final class WorkspaceRunController {
         }
     }
 
-    public RestResponse<Void> cancel(String tenant, String run, String reason) {
+    public RestResponse<Void> cancel(String run, String reason) {
         try {
-            runner.cancel(tenant, run, reason);
+            runner.cancel(run, reason);
             return RestResponse.ok(204, null);
         } catch (ClaraException e) {
             return RestResponse.error(RestErrors.status(e.getError()), e.getError());

@@ -1,8 +1,8 @@
 package com.clara.workspace.runtime;
 
-import com.clara.kernel.exception.ClaraException;
-import com.clara.kernel.exception.ClaraError;
-import com.clara.kernel.exception.ErrorCategory;
+import com.clara.exception.ClaraException;
+import com.clara.exception.ClaraError;
+import com.clara.exception.ErrorCategory;
 
 import java.util.Collections;
 

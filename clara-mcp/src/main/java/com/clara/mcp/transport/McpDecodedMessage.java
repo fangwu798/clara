@@ -1,8 +1,8 @@
 package com.clara.mcp.transport;
 
-import com.clara.mcp.client.JsonRpcNotification;
-import com.clara.mcp.client.JsonRpcRequest;
-import com.clara.mcp.client.JsonRpcResponse;
+import com.clara.mcp.transport.jsonrpc.JsonRpcNotification;
+import com.clara.mcp.transport.jsonrpc.JsonRpcRequest;
+import com.clara.mcp.transport.jsonrpc.JsonRpcResponse;
 
 /**
  * 表示MCP解码结果交换的消息。

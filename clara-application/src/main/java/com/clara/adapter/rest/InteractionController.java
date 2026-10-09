@@ -1,7 +1,10 @@
 package com.clara.adapter.rest;
 
-import com.clara.kernel.exception.ClaraException;
-import com.clara.orchestration.interaction.*;
+import com.clara.core.interaction.IInteractionService;
+import com.clara.dto.interaction.FeedbackResult;
+import com.clara.dto.interaction.InteractionFeedback;
+import com.clara.dto.interaction.InteractionRequest;
+import com.clara.exception.ClaraException;
 
 import java.util.List;
 
@@ -9,26 +12,26 @@ import java.util.List;
  * 对外暴露交互的控制接口。
  */
 public final class InteractionController {
-    private final InteractionService service;
+    private final IInteractionService service;
 
-    public InteractionController(InteractionService service) {
+    public InteractionController(IInteractionService service) {
         if (service == null) {
             throw new IllegalArgumentException();
         }
         this.service = service;
     }
 
-    public RestResponse<List<InteractionRequest>> pending(String tenant, String run) {
+    public RestResponse<List<InteractionRequest>> pending(String run) {
         try {
-            return RestResponse.ok(200, service.pending(tenant, run));
+            return RestResponse.ok(200, service.pending(run));
         } catch (ClaraException e) {
             return RestResponse.error(RestErrors.status(e.getError()), e.getError());
         }
     }
 
-    public RestResponse<InteractionRequest> get(String tenant, String run, String interaction) {
+    public RestResponse<InteractionRequest> get(String run, String interaction) {
         try {
-            return RestResponse.ok(200, service.get(tenant, run, interaction));
+            return RestResponse.ok(200, service.get(run, interaction));
         } catch (ClaraException e) {
             return RestResponse.error(RestErrors.status(e.getError()), e.getError());
         }
@@ -42,9 +45,9 @@ public final class InteractionController {
         }
     }
 
-    public RestResponse<Void> cancel(String tenant, String interaction, String reason) {
+    public RestResponse<Void> cancel(String interaction, String reason) {
         try {
-            service.cancel(tenant, interaction, reason);
+            service.cancel(interaction, reason);
             return RestResponse.ok(204, null);
         } catch (ClaraException e) {
             return RestResponse.error(RestErrors.status(e.getError()), e.getError());

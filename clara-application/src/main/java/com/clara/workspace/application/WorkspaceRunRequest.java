@@ -1,5 +1,6 @@
 package com.clara.workspace.application;
 
+import com.clara.enums.ModelProviderEnum;
 import com.clara.workspace.api.WorkspaceAccessMode;
 
 import java.nio.file.Path;
@@ -9,17 +10,18 @@ import java.util.*;
  * 封装工作区运行操作的输入参数。
  */
 public final class WorkspaceRunRequest {
-    private final String tenantId, userId, runId, goal, skillId;
+    private final String userId, runId, goal, skillId;
     private final Path workspace;
     private final WorkspaceAccessMode accessMode;
     private final boolean approveChanges;
     private final Map<String, Object> inputs;
+    private final ModelProviderEnum provider;
+    private final String model;
 
-    public WorkspaceRunRequest(String tenant, String user, String run, Path workspace, String goal, String skill, WorkspaceAccessMode mode, boolean approve, Map<String, Object> inputs) {
-        if (blank(tenant) || blank(user) || blank(run) || workspace == null || !workspace.isAbsolute() || mode == null) {
+    public WorkspaceRunRequest(String user, String run, Path workspace, String goal, String skill, WorkspaceAccessMode mode, boolean approve, Map<String, Object> inputs, ModelProviderEnum provider, String model) {
+        if (blank(user) || blank(run) || workspace == null || !workspace.isAbsolute() || mode == null) {
             throw new IllegalArgumentException("workspace run request is invalid");
         }
-        tenantId = tenant;
         userId = user;
         runId = run;
         this.workspace = workspace.normalize();
@@ -28,10 +30,8 @@ public final class WorkspaceRunRequest {
         accessMode = mode;
         approveChanges = approve;
         this.inputs = inputs == null ? Collections.<String, Object>emptyMap() : Collections.unmodifiableMap(new LinkedHashMap<String, Object>(inputs));
-    }
-
-    public String getTenantId() {
-        return tenantId;
+        this.provider = provider;
+        this.model = model;
     }
 
     public String getUserId() {
@@ -64,6 +64,14 @@ public final class WorkspaceRunRequest {
 
     public Map<String, Object> getInputs() {
         return inputs;
+    }
+
+    public ModelProviderEnum getProvider() {
+        return provider;
+    }
+
+    public String getModel() {
+        return model;
     }
 
     private static boolean blank(String v) {

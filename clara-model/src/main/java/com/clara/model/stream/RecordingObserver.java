@@ -2,7 +2,7 @@ package com.clara.model.stream;
 
 import com.clara.enums.StreamEventEnum;
 import com.clara.kernel.api.IResponse;
-import com.clara.kernel.exception.ClaraError;
+import com.clara.exception.ClaraError;
 import com.clara.kernel.stream.IStreamObserver;
 import com.clara.kernel.stream.StreamEvent;
 import com.clara.tool.ToolCall;

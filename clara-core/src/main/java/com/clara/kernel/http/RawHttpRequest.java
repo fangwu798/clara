@@ -18,8 +18,7 @@ import java.util.Set;
  * 只面对已合法化的输入。
  *
  * <p>谁创建谁调用：由请求对象的 {@link com.clara.kernel.api.IRequest#toRequest()} 创建（实现里交给
- * {@code ProviderRequestEncoder} 按字段注解编码），再交给传输实现读取（如
- * {@link com.clara.kernel.http.execute.Jdk8HttpTransport}）。适配器不自行构造本类。
+ * {@code ProviderRequestEncoder} 按字段注解编码），再交给传输实现读取（如 Jdk8HttpTransport）。适配器不自行构造本类。
  *
  * <p>使用方法：传输实现依次调用 {@code getMethod()}、{@code getEndpoint()}、{@code getHeaders()}、
  * {@code getBody()} 组装连接并发送。本类没有 close 或释放动作，也不持有连接、流等需要回收的资源，构造完成
@@ -87,8 +86,8 @@ public final class RawHttpRequest {
         if (("GET".equals(normalizedMethod) || "DELETE".equals(normalizedMethod)) && safeBody.length != 0) {
             throw new IllegalArgumentException("method must not contain a body");
         }
-        LinkedHashMap<String, String> safeHeaders = new LinkedHashMap<String, String>();
-        Set<String> headerNames = new HashSet<String>();
+        LinkedHashMap<String, String> safeHeaders = new LinkedHashMap<>();
+        Set<String> headerNames = new HashSet<>();
         if (headers != null) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {
                 requireHeader(entry.getKey(), entry.getValue());

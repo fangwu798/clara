@@ -1,7 +1,7 @@
 package com.clara.tool;
 
 import com.clara.enums.RoleEnum;
-import com.clara.kernel.api.message.IContent;
+import com.clara.core.message.IContent;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

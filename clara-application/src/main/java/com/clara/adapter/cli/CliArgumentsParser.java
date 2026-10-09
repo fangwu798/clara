@@ -1,5 +1,6 @@
 package com.clara.adapter.cli;
 
+import com.clara.enums.ModelProviderEnum;
 import com.clara.workspace.api.WorkspaceAccessMode;
 
 import java.io.IOException;
@@ -32,16 +33,18 @@ public final class CliArgumentsParser {
                 throw new IllegalArgumentException("invalid option");
             }
         }
-        Set<String> allowed = new HashSet<String>(Arrays.asList("--workspace", "--goal", "--skill", "--write-mode", "--ui", "--output", "--config", "--tenant", "--user", "--run-id", "--interaction-id", "--answer-file"));
+        Set<String> allowed = new HashSet<String>(Arrays.asList("--workspace", "--goal", "--skill", "--write-mode", "--ui", "--output", "--config", "--user", "--run-id", "--interaction-id", "--answer-file", "--model", "--provider"));
         for (String key : values.keySet())
             if (!allowed.contains(key)) {
                 throw new IllegalArgumentException("unknown option " + key);
             }
         Path workspace = real(values.get("--workspace"), true), answer = real(values.get("--answer-file"), false), config = real(values.get("--config"), false);
-        String tenant = value(values, "--tenant", "local"), user = value(values, "--user", "console"), run = value(values, "--run-id", command == CliCommand.RUN ? UUID.randomUUID().toString() : null);
+        String user = value(values, "--user", "console"), run = value(values, "--run-id", command == CliCommand.RUN ? UUID.randomUUID().toString() : null);
         WorkspaceAccessMode mode = mode(value(values, "--write-mode", "preview"));
         CliUiMode ui = ui(value(values, "--ui", "auto"));
         CliOutputFormat output = output(value(values, "--output", "text"));
+        ModelProviderEnum provider = provider(values.get("--provider"));
+        String model = values.get("--model");
         boolean approve = flags.contains("--approve-changes");
         if (approve && mode != WorkspaceAccessMode.APPLY_WRITE) {
             throw new IllegalArgumentException("approval requires apply mode");
@@ -50,7 +53,7 @@ public final class CliArgumentsParser {
         if (command == CliCommand.RESUME && (blank(run) || blank(interaction) || answer == null)) {
             throw new IllegalArgumentException("resume fields are required");
         }
-        return new CliOptions(command, workspace, answer, config, tenant, user, run, values.get("--goal"), values.get("--skill"), interaction, mode, ui, output, approve, flags.contains("--no-color"));
+        return new CliOptions(command, workspace, answer, config, user, run, values.get("--goal"), values.get("--skill"), interaction, mode, ui, output, approve, flags.contains("--no-color"), provider, model);
     }
 
     private static Path real(String value, boolean directory) {
@@ -96,6 +99,17 @@ public final class CliArgumentsParser {
         if ("text".equals(v)) return CliOutputFormat.TEXT;
         if ("json".equals(v)) return CliOutputFormat.JSON;
         throw new IllegalArgumentException("invalid output");
+    }
+
+    private static ModelProviderEnum provider(String v) {
+        if (v == null) {
+            return null;
+        }
+        try {
+            return ModelProviderEnum.valueOf(v);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("invalid provider");
+        }
     }
 
     private static boolean blank(String v) {

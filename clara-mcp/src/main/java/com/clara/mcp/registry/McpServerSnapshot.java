@@ -2,6 +2,10 @@ package com.clara.mcp.registry;
 
 import com.clara.mcp.client.McpServerCapabilities;
 import com.clara.mcp.client.McpServerIdentity;
+import com.clara.mcp.registry.capability.McpPromptDescriptor;
+import com.clara.mcp.registry.capability.McpResourceDescriptor;
+import com.clara.mcp.registry.capability.McpResourceTemplateDescriptor;
+import com.clara.mcp.registry.capability.McpToolDescriptor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;

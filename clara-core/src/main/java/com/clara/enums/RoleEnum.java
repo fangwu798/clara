@@ -1,6 +1,6 @@
 package com.clara.enums;
 
-import com.clara.kernel.api.message.IContent;
+import com.clara.core.message.IContent;
 
 /**
  * 对话消息的角色：{@link IContent#getRoleType()} 的类型判别取值。

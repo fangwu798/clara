@@ -1,6 +1,6 @@
 package com.clara.workspace.application;
 
-import com.clara.orchestration.interaction.InteractionRequest;
+import com.clara.dto.interaction.InteractionRequest;
 
 import java.util.*;
 

@@ -1,6 +1,6 @@
 package com.clara.adapter.cli;
 
-import com.clara.kernel.exception.ClaraError;
+import com.clara.exception.ClaraError;
 
 public final class CliExitCodes {
     public static final int SUCCESS = 0, INVALID = 2, WAITING_INPUT = 3, FAILED = 4, DENIED = 5, EXTERNAL_UNAVAILABLE = 6;

@@ -1,11 +1,11 @@
 package com.clara.mcp.transport;
 
-import com.clara.kernel.exception.ErrorCategory;
-import com.clara.kernel.exception.ErrorCodes;
-import com.clara.mcp.client.JsonRpcError;
-import com.clara.mcp.client.JsonRpcNotification;
-import com.clara.mcp.client.JsonRpcRequest;
-import com.clara.mcp.client.JsonRpcResponse;
+import com.clara.exception.ErrorCategory;
+import com.clara.exception.ErrorCodes;
+import com.clara.mcp.transport.jsonrpc.JsonRpcError;
+import com.clara.mcp.transport.jsonrpc.JsonRpcNotification;
+import com.clara.mcp.transport.jsonrpc.JsonRpcRequest;
+import com.clara.mcp.transport.jsonrpc.JsonRpcResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;

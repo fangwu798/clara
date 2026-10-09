@@ -1,76 +1,96 @@
 package com.clara.memory.semantic.milvus;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.Set;
-
 /**
- * 表示。
+ * Milvus 集合规格：描述集合名称、向量维度、索引类型与距离度量。
+ *
+ * <p>嵌入模型需全程一致（入库与检索同模型、同维度），因此集合标识（名称 + 维度 + 度量）用于
+ * {@code ensureCollection} 时校验既有集合是否匹配；索引类型只影响建索引参数，不参与身份比较。
  */
 public final class MilvusCollectionSpec {
-    private static final int SCHEMA_VERSION = 1;
-    private static final Set<String> REQUIRED_FIELDS = Collections.unmodifiableSet(
-            new LinkedHashSet<String>(Arrays.asList(
-                    "id", "tenant_id", "user_id", "conversation_id", "domain",
-                    "source_type", "source_id", "content", "content_hash",
-                    "created_at", "expires_at", "embedding_model",
-                    "embedding_revision", "metadata", "vector")));
+
+    /**
+     * 默认距离度量：余弦相似度。
+     */
+    public static final String COSINE = "COSINE";
+
+    /**
+     * 默认索引类型：IVF_FLAT。
+     */
+    public static final String IVF_FLAT = "IVF_FLAT";
 
     private final String collection;
-    private final String embeddingModel;
-    private final String embeddingRevision;
-    private final String distanceType;
     private final int dimension;
-    private final Set<String> requiredFields;
+    private final String metricType;
+    private final String indexType;
 
-    public MilvusCollectionSpec(String collection, String model, String revision,
-            int dimension, String distance) {
-        this(collection, model, revision, dimension, distance, REQUIRED_FIELDS);
+    /**
+     * 创建集合规格。
+     *
+     * @param collection 集合名称，不可为空白
+     * @param dimension  向量维度，必须为正
+     * @param metricType 距离度量，不可为空白
+     * @throws IllegalArgumentException 任一字段不合法时
+     */
+    public MilvusCollectionSpec(String collection, int dimension, String metricType) {
+        this(collection, dimension, metricType, IVF_FLAT);
     }
 
-    public MilvusCollectionSpec(String collection, String model, String revision,
-            int dimension, String distance, Set<String> requiredFields) {
-        if (isBlank(collection) || isBlank(model) || isBlank(revision)
-                || dimension <= 0 || isBlank(distance) || requiredFields == null
-                || requiredFields.isEmpty() || requiredFields.contains(null)) {
-            throw new IllegalArgumentException("Milvus collection specification is invalid");
-        }
-        LinkedHashSet<String> fields = new LinkedHashSet<String>();
-        for (String field : requiredFields) {
-            if (isBlank(field)) {
-                throw new IllegalArgumentException("Milvus field names must not be blank");
-            }
-            fields.add(field);
+    /**
+     * 创建集合规格。
+     *
+     * @param collection 集合名称，不可为空白
+     * @param dimension  向量维度，必须为正
+     * @param metricType 距离度量，不可为空白
+     * @param indexType  索引类型（如 {@code IVF_FLAT} / {@code HNSW}），不可为空白
+     * @throws IllegalArgumentException 任一字段不合法时
+     */
+    public MilvusCollectionSpec(String collection, int dimension, String metricType, String indexType) {
+        if (blank(collection) || dimension <= 0 || blank(metricType) || blank(indexType)) {
+            throw new IllegalArgumentException("milvus collection specification is invalid");
         }
         this.collection = collection;
-        this.embeddingModel = model;
-        this.embeddingRevision = revision;
         this.dimension = dimension;
-        this.distanceType = distance;
-        this.requiredFields = Collections.unmodifiableSet(fields);
+        this.metricType = metricType;
+        this.indexType = indexType;
     }
 
-    public int getSchemaVersion() { return SCHEMA_VERSION; }
-    public String getCollection() { return collection; }
-    public String getEmbeddingModel() { return embeddingModel; }
-    public String getEmbeddingRevision() { return embeddingRevision; }
-    public int getDimension() { return dimension; }
-    public String getDistanceType() { return distanceType; }
-    public Set<String> getRequiredFields() { return requiredFields; }
+    /**
+     * 创建使用余弦相似度与默认索引的集合规格。
+     *
+     * @param collection 集合名称，不可为空白
+     * @param dimension  向量维度，必须为正
+     */
+    public MilvusCollectionSpec(String collection, int dimension) {
+        this(collection, dimension, COSINE);
+    }
 
+    public String getCollection() {
+        return collection;
+    }
+
+    public int getDimension() {
+        return dimension;
+    }
+
+    public String getMetricType() {
+        return metricType;
+    }
+
+    public String getIndexType() {
+        return indexType;
+    }
+
+    /**
+     * 判断两个集合规格是否同源（可复用同一既有集合）。
+     */
     public boolean sameIdentity(MilvusCollectionSpec other) {
         return other != null
-                && SCHEMA_VERSION == other.getSchemaVersion()
                 && collection.equals(other.collection)
-                && embeddingModel.equals(other.embeddingModel)
-                && embeddingRevision.equals(other.embeddingRevision)
                 && dimension == other.dimension
-                && distanceType.equals(other.distanceType)
-                && requiredFields.equals(other.requiredFields);
+                && metricType.equals(other.metricType);
     }
 
-    private static boolean isBlank(String value) {
+    private static boolean blank(String value) {
         return value == null || value.trim().isEmpty();
     }
 }

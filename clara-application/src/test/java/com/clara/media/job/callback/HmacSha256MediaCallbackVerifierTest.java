@@ -1,7 +1,7 @@
 package com.clara.media.job.callback;
 
-import com.clara.kernel.exception.ClaraException;
-import com.clara.kernel.exception.ErrorCodes;
+import com.clara.exception.ClaraException;
+import com.clara.exception.ErrorCodes;
 import com.clara.media.MediaAsset;
 import com.clara.media.MediaStore;
 import com.clara.media.MediaUpload;

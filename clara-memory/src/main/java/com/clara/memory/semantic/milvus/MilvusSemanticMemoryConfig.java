@@ -1,7 +1,0 @@
-package com.clara.memory.semantic.milvus;
-/**
- * 定义Milvus语义记忆的配置。
- */
-public final class MilvusSemanticMemoryConfig {private final String collection,embeddingModel,embeddingRevision;private final int dimension,maxBatchSize,maxTopK,oversamplingFactor;
- public MilvusSemanticMemoryConfig(String collection,String model,String revision,int dimension,int maxBatch,int maxTopK,int oversampling){if(blank(collection)||!collection.matches("[A-Za-z][A-Za-z0-9_]{0,254}")||blank(model)||blank(revision)||dimension<=0||maxBatch<=0||maxTopK<=0||oversampling<=0) {throw new IllegalArgumentException("milvus config is invalid"); }this.collection=collection;embeddingModel=model;embeddingRevision=revision;this.dimension=dimension;maxBatchSize=maxBatch;this.maxTopK=maxTopK;oversamplingFactor=oversampling;}
- public String getCollection(){return collection;}public String getEmbeddingModel(){return embeddingModel;}public String getEmbeddingRevision(){return embeddingRevision;}public int getDimension(){return dimension;}public int getMaxBatchSize(){return maxBatchSize;}public int getMaxTopK(){return maxTopK;}public int getOversamplingFactor(){return oversamplingFactor;}private static boolean blank(String v){return v==null||v.trim().isEmpty();}}

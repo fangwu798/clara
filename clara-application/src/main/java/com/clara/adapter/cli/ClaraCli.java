@@ -1,8 +1,8 @@
 package com.clara.adapter.cli;
 
-import com.clara.kernel.exception.ClaraException;
-import com.clara.kernel.exception.ClaraError;
-import com.clara.orchestration.interaction.InteractionRequest;
+import com.clara.exception.ClaraException;
+import com.clara.exception.ClaraError;
+import com.clara.dto.interaction.InteractionRequest;
 import com.clara.workspace.application.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +44,7 @@ public final class ClaraCli {
             }
             if (options.getCommand() == CliCommand.RESUME)
                 return render(options, resume(options), input, output, error);
-            WorkspaceRunRequest request = new WorkspaceRunRequest(options.getTenant(), options.getUser(), options.getRunId(), options.getWorkspace(), options.getGoal(), options.getSkill(), options.getMode(), options.isApprove(), Collections.<String, Object>emptyMap());
+            WorkspaceRunRequest request = new WorkspaceRunRequest(options.getUser(), options.getRunId(), options.getWorkspace(), options.getGoal(), options.getSkill(), options.getMode(), options.isApprove(), Collections.<String, Object>emptyMap(), options.getProvider(), options.getModel());
             return render(options, runner.run(request), input, output, error);
         } catch (ClaraException e) {
             writeError(options, output, error, e.getError());
@@ -69,7 +69,7 @@ public final class ClaraCli {
         if (!(version instanceof Number) || !(key instanceof String) || !(answer instanceof Map)) {
             throw new IllegalArgumentException("answer file is invalid");
         }
-        return new WorkspaceResumeRequest(options.getTenant(), options.getUser(), options.getRunId(), options.getWorkspace(), options.getInteractionId(), ((Number) version).longValue(), (String) key, stringMap((Map<?, ?>) answer));
+        return new WorkspaceResumeRequest(options.getUser(), options.getRunId(), options.getWorkspace(), options.getInteractionId(), ((Number) version).longValue(), (String) key, stringMap((Map<?, ?>) answer), options.getProvider(), options.getModel());
     }
 
     private int render(CliOptions options, WorkspaceRunResult result, InputStream input, PrintStream out, PrintStream error) throws IOException {
@@ -117,7 +117,7 @@ public final class ClaraCli {
             }
             try {
                 if ("run.cancel".equals(type)) {
-                    runner.cancel(options.getTenant(), current.getRunId(), "cli command");
+                    runner.cancel(current.getRunId(), "cli command");
                     protocol.event("ack", current.getRunId(), null, Collections.singletonMap("commandId", commandId));
                     return CliExitCodes.FAILED;
                 }
@@ -129,7 +129,7 @@ public final class ClaraCli {
                 if (interaction == null || key == null || !(expected instanceof Number) || !(answer instanceof Map)) {
                     throw new IllegalArgumentException("response command is invalid");
                 }
-                WorkspaceResumeRequest resume = new WorkspaceResumeRequest(options.getTenant(), options.getUser(), current.getRunId(), options.getWorkspace(), interaction, ((Number) expected).longValue(), key, stringMap((Map<?, ?>) answer));
+                WorkspaceResumeRequest resume = new WorkspaceResumeRequest(options.getUser(), current.getRunId(), options.getWorkspace(), interaction, ((Number) expected).longValue(), key, stringMap((Map<?, ?>) answer), options.getProvider(), options.getModel());
                 current = runner.resume(resume);
                 protocol.event("ack", current.getRunId(), interaction, Collections.singletonMap("commandId", commandId));
                 emit(protocol, current);
@@ -146,7 +146,7 @@ public final class ClaraCli {
     private static void emit(NdjsonProtocolWriter protocol, WorkspaceRunResult result) {
         if (result.getStatus() == WorkspaceRunStatus.WAITING_INPUT) {
             for (InteractionRequest interaction : result.getInteractions())
-                protocol.event("interaction.required", result.getRunId(), interaction.getInteractionId(), interaction);
+                protocol.event("interaction.required", result.getRunId(), interaction.getContext().getInteractionId(), interaction);
         } else protocol.event("run.completed", result.getRunId(), null, result);
     }
 

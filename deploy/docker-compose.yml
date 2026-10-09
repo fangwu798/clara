@@ -1,0 +1,79 @@
+# Milvus standalone 本地部署（用于语义记忆联调）
+#
+# Milvus 采用「计算与存储分离」架构，本体只做向量计算，元数据与数据分别外包给 etcd 与 MinIO，
+# 因此 standalone 模式需要三个容器协同，依赖方向：
+#   standalone ──► etcd   （元数据 / 协调，2379）
+#              └►  minio  （对象存储，9000）
+# 缺任何一个，Milvus 都无法启动；向量数据实际落在 MinIO，元数据落在 etcd，Milvus 本身无状态。
+#
+# 启动：docker compose up -d
+# 停止：docker compose down（保留 ./volumes 数据）
+services:
+  # etcd：元数据与协调存储。
+  # 存集合 schema、segment 信息、channel 检查点、节点注册等强一致 KV 数据，为 Milvus 提供集群元数据。
+  # 仅供 Milvus 内部访问（2379 未对外暴露端口）。
+  etcd:
+    container_name: clara-milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.18
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ./volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # minio：S3 兼容的对象存储。
+  # 存向量数据、索引文件、binlog（真正的数据都落在这里），使 Milvus 可以无状态重启。
+  # 9000 为 S3 API（Milvus 使用），9001 为 Web 控制台（浏览器人工查看，账号 minioadmin/minioadmin）。
+  minio:
+    container_name: clara-milvus-minio
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API：Milvus 读写数据
+      - "9001:9001"   # Web 控制台：http://localhost:9001
+    volumes:
+      - ./volumes/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # standalone：Milvus 引擎本体（单机模式）。
+  # 将协调器 / 查询节点 / 数据节点 / 索引节点 / 代理合并进一个进程，是本部署唯一对外提供服务的容器。
+  # 19530 为 gRPC 服务端口（业务代码与集成测试连接的地址）；9091 为 metrics / 健康检查端口。
+  # 本身不持久化数据，依赖 etcd（元数据）与 minio（数据）。
+  standalone:
+    container_name: clara-milvus-standalone
+    image: milvusdb/milvus:v2.5.8
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379   # 元数据后端
+      MINIO_ADDRESS: minio:9000   # 对象存储后端
+    volumes:
+      - ./volumes/milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"   # gRPC：业务 / 联测入口
+      - "9091:9091"     # metrics / 健康检查
+    depends_on:
+      - etcd    # 元数据存储
+      - minio   # 对象存储

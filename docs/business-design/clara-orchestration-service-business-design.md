@@ -28,7 +28,7 @@
 | 对话编排（Orchestration / Agent Loop） | 串起多模态对话全链路的编排，含历史恢复、窗口、压缩、检索注入、模型调用、记录与工具往返 / 多模态能力调用循环 |
 | 工作流（Workflow） | 独立模块 clara-workflow 提供的确定性流程，可被对话编排作为一个步骤调用 |
 | mcp 联动 | 通过 clara-mcp 与其他服务交互，本 agent 调用外部 mcp 服务 |
-| 工具往返（Tool Round-trip） | 模型请求工具 → 执行工具方法（skill Python / mcp 服务）→ 回填 → 再次请求的循环 |
+| 工具往返（Tool Round-trip） | 模型请求工具 → 执行工具方法（skill 脚本（Python / JavaScript / Shell）/ mcp 服务）→ 回填 → 再次请求的循环 |
 
 ---
 
@@ -63,7 +63,7 @@
   → 组装请求 → 模型调用
   → 响应结束 → 调用记录（orchestration 消费）
   → 检测工具 / 多模态能力调用：
-      有 → 执行（skill Python / mcp 服务 / 图片视频音频生成，无需人工审批）→ 回填 → 回到窗口检查
+      有 → 执行（skill 脚本（Python / JavaScript / Shell）/ mcp 服务 / 图片视频音频生成，无需人工审批）→ 回填 → 回到窗口检查
       无 → 返回结果（文本 / 图片 / 视频 / 音频）
 ```
 
@@ -89,7 +89,7 @@
 
 ### FR-O3 工具往返循环
 
-模型响应含工具调用时，执行对应工具方法（skill 的 Python 脚本或 mcp 服务，无需人工审批），回填结果后再次调用，直至无工具调用。
+模型响应含工具调用时，执行对应工具方法（skill 的脚本（Python / JavaScript / Shell）或 mcp 服务，无需人工审批），回填结果后再次调用，直至无工具调用。
 
 ### FR-O4 调用工作流
 
@@ -114,7 +114,7 @@
 | OR3 | 窗口限制、压缩、技能匹配检索、对话知识找回在发送请求前触发 |
 | OR4 | 压缩是一次性任务，不走 RAG 递归流程 |
 | OR5 | 工具往返循环由编排层驱动，直至无工具调用 |
-| OR6 | 工具方法来自 skill（Python 脚本）或 mcp 服务（外部联动） |
+| OR6 | 工具方法来自 skill（脚本：Python / JavaScript / Shell）或 mcp 服务（外部联动） |
 | OR7 | 对话编排可调用 clara-workflow 的工作流作为一个步骤 |
 | OR8 | 工具执行无需人工审批，执行权限给到最大 |
 | OR9 | 对话编排覆盖多模态，图片 / 视频 / 音频能力作为能力调用纳入编排 |
@@ -133,7 +133,7 @@ orchestration 作为对话编排层，组合各模块能力：
 | 对话知识找回 | clara-memory（语义记忆检索，找回缺失历史） |
 | 模型调用 | clara-model（模型编排 / 协议适配） |
 | 调用记录 | clara-core（记录接口） |
-| 工具往返（本地） | clara-skill（工具方法 Python 脚本） |
+| 工具往返（本地） | clara-skill（工具方法脚本：Python / JavaScript / Shell） |
 | 工具往返（外部） | clara-mcp（与其他服务联动） |
 | 调用工作流 | clara-workflow（工作流执行） |
 

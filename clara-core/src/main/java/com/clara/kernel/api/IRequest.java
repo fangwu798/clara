@@ -1,5 +1,6 @@
 package com.clara.kernel.api;
 
+import com.clara.exception.ClaraException;
 import com.clara.kernel.http.RawHttpRequest;
 
 /**
@@ -26,7 +27,7 @@ import com.clara.kernel.http.RawHttpRequest;
  *
  * <p>失败语义：{@link #toRequest()} 的失败来自编码步骤——必需入参为 null、字段注解默认值与字段类型不匹配
  * 时抛 {@link IllegalArgumentException}，请求体无法序列化、密钥不可用或平台与能力组合不受支持时抛
- * {@link com.clara.kernel.exception.ClaraException}。
+ * {@link ClaraException}。
  */
 public interface IRequest {
 
@@ -49,7 +50,7 @@ public interface IRequest {
      * @return 可直接交给传输实现的 HTTP 请求，非 null；成功时为 POST，请求体为筛选后的参数字节
      * @throws NullPointerException      线程未绑定会话上下文（{@code ConvContext.current()} 为 null）时
      * @throws IllegalArgumentException  编码所需入参为 null、当前能力未配置，或注解默认值字面量与字段类型不匹配时
-     * @throws com.clara.kernel.exception.ClaraException 请求体无法序列化、密钥不可用或平台与能力组合不受支持时
+     * @throws ClaraException 请求体无法序列化、密钥不可用或平台与能力组合不受支持时
      */
     RawHttpRequest toRequest();
 

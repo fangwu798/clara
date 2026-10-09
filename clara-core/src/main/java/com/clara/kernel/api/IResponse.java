@@ -1,7 +1,6 @@
 package com.clara.kernel.api;
 
 import com.clara.kernel.http.RawHttpResponse;
-import com.clara.kernel.message.provider.ProviderResponseDecoder;
 
 /**
  * 响应对象契约：一次能力调用的出参根接口，字段与平台 JSON 的对应关系由字段注解声明。

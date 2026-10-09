@@ -8,5 +8,5 @@ public interface WorkspaceBusinessRunner {
 
     WorkspaceRunResult resume(WorkspaceResumeRequest request);
 
-    void cancel(String tenantId, String runId, String reason);
+    void cancel(String runId, String reason);
 }

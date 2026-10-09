@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "builtin": {
+      "command": "node",
+      "args": ["classpath"]
+    }
+  }
+}

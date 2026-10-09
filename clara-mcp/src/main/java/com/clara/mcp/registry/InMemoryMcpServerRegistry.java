@@ -1,7 +1,7 @@
 package com.clara.mcp.registry;
 
-import com.clara.kernel.exception.ErrorCategory;
-import com.clara.kernel.exception.ErrorCodes;
+import com.clara.exception.ErrorCategory;
+import com.clara.exception.ErrorCodes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -48,9 +48,7 @@ public final class InMemoryMcpServerRegistry implements McpServerRegistry {
         return Collections.unmodifiableList(result);
     }
     public McpServerRegistration get(String tenantId, String serverKey) {
-        McpServerRegistration result = registrations.get(key(tenantId, serverKey));
-        if (result == null) { throw notFound(); }
-        return result;
+        return registrations.get(key(tenantId, serverKey));
     }
     private static String key(String tenantId, String serverKey) {
         require(tenantId, "tenantId"); require(serverKey, "serverKey");

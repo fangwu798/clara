@@ -6,16 +6,15 @@ import java.nio.file.Path;
  * 标识对工作区的引用。
  */
 public final class WorkspaceRef {
-    private final String workspaceId, tenantId, runId;
+    private final String workspaceId, runId;
     private final Path root;
     private final WorkspaceAccessMode mode;
 
-    public WorkspaceRef(String workspaceId, String tenantId, String runId, Path root, WorkspaceAccessMode mode) {
-        if (blank(workspaceId) || blank(tenantId) || blank(runId) || root == null || !root.isAbsolute() || mode == null) {
+    public WorkspaceRef(String workspaceId, String runId, Path root, WorkspaceAccessMode mode) {
+        if (blank(workspaceId) || blank(runId) || root == null || !root.isAbsolute() || mode == null) {
             throw new IllegalArgumentException("workspace reference is invalid");
         }
         this.workspaceId = workspaceId;
-        this.tenantId = tenantId;
         this.runId = runId;
         this.root = root.normalize();
         this.mode = mode;
@@ -23,10 +22,6 @@ public final class WorkspaceRef {
 
     public String getWorkspaceId() {
         return workspaceId;
-    }
-
-    public String getTenantId() {
-        return tenantId;
     }
 
     public String getRunId() {

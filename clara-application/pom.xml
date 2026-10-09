@@ -41,6 +41,11 @@
         </dependency>
         <dependency>
             <groupId>com.clara</groupId>
+            <artifactId>clara-workflow</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.clara</groupId>
             <artifactId>clara-skill</artifactId>
             <version>${project.version}</version>
         </dependency>

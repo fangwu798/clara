@@ -1,7 +1,10 @@
 package com.clara.mcp.registry;
 
-import com.clara.kernel.exception.ErrorCategory;
-import com.clara.kernel.exception.ErrorCodes;
+import com.clara.exception.ErrorCategory;
+import com.clara.exception.ErrorCodes;
+import com.clara.mcp.registry.capability.McpPromptDescriptor;
+import com.clara.mcp.registry.capability.McpResourceDescriptor;
+import com.clara.mcp.registry.capability.McpToolDescriptor;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,27 +35,18 @@ public final class InMemoryMcpCapabilityCatalog implements McpCapabilityCatalog 
         }
     }
     public McpServerSnapshot latest(String tenantId, String serverKey) {
-        McpServerSnapshot snapshot = latest.get(serverKey(tenantId, serverKey));
-        if (snapshot == null) { throw notFound(); }
-        return snapshot;
+        return latest.get(serverKey(tenantId, serverKey));
     }
     public McpServerSnapshot get(String tenantId, String serverKey, String snapshotId) {
-        McpServerSnapshot snapshot = snapshots.get(snapshotKey(tenantId, serverKey, snapshotId));
-        if (snapshot == null) { throw notFound(); }
-        return snapshot;
+        return snapshots.get(snapshotKey(tenantId, serverKey, snapshotId));
     }
     public McpToolDescriptor resolveTool(String tenantId, String serverKey, String snapshotId,
             String toolName, String expectedSchemaHash) {
-        if (toolName == null || toolName.trim().isEmpty()) { throw new IllegalArgumentException("toolName must not be blank"); }
-        if (expectedSchemaHash == null || expectedSchemaHash.trim().isEmpty()) {
-            throw new IllegalArgumentException("expectedSchemaHash must not be blank");
-        }
-        for (McpToolDescriptor tool : get(tenantId, serverKey, snapshotId).getTools()) {
+        require(toolName, "toolName"); require(expectedSchemaHash, "expectedSchemaHash");
+        McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
+        for (McpToolDescriptor tool : snapshot.getTools()) {
             if (toolName.equals(tool.getName())) {
-                if (!expectedSchemaHash.equals(tool.getSchemaHash())) {
-                    throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_CHANGED, ErrorCategory.CAPABILITY);
-                }
-                return tool;
+                requireHash(expectedSchemaHash, tool.getSchemaHash()); return tool;
             }
         }
         throw notFound();
@@ -60,7 +54,8 @@ public final class InMemoryMcpCapabilityCatalog implements McpCapabilityCatalog 
     public McpResourceDescriptor resolveResource(String tenantId, String serverKey, String snapshotId,
             String uri, String expectedSchemaHash) {
         require(uri, "uri"); require(expectedSchemaHash, "expectedSchemaHash");
-        for (McpResourceDescriptor resource : get(tenantId, serverKey, snapshotId).getResources()) {
+        McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
+        for (McpResourceDescriptor resource : snapshot.getResources()) {
             if (uri.equals(resource.getUri())) {
                 requireHash(expectedSchemaHash, resource.getSchemaHash()); return resource;
             }
@@ -70,16 +65,22 @@ public final class InMemoryMcpCapabilityCatalog implements McpCapabilityCatalog 
     public McpPromptDescriptor resolvePrompt(String tenantId, String serverKey, String snapshotId,
             String promptName, String expectedSchemaHash) {
         require(promptName, "promptName"); require(expectedSchemaHash, "expectedSchemaHash");
-        for (McpPromptDescriptor prompt : get(tenantId, serverKey, snapshotId).getPrompts()) {
+        McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
+        for (McpPromptDescriptor prompt : snapshot.getPrompts()) {
             if (promptName.equals(prompt.getName())) {
                 requireHash(expectedSchemaHash, prompt.getSchemaHash()); return prompt;
             }
         }
         throw notFound();
     }
+    private McpServerSnapshot requireSnapshot(String tenantId, String serverKey, String snapshotId) {
+        McpServerSnapshot snapshot = get(tenantId, serverKey, snapshotId);
+        if (snapshot == null) { throw notFound(); }
+        return snapshot;
+    }
     private static void requireHash(String expected, String actual) {
         if (!expected.equals(actual)) {
-            throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_CHANGED, ErrorCategory.CAPABILITY);
+            throw McpErrors.error(ErrorCodes.MCP_SCHEMA_MISMATCH, ErrorCategory.CAPABILITY);
         }
     }
     private static String serverKey(String tenantId, String serverKey) {

@@ -2,7 +2,7 @@ package com.clara.kernel.stream;
 
 import com.clara.enums.StreamEventEnum;
 import com.clara.kernel.api.IResponse;
-import com.clara.kernel.exception.ClaraError;
+import com.clara.exception.ClaraError;
 import lombok.Data;
 
 /**

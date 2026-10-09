@@ -2,10 +2,20 @@ package com.clara.adapter;
 
 import com.clara.adapter.cli.*;
 import com.clara.adapter.rest.*;
-import com.clara.kernel.exception.ClaraException;
-import com.clara.kernel.exception.ClaraError;
-import com.clara.kernel.exception.ErrorCategory;
-import com.clara.orchestration.interaction.*;
+import com.clara.core.interaction.IAnswerSchemaValidator;
+import com.clara.core.interaction.IInteractionResumeCoordinator;
+import com.clara.core.interaction.ITimeSource;
+import com.clara.dto.interaction.InteractionContext;
+import com.clara.dto.interaction.InteractionOption;
+import com.clara.dto.interaction.InteractionRequest;
+import com.clara.dto.interaction.InteractionResponse;
+import com.clara.dto.interaction.Question;
+import com.clara.dto.interaction.ResumeOutcome;
+import com.clara.enums.interaction.InteractionTypeEnum;
+import com.clara.exception.ClaraException;
+import com.clara.exception.ClaraError;
+import com.clara.exception.ErrorCategory;
+import com.clara.workflow.interaction.InMemoryInteractionService;
 import com.clara.workspace.application.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,23 +41,23 @@ public class ApplicationAdapterContractTest {
     public void setUp() throws Exception {
         workspace = folder.newFolder("workspace").toPath().toRealPath();
         json = new ObjectMapper();
-        InMemoryInteractionService service = new InMemoryInteractionService(new InteractionResumeCoordinator() {
+        InMemoryInteractionService service = new InMemoryInteractionService(new IInteractionResumeCoordinator() {
             public ResumeOutcome resumeAndRecord(InteractionRequest request, List<InteractionResponse> responses, Map<String, Object> updates) {
                 return null;
             }
 
             public void interactionCancelled(InteractionRequest request, String reason) {
             }
-        }, new AnswerSchemaValidator() {
+        }, new IAnswerSchemaValidator() {
             public boolean isValid(String schema, Map<String, Object> answer) {
                 return true;
             }
-        }, new TimeSource() {
+        }, new ITimeSource() {
             public long currentTimeMillis() {
                 return 100L;
             }
         }, 10);
-        interaction = service.request(new InteractionContext("i1", "tenant", "run", "instance", "task", 2L, 10L, 1000L), new Question(InteractionType.TEXT_INPUT, "Name?", Collections.<InteractionOption>emptyList(), "{}", Collections.<String, Object>emptyMap(), true, "name", 100));
+        interaction = service.request(new InteractionContext("i1", "run", "instance", "task", 2L, 10L, 1000L), new Question(InteractionTypeEnum.TEXT_INPUT, "Name?", Collections.<InteractionOption>emptyList(), "{}", Collections.<String, Object>emptyMap(), true, "name", 100));
     }
 
     @Test
@@ -110,7 +120,7 @@ public class ApplicationAdapterContractTest {
                 throw denied;
             }
 
-            public void cancel(String t, String r, String why) {
+            public void cancel(String r, String why) {
                 throw denied;
             }
         };
@@ -131,7 +141,7 @@ public class ApplicationAdapterContractTest {
     }
 
     private WorkspaceRunRequest runRequest() {
-        return new WorkspaceRunRequest("tenant", "user", "run", workspace, "goal", null, com.clara.workspace.api.WorkspaceAccessMode.PREVIEW_WRITE, false, null);
+        return new WorkspaceRunRequest("user", "run", workspace, "goal", null, com.clara.workspace.api.WorkspaceAccessMode.PREVIEW_WRITE, false, null, null, null);
     }
 
     private WorkspaceRunResult waiting() {
@@ -167,7 +177,7 @@ public class ApplicationAdapterContractTest {
             return resumed;
         }
 
-        public void cancel(String tenant, String run, String reason) {
+        public void cancel(String run, String reason) {
         }
     }
 }

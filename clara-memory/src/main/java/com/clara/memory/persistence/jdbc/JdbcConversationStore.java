@@ -1,203 +1,194 @@
-//package com.clara.memory.persistence.jdbc;
-//
-//import com.clara.kernel.exception.ClaraException;
-//import com.clara.kernel.exception.ErrorCategory;
-//import com.clara.kernel.exception.ErrorCodes;
-//import com.clara.memory.api.ConversationSnapshot;
-//import com.clara.memory.api.ConversationStore;
-////import com.clara.memory.persistence.ConversationCodec;
-//import com.clara.memory.persistence.ConversationStoreErrors;
-////import com.clara.kernel.ChatMessage;
-//import java.io.IOException;
-//import java.sql.Connection;
-//import java.sql.PreparedStatement;
-//import java.sql.ResultSet;
-//import java.sql.SQLException;
-//import java.util.ArrayList;
-//import java.util.Collections;
-//import java.util.List;
-//import javax.sql.DataSource;
-//
-///**
-// * 通过 JDBC 持久化对话消息，并在事务内使用版本号实现并发追加控制。
-// *
-// * <p>常规用法：注入已配置的数据源，可选指定受校验的表名；先调用 {@link #loadSnapshot} 获取当前版本，
-// * 再调用 {@link #append} 追加消息，清理会话使用 {@link #clear}。
-// *
-// * <p>注意：调用方需预先创建兼容的表结构并保证数据源事务可用。本类不拥有也不会关闭 {@link javax.sql.DataSource}；
-// * 版本冲突应重新读取后处理，数据库异常会统一映射为会话存储领域错误。
-// */
-//public final class JdbcConversationStore implements ConversationStore {
-//    private final DataSource dataSource;
-//    private final String table;
-////    private final ConversationCodec codec = new ConversationCodec();
-//
-//    public JdbcConversationStore(DataSource dataSource) {
-//        this(dataSource, "clara_conversation");
-//    }
-//
-//    public JdbcConversationStore(DataSource dataSource, String table) {
-//        if (table == null || !table.matches("[A-Za-z][A-Za-z0-9_]*")) {
-//            throw new IllegalArgumentException("table must be a simple SQL identifier");
-//        }
-//        if (dataSource == null) { throw new IllegalArgumentException("dataSource must not be null"); }
-//        this.dataSource = dataSource;
-//        this.table = table;
-//    }
-//
-//    @Override
-//    public List<ChatMessage> load(String conversationId) {
-//        return loadSnapshot(conversationId).getMessages();
-//    }
-//
-//    @Override
-//    public ConversationSnapshot loadSnapshot(String conversationId) {
-//        requireId(conversationId);
-//        try (Connection connection = dataSource.getConnection();
-//                PreparedStatement statement = connection.prepareStatement(selectSql())) {
-//            statement.setString(1, conversationId);
-//            try (ResultSet result = statement.executeQuery()) {
-//                return result.next()
-//                        ? decode(conversationId, result.getLong(1), result.getBytes(2))
-//                        : emptySnapshot();
-//            }
-//        } catch (SQLException exception) {
-//            throw ioError();
-//        }
-//    }
-//
-//    @Override
-//    public void append(String conversationId, List<ChatMessage> messages, long expectedVersion) {
-//        requireId(conversationId);
-//        requireMessages(messages);
-//        Connection connection = null;
-//        try {
-//            connection = dataSource.getConnection();
-//            connection.setAutoCommit(false);
-//            ConversationSnapshot current = loadForUpdate(connection, conversationId);
-//            if (current.getVersion() != expectedVersion) { throw versionConflict(); }
-//            List<ChatMessage> combined = new ArrayList<ChatMessage>(current.getMessages());
-//            combined.addAll(messages);
-//            byte[] payload = codec.encode(conversationId,
-//                    new ConversationSnapshot(expectedVersion + 1L, combined));
-//            int changed = current.getVersion() == 0L
-//                    ? insert(connection, conversationId, payload)
-//                    : update(connection, conversationId, expectedVersion, payload);
-//            if (changed != 1) { throw versionConflict(); }
-//            connection.commit();
-//        } catch (ClaraException exception) {
-//            rollback(connection);
-//            throw exception;
-//        } catch (IOException exception) {
-//            rollback(connection);
-//            throw corrupted();
-//        } catch (SQLException exception) {
-//            rollback(connection);
-//            if (isConstraintViolation(exception)) { throw versionConflict(); }
-//            throw ioError();
-//        } finally {
-//            close(connection);
-//        }
-//    }
-//
-//    @Override
-//    public void clear(String conversationId) {
-//        requireId(conversationId);
-//        try (Connection connection = dataSource.getConnection();
-//                PreparedStatement statement = connection.prepareStatement(
-//                        "DELETE FROM " + table + " WHERE conversation_id = ?")) {
-//            statement.setString(1, conversationId);
-//            statement.executeUpdate();
-//        } catch (SQLException exception) {
-//            throw ioError();
-//        }
-//    }
-//
-//    private ConversationSnapshot loadForUpdate(Connection connection, String conversationId)
-//            throws SQLException {
-//        try (PreparedStatement statement = connection.prepareStatement(selectSql() + " FOR UPDATE")) {
-//            statement.setString(1, conversationId);
-//            try (ResultSet result = statement.executeQuery()) {
-//                return result.next()
-//                        ? decode(conversationId, result.getLong(1), result.getBytes(2))
-//                        : emptySnapshot();
-//            }
-//        }
-//    }
-//
-//    private int insert(Connection connection, String conversationId, byte[] payload)
-//            throws SQLException {
-//        try (PreparedStatement statement = connection.prepareStatement("INSERT INTO " + table
-//                + " (conversation_id, version, payload) VALUES (?, ?, ?)")) {
-//            statement.setString(1, conversationId);
-//            statement.setLong(2, 1L);
-//            statement.setBytes(3, payload);
-//            return statement.executeUpdate();
-//        }
-//    }
-//
-//    private int update(Connection connection, String conversationId, long expectedVersion,
-//            byte[] payload) throws SQLException {
-//        try (PreparedStatement statement = connection.prepareStatement("UPDATE " + table
-//                + " SET version = ?, payload = ? WHERE conversation_id = ? AND version = ?")) {
-//            statement.setLong(1, expectedVersion + 1L);
-//            statement.setBytes(2, payload);
-//            statement.setString(3, conversationId);
-//            statement.setLong(4, expectedVersion);
-//            return statement.executeUpdate();
-//        }
-//    }
-//
-//    private ConversationSnapshot decode(String conversationId, long databaseVersion, byte[] payload) {
-//        try {
-//            ConversationSnapshot snapshot = codec.decode(conversationId, payload);
-//            if (snapshot.getVersion() != databaseVersion) { throw corrupted(); }
-//            return snapshot;
-//        } catch (IOException exception) {
-//            throw corrupted();
-//        }
-//    }
-//
-//    private String selectSql() {
-//        return "SELECT version, payload FROM " + table + " WHERE conversation_id = ?";
-//    }
-//
-//    private static ConversationSnapshot emptySnapshot() {
-//        return new ConversationSnapshot(0L, Collections.<ChatMessage>emptyList());
-//    }
-//    private static void requireId(String conversationId) {
-//        if (conversationId == null || conversationId.trim().isEmpty()) {
-//            throw new IllegalArgumentException("conversationId must not be blank");
-//        }
-//    }
-//    private static void requireMessages(List<ChatMessage> messages) {
-//        if (messages == null || messages.isEmpty()) {
-//            throw new IllegalArgumentException("messages must not be empty");
-//        }
-//        if (messages.contains(null)) { throw new IllegalArgumentException("messages must not contain null"); }
-//    }
-//    private static ClaraException versionConflict() {
-//        return ConversationStoreErrors.error(ErrorCodes.CONVERSATION_VERSION_CONFLICT,
-//                ErrorCategory.CONFLICT, false);
-//    }
-//    private static ClaraException corrupted() {
-//        return ConversationStoreErrors.error(ErrorCodes.CONVERSATION_STORE_CORRUPTED,
-//                ErrorCategory.INTERNAL, false);
-//    }
-//    private static ClaraException ioError() {
-//        return ConversationStoreErrors.error(ErrorCodes.CONVERSATION_STORE_IO_ERROR,
-//                ErrorCategory.EXTERNAL_SERVICE, true);
-//    }
-//    private static void rollback(Connection connection) {
-//        if (connection == null) return;
-//        try { connection.rollback(); } catch (SQLException ignored) { }
-//    }
-//    private static void close(Connection connection) {
-//        if (connection == null) return;
-//        try { connection.close(); } catch (SQLException ignored) { }
-//    }
-//    private static boolean isConstraintViolation(SQLException exception) {
-//        String state = exception.getSQLState();
-//        return state != null && state.startsWith("23");
-//    }
-//}
+package com.clara.memory.persistence.jdbc;
+
+import com.clara.core.message.IContent;
+import com.clara.memory.persistence.ConversationCodec;
+import com.clara.memory.persistence.ConversationKey;
+import com.clara.memory.persistence.ConversationSnapshot;
+import com.clara.memory.persistence.ConversationStore;
+import com.clara.memory.persistence.ConversationStoreErrors;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * JDBC 会话存储：通过 JDBC 持久化会话快照，用于多实例共享部署。
+ *
+ * <p>以 {@code store_key} 为主键的简单单表实现；{@code append} 用
+ * {@code UPDATE ... WHERE version = expectedVersion} 做乐观并发，未命中且行不存在时插入。
+ * 需要调用方注入 {@link DataSource} 并保证目标表已存在。
+ */
+public final class JdbcConversationStore implements ConversationStore {
+
+    /**
+     * 默认表名。
+     */
+    public static final String DEFAULT_TABLE = "clara_conversation";
+
+    private final DataSource dataSource;
+    private final String table;
+    private final ConversationCodec codec = new ConversationCodec();
+    private volatile boolean closed = false;
+
+    /**
+     * 使用默认表名创建 JDBC 会话存储。
+     *
+     * @param dataSource 数据源，不可为 null
+     */
+    public JdbcConversationStore(DataSource dataSource) {
+        this(dataSource, DEFAULT_TABLE);
+    }
+
+    /**
+     * 创建 JDBC 会话存储。
+     *
+     * @param dataSource 数据源，不可为 null
+     * @param table      表名，必须是简单标识符
+     */
+    public JdbcConversationStore(DataSource dataSource, String table) {
+        if (dataSource == null) {
+            throw new IllegalArgumentException("dataSource must not be null");
+        }
+        if (table == null || !table.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+            throw new IllegalArgumentException("table must be a simple identifier");
+        }
+        this.dataSource = dataSource;
+        this.table = table;
+    }
+
+    @Override
+    public ConversationSnapshot loadSnapshot(ConversationKey key) {
+        open();
+        requireKey(key);
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT version, payload FROM " + table + " WHERE store_key = ?")) {
+            statement.setString(1, key.value());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return new ConversationSnapshot(0L, Collections.<IContent>emptyList());
+                }
+                long version = resultSet.getLong(1);
+                byte[] payload = resultSet.getBytes(2);
+                return codec.decode(payload);
+            }
+        } catch (SQLException e) {
+            throw ConversationStoreErrors.io();
+        }
+    }
+
+    @Override
+    public void append(ConversationKey key, List<IContent> messages, long expectedVersion) {
+        open();
+        requireKey(key);
+        if (messages == null) {
+            throw new IllegalArgumentException("messages must not be null");
+        }
+        if (messages.isEmpty()) {
+            return;
+        }
+        ConversationSnapshot current = loadSnapshot(key);
+        if (current.version() != expectedVersion) {
+            throw ConversationStoreErrors.versionConflict();
+        }
+        List<IContent> merged = new ArrayList<IContent>(current.messages().size() + messages.size());
+        merged.addAll(current.messages());
+        for (IContent message : messages) {
+            if (message == null) {
+                throw new IllegalArgumentException("messages must not contain null");
+            }
+            merged.add(message);
+        }
+        ConversationSnapshot next = new ConversationSnapshot(expectedVersion + 1L, merged);
+        byte[] payload = codec.encode(next);
+        try (Connection connection = dataSource.getConnection()) {
+            boolean autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                int updated;
+                try (PreparedStatement update = connection.prepareStatement(
+                        "UPDATE " + table + " SET version = ?, payload = ? WHERE store_key = ? AND version = ?")) {
+                    update.setLong(1, next.version());
+                    update.setBytes(2, payload);
+                    update.setString(3, key.value());
+                    update.setLong(4, expectedVersion);
+                    updated = update.executeUpdate();
+                }
+                if (updated == 0) {
+                    if (rowExists(connection, key.value())) {
+                        throw ConversationStoreErrors.versionConflict();
+                    }
+                    try (PreparedStatement insert = connection.prepareStatement(
+                            "INSERT INTO " + table + " (store_key, version, payload) VALUES (?, ?, ?)")) {
+                        insert.setString(1, key.value());
+                        insert.setLong(2, next.version());
+                        insert.setBytes(3, payload);
+                        insert.executeUpdate();
+                    }
+                }
+                connection.commit();
+            } catch (SQLException e) {
+                rollbackQuietly(connection);
+                throw e;
+            } finally {
+                connection.setAutoCommit(autoCommit);
+            }
+        } catch (SQLException e) {
+            throw ConversationStoreErrors.io();
+        }
+    }
+
+    @Override
+    public void clear(ConversationKey key) {
+        open();
+        requireKey(key);
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM " + table + " WHERE store_key = ?")) {
+            statement.setString(1, key.value());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw ConversationStoreErrors.io();
+        }
+    }
+
+    @Override
+    public void close() {
+        closed = true;
+    }
+
+    private boolean rowExists(Connection connection, String keyValue) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT 1 FROM " + table + " WHERE store_key = ?")) {
+            statement.setString(1, keyValue);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+        }
+    }
+
+    private void open() {
+        if (closed) {
+            throw new IllegalStateException("conversation store is closed");
+        }
+    }
+
+    private static void rollbackQuietly(Connection connection) {
+        try {
+            connection.rollback();
+        } catch (SQLException ignored) {
+            // 回滚失败不阻断异常传播
+        }
+    }
+
+    private static void requireKey(ConversationKey key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key must not be null");
+        }
+    }
+}

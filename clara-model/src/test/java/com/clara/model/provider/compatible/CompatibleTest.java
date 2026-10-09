@@ -10,7 +10,7 @@ import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.http.RawHttpResponse;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
-import com.clara.kernel.api.message.IContent;
+import com.clara.core.message.IContent;
 import com.clara.kernel.message.delta.ImageItem;
 import com.clara.kernel.message.delta.ToolContent;
 import com.clara.kernel.message.delta.UserContent;

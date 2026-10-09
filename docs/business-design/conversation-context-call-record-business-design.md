@@ -77,7 +77,7 @@
 
 **再次请求：** 下一轮请求自动携带完整的工具往返，客户端无需手动维护。
 
-**工具执行：** 具体工具的调用与执行通过 core 定义的接口进行，实现在 `clara-skill`（脚本统一用 Python 执行）。
+**工具执行：** 具体工具的调用与执行通过 core 定义的接口进行，实现在 `clara-skill`（脚本统一执行：Python / JavaScript / Shell）。
 
 ### FR-4 上下文窗口限制
 
@@ -227,7 +227,7 @@
 
 **clara-memory 层：** 负责窗口执行、压缩、向量化等具体实现。
 
-**clara-skill 层：** 负责提供与管理技能——包括总结用的提示词文本，以及执行工具方法（脚本统一使用 Python 执行）。core 定义的提示词接口与工具方法调用/执行接口，由 skill 实现。
+**clara-skill 层：** 负责提供与管理技能——包括总结用的提示词文本，以及执行工具方法（脚本统一执行：Python / JavaScript / Shell）。core 定义的提示词接口与工具方法调用/执行接口，由 skill 实现。
 
 **clara-orchestration 层：** 负责把 core / memory / skill 组合成完整对话流程，触发窗口限制、压缩、向量检索注入与工具往返循环。
 
@@ -239,7 +239,7 @@
 |---|---|---|
 | 总结提示词接口 | 获取压缩总结用的提示词 | clara-skill |
 | 工具调用接口 | 调用工具方法 | clara-skill |
-| 工具执行接口 | 执行工具方法（Python） | clara-skill |
+| 工具执行接口 | 执行工具方法（Python / JavaScript / Shell） | clara-skill |
 | 向量存储接口 | 写入向量（Milvus） | clara-memory |
 | 向量检索接口 | 按会话检索知识 | clara-memory |
 | 调用记录接口 | 接收调用记录 | 宿主 |

@@ -1,147 +1,147 @@
-//package com.clara.memory.persistence;
-//
-//import com.clara.memory.api.ConversationSnapshot;
-//import com.clara.kernel.ChatMessage;
-//import com.clara.kernel.message.IContent;
-//import com.clara.kernel.message.MediaContent;
-//import com.clara.enums.RoleEnum;
-//import com.clara.kernel.message.impl.UserContent;
-//import com.clara.kernel.message.impl.ToolCallContent;
-//import java.io.ByteArrayInputStream;
-//import java.io.ByteArrayOutputStream;
-//import java.io.DataInputStream;
-//import java.io.DataOutputStream;
-//import java.io.EOFException;
-//import java.io.IOException;
-//import java.nio.charset.StandardCharsets;
-//import java.util.ArrayList;
-//import java.util.LinkedHashMap;
-//import java.util.List;
-//import java.util.Map;
-//
-///**
-// * 负责会话数据的编码与解码。
-// */
-//public final class ConversationCodec {
-//    private static final int MAGIC = 0x434C5241;
-//    private static final int FORMAT_VERSION = 1;
-//    private static final int MAX_MESSAGES = 100000;
-//    private static final int MAX_CONTENTS = 1000;
-//    private static final int MAX_METADATA = 1000;
-//    private static final int MAX_STRING_BYTES = 16 * 1024 * 1024;
-//
-//    public byte[] encode(String conversationId, ConversationSnapshot snapshot) throws IOException {
-//        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-//        DataOutputStream output = new DataOutputStream(bytes);
-//        output.writeInt(MAGIC);
-//        output.writeInt(FORMAT_VERSION);
-//        writeString(output, conversationId);
-//        output.writeLong(snapshot.getVersion());
-//        output.writeInt(snapshot.getMessages().size());
-//        for (ChatMessage message : snapshot.getMessages()) writeMessage(output, message);
-//        output.flush();
-//        return bytes.toByteArray();
-//    }
-//
-//    public ConversationSnapshot decode(String expectedConversationId, byte[] encoded) throws IOException {
-//        DataInputStream input = new DataInputStream(new ByteArrayInputStream(encoded));
-//        try {
-//            if (input.readInt() != MAGIC) { throw new IOException("invalid conversation file magic"); }
-//            if (input.readInt() != FORMAT_VERSION) { throw new IOException("unsupported conversation format"); }
-//            if (!expectedConversationId.equals(readString(input))) {
-//                throw new IOException("conversation identifier mismatch");
-//            }
-//            long version = input.readLong();
-//            int count = readCount(input, MAX_MESSAGES, "message count");
-//            List<ChatMessage> messages = new ArrayList<ChatMessage>(count);
-//            for (int i = 0; i < count; i++) messages.add(readMessage(input));
-//            if (input.read() != -1) { throw new IOException("trailing conversation data"); }
-//            return new ConversationSnapshot(version, messages);
-//        } catch (EOFException exception) {
-//            throw new IOException("truncated conversation data", exception);
-//        } catch (IllegalArgumentException exception) {
-//            throw new IOException("invalid conversation data", exception);
-//        }
-//    }
-//
-//    private static void writeMessage(DataOutputStream output, ChatMessage message) throws IOException {
-////        output.writeByte(message.getRole().ordinal());
-////        writeNullableString(output, message.getName());
-////        output.writeInt(message.getContents().size());
-////        for (IContent content : message.getContents()) {
-////            if (content instanceof UserContent) {
-////                output.writeByte(1);
-////                writeString(output, ((UserContent) content).getText());
-////            } else if (content instanceof MediaContent) {
-////                output.writeByte(2);
-////                writeString(output, content.getRoleType());
-////                writeString(output, ((MediaContent) content).getAssetId());
-////            } else if (content instanceof ToolCallContent) {
-////                ToolCallContent call = (ToolCallContent) content;
-////                output.writeByte(3);
-////                writeString(output, call.getId());
-////                writeString(output, call.getName());
-////                writeString(output, call.getArguments());
-////            } else {
-////                throw new IOException("unsupported content type: " + content.getClass().getName());
-////            }
-////        }
-////        output.writeInt(message.getMetadata().size());
-////        for (Map.Entry<String, String> entry : message.getMetadata().entrySet()) {
-////            writeString(output, entry.getKey());
-////            writeNullableString(output, entry.getValue());
-////        }
-//    }
-//
-//    private static ChatMessage readMessage(DataInputStream input) throws IOException {
-//        int role = input.readUnsignedByte();
-//        if (role >= RoleEnum.values().length) { throw new IOException("invalid role"); }
-//        String name = readNullableString(input);
-//        int contentCount = readCount(input, MAX_CONTENTS, "content count");
-//        List<IContent> contents = new ArrayList<IContent>(contentCount);
-//        for (int i = 0; i < contentCount; i++) {
-//            int type = input.readUnsignedByte();
-//            if (type == 1) contents.add(new UserContent(readString(input)));
-//            else if (type == 2) contents.add(new MediaContent(readString(input), readString(input)));
-//            else if (type == 3) {
-//                contents.add(new ToolCallContent(readString(input), readString(input), readString(input)));
-//            } else throw new IOException("unsupported content type");
-//        }
-//        int metadataCount = readCount(input, MAX_METADATA, "metadata count");
-//        Map<String, String> metadata = new LinkedHashMap<String, String>();
-//        for (int i = 0; i < metadataCount; i++) {
-//            metadata.put(readString(input), readNullableString(input));
-//        }
-//        return new ChatMessage(RoleEnum.values()[role], contents, name, metadata);
-//    }
-//
-//    private static void writeNullableString(DataOutputStream output, String value) throws IOException {
-//        output.writeBoolean(value != null);
-//        if (value != null) writeString(output, value);
-//    }
-//
-//    private static String readNullableString(DataInputStream input) throws IOException {
-//        return input.readBoolean() ? readString(input) : null;
-//    }
-//
-//    private static void writeString(DataOutputStream output, String value) throws IOException {
-//        if (value == null) { throw new IOException("required string is null"); }
-//        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-//        if (bytes.length > MAX_STRING_BYTES) { throw new IOException("string is too large"); }
-//        output.writeInt(bytes.length);
-//        output.write(bytes);
-//    }
-//
-//    private static String readString(DataInputStream input) throws IOException {
-//        int length = readCount(input, MAX_STRING_BYTES, "string length");
-//        byte[] bytes = new byte[length];
-//        input.readFully(bytes);
-//        return new String(bytes, StandardCharsets.UTF_8);
-//    }
-//
-//    private static int readCount(DataInputStream input, int maximum, String field) throws IOException {
-//        int value = input.readInt();
-//        if (value < 0 || value > maximum) { throw new IOException("invalid " + field); }
-//        return value;
-//    }
-//}
+package com.clara.memory.persistence;
+
+import com.clara.core.message.IContent;
+import com.clara.kernel.message.delta.AssistantContent;
+import com.clara.kernel.message.delta.SystemContent;
+import com.clara.kernel.message.delta.ToolContent;
+import com.clara.kernel.message.delta.UserContent;
+import com.clara.tool.ToolCall;
+import com.clara.tool.ToolCallContent;
+import com.clara.tool.ToolCallFunction;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 会话快照与持久化字节之间的编解码器。
+ *
+ * <p>以 JSON 字节承载「版本 + 消息列表」；消息复用 {@link IContent#toCompletionMessage()} 的线格式渲染，
+ * 反序列化时按 {@code role} 与 {@code tool_calls} 还原为具体消息实现，隔离底层序列化细节。
+ */
+public final class ConversationCodec {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final TypeReference<Map<String, Object>> MAP_TYPE =
+            new TypeReference<Map<String, Object>>() {
+            };
+
+    /**
+     * 把快照编码为持久化字节。
+     *
+     * @param snapshot 会话快照，不可为 null
+     * @return JSON 字节，非 null
+     */
+    public byte[] encode(ConversationSnapshot snapshot) {
+        if (snapshot == null) {
+            throw new IllegalArgumentException("snapshot must not be null");
+        }
+        Map<String, Object> root = new LinkedHashMap<String, Object>();
+        root.put("version", Long.valueOf(snapshot.version()));
+        List<Map<String, Object>> messages = new ArrayList<Map<String, Object>>();
+        for (IContent message : snapshot.messages()) {
+            messages.add(message.toCompletionMessage());
+        }
+        root.put("messages", messages);
+        try {
+            return MAPPER.writeValueAsBytes(root);
+        } catch (JsonProcessingException e) {
+            throw ConversationStoreErrors.corrupted();
+        }
+    }
+
+    /**
+     * 把持久化字节解码为快照。
+     *
+     * @param bytes 持久化字节，不可为 null
+     * @return 会话快照，非 null
+     */
+    @SuppressWarnings("unchecked")
+    public ConversationSnapshot decode(byte[] bytes) {
+        if (bytes == null) {
+            throw new IllegalArgumentException("bytes must not be null");
+        }
+        try {
+            Map<String, Object> root = MAPPER.readValue(bytes, MAP_TYPE);
+            Object versionValue = root.get("version");
+            if (!(versionValue instanceof Number)) {
+                throw ConversationStoreErrors.corrupted();
+            }
+            long version = ((Number) versionValue).longValue();
+            Object messagesValue = root.get("messages");
+            if (!(messagesValue instanceof List)) {
+                throw ConversationStoreErrors.corrupted();
+            }
+            List<IContent> messages = new ArrayList<IContent>();
+            for (Object item : (List<Object>) messagesValue) {
+                if (!(item instanceof Map)) {
+                    throw ConversationStoreErrors.corrupted();
+                }
+                messages.add(decodeMessage((Map<String, Object>) item));
+            }
+            return new ConversationSnapshot(version, messages);
+        } catch (IOException e) {
+            throw ConversationStoreErrors.corrupted();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static IContent decodeMessage(Map<String, Object> message) {
+        Object roleValue = message.get("role");
+        if (!(roleValue instanceof String)) {
+            throw ConversationStoreErrors.corrupted();
+        }
+        String role = (String) roleValue;
+        if ("system".equals(role)) {
+            return new SystemContent(text(message.get("content")));
+        }
+        if ("user".equals(role)) {
+            return new UserContent(text(message.get("content")));
+        }
+        if ("tool".equals(role)) {
+            return new ToolContent(text(message.get("tool_call_id")), text(message.get("content")));
+        }
+        if ("assistant".equals(role)) {
+            Object toolCalls = message.get("tool_calls");
+            if (toolCalls instanceof List && !((List<Object>) toolCalls).isEmpty()) {
+                return new ToolCallContent(text(message.get("content")),
+                        decodeToolCalls((List<Object>) toolCalls));
+            }
+            return new AssistantContent(text(message.get("content")));
+        }
+        throw ConversationStoreErrors.corrupted();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<ToolCall> decodeToolCalls(List<Object> rawCalls) {
+        List<ToolCall> calls = new ArrayList<ToolCall>(rawCalls.size());
+        for (Object item : rawCalls) {
+            if (!(item instanceof Map)) {
+                throw ConversationStoreErrors.corrupted();
+            }
+            Map<String, Object> raw = (Map<String, Object>) item;
+            ToolCall call = new ToolCall();
+            call.setId(text(raw.get("id")));
+            call.setType(text(raw.get("type")));
+            Object functionValue = raw.get("function");
+            if (functionValue instanceof Map) {
+                Map<String, Object> rawFunction = (Map<String, Object>) functionValue;
+                ToolCallFunction function = new ToolCallFunction();
+                function.setName(text(rawFunction.get("name")));
+                function.setArguments(text(rawFunction.get("arguments")));
+                call.setFunction(function);
+            }
+            calls.add(call);
+        }
+        return calls;
+    }
+
+    private static String text(Object value) {
+        return value instanceof String ? (String) value : null;
+    }
+}

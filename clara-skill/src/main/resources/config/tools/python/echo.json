@@ -1,0 +1,12 @@
+{
+  "id": "echo",
+  "name": "echo",
+  "type": "PYTHON",
+  "description": "把传入的文本原样回显的示例工具方法，用于演示 Python 脚本工具的执行链路。",
+  "parameters": "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\",\"description\":\"要回显的文本\"}},\"required\":[\"text\"]}",
+  "script": "import json,sys; print(json.dumps({\"echo\": json.load(sys.stdin).get(\"text\", \"\")}))",
+  "metadata": {
+    "domain": "example",
+    "tags": "echo,python"
+  }
+}

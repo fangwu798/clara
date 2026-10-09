@@ -1,7 +1,7 @@
 package com.clara.adapter.rest;
 
-import com.clara.kernel.exception.ClaraError;
-import com.clara.orchestration.interaction.InteractionRequest;
+import com.clara.exception.ClaraError;
+import com.clara.dto.interaction.InteractionRequest;
 import com.clara.workspace.application.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +27,7 @@ public final class WorkspaceRunSseAdapter {
         List<SseEvent> events = new ArrayList<SseEvent>();
         if (result.getStatus() == WorkspaceRunStatus.WAITING_INPUT) {
             for (InteractionRequest interaction : result.getInteractions())
-                events.add(event(result.getRunId(), interaction.getInteractionId(), "interaction.required", interaction));
+                events.add(event(result.getRunId(), interaction.getContext().getInteractionId(), "interaction.required", interaction));
         } else events.add(event(result.getRunId(), null, "run.completed", result));
         return Collections.unmodifiableList(events);
     }

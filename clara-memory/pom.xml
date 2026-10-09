@@ -15,8 +15,17 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.clara</groupId>
+            <artifactId>clara-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.milvus</groupId>
+            <artifactId>milvus-sdk-java</artifactId>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

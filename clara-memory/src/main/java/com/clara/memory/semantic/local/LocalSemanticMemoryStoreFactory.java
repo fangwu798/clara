@@ -1,1 +1,0 @@
-package com.clara.memory.semantic.local;import com.clara.memory.semantic.api.*;public final class LocalSemanticMemoryStoreFactory implements SemanticMemoryStoreFactory {public SemanticMemoryStore create(SemanticMemoryStoreConfig config){return new LocalSemanticMemoryStore(config);}}
