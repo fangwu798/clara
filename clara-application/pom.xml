@@ -50,4 +50,47 @@
             <version>${project.version}</version>
         </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <!-- 打成可直接 `java -jar` 运行的可执行 fat jar，输出到仓库根目录 clara.jar。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven.shade.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!-- 不生成 dependency-reduced-pom.xml（模块 artifact 保持原样，仅额外产出 fat jar） -->
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <outputFile>${project.basedir}/../clara.jar</outputFile>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- 去除签名文件，避免运行期 Invalid signature -->
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>module-info.class</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.clara.ClaraApplication</mainClass>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

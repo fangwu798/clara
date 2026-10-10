@@ -1,0 +1,7 @@
+# Clara 本地运行配置。
+#
+# defaultModel：主（默认）模型。取值是 config/model-providers 下的模型配置——
+#   可写文件名（deepseek-completion.yml）或去掉扩展名的名字（deepseek-completion）；
+#   示例：deepseek-completion / deepseek-response / volcengine-response / kimi-completion / openai。
+# 未配置或未匹配到时，启动会列出全部模型配置（已忽略 examples 样例）供手动选择。
+defaultModel: deepseek-completion

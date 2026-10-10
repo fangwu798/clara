@@ -1,0 +1,6 @@
+# 统一脚本换行，避免跨平台签出后失效：
+#  - Windows 批处理必须 CRLF，否则 cmd 逐行解析错乱；
+#  - Shell 脚本必须 LF，否则 bash 报 “\r: command not found”。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh  text eol=lf

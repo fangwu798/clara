@@ -12,6 +12,16 @@ target/
 # sample 联调运行产物（file_ops 工具写入的工作区输出目录）。
 /config/sample/workspace/notes/
 
+# 根目录下的可执行 fat jar 构建产物。
+/clara.jar
+
 # 本机模型平台配置可能包含真实地址和密钥，只提交 examples 与说明文件。
 /config/model-providers/local/*.yml
 /config/model-providers/local/*.yaml
+
+# 本机 MCP 服务端配置可能包含真实密钥，仅本地保留，不提交。
+/config/mcp/mcp.json
+
+# JVM 崩溃产物（HotSpot error / replay 文件）。
+replay_pid*.log
+hs_err_pid*.log
