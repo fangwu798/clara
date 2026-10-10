@@ -301,7 +301,7 @@ flowchart LR
 | Maven 模块 | 主要命名空间 | 领域职责 |
 | --- | --- | --- |
 | `clara-bom` | 无 | Java 8 兼容依赖和插件版本 |
-| `clara-core` | `.kernel`、`.media`、`.model.api`、`.tool` | 公共值对象、媒体资产、模型端口和通用工具契约；不含外部 SDK |
+| `clara-core` | `.core`、`.dto`、`.enums`、`.exception` | 接口契约、DTO、枚举与异常；不含外部 SDK |
 | `clara-model` | `.model.runtime`、`.model.provider.*` | 模型注册/路由以及五个厂商的 Chat、Embedding、图片、音频、视频实现 |
 | `clara-memory` | `.memory.api`、`.memory.shortterm`、`.memory.semantic.*`、`.memory.persistence.*` | 短期窗口、会话存储、本地/Milvus 语义记忆和上下文装配 |
 | `clara-mcp` | `.mcp.client`、`.mcp.registry`、`.mcp.transport.*` | MCP 协议、服务发现、stdio/HTTP 传输和能力聚合 |
@@ -313,10 +313,10 @@ flowchart LR
 
 ```text
 clara-core
-  com.clara.kernel
-  com.clara.media
-  com.clara.model.api
-  com.clara.tool
+  com.clara.core
+  com.clara.dto
+  com.clara.enums
+  com.clara.exception
 
 clara-model
   com.clara.model.runtime

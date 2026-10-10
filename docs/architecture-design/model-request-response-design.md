@@ -37,14 +37,31 @@ com.clara
 │   ├── @ProtocolResponse              # 响应字段：协议 + 同步路径 + 流式路径 + 流事件 + 结束原因路径
 │   └── @ProtocolResponses             # 容器（可重复注解）
 │
-├── kernel
-│   ├── api                            # 契约层（接口）
+├── core                               # clara-core · 契约层（接口）
+│   ├── model
 │   │   ├── IRequest                   # 请求根接口：getCls() / toRequest() / getStream()
-│   │   ├── IResponse                  # 响应根接口：getCls() / toResponse()
-│   │   ├── message/IContent           # 消息基接口：getRoleType()
-│   │   └── execute/
-│   │       ├── IRequestEncoder        # 请求编码器契约：encode(request, providerConfig)
-│   │       └── IResponseDecoder       # 响应解码器契约：decode(raw, type) / streamAssembler(type)
+│   │   └── IResponse                  # 响应根接口：getCls() / toResponse()
+│   ├── message
+│   │   └── IContent                   # 消息基接口：getRoleType()
+│   └── tool
+│       ├── ITool                      # 工具契约
+│       └── IToolInvocation            # 工具调用契约
+│
+├── dto                                # clara-core · DTO（值对象）
+│   ├── model
+│   │   └── StreamEvent                # 流事件（type + sequence + payload + toolCallId/toolName + response + error）
+│   └── tool
+│       ├── ToolContext                # 工具声明条目（请求侧，type + function）
+│       ├── ToolSpecification          # 函数签名（name + description + parameters JSON Schema）
+│       ├── ToolCall                   # COMPLETION 工具调用（响应侧，type=function）
+│       ├── ToolCallFunction           # 函数调用详情（name + arguments）
+│       ├── ToolCallContent            # 工具调用消息（role=assistant + tool_calls）
+│       └── ResponsesToolCall          # RESPONSE 工具调用（响应侧，type=function_call）
+│
+├── kernel                             # clara-model · 编解码与线格式实现
+│   ├── api/execute                    # 契约层（编解码接口）
+│   │   ├── IRequestEncoder            # 请求编码器契约：encode(request, providerConfig)
+│   │   └── IResponseDecoder           # 响应解码器契约：decode(raw, type) / streamAssembler(type)
 │   │
 │   ├── message                        # 请求参数对象层（字段 + 注解）
 │   │   ├── ModelParameters            # 抽象：CHAT 文本对话通用字段
@@ -55,7 +72,8 @@ com.clara
 │   │   │   ├── AssistantContent       # 助手消息（role=assistant）
 │   │   │   ├── SystemContent          # 系统消息（role=system）
 │   │   │   ├── ToolContent            # 工具结果消息（role=tool）
-│   │   │   └── ImageItem              # 图片条目（url / b64_json / size）
+│   │   │   ├── ImageItem              # 图片条目（url / b64_json / size）
+│   │   │   └── TokenUsage             # token 用量（input/output/total/cache）
 │   │   └── provider/                  # 编解码器（协议分派 + 反射执行）
 │   │       ├── ProviderRequestEncoder # 请求编码分派入口（按协议选编码器）
 │   │       ├── ProviderResponseDecoder# 响应解码分派入口（按协议选解码器）
@@ -73,17 +91,9 @@ com.clara
 │   ├── http                          # 实现层（具体对象）
 │   │   ├── HttpRequest                # 具体请求对象（继承 ImageParameters，@SuperBuilder）
 │   │   └── HttpResponse               # 统一响应对象（所有平台/协议共用）
-│   └── stream/
-│       └── StreamEvent                # 流事件（type + sequence + payload + toolCallId/toolName + response + error）
-│
-└── tool                               # 工具域（请求声明 + 响应调用）
-    ├── ToolContext                    # 工具声明条目（请求侧，type + function）
-    ├── ToolSpecification              # 函数签名（name + description + parameters JSON Schema）
-    ├── ToolCall                       # COMPLETION 工具调用（响应侧，type=function）
-    ├── ToolCallFunction               # 函数调用详情（name + arguments）
-    ├── ToolCallContent                # 工具调用消息（role=assistant + tool_calls）
-    ├── ResponsesToolCall              # RESPONSE 工具调用（响应侧，type=function_call）
-    └── TokenUsage                     # token 用量（input/output/total/cache）
+│   └── stream
+│       ├── IStreamHandle              # 流式句柄：cancel() / isDone()
+│       └── IStreamObserver            # 流事件回调：onEvent(StreamEvent)
 ```
 
 ---
