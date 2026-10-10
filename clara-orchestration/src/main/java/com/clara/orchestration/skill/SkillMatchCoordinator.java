@@ -4,12 +4,16 @@ import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.dto.memory.ContextControlConfig;
+import com.clara.dto.memory.MemoryEntry;
 import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
 import com.clara.enums.memory.MemorySourceTypeEnum;
 import com.clara.dto.tool.ToolContext;
 import com.clara.dto.tool.ToolSpecification;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -28,6 +32,11 @@ import java.util.Set;
 public final class SkillMatchCoordinator {
 
     private static final int MAX_TOOL_NAME_LENGTH = 128;
+
+    /**
+     * 解析工具入参 Schema 的 JSON 映射器。
+     */
+    private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
 
     private final IEmbeddingClient embeddingClient;
     private final ISemanticMemoryStore semanticMemoryStore;
@@ -70,9 +79,33 @@ public final class SkillMatchCoordinator {
         for (MemoryMatch match : search(MemorySourceTypeEnum.TOOL_DESCRIPTION, vector, control)) {
             tools.add(new ToolContext(new ToolSpecification(
                     toolName(match.getEntry().getSourceId()),
-                    match.getEntry().getContent(), emptySchema())));
+                    match.getEntry().getContent(),
+                    toolParameters(match.getEntry()))));
         }
         return new MatchedSkill(prompts, tools);
+    }
+
+    /**
+     * 从工具描述条目的元数据重建入参 Schema。
+     *
+     * <p>技能注册表在索引时把工具方法的 {@code parameters} 存入
+     * {@link MemoryEntry#TOOL_PARAMETERS_METADATA_KEY}；这里解析后下发给模型，使模型能看到工具的真实
+     * 入参。元数据缺失或解析失败时退化为空对象 Schema（仅 {@code type/properties}），不影响下发。
+     *
+     * @param entry 工具描述条目，非 null
+     * @return 入参 JSON Schema，非 null
+     */
+    private static Map<String, Object> toolParameters(MemoryEntry entry) {
+        String raw = entry.getMetadata().get(MemoryEntry.TOOL_PARAMETERS_METADATA_KEY);
+        if (raw == null || raw.trim().isEmpty()) {
+            return emptySchema();
+        }
+        try {
+            Map<String, Object> parsed = SCHEMA_MAPPER.readValue(raw, new TypeReference<Map<String, Object>>() { });
+            return parsed == null || parsed.isEmpty() ? emptySchema() : parsed;
+        } catch (IOException exception) {
+            return emptySchema();
+        }
     }
 
     /**

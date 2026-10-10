@@ -1,0 +1,12 @@
+{
+  "id": "http_fetch",
+  "name": "http_fetch",
+  "type": "PYTHON",
+  "description": "通过 HTTP GET 访问外部网络地址并返回状态码与响应体片段（用于外部网络查询能力验证）。入参 JSON：url(必填)、max_bytes(可选，默认 4096)。",
+  "parameters": "{\"type\":\"object\",\"properties\":{\"url\":{\"type\":\"string\"},\"max_bytes\":{\"type\":\"integer\"}},\"required\":[\"url\"]}",
+  "script": "import json,sys,urllib.request\nspec=json.load(sys.stdin)\nurl=spec.get(\"url\")\nlimit=int(spec.get(\"max_bytes\") or 4096)\nresult={\"url\":url}\ntry:\n    req=urllib.request.Request(url,headers={\"User-Agent\":\"clara-sample\"})\n    resp=urllib.request.urlopen(req,timeout=15)\n    body=resp.read(limit).decode(\"utf-8\",\"ignore\")\n    result[\"status\"]=resp.status\n    result[\"body\"]=body\n    result[\"body_length\"]=len(body)\nexcept Exception as e:\n    result[\"error\"]=str(e)\nprint(json.dumps(result,ensure_ascii=False))\n",
+  "metadata": {
+    "domain": "sample",
+    "tags": "network,http,python"
+  }
+}

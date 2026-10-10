@@ -1,0 +1,12 @@
+{
+  "id": "file_ops",
+  "name": "file_ops",
+  "type": "PYTHON",
+  "description": "对指定目录下的文件执行新增/读取/追加/替换/删除/存在性/列举等操作。入参 JSON：op(write|read|append|replace|delete|exists|list)、path(相对 base_dir 或绝对路径)、base_dir(可选根目录，缺省为 config/sample/workspace)、content、find、replace。",
+  "parameters": "{\"type\":\"object\",\"properties\":{\"op\":{\"type\":\"string\",\"enum\":[\"write\",\"read\",\"append\",\"replace\",\"delete\",\"exists\",\"list\"]},\"path\":{\"type\":\"string\"},\"base_dir\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"},\"find\":{\"type\":\"string\"},\"replace\":{\"type\":\"string\"}},\"required\":[\"op\"]}",
+  "script": "config/skill/scripts/file_ops.py",
+  "metadata": {
+    "domain": "sample",
+    "tags": "file,python,filesystem"
+  }
+}

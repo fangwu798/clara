@@ -16,6 +16,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -233,21 +234,27 @@ public final class SkillRegistry {
     }
 
     private MemoryEntry indexTool(ToolMethod method) {
-        return entry(MemorySourceTypeEnum.TOOL_DESCRIPTION, method.getId(), method.getDescription());
+        Map<String, String> metadata = new LinkedHashMap<String, String>();
+        if (method.getParameters() != null && !method.getParameters().trim().isEmpty()) {
+            metadata.put(MemoryEntry.TOOL_PARAMETERS_METADATA_KEY, method.getParameters());
+        }
+        return entry(MemorySourceTypeEnum.TOOL_DESCRIPTION, method.getId(), method.getDescription(), metadata);
     }
 
     private MemoryEntry indexPrompt(PromptDefinition prompt) {
         String content = prompt.getDescription() == null || prompt.getDescription().trim().isEmpty()
                 ? prompt.getId()
                 : prompt.getDescription();
-        return entry(MemorySourceTypeEnum.PROMPT, prompt.getId(), content);
+        return entry(MemorySourceTypeEnum.PROMPT, prompt.getId(), content,
+                Collections.<String, String>emptyMap());
     }
 
-    private MemoryEntry entry(MemorySourceTypeEnum sourceType, String sourceId, String content) {
+    private MemoryEntry entry(MemorySourceTypeEnum sourceType, String sourceId, String content,
+            Map<String, String> metadata) {
         float[] vector = embeddingClient.embed(content);
         long now = System.currentTimeMillis();
         return new MemoryEntry(entryId(sourceType, sourceId), sourceType, sourceId, null, content,
-                sha256(content), vector, now, 0L, Collections.<String, String>emptyMap());
+                sha256(content), vector, now, 0L, metadata);
     }
 
     private String entryId(MemorySourceTypeEnum sourceType, String sourceId) {

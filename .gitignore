@@ -9,6 +9,9 @@ target/
 # 本地 docker compose 部署（Milvus 等）产生的运行数据：etcd / minio / milvus，不纳入版本控制。
 /deploy/volumes/
 
+# sample 联调运行产物（file_ops 工具写入的工作区输出目录）。
+/config/sample/workspace/notes/
+
 # 本机模型平台配置可能包含真实地址和密钥，只提交 examples 与说明文件。
 /config/model-providers/local/*.yml
 /config/model-providers/local/*.yaml

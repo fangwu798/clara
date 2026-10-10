@@ -21,6 +21,16 @@ import java.util.List;
  */
 public final class CapabilityDispatcher {
 
+    /**
+     * 等待流终态时的轮询间隔（毫秒）。
+     */
+    private static final long STREAM_POLL_INTERVAL_MILLIS = 20L;
+
+    /**
+     * 等待流终态的最长时长（毫秒），作为兜底避免流异常不结束时无限阻塞。
+     */
+    private static final long STREAM_TERMINAL_MAX_WAIT_MILLIS = 300_000L;
+
     private final IStreamModel streamModel;
 
     /**
@@ -57,8 +67,30 @@ public final class CapabilityDispatcher {
             return invoke(request);
         }
         IStreamHandle handle = streamModel.chat(request, HttpResponse.class, observer);
+        awaitTerminal(handle);
         IResponse result = handle.result();
         return result instanceof HttpResponse ? (HttpResponse) result : null;
+    }
+
+    /**
+     * 等待流进入终态后再取结果。
+     *
+     * <p>流式读取在后台线程执行（见 {@code StreamHandle.start()}），入口返回句柄时读数尚未完成；
+     * {@link IStreamHandle} 的约定是「轮询 {@link IStreamHandle#isDone()} 或等待终态事件」，
+     * 因此这里先等到 done，避免在读取未完成时 {@code result()} 恒为 null。
+     *
+     * @param handle 流式句柄，非 null
+     */
+    private static void awaitTerminal(IStreamHandle handle) {
+        long deadline = System.currentTimeMillis() + STREAM_TERMINAL_MAX_WAIT_MILLIS;
+        while (!handle.isDone() && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(STREAM_POLL_INTERVAL_MILLIS);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     /**

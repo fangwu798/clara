@@ -1,0 +1,3 @@
+clara sample workspace seed file
+line-2 original text
+line-3 original text

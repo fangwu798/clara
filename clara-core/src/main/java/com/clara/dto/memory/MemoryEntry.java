@@ -16,6 +16,14 @@ import java.util.Map;
 @Data
 public final class MemoryEntry {
 
+    /**
+     * 语义记忆元数据键：工具方法的入参 JSON Schema（仅 {@code TOOL_DESCRIPTION} 来源条目携带）。
+     *
+     * <p>技能注册表在索引工具描述时把工具方法的 {@code parameters} 写入该键，供编排层在匹配到工具后
+     * 重建 {@code ToolSpecification.parameters} 下发给模型，使模型能看到工具的真实入参。
+     */
+    public static final String TOOL_PARAMETERS_METADATA_KEY = "parameters";
+
     private final String id;
     private final MemorySourceTypeEnum sourceType;
     private final String sourceId;
