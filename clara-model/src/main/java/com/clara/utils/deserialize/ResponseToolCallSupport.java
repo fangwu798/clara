@@ -1,6 +1,6 @@
 package com.clara.utils.deserialize;
 
-import com.clara.tool.ResponsesToolCall;
+import com.clara.dto.tool.ResponsesToolCall;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;

@@ -1,4 +1,6 @@
-package com.clara.tool;
+package com.clara.skill.tool;
+
+import com.clara.core.tool.ITool;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

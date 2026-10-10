@@ -5,8 +5,8 @@ import com.clara.core.skill.IToolInvoker;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.skill.SkillErrors;
 import com.clara.skill.registry.SkillRegistry;
-import com.clara.tool.IToolInvocation;
-import com.clara.tool.ToolResult;
+import com.clara.core.tool.IToolInvocation;
+import com.clara.dto.tool.ToolResult;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;

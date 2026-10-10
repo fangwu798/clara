@@ -7,10 +7,11 @@ import com.clara.enums.FinishReasonEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.ProtocolEnum;
 import com.clara.enums.StreamEventEnum;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IResponse;
+import com.clara.dto.model.RawHttpResponse;
 import com.clara.kernel.message.delta.ImageItem;
-import com.clara.tool.ResponsesToolCall;
-import com.clara.tool.ToolCall;
+import com.clara.dto.tool.ResponsesToolCall;
+import com.clara.dto.tool.ToolCall;
 import lombok.Data;
 
 import java.util.List;

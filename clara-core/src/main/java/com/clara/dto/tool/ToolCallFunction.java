@@ -1,11 +1,11 @@
-package com.clara.tool;
+package com.clara.dto.tool;
 
 import lombok.Data;
 
 /**
  * 函数调用详情：模型选中的函数名，以及模型为该函数生成的入参 JSON 字符串。
  *
- * <p>是什么、在哪一层：契约层的响应值对象（包 {@code com.clara.tool}），是 {@link ToolCall} 的
+ * <p>是什么、在哪一层：契约层的响应值对象（包 {@code com.clara.dto.tool}），是 {@link ToolCall} 的
  * {@code function} 子对象。请求侧声明函数签名的 {@link ToolSpecification} 与本类形状相反——
  * 那个描述「函数是什么」（{@code description} + JSON Schema {@code parameters}），
  * 本类描述「模型怎么调它」（{@code arguments}），因此两者不共用类型。

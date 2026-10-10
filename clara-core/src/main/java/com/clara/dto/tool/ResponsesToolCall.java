@@ -1,5 +1,6 @@
-package com.clara.tool;
+package com.clara.dto.tool;
 
+import com.clara.core.tool.IToolInvocation;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;

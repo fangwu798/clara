@@ -1,5 +1,7 @@
 package com.clara.kernel.stream;
 
+import com.clara.dto.model.StreamEvent;
+
 /**
  * 领域流事件的接收方。
  *

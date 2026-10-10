@@ -3,6 +3,8 @@ package com.clara.tool;
 import com.clara.context.CallContext;
 import com.clara.context.ConvContext;
 import com.clara.core.skill.IToolInvoker;
+import com.clara.core.tool.IToolInvocation;
+import com.clara.dto.tool.ToolResult;
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.client.gateway.McpGateway;

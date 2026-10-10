@@ -1,4 +1,4 @@
-package com.clara.tool;
+package com.clara.dto.tool;
 
 import com.clara.enums.RoleEnum;
 import com.clara.core.message.IContent;
@@ -16,7 +16,7 @@ import java.util.Map;
  * 助手要求调用工具的消息：线格式为
  * {@code {"role":"assistant","content":null,"tool_calls":[...]}}。
  *
- * <p>是什么、在哪一层：契约层的消息实现（包 {@code com.clara.tool}），是工具调用往返的第一轮回执——
+ * <p>是什么、在哪一层：契约层的消息实现（包 {@code com.clara.dto.tool}），是工具调用往返的第一轮回执——
  * 模型返回的 {@link ToolCall} 列表要原样放回 {@code ModelParameters.messages}，平台才会认可接下来那条
  * {@code role=tool} 的结果消息。它和 {@code AssistantContent} 的区别只在于多了 {@code tool_calls}。
  *

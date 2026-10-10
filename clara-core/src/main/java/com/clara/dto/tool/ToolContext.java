@@ -1,4 +1,4 @@
-package com.clara.tool;
+package com.clara.dto.tool;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -9,7 +9,7 @@ import java.util.Map;
 /**
  * 工具声明条目：告诉模型「有哪些工具可用」，是 {@code ModelParameters.tools} 的元素。
  *
- * <p>是什么、在哪一层：契约层的请求值对象（包 {@code com.clara.tool}），是请求体 {@code tools[]} 的元素
+ * <p>是什么、在哪一层：契约层的请求值对象（包 {@code com.clara.dto.tool}），是请求体 {@code tools[]} 的元素
  * ——线格式为 {@code {"type":"function","function":{...}}}，函数签名统一由 {@link ToolSpecification} 承载。
  *
  * <p>与响应侧的对应关系：本类描述「工具是什么」（函数名、功能描述、JSON Schema 入参），

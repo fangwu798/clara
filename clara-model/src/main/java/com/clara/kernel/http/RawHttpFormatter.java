@@ -1,5 +1,8 @@
 package com.clara.kernel.http;
 
+import com.clara.dto.model.RawHttpRequest;
+import com.clara.dto.model.RawHttpResponse;
+
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;

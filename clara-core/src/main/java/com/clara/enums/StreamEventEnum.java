@@ -1,6 +1,6 @@
 package com.clara.enums;
 
-import com.clara.kernel.stream.StreamEvent;
+import com.clara.dto.model.StreamEvent;
 
 /**
  * 对话流事件类型：{@link StreamEvent#getType()} 的取值。

@@ -4,7 +4,7 @@ import com.clara.annoation.ResponseAdapter;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.FinishReasonEnum;
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IResponse;
 import com.clara.utils.ExceptionUtils;
 import com.clara.utils.FinishReasonUtils;
 import com.clara.utils.JsonNodeUtils;

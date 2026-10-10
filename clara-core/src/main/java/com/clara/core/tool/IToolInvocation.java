@@ -1,9 +1,12 @@
-package com.clara.tool;
+package com.clara.core.tool;
+
+import com.clara.dto.tool.ResponsesToolCall;
+import com.clara.dto.tool.ToolCall;
 
 /**
  * 统一工具调用视图：模型在响应中要求调用的一次工具，屏蔽 Chat Completions / Responses 两种协议的结构差异。
  *
- * <p>是什么、在哪一层：契约层的工具调用抽象（包 {@code com.clara.tool}）。{@link ToolCall}（Chat Completions）
+ * <p>是什么、在哪一层：契约层的工具调用抽象（包 {@code com.clara.core.tool}）。{@link ToolCall}（Chat Completions）
  * 与 {@link ResponsesToolCall}（Responses）都实现本接口，调用方统一通过本接口读取 {@code callId/name/arguments}，
  * 无需感知协议。
  *

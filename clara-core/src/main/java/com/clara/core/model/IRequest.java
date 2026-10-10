@@ -1,12 +1,12 @@
-package com.clara.kernel.api;
+package com.clara.core.model;
 
+import com.clara.dto.model.RawHttpRequest;
 import com.clara.exception.ClaraException;
-import com.clara.kernel.http.RawHttpRequest;
 
 /**
  * 请求对象契约：一次能力调用的入参根接口，字段与平台 JSON 的对应关系由字段注解声明。
  *
- * <p>是什么、在哪一层：契约层（{@code com.clara.kernel.api}）。派生链为
+ * <p>是什么、在哪一层：契约层（{@code com.clara.core.model}）。派生链为
  * {@code ModelParameters}（通用参数）→ {@code ImageParameters}（图片生成专有参数）→
  * {@link com.clara.kernel.http.HttpRequest}（统一入参对象）。平台与能力不写在请求对象里，而是随线程
  * 上下文（{@link com.clara.context.ConvContext}）传入：字段上的 {@code @ProviderAdapter} 注解按

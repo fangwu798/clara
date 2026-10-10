@@ -1,7 +1,8 @@
 package com.clara.kernel.http;
 
 import com.clara.context.ConvContext;
-import com.clara.kernel.api.IRequest;
+import com.clara.core.model.IRequest;
+import com.clara.dto.model.RawHttpRequest;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.BasicParameters;
 import com.clara.kernel.message.ImageParameters;

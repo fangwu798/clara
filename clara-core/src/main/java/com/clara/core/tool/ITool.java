@@ -1,4 +1,4 @@
-package com.clara.tool;
+package com.clara.core.tool;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * 工具接口：一次可被模型调用的工具（描述信息 + 执行逻辑）。
  *
- * <p>是什么、在哪一层：契约层的工具抽象（包 {@code com.clara.tool}），把「工具声明（描述信息）」与
+ * <p>是什么、在哪一层：契约层的工具抽象（包 {@code com.clara.core.tool}），把「工具声明（描述信息）」与
  * 「工具执行（invoke）」内聚到同一接口，并自带两种协议的声明渲染，使调用方声明工具时无需感知协议差异。
  *
  * <p>协议自渲染：{@link #toCompletionDeclaration()} 产出 Chat Completions 的嵌套 function 声明，

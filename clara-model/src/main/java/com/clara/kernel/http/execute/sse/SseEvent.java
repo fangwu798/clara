@@ -1,7 +1,7 @@
 package com.clara.kernel.http.execute.sse;
 
 
-import com.clara.kernel.api.IRequest;
+import com.clara.core.model.IRequest;
 import com.clara.kernel.api.execute.IHttpExecute;
 import com.clara.kernel.api.execute.ISseListener;
 import lombok.Data;

@@ -8,9 +8,9 @@ import com.clara.kernel.message.delta.SystemContent;
 import com.clara.kernel.message.delta.ToolContent;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.memory.persistence.InMemoryConversationStore;
-import com.clara.tool.ToolCall;
-import com.clara.tool.ToolCallContent;
-import com.clara.tool.ToolCallFunction;
+import com.clara.dto.tool.ToolCall;
+import com.clara.dto.tool.ToolCallContent;
+import com.clara.dto.tool.ToolCallFunction;
 import org.junit.Test;
 
 import java.util.Arrays;

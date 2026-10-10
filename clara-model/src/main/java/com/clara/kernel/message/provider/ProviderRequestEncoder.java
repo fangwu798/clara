@@ -2,11 +2,11 @@ package com.clara.kernel.message.provider;
 
 import com.clara.context.ConvContext;
 import com.clara.enums.ProtocolEnum;
-import com.clara.kernel.api.IRequest;
+import com.clara.core.model.IRequest;
 import com.clara.kernel.api.execute.IRequestEncoder;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.kernel.http.RawHttpRequest;
+import com.clara.dto.model.RawHttpRequest;
 import com.clara.kernel.message.provider.completion.CompletionRequestEncoder;
 import com.clara.kernel.message.provider.response.ResponseRequestEncoder;
 

@@ -7,8 +7,8 @@ import com.clara.dto.memory.ContextControlConfig;
 import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
 import com.clara.enums.memory.MemorySourceTypeEnum;
-import com.clara.tool.ToolContext;
-import com.clara.tool.ToolSpecification;
+import com.clara.dto.tool.ToolContext;
+import com.clara.dto.tool.ToolSpecification;
 
 import java.util.ArrayList;
 import java.util.Collections;

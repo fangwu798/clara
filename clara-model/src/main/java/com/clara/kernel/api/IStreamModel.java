@@ -1,5 +1,7 @@
 package com.clara.kernel.api;
 
+import com.clara.core.model.IRequest;
+import com.clara.core.model.IResponse;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.stream.IStreamHandle;
 import com.clara.kernel.stream.IStreamObserver;

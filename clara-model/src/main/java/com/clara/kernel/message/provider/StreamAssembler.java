@@ -2,9 +2,9 @@ package com.clara.kernel.message.provider;
 
 import com.clara.annoation.ResponseAdapter;
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IResponse;
 import com.clara.exception.ClaraException;
-import com.clara.kernel.stream.StreamEvent;
+import com.clara.dto.model.StreamEvent;
 import com.clara.utils.deserialize.ResponseDecoderSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 

@@ -4,12 +4,12 @@ import com.clara.core.message.IContent;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ToolContent;
-import com.clara.tool.IToolInvocation;
-import com.clara.tool.ResponsesToolCall;
-import com.clara.tool.ToolCall;
-import com.clara.tool.ToolCallContent;
-import com.clara.tool.ToolCallFunction;
-import com.clara.tool.ToolResult;
+import com.clara.core.tool.IToolInvocation;
+import com.clara.dto.tool.ResponsesToolCall;
+import com.clara.dto.tool.ToolCall;
+import com.clara.dto.tool.ToolCallContent;
+import com.clara.dto.tool.ToolCallFunction;
+import com.clara.dto.tool.ToolResult;
 import org.junit.Test;
 
 import java.util.ArrayList;

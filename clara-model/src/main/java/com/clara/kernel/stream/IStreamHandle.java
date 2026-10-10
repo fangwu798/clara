@@ -1,6 +1,6 @@
 package com.clara.kernel.stream;
 
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IResponse;
 
 /**
  * 流式调用句柄：查询状态、取消本次流、取回累积完成的响应。

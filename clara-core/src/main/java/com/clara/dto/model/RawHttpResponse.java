@@ -1,4 +1,4 @@
-package com.clara.kernel.http;
+package com.clara.dto.model;
 
 import lombok.Data;
 
@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * 线格式响应：封装一次服务提供商 HTTP 响应的状态码、响应头与响应体。
  *
- * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.kernel.http}），是实现层
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.dto.model}），是实现层
  * 不可变值对象，不是模型 API 契约；它承载传输实现读取到的状态码、响应头与响应体，供调用方判定成败、供
  * {@code ProviderResponseDecoder} 按字段注解解析成领域响应对象。
  *

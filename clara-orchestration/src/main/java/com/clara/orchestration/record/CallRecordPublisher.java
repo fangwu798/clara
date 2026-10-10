@@ -3,8 +3,8 @@ package com.clara.orchestration.record;
 import com.clara.core.record.ICallRecordSink;
 import com.clara.dto.record.CallRecord;
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.api.IRequest;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IRequest;
+import com.clara.core.model.IResponse;
 
 /**
  * 调用记录发布者：每次模型响应结束后，用本次实际请求与响应对象构造 {@link CallRecord} 交给接收方。

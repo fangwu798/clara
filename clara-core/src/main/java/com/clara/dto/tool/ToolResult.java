@@ -1,5 +1,7 @@
-package com.clara.tool;
+package com.clara.dto.tool;
 
+import com.clara.core.tool.ITool;
+import com.clara.core.tool.IToolInvocation;
 import com.clara.enums.RoleEnum;
 import com.clara.core.message.IContent;
 
@@ -11,7 +13,7 @@ import java.util.Map;
 /**
  * 统一工具执行结果：工具调用执行后回传给平台的结果，实现 {@link IContent} 以复用消息协议渲染。
  *
- * <p>是什么、在哪一层：契约层的工具结果值对象（包 {@code com.clara.tool}），是「工具执行产出」与
+ * <p>是什么、在哪一层：契约层的工具结果值对象（包 {@code com.clara.dto.tool}），是「工具执行产出」与
  * 「回传平台的消息」之间的统一桥梁。Chat Completions 下渲染为 {@code role=tool} 消息，
  * Responses 下渲染为 {@code function_call_output} 输入项。
  *

@@ -1,8 +1,8 @@
 package com.clara.dto.record;
 
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.api.IRequest;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IRequest;
+import com.clara.core.model.IResponse;
 
 /**
  * 调用记录：一次大模型调用的留痕，是后续「对话总结 / 理解」的原始依据。

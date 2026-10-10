@@ -2,7 +2,7 @@ package com.clara.orchestration.capability;
 
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.kernel.api.IStreamModel;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IResponse;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ImageItem;

@@ -1,12 +1,13 @@
-package com.clara.tool;
+package com.clara.dto.tool;
 
+import com.clara.core.tool.IToolInvocation;
 import lombok.Data;
 
 /**
  * 工具调用条目：模型在响应中要求调用的一次工具，对应 OpenAI 兼容家族 {@code choices[0].message.tool_calls[]}
  * 的元素，或流式下 {@code choices[0].delta.tool_calls[]} 的分片。
  *
- * <p>是什么、在哪一层：契约层的响应值对象（包 {@code com.clara.tool}），与请求侧的
+ * <p>是什么、在哪一层：契约层的响应值对象（包 {@code com.clara.dto.tool}），与请求侧的
  * {@link ToolContext} 同属「工具」这一语义域，但形状不同——{@link ToolContext} 描述「有哪些工具可用」
  * （调用前声明，函数带描述与 JSON Schema），本类描述「模型要调用哪个工具」以及「传什么参数」
  * （调用后返回，入口是 {@code id} 与 {@code arguments}），因此两者不共用类型。

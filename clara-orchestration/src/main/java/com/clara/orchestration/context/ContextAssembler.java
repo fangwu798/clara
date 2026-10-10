@@ -9,7 +9,7 @@ import com.clara.enums.RoleEnum;
 import com.clara.kernel.message.delta.SystemContent;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
-import com.clara.tool.ToolContext;
+import com.clara.dto.tool.ToolContext;
 
 import java.util.ArrayList;
 import java.util.Collections;

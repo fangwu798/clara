@@ -15,7 +15,7 @@ import java.util.Map;
  * 工具结果消息：线格式为 {@code {"role":"tool","tool_call_id":"...","content":"..."}}。
  *
  * <p>是什么、在哪一层：契约层的消息实现，是工具调用往返的第二轮——模型返回
- * {@link com.clara.tool.ToolCall} 后，调用方执行工具，再用本类把执行结果放回
+ * {@link com.clara.dto.tool.ToolCall} 后，调用方执行工具，再用本类把执行结果放回
  * {@code ModelParameters.messages}，模型据此继续作答。
  *
  * <p>使用方法：

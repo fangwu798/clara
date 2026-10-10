@@ -1,11 +1,11 @@
-package com.clara.kernel.api;
+package com.clara.core.model;
 
-import com.clara.kernel.http.RawHttpResponse;
+import com.clara.dto.model.RawHttpResponse;
 
 /**
  * 响应对象契约：一次能力调用的出参根接口，字段与平台 JSON 的对应关系由字段注解声明。
  *
- * <p>是什么、在哪一层：契约层（{@code com.clara.kernel.api}）。当前唯一实现是
+ * <p>是什么、在哪一层：契约层（{@code com.clara.core.model}）。当前唯一实现是
  * {@link com.clara.kernel.http.HttpResponse}——所有平台、所有能力的返回都解到同一个响应对象上，字段上的
  * {@code @ResponseAdapter} 注解按「平台 + 能力种类」分别声明同步取值路径与流式增量路径，因此响应侧也不
  * 需要为每个平台写实现类。

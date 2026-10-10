@@ -1,14 +1,14 @@
-package com.clara.kernel.stream;
+package com.clara.dto.model;
 
+import com.clara.core.model.IResponse;
 import com.clara.enums.StreamEventEnum;
-import com.clara.kernel.api.IResponse;
 import com.clara.exception.ClaraError;
 import lombok.Data;
 
 /**
  * 一次调用的流事件。
  *
- * <p>位置：契约层（{@code com.clara.kernel.stream}）。由流式链路（{@code StreamHandle}）构造并回调给调用方，
+ * <p>位置：契约层（{@code com.clara.dto.model}）。由流式链路（{@code StreamHandle}）构造并回调给调用方，
  * 调用方据 {@link #getType()} 分派处理。
  *
  * <p>使用方法：

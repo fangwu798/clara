@@ -3,11 +3,11 @@ package com.clara.kernel.message.provider.response;
 import com.clara.annoation.ProtocolField;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.ProtocolEnum;
-import com.clara.kernel.api.IRequest;
+import com.clara.core.model.IRequest;
 import com.clara.core.message.IContent;
 import com.clara.kernel.message.BasicParameters;
 import com.clara.kernel.message.provider.AbstractRequestEncoder;
-import com.clara.tool.ToolContext;
+import com.clara.dto.tool.ToolContext;
 import com.clara.utils.CodexTuiGenerator;
 
 import java.lang.reflect.Field;

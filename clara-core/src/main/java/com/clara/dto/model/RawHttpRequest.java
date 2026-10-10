@@ -1,4 +1,4 @@
-package com.clara.kernel.http;
+package com.clara.dto.model;
 
 import lombok.Data;
 
@@ -13,11 +13,11 @@ import java.util.Set;
 /**
  * 线格式请求：封装一次服务提供商 HTTP 请求的方法、端点、请求头与请求体。
  *
- * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.kernel.http}），是实现层
+ * <p>是什么与所属层：本类属于 {@code clara-core} 的 HTTP 层（{@code com.clara.dto.model}），是实现层
  * 不可变值对象，不是模型 API 契约；它对一次 HTTP 请求的方法、端点、请求头与请求体做一次性校验，使传输实现
  * 只面对已合法化的输入。
  *
- * <p>谁创建谁调用：由请求对象的 {@link com.clara.kernel.api.IRequest#toRequest()} 创建（实现里交给
+ * <p>谁创建谁调用：由请求对象的 {@link com.clara.core.model.IRequest#toRequest()} 创建（实现里交给
  * {@code ProviderRequestEncoder} 按字段注解编码），再交给传输实现读取（如 Jdk8HttpTransport）。适配器不自行构造本类。
  *
  * <p>使用方法：传输实现依次调用 {@code getMethod()}、{@code getEndpoint()}、{@code getHeaders()}、

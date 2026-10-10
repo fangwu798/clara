@@ -1,7 +1,7 @@
 package com.clara.model.provider;
 
-import com.clara.kernel.api.IRequest;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IRequest;
+import com.clara.core.model.IResponse;
 import com.clara.kernel.api.IStreamModel;
 import com.clara.kernel.api.execute.IHttpExecute;
 import com.clara.kernel.stream.IStreamHandle;

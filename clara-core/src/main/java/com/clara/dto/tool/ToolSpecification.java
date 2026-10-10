@@ -1,4 +1,4 @@
-package com.clara.tool;
+package com.clara.dto.tool;
 
 import lombok.Data;
 
@@ -9,7 +9,7 @@ import java.util.Map;
 /**
  * 函数签名：一个可被模型调用的函数的名称、功能描述与入参 JSON Schema。
  *
- * <p>是什么、在哪一层：契约层的请求值对象（包 {@code com.clara.tool}），是 {@link ToolContext} 的
+ * <p>是什么、在哪一层：契约层的请求值对象（包 {@code com.clara.dto.tool}），是 {@link ToolContext} 的
  * {@code function} 子对象，也是本项目中「函数声明」的唯一类型——请求侧不再有第二个同义类。
  *
  * <p>谁创建谁调用：由调用方在装配请求时构造（不可变值对象，构造期即校验），交给

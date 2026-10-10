@@ -84,7 +84,7 @@ public class SkillMatchCoordinatorTest {
 
         SkillMatchCoordinator.MatchedSkill matched = coordinator.match("hello", control(3, 0.5));
 
-        List<com.clara.tool.ToolContext> result = matched.getTools();
+        List<com.clara.dto.tool.ToolContext> result = matched.getTools();
         assertEquals(2, result.size());
         assertEquals("my_tool_name_", result.get(0).getFunction().getName());
         assertEquals(128, result.get(1).getFunction().getName().length());

@@ -1,12 +1,12 @@
 package com.clara.model.stream;
 
 import com.clara.enums.StreamEventEnum;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IResponse;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.stream.IStreamObserver;
-import com.clara.kernel.stream.StreamEvent;
-import com.clara.tool.ToolCall;
-import com.clara.tool.ToolCallFunction;
+import com.clara.dto.model.StreamEvent;
+import com.clara.dto.tool.ToolCall;
+import com.clara.dto.tool.ToolCallFunction;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  * 重复做一遍的事，本类把它收敛成一处，因此不需要每次调用都临时写一个匿名实现。
  *
  * <p>谁创建谁调用：由调用方在发起流式调用前创建，交给
- * {@link com.clara.kernel.api.IStreamModel#chat(com.clara.kernel.api.IRequest, Class, IStreamObserver)}；
+ * {@link com.clara.kernel.api.IStreamModel#chat(com.clara.core.model.IRequest, Class, IStreamObserver)}；
  * 一次流对应一个实例，不可复用。不需要 {@code close()}。
  *
  * <p>使用方法：

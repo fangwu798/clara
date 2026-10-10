@@ -2,13 +2,13 @@ package com.clara.kernel.http.execute;
 
 import com.clara.context.CallContext;
 import com.clara.context.ConvContext;
-import com.clara.kernel.api.IRequest;
+import com.clara.core.model.IRequest;
 import com.clara.kernel.api.execute.IHttpExecute;
 import com.clara.kernel.api.execute.ISseListener;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.http.RawHttpFormatter;
-import com.clara.kernel.http.RawHttpRequest;
-import com.clara.kernel.http.RawHttpResponse;
+import com.clara.dto.model.RawHttpRequest;
+import com.clara.dto.model.RawHttpResponse;
 import com.clara.kernel.http.TransportConfig;
 import com.clara.kernel.http.execute.sse.SseParser;
 import com.clara.utils.ExceptionUtils;

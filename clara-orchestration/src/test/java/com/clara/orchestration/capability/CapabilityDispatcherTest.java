@@ -1,8 +1,8 @@
 package com.clara.orchestration.capability;
 
 import com.clara.enums.CapabilityKindEnum;
-import com.clara.kernel.api.IRequest;
-import com.clara.kernel.api.IResponse;
+import com.clara.core.model.IRequest;
+import com.clara.core.model.IResponse;
 import com.clara.kernel.api.IStreamModel;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.http.HttpRequest;

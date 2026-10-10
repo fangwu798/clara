@@ -1,10 +1,10 @@
 package com.clara.kernel.message.provider.completion;
 
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.api.IRequest;
+import com.clara.core.model.IRequest;
 import com.clara.core.message.IContent;
 import com.clara.kernel.message.provider.AbstractRequestEncoder;
-import com.clara.tool.ToolContext;
+import com.clara.dto.tool.ToolContext;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;

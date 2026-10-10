@@ -2,8 +2,8 @@ package com.clara.skill.tool;
 
 import com.clara.core.skill.IToolExecutor;
 import com.clara.core.skill.IToolInvoker;
-import com.clara.tool.IToolInvocation;
-import com.clara.tool.ToolResult;
+import com.clara.core.tool.IToolInvocation;
+import com.clara.dto.tool.ToolResult;
 
 /**
  * 工具调用统一入口：框架拿到模型工具调用后经本类执行并取回可回填结果。

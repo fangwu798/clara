@@ -1,7 +1,7 @@
 package com.clara.core.skill;
 
-import com.clara.tool.IToolInvocation;
-import com.clara.tool.ToolResult;
+import com.clara.core.tool.IToolInvocation;
+import com.clara.dto.tool.ToolResult;
 
 /**
  * 工具调用接口：框架调用技能声明的工具方法，是工具往返循环的统一入口。
