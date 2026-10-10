@@ -2,18 +2,20 @@ import json
 import os
 import sys
 
-# 默认工作区：相对本脚本位置推导，保证脚本无论被哪个工作目录拉起都指向同一处。
-# 本脚本位于 <repo>/config/skill/scripts/file_ops.py，故工作区为 <repo>/config/sample/workspace。
+# 仓库根：本脚本位于 <repo>/config/skill/scripts/file_ops.py，故上溯三级即仓库根。
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_BASE = os.path.normpath(os.path.join(HERE, "..", "..", "sample", "workspace"))
+REPO_ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
+
+# 默认工作区：<repo>/config/sample/workspace。
+DEFAULT_BASE = os.path.join(REPO_ROOT, "config", "sample", "workspace")
 
 
 def resolve(path, base):
+    # base 可为绝对路径或相对仓库根的路径；path 可为绝对路径或相对 base 的路径。
+    root = base if os.path.isabs(base) else os.path.join(REPO_ROOT, base)
     if not path:
-        return base
-    if os.path.isabs(path) or not base:
-        return path
-    return os.path.join(base, path)
+        return root
+    return path if os.path.isabs(path) else os.path.join(root, path)
 
 
 def main():
