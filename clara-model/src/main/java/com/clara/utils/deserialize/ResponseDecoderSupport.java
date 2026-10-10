@@ -1,6 +1,6 @@
 package com.clara.utils.deserialize;
 
-import com.clara.annoation.ResponseAdapter;
+import com.clara.core.annotation.ResponseAdapter;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.FinishReasonEnum;
 import com.clara.enums.ModelProviderEnum;

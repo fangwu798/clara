@@ -27,17 +27,16 @@ com.clara
 │   ├── FinishReasonEnum               # 结束原因：STOP / LENGTH / TOOL_CALLS / CONTENT_FILTER / CANCELLED / ERROR
 │   └── StreamEventEnum                # 流事件：TEXT_DELTA / REASONING_DELTA / TOOL_ARGUMENT_DELTA / TOOL_CALL_COMPLETE / LOG / RESPONSE_COMPLETE / ERROR
 │
-├── annoation                          # 注解层：字段级适配规则（运行时反射读取）
-│   ├── @ProviderAdapter               # 请求字段：平台 + 能力 + 线格式名 + 默认值 + 可选值 + 是否支持
-│   ├── @ProviderAdapters              # 容器（可重复注解）
-│   ├── @ProtocolField                 # 请求字段：协议 + 线格式名 + 是否支持
-│   ├── @ProtocolFields                # 容器（可重复注解）
-│   ├── @ResponseAdapter               # 响应字段：平台 + 能力 + 同步路径 + 流式路径 + 流事件 + 结束原因路径
-│   ├── @ResponseAdapters              # 容器（可重复注解）
-│   ├── @ProtocolResponse              # 响应字段：协议 + 同步路径 + 流式路径 + 流事件 + 结束原因路径
-│   └── @ProtocolResponses             # 容器（可重复注解）
-│
 ├── core                               # clara-core · 契约层（接口）
+│   ├── annotation                     # 字段级适配注解（运行时反射读取）
+│   │   ├── @ProviderAdapter           # 请求字段：平台 + 能力 + 线格式名 + 默认值 + 可选值 + 是否支持
+│   │   ├── @ProviderAdapters          # 容器（可重复注解）
+│   │   ├── @ProtocolField             # 请求字段：协议 + 线格式名 + 是否支持
+│   │   ├── @ProtocolFields            # 容器（可重复注解）
+│   │   ├── @ResponseAdapter           # 响应字段：平台 + 能力 + 同步路径 + 流式路径 + 流事件 + 结束原因路径
+│   │   ├── @ResponseAdapters          # 容器（可重复注解）
+│   │   ├── @ProtocolResponse          # 响应字段：协议 + 同步路径 + 流式路径 + 流事件 + 结束原因路径
+│   │   └── @ProtocolResponses         # 容器（可重复注解）
 │   ├── model
 │   │   ├── IRequest                   # 请求根接口：getCls() / toRequest() / getStream()
 │   │   └── IResponse                  # 响应根接口：getCls() / toResponse()

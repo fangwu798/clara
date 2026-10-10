@@ -1,4 +1,4 @@
-package com.clara.annoation;
+package com.clara.core.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

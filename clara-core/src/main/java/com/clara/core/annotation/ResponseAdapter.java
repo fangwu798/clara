@@ -1,9 +1,8 @@
-package com.clara.annoation;
+package com.clara.core.annotation;
 
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.StreamEventEnum;
-import com.clara.kernel.message.provider.ProviderResponseDecoder;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Repeatable;
@@ -16,8 +15,8 @@ import java.lang.annotation.Target;
  *
  * <p>与入参侧的 {@link ProviderAdapter} 对称：入参注解解决「同一个请求字段在不同平台怎么下发」，
  * 本注解解决「同一个响应字段在不同平台从哪里取」。本注解只由解码器
- * {@link ProviderResponseDecoder} 反射读取；两者配合后，
- * {@link com.clara.kernel.http.HttpResponse} 这类统一响应对象即可承载所有平台的返回，不需要为每个平台写解码器。
+ * {@code ProviderResponseDecoder} 反射读取；两者配合后，
+ * {@code com.clara.kernel.http.HttpResponse} 这类统一响应对象即可承载所有平台的返回，不需要为每个平台写解码器。
  *
  * <p>路径语法：以 {@code .} 分隔层级，数组下标写在段尾方括号里，例如
  * {@code choices[0].message.content}、{@code usage.prompt_tokens_details.cached_tokens}、

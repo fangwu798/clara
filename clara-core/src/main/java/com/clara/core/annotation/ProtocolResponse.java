@@ -1,4 +1,4 @@
-package com.clara.annoation;
+package com.clara.core.annotation;
 
 import com.clara.enums.ProtocolEnum;
 import java.lang.annotation.ElementType;

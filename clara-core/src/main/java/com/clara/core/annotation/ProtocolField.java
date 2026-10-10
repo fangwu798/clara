@@ -1,8 +1,6 @@
-package com.clara.annoation;
+package com.clara.core.annotation;
 
 import com.clara.enums.ProtocolEnum;
-import com.clara.kernel.message.BasicParameters;
-import com.clara.kernel.message.provider.ProviderRequestEncoder;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Repeatable;
@@ -18,8 +16,8 @@ import java.lang.annotation.Target;
  * 两者叠加时，本注解声明的名字<b>覆盖</b> {@link ProviderAdapter#name()} 与 {@code @JsonProperty} 决定的
  * 线格式名；因此不要在 {@link ProviderAdapter} 里堆协议差异，协议差异收敛到本注解。
  *
- * <p>谁创建、谁调用：由参数类（如 {@link BasicParameters}）在字段上标注，
- * 只被编码器 {@link ProviderRequestEncoder} 反射读取。同一字段需要适配多个
+ * <p>谁创建、谁调用：由参数类（如 {@code BasicParameters}）在字段上标注，
+ * 只被编码器 {@code ProviderRequestEncoder} 反射读取。同一字段需要适配多个
  * 协议时由 {@link ProtocolFields} 承载重复标注。
  *
  * <p>命名规则：{@link #name()} 与 {@link ProviderAdapter#name()} 一致——空串表示沿用原线格式名，

@@ -1,7 +1,6 @@
-package com.clara.annoation;
+package com.clara.core.annotation;
 
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.message.provider.ProviderRequestEncoder;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -13,7 +12,7 @@ import java.lang.annotation.Target;
  *
  * <p>本注解运行时保留（{@code RetentionPolicy.RUNTIME}）、只作用于字段，是否为字段级平台适配规则由读取方
  * 决定。当前入参编码链路读取的是 {@link ProviderAdapter#type()}（见
- * {@link ProviderRequestEncoder}），本注解在仓库内暂无标注点。
+ * {@code ProviderRequestEncoder}），本注解在仓库内暂无标注点。
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD})

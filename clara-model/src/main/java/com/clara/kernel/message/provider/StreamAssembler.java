@@ -1,6 +1,6 @@
 package com.clara.kernel.message.provider;
 
-import com.clara.annoation.ResponseAdapter;
+import com.clara.core.annotation.ResponseAdapter;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.core.model.IResponse;
 import com.clara.exception.ClaraException;

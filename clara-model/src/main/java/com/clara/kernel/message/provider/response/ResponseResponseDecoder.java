@@ -1,6 +1,6 @@
 package com.clara.kernel.message.provider.response;
 
-import com.clara.annoation.ProtocolResponse;
+import com.clara.core.annotation.ProtocolResponse;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.ProtocolEnum;
 import com.clara.core.model.IResponse;

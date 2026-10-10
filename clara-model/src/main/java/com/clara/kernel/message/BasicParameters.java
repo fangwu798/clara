@@ -1,7 +1,7 @@
 package com.clara.kernel.message;
 
-import com.clara.annoation.ProviderAdapter;
-import com.clara.annoation.ProtocolField;
+import com.clara.core.annotation.ProviderAdapter;
+import com.clara.core.annotation.ProtocolField;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.ProtocolEnum;
