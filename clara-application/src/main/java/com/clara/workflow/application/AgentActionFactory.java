@@ -4,7 +4,9 @@ import com.clara.core.skill.IPromptProvider;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.dto.workflow.WorkflowActionSpec;
+import com.clara.media.runtime.MediaRuntime;
 import com.clara.orchestration.DefaultConversationOrchestrator;
+import com.clara.session.ModelRegistry;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -15,31 +17,27 @@ import java.util.Map;
  * <p>是什么、在哪一层：application 工作流装配层对 core {@link IWorkflowActionFactory} 的实现
  * （包 {@code com.clara.workflow.application}），由装配层创建并注入工作流定义加载器。
  *
- * <p>属性约定：必需 {@code prompt}（提示词标识），可选 {@code promptVars}（对象，变量名到模板的映射）。
- * 失败语义：{@code prompt} 缺失或 {@code promptVars} 类型不符时抛 {@link IllegalArgumentException}。
+ * <p>属性约定：必需 {@code prompt}（提示词标识），可选 {@code promptVars}（对象，变量名到模板的映射）；
+ * 可选 {@code role} / {@code model} / {@code capability}（节点级模型与能力选择，见 {@link AgentNodeOptions}）。
+ * 失败语义：{@code prompt} 缺失、{@code promptVars} 类型不符或 {@code capability} 非法时抛
+ * {@link IllegalArgumentException}。
  */
 public final class AgentActionFactory implements IWorkflowActionFactory {
 
-    private final DefaultConversationOrchestrator orchestrator;
-    private final IPromptProvider promptProvider;
-    private final WorkflowModelContext modelContext;
+    private final AgentActionContext context;
 
     /**
      * 创建 AGENT 动作工厂。
      *
      * @param orchestrator   对话编排器，不可为 null
      * @param promptProvider 提示词提供器，不可为 null
-     * @param modelContext   工作流模型上下文，不可为 null
+     * @param modelRegistry  模型绑定注册表，不可为 null
+     * @param mediaRuntime   媒体运行时（图片产物资产化），不可为 null
      * @throws IllegalArgumentException 任一项为 null 时
      */
     public AgentActionFactory(DefaultConversationOrchestrator orchestrator, IPromptProvider promptProvider,
-            WorkflowModelContext modelContext) {
-        if (orchestrator == null || promptProvider == null || modelContext == null) {
-            throw new IllegalArgumentException("agent factory dependencies must not be null");
-        }
-        this.orchestrator = orchestrator;
-        this.promptProvider = promptProvider;
-        this.modelContext = modelContext;
+            ModelRegistry modelRegistry, MediaRuntime mediaRuntime) {
+        this.context = new AgentActionContext(orchestrator, promptProvider, modelRegistry, mediaRuntime);
     }
 
     @Override
@@ -57,8 +55,8 @@ public final class AgentActionFactory implements IWorkflowActionFactory {
             throw new IllegalArgumentException("AGENT 节点缺少 prompt：" + spec.getNodeId());
         }
         Map<String, Object> promptVars = asMap(spec.getAttribute("promptVars"), spec.getNodeId(), "promptVars");
-        return new AgentWorkflowAction(orchestrator, promptProvider, modelContext, spec.getNodeId(), prompt.trim(),
-                promptVars);
+        AgentNodeOptions options = AgentNodeOptions.fromSpec(spec);
+        return new AgentWorkflowAction(context, spec.getNodeId(), prompt.trim(), promptVars, options);
     }
 
     private static String asText(Object value) {

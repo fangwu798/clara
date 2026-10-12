@@ -3,6 +3,10 @@ import os
 import re
 import sys
 
+# 工具脚本按用途分目录存放，共享辅助模块位于 scripts 根目录，故先把 scripts 根加入模块搜索路径。
+SCRIPTS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, SCRIPTS_ROOT)
+
 import _textio
 import _toolmeta
 
@@ -35,9 +39,8 @@ _TOOL = {
 if _toolmeta.describe(_TOOL):
     sys.exit(0)
 
-# 仓库根：本脚本位于 <repo>/config/skill/scripts/doc_outline.py，上溯三级即仓库根。
-HERE = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
+# 仓库根：scripts 根（见文件头部 SCRIPTS_ROOT）上溯三级即仓库根。
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPTS_ROOT, "..", "..", ".."))
 WORK_ROOT = os.environ.get("CLARA_WORK_DIR") or REPO_ROOT
 DEFAULT_BASE = os.environ.get("CLARA_WORK_DIR") or os.path.join(REPO_ROOT, "config", "sample", "workspace")
 REPO_PREFIX = "@repo"

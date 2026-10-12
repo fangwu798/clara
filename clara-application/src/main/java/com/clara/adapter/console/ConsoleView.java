@@ -22,8 +22,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * 控制台视图：集中承担「显示」相关的全部职责——颜色与日志模式、框架标准输出的接管、详细日志落盘、
@@ -56,6 +58,11 @@ public final class ConsoleView implements Closeable {
      * ANSI 控制码：重置。
      */
     public static final String ANSI_RESET = "\u001B[0m";
+
+    /**
+     * 「调用工具」日志中用途短句的最大字符数，超出部分以省略号截断。
+     */
+    private static final int TOOL_PURPOSE_MAX_CHARS = 80;
 
     /**
      * 丢弃输出的流：精简模式下接管框架的标准输出。
@@ -217,14 +224,63 @@ public final class ConsoleView implements Closeable {
     /**
      * 创建一个新的流式观察者，用于实时渲染模型思考、正文与工具调用过程。
      *
+     * @param toolPurpose 工具用途解析器：按「工具名 + 本次入参」返回一句用途说明（为 null 时不展示）；
+     *                    用于在「调用工具」日志中简要说明调用目的
      * @return 流式观察者，非 null
      */
-    public ConsoleStreamObserver newObserver() {
-        return new ConsoleStreamObserver(this);
+    public ConsoleStreamObserver newObserver(ToolPurposeResolver toolPurpose) {
+        return new ConsoleStreamObserver(this, toolPurpose);
     }
 
     /**
-     * 打印装配结果与当前模型信息。
+     * 工具用途解析器：把一次工具调用（工具名 + 入参 JSON）翻译成一句人可读的用途说明。
+     *
+     * <p>为什么需要入参：同一个工具可以做很多不同的事（{@code run_command} 既可编译也可看 Git 状态），
+     * 只按工具名只能回答「这个工具是干什么的」，带上入参才能回答「这次调用是为了什么」。
+     */
+    @FunctionalInterface
+    public interface ToolPurposeResolver {
+
+        /**
+         * 解析一次工具调用的用途。
+         *
+         * @param toolName      工具名，非 null
+         * @param argumentsJson 本次调用的入参 JSON，可为 null
+         * @return 一句用途说明；无可展示内容时返回 null
+         */
+        String purpose(String toolName, String argumentsJson);
+    }
+
+    /**
+     * 把工具声明里的用途描述压成一行短句，供控制台「调用工具」日志展示。
+     *
+     * <p>工具描述本是为模型编写的长段落（含入参说明、调用时机等），整段打印会淹没控制台，故只取首句
+     * （以「。」为界）并限制最大长度。
+     *
+     * @param description 工具用途描述，可为 null
+     * @return 一行短句；无可用描述时为空串
+     */
+    static String briefToolPurpose(String description) {
+        if (description == null) {
+            return "";
+        }
+        String text = description.trim().replaceAll("\\s+", " ");
+        if (text.isEmpty()) {
+            return "";
+        }
+        int end = text.length();
+        int stop = text.indexOf('。');
+        if (stop >= 0) {
+            end = stop + 1;
+        }
+        String sentence = text.substring(0, end);
+        return sentence.length() <= TOOL_PURPOSE_MAX_CHARS
+                ? sentence
+                : sentence.substring(0, TOOL_PURPOSE_MAX_CHARS) + "…";
+    }
+
+    /**
+     * 打印装配结果、当前模型信息与对话历史存放位置。
      */
     public void printBanner(ApplicationBootstrap bootstrap, ProviderConfiguration providerConfig,
             Path configPath, String source) {
@@ -232,6 +288,7 @@ public final class ConsoleView implements Closeable {
         emit("  orchestrator   : " + bootstrap.orchestrator().getClass().getName());
         emit("  workflowEngine : " + bootstrap.workflowEngine().getClass().getName());
         emit("  embeddingClient: " + bootstrap.embeddingClient().getClass().getName());
+        emit("  memory         : " + bootstrap.conversationHistoryDescription());
         emit("  model          : " + describe(providerConfig) + "   [" + configPath + "]");
         emit("  modelSource    : " + source);
         emit("  workDir        : " + workDirectory());
@@ -247,7 +304,8 @@ public final class ConsoleView implements Closeable {
      */
     public void printHints() {
         println("输入内容回车发送；/model 切换模型；/log 切换精简/全量日志；/color 开关颜色；"
-                + "exit 或 quit 结束。需要读取本地目录、整理技术文档、生成需求与技术方案或开发计划时，"
+                + "exit 或 quit 结束；执行中按 ESC 两次可取消本轮模型调用与工具执行。"
+                + "需要读取本地目录、整理技术文档、生成需求与技术方案或开发计划时，"
                 + "可直接用自然语言提出（模型会调用 run_workflow 工作流，如 analyze_repo_docs / "
                 + "design_business_solution / plan_development）。");
         println();
@@ -435,9 +493,8 @@ public final class ConsoleView implements Closeable {
     /**
      * 控制台流式观察者：把模型思考、正文与工具调用过程实时打印到控制台。
      *
-     * <p>思考以灰色、正文以淡绿色呈现，思考与正文各自成段（切换时换行并打前缀）；工具调用只在每轮首次出现
-     * 参数分片时打印一条灰色提示，避免逐片参数刷屏。一轮流结束（{@code RESPONSE_COMPLETE}）后复位，
-     * 供下一轮工具往返复用。
+     * <p>思考以灰色、正文以淡绿色呈现，思考与正文各自成段（切换时换行并打前缀）；工具调用在参数拼装完整时
+     * （{@code TOOL_CALL_COMPLETE}）按调用标识去重，每次调用打印一条灰色提示（含工具名与本次调用用途短句）。
      */
     public static final class ConsoleStreamObserver implements IStreamObserver {
 
@@ -446,13 +503,14 @@ public final class ConsoleView implements Closeable {
         private static final int MODE_ANSWER = 2;
 
         private final ConsoleView view;
+        private final ToolPurposeResolver toolPurpose;
         private int mode = MODE_IDLE;
-        private boolean toolNoted;
-        private String toolName;
+        private final Set<String> notedCalls = new HashSet<String>();
         private boolean printed;
 
-        ConsoleStreamObserver(ConsoleView view) {
+        ConsoleStreamObserver(ConsoleView view, ToolPurposeResolver toolPurpose) {
             this.view = view;
+            this.toolPurpose = toolPurpose;
         }
 
         /**
@@ -478,12 +536,14 @@ public final class ConsoleView implements Closeable {
                     view.out.flush();
                     break;
                 case TOOL_ARGUMENT_DELTA:
+                    // 参数分片期间只做展示准备，不打印：等参数拼装完整（TOOL_CALL_COMPLETE）才发出提示，
+                    // 这样提示里能带上本次调用的入参（如 run_command 实际执行的命令）。
+                    break;
                 case TOOL_CALL_COMPLETE:
-                    noteToolCall(event.getToolName());
+                    noteToolCall(event);
                     break;
                 case RESPONSE_COMPLETE:
                     end();
-                    toolName = null;
                     break;
                 case ERROR:
                     end();
@@ -514,24 +574,38 @@ public final class ConsoleView implements Closeable {
         }
 
         /**
-         * 每轮首次拿到工具名时打印一条灰色提示，指明正在调用哪个工具。
+         * 打印一条灰色「调用工具」提示：工具名 +（本次调用的用途）。
          *
-         * <p>流式下函数名只在首片出现，故以「已记录到名字且本行尚未打印」为打印条件。
+         * <p>由 {@code TOOL_CALL_COMPLETE} 触发（参数已拼装完整，能拿到完整入参），按调用标识去重，
+         * 因此同一轮里多次调用同一工具也会各打印一条。
          */
-        private void noteToolCall(String name) {
-            if (name != null && !name.trim().isEmpty()) {
-                toolName = name.trim();
+        private void noteToolCall(StreamEvent event) {
+            String name = event.getToolName() == null ? null : event.getToolName().trim();
+            if (name == null || name.isEmpty()) {
+                return;
             }
-            if (toolNoted || toolName == null) {
+            String key = event.getToolCallId() != null
+                    ? event.getToolCallId() : name + "\u0000" + event.getPayload();
+            if (!notedCalls.add(key)) {
                 return;
             }
             end();
-            toolNoted = true;
-            view.out.println(view.wrapColor(ANSI_GRAY, "  [tool] 调用工具：" + toolName));
+            view.emit(toolLine(name, event.getPayload()), ANSI_GRAY);
         }
 
         /**
-         * 结束当前段：补换行并复位颜色与工具提示标记。
+         * 组装「调用工具」日志行：工具名 +（用途短句）。
+         */
+        private String toolLine(String name, String argumentsJson) {
+            String purpose = toolPurpose == null
+                    ? "" : briefToolPurpose(toolPurpose.purpose(name, argumentsJson));
+            return purpose.isEmpty()
+                    ? "  [tool] 调用工具：" + name
+                    : "  [tool] 调用工具：" + name + "（" + purpose + "）";
+        }
+
+        /**
+         * 结束当前段：补换行并复位颜色。
          */
         private void end() {
             if (mode != MODE_IDLE) {
@@ -542,7 +616,6 @@ public final class ConsoleView implements Closeable {
                 view.out.println();
                 view.out.flush();
             }
-            toolNoted = false;
         }
     }
 

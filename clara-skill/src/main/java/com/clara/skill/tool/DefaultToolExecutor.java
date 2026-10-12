@@ -1,5 +1,7 @@
 package com.clara.skill.tool;
 
+import com.clara.context.CancellationToken;
+import com.clara.context.ConvContext;
 import com.clara.core.skill.IToolExecutor;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.skill.executor.SkillPermissionAuthorizer;
@@ -65,10 +67,21 @@ public final class DefaultToolExecutor implements IToolExecutor {
 
         IScriptExecutor executor = executors.resolve(method.getType());
         ScriptExecutionSpec spec = new ScriptExecutionSpec(method.getType(), method.getScript(),
-                argumentsJson, defaultTimeoutMillis);
+                argumentsJson, defaultTimeoutMillis, currentCancellationToken());
         String output = executor.execute(spec);
 
         schemaValidator.validateOutput(method, output);
         return output;
+    }
+
+    /**
+     * 取当前线程所在会话的取消令牌，随执行描述下发给脚本执行器。
+     *
+     * <p>这样外部（如控制台 ESC、Web 层的客户端断开）置位会话令牌即可让正在运行的脚本在轮询检查点立刻终止；
+     * 线程未绑定会话时返回 null（脚本执行不响应外部取消）。
+     */
+    private static CancellationToken currentCancellationToken() {
+        ConvContext context = ConvContext.current();
+        return context == null ? null : context.getCancellationToken();
     }
 }

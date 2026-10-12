@@ -17,5 +17,7 @@ public enum WorkflowNodeTypeEnum {
     /** 循环节点。 */
     LOOP,
     /** 人工输入节点。 */
-    HUMAN
+    HUMAN,
+    /** 多角色评审 / 讨论节点（动作型：多角色轮流发言并由主持人汇总）。 */
+    REVIEW
 }

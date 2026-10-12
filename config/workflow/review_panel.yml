@@ -1,0 +1,19 @@
+workflowId: review_panel
+version: "1.0.0"
+# 对外只回传最终结论，避免把逐轮讨论稿整体回灌给对话模型。
+outputs: [conclusion]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    # 多角色评审：architect / reviewer / tester 轮流发言 2 轮，最后由 architect 汇总结论。
+    # 各角色经 config/model-roles.yml 映射到各自模型别名（未配置时角色名直接作模型别名），
+    # 因此可由相同模型或不同模型担任；调用方需在输入中提供 topic。
+    - id: panel
+      type: REVIEW
+      outputKeys: [conclusion]
+      prompt: review_panel
+      topic: "${topic}"
+      roles: [architect, reviewer, tester]
+      moderator: architect
+      rounds: 2

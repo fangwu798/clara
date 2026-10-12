@@ -28,6 +28,7 @@
         <pdfbox.version>2.0.29</pdfbox.version>
         <jtokkit.version>1.1.0</jtokkit.version>
         <milvus.version>2.6.25</milvus.version>
+        <jline.version>3.25.1</jline.version>
         <maven.compiler.version>3.11.0</maven.compiler.version>
         <maven.resources.version>3.3.1</maven.resources.version>
         <maven.surefire.version>3.2.5</maven.surefire.version>
@@ -81,6 +82,17 @@
                 <groupId>io.milvus</groupId>
                 <artifactId>milvus-sdk-java</artifactId>
                 <version>${milvus.version}</version>
+            </dependency>
+            <!-- 控制台单键（ESC）监听：jline-terminal 提供终端抽象，jline-terminal-jna 在 Windows 上提供原生原始模式。 -->
+            <dependency>
+                <groupId>org.jline</groupId>
+                <artifactId>jline-terminal</artifactId>
+                <version>${jline.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jline</groupId>
+                <artifactId>jline-terminal-jna</artifactId>
+                <version>${jline.version}</version>
             </dependency>
             <!-- Milvus SDK 传递依赖的统一版本约束：SDK 直接声明的版本高于部分传递版本，
                  统一到 SDK 的声明值以通过 dependencyConvergence 校验。 -->

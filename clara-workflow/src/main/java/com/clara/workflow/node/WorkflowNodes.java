@@ -19,8 +19,9 @@ public final class WorkflowNodes {
 
     public static IWorkflowNode action(String id, WorkflowNodeTypeEnum type, Set<String> outputKeys,
             String idempotencyKey, IWorkflowAction action) {
-        if (type != WorkflowNodeTypeEnum.AGENT && type != WorkflowNodeTypeEnum.TOOL) {
-            throw new IllegalArgumentException("action type must be AGENT or TOOL");
+        if (type != WorkflowNodeTypeEnum.AGENT && type != WorkflowNodeTypeEnum.TOOL
+                && type != WorkflowNodeTypeEnum.REVIEW) {
+            throw new IllegalArgumentException("action type must be AGENT, TOOL or REVIEW");
         }
         return new ActionNode(id, type, outputKeys, idempotencyKey, action);
     }

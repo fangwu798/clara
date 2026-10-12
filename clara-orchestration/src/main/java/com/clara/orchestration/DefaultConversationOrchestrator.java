@@ -16,7 +16,9 @@ import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.kernel.message.delta.UserContent;
+import com.clara.kernel.message.delta.UserVisionContent;
 import com.clara.kernel.stream.IStreamObserver;
+import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
@@ -36,7 +38,8 @@ import java.util.List;
  * <p>单轮流程：绑定会话上下文 → 恢复历史 → 装配上下文（窗口 / 压缩 / 技能 / 检索注入） → 按能力种类调用
  * 模型 → 记录调用 → 追加历史 → 若含工具调用则执行并回填后再次请求，直至无工具调用 → 封装结果 → 解绑。
  *
- * <p>取消：全链路复用 {@link ConvContext} 的取消令牌，循环体与关键点快速失败；取消后以「已取消」终态收尾。
+ * <p>取消：请求携带取消令牌时复用它（见 {@link ConversationRequest#getCancellationToken()}），全链路共享同一
+ * 令牌，循环体与关键点快速失败；取消后以「已取消」终态收尾。
  */
 public final class DefaultConversationOrchestrator {
 
@@ -94,26 +97,33 @@ public final class DefaultConversationOrchestrator {
         // 工具往返默认不设上限：仅当请求显式给出正值时才按该值限制（<=0 表示不限制）。
         int maxToolRoundTrips = request.getMaxToolRoundTrips();
 
-        ConvContext context = new ConvContext(request.getUserId(), request.getConversationId(),
-                request.getProviderConfiguration(), capabilityKind);
+        ConvContext context = createContext(request, capabilityKind);
         IWindowMemory windowMemory = windowMemoryFactory.create(request.getConversationId(),
                 provider == null ? null : provider.name(), request.getModel());
         // 用可嵌套的作用域绑定会话：工具往返可能再次进入本方法（如工作流 AGENT 节点经工具触发），
         // 内层退出时必须还原外层绑定，故不能用 bind + finally clear（那会把外层会话一并清空）。
         StringBuilder reasoning = new StringBuilder();
         try (ConvContext.Scope ignored = ConvContext.open(context)) {
-            windowMemory.append(Collections.singletonList(new UserContent(request.getUserInput())));
+            windowMemory.append(Collections.singletonList(userContent(request, capabilityKind)));
             int toolRoundTrips = 0;
             while (true) {
                 context.throwIfCancelled();
                 ContextAssembler.AssembledContext assembled =
                         contextAssembler.assemble(windowMemory, control, tokenCountEstimator);
-                HttpRequest httpRequest = HttpRequest.builder()
+                HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
                         .model(request.getModel())
                         .messages(assembled.getMessages())
                         .tools(assembled.getTools().isEmpty() ? null : assembled.getTools())
-                        .stream(Boolean.valueOf(request.isStream() || hostObserver != null))
-                        .build();
+                        .stream(Boolean.valueOf(request.isStream() || hostObserver != null));
+                // 对话能力走 messages；图片 / 视频生成等非对话能力以「本轮输入」作为生成提示词。
+                if (capabilityKind != CapabilityKindEnum.CHAT) {
+                    requestBuilder.prompt(request.getUserInput());
+                }
+                // 图片生成能力把随请求下发的图片引用作为参考图（图生图）；无附件时即文生图。
+                if (capabilityKind == CapabilityKindEnum.IMAGE) {
+                    requestBuilder.image(request.getAttachments());
+                }
+                HttpRequest httpRequest = requestBuilder.build();
                 StreamingToolCallObserver streamObserver = hostObserver == null
                         ? null : new StreamingToolCallObserver(hostObserver);
                 HttpResponse response = capabilityDispatcher.invoke(httpRequest, streamObserver);
@@ -149,6 +159,35 @@ public final class DefaultConversationOrchestrator {
             return conversationResult(request.getConversationId(), null,
                     OrchestrationStatusEnum.FAILED, 0, null, failure.getError(), reasoning.toString());
         }
+    }
+
+    /**
+     * 本轮用户消息：对话能力携带图片附件时以多模态消息下发（图片识别），其余情况为纯文本消息。
+     *
+     * <p>图片生成能力（IMAGE）的附件是参考图，由请求的 {@code image} 字段承载，不进入对话消息。
+     */
+    static IContent userContent(ConversationRequest request, CapabilityKindEnum capabilityKind) {
+        List<String> attachments = request.getAttachments();
+        if (capabilityKind != CapabilityKindEnum.CHAT || attachments == null || attachments.isEmpty()) {
+            return new UserContent(request.getUserInput());
+        }
+        return new UserVisionContent(request.getUserInput(), attachments);
+    }
+
+    /**
+     * 装配本轮会话上下文：请求携带取消令牌时复用它，否则自建。
+     *
+     * <p>为什么复用：宿主（如控制台 ESC、Web 层的客户端断开）需要在外部置位同一个令牌来终止本轮正在进行的
+     * 模型调用与工具执行；若编排层自建令牌，外部便无从干预。
+     */
+    private static ConvContext createContext(ConversationRequest request, CapabilityKindEnum capabilityKind) {
+        CancellationToken cancellationToken = request.getCancellationToken();
+        if (cancellationToken == null) {
+            return new ConvContext(request.getUserId(), request.getConversationId(),
+                    request.getProviderConfiguration(), capabilityKind);
+        }
+        return new ConvContext(request.getUserId(), request.getConversationId(), null,
+                request.getProviderConfiguration(), capabilityKind, cancellationToken);
     }
 
     /**

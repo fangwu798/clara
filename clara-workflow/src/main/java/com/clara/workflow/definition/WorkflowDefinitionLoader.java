@@ -29,7 +29,7 @@ import java.util.Set;
  * 工作流定义加载器：把 YAML 工作流文件解析为 {@link WorkflowDefinition}。
  *
  * <p>是什么、在哪一层：clara-workflow 的配置化入口（包 {@code com.clara.workflow.definition}），
- * 用 Jackson {@link YAMLFactory} 读取 YAML，递归构建节点树。AGENT / TOOL 节点的动作由注入的
+ * 用 Jackson {@link YAMLFactory} 读取 YAML，递归构建节点树。AGENT / TOOL / REVIEW 节点的动作由注入的
  * {@link IWorkflowActionFactory} 按类型生成，加载器不写死具体动作。
  *
  * <p>YAML 约定：顶层含 {@code workflowId}（必填）、{@code version}（缺省 {@code 1.0.0}）、
@@ -141,6 +141,7 @@ public final class WorkflowDefinitionLoader {
                 return WorkflowNodes.parallel(id, buildChildren(node, file, id));
             case AGENT:
             case TOOL:
+            case REVIEW:
                 return buildActionNode(node, file, id, type);
             case HUMAN:
                 String inputKey = text(node, "inputKey");

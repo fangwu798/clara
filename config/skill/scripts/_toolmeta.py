@@ -4,8 +4,11 @@
 框架解析后即得到该工具的声明；正常调用（无 --describe）时脚本仍从 stdin 读入参执行。
 
 约定：
-- 工具脚本以 `<name>.py` 命名；共享辅助模块以下划线开头（如 _textio.py、_toolmeta.py），
-  框架会跳过下划线开头的文件，不把它们当工具。
+- 工具脚本按用途分子目录存放（如 文件操作/、检索/、文档/、命令执行/、程序编译/、数据库/、网络/）；
+  框架递归扫描 scripts/ 下任意层级的 .py，目录层级不影响工具发现。
+- 共享辅助模块置于 scripts 根目录并以下划线开头（如 _textio.py、_toolmeta.py）；框架跳过下划线开头的
+  目录与文件（顺带排除 __pycache__），不把它们当工具。工具脚本需先把 scripts 根目录插入 sys.path，
+  再 import 这些辅助模块。
 - 元数据字段：id / name / type(缺省 PYTHON) / description / parameters(JSON Schema 对象) / metadata。
 - script 字段由框架按脚本文件路径自动填入，无需脚本提供。
 """

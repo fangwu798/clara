@@ -16,6 +16,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -30,12 +31,18 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>失败语义：Python 不可用、超时、退出码非零或输出非法 JSON 时一律返回 null（跳过该脚本），不向上抛出，
  * 避免单个脚本问题阻断整表加载；仅当 Python 进程无法启动时向 stderr 提示一次。
+ *
+ * <p>运行期改动：解析结果按「脚本绝对路径 + 文件签名（修改时间:大小）」缓存，文件未改动时复用缓存；
+ * 脚本被修改后签名变化，下次加载即重新执行 {@code --describe}，因此改动在下一次调用生效。
  */
 public final class ScriptToolLoader {
 
     private static final long DESCRIBE_TIMEOUT_MILLIS = 15_000L;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /** 脚本声明缓存：脚本绝对路径 → （文件签名, 声明）。 */
+    private final Map<String, CachedTool> cache = new ConcurrentHashMap<String, CachedTool>();
 
     private volatile boolean pythonMissingWarned;
 
@@ -49,7 +56,23 @@ public final class ScriptToolLoader {
         if (script == null || !script.isFile()) {
             return null;
         }
-        String stdout = describe(script);
+        String path = script.getAbsolutePath();
+        String stamp = stamp(script);
+        CachedTool cached = cache.get(path);
+        if (cached != null && cached.stamp.equals(stamp)) {
+            return cached.method;
+        }
+        ToolMethod method = parse(describe(script), script);
+        if (method != null) {
+            cache.put(path, new CachedTool(stamp, method));
+        }
+        return method;
+    }
+
+    /**
+     * 解析 {@code --describe} 输出为工具方法定义；无输出或输出非法时返回 null。
+     */
+    private ToolMethod parse(String stdout, File script) {
         if (stdout == null || stdout.trim().isEmpty()) {
             return null;
         }
@@ -59,6 +82,27 @@ public final class ScriptToolLoader {
             return null;
         } catch (IllegalArgumentException e) {
             return null;
+        }
+    }
+
+    /**
+     * 文件签名（修改时间:大小），用于判断脚本是否改动并决定是否复用缓存。
+     */
+    private static String stamp(File file) {
+        return file.lastModified() + ":" + file.length();
+    }
+
+    /**
+     * 脚本声明缓存项：文件签名与解析结果。
+     */
+    private static final class CachedTool {
+
+        private final String stamp;
+        private final ToolMethod method;
+
+        private CachedTool(String stamp, ToolMethod method) {
+            this.stamp = stamp;
+            this.method = method;
         }
     }
 

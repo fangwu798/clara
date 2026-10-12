@@ -1,6 +1,11 @@
 import json
+import os
 import sys
 import urllib.request
+
+# 工具脚本按用途分目录存放，共享辅助模块位于 scripts 根目录，故先把 scripts 根加入模块搜索路径。
+SCRIPTS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, SCRIPTS_ROOT)
 
 import _textio
 import _toolmeta

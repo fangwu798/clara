@@ -1,0 +1,17 @@
+workflowId: image_understanding
+version: "1.0.0"
+# 对外只回传图片理解结果。
+outputs: [description]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    # 图片识别（图 → 文）：把输入中的图片引用作为多模态消息随文本一起下发给对话模型（CHAT 能力）。
+    # 调用方需在输入中提供 image：公网可访问的图片 URL，或 data:image/<格式>;base64,<编码>；
+    # 所选 CHAT 模型需具备视觉能力（如 openai.yml 的 CHAT 指向多模态模型）。
+    - id: describe
+      type: AGENT
+      outputKeys: [description]
+      prompt: image_describer
+      attachments:
+        - "${image}"

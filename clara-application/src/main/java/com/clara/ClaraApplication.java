@@ -1,13 +1,14 @@
 package com.clara;
 
+import com.clara.adapter.console.CancelKeyMonitor;
 import com.clara.adapter.console.ConsoleView;
 import com.clara.adapter.console.LaunchOptions;
 import com.clara.adapter.console.SessionCommandHandler;
 import com.clara.config.ConfigLocator;
+import com.clara.context.CancellationToken;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.session.ModelSession;
@@ -19,7 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 交互式对话入口：从 {@code config/model-providers} 选择模型（可多平台 / 多调用方式），装配各模块后逐行对话。
@@ -42,7 +42,11 @@ import java.util.UUID;
  *
  * <p>使用方法：主（默认）模型由 {@code config/clara.yml} 的 {@code defaultModel} 指定；未配置或未匹配到时，
  * 若存在多个模型配置会列出编号供选择，也可用首个命令行参数直接指定配置文件。进入对话后逐行输入回车发送，
- * {@code /model} 重新选择模型，{@code /log} 切换日志模式，{@code /color} 开关颜色，{@code exit} / {@code quit} 结束。
+ * {@code /model} 重新选择模型，{@code /log} 切换日志模式，{@code /color} 开关颜色，{@code exit} / {@code quit} 结束；
+ * 一轮执行过程中按 ESC 两次可取消本轮正在进行的模型调用与工具执行（首次 ESC 仅提示，避开误触）。
+ *
+ * <p>会话标识由工作目录推导，对话历史落盘在工作目录下的 {@code .clara/state/conversations}，因此<b>退出后
+ * 再次进入同一目录会续接上次的上下文</b>；换目录即换上下文，删除该目录即清空历史。
  *
  * <p>详细日志：{@link ConsoleView} 会把<b>完整</b>交互写入仓库根 {@code logs/clara-<时间戳>.log}，与显示模式无关。
  */
@@ -58,14 +62,16 @@ public final class ClaraApplication {
      * @throws Exception 输出流初始化失败时
      */
     public static void main(String[] args) throws Exception {
-        conversationId = UUID.randomUUID().toString();
+        // 会话标识由工作目录推导：同一目录再次进入即续接上次的对话历史（历史落盘位置见启动横幅）。
+        conversationId = ConfigLocator.cliSessionId();
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         LaunchOptions options = LaunchOptions.parse(args);
 
-        try (ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(), options.forcedColor())) {
+        try (ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(), options.forcedColor());
+                CancelKeyMonitor monitor = CancelKeyMonitor.create(view)) {
             List<Path> candidates = ConfigLocator.modelConfigs();
             ModelChoice choice = selectModelConfig(view, reader, options, candidates);
-            runSession(view, reader, candidates, choice);
+            runSession(view, reader, candidates, choice, monitor);
         }
     }
 
@@ -76,17 +82,23 @@ public final class ClaraApplication {
      * @param reader     标准输入读取器，非 null
      * @param candidates 候选模型配置，非 null
      * @param choice     选中的模型配置与来源，非 null
+     * @param monitor    ESC 取消监听器，非 null
      * @throws IOException 读取标准输入失败时
      */
-    private static void runSession(ConsoleView view, BufferedReader reader, List<Path> candidates, ModelChoice choice) throws IOException {
-        ProviderConfiguration initial = new ProviderYamlConfigurationLoader().load(choice.configPath());
-        try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(); ModelSession session = new ModelSession(bootstrap, candidates, initial, choice.configPath())) {
-            bootstrap.workflowModelContext().use(initial, initial.toConfig(CapabilityKindEnum.CHAT).getModelId());
+    private static void runSession(ConsoleView view, BufferedReader reader, List<Path> candidates, ModelChoice choice,
+                                   CancelKeyMonitor monitor) throws IOException {
+        try (ApplicationBootstrap bootstrap = new ApplicationBootstrap();
+                ModelSession session = new ModelSession(bootstrap.modelRegistry(), candidates, choice.configPath())) {
             SessionCommandHandler commands = new SessionCommandHandler(view, reader, session);
 
             view.printBanner(bootstrap, session.providerConfig(), choice.configPath(), choice.source());
+            view.emit("  sessionId      : " + conversationId
+                    + "（由工作目录生成，同一目录再次进入续接同一份历史）");
             view.printHints();
-            loop(view, reader, bootstrap, session, commands);
+            if (monitor.isAvailable()) {
+                view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
+            }
+            loop(view, reader, bootstrap, session, commands, monitor);
         } catch (RuntimeException startupFailure) {
             view.println("启动失败：" + startupFailure.getClass().getSimpleName() + ": " + startupFailure.getMessage());
             view.println("请确认：1) 所选模型配置存在且合法（当前 " + choice.configPath().toAbsolutePath() + "）；"
@@ -103,9 +115,10 @@ public final class ClaraApplication {
      * @param bootstrap 已装配的引导器，非 null
      * @param session   会话级模型状态，非 null
      * @param commands  会话内指令处理器，非 null
+     * @param monitor   ESC 取消监听器，非 null
      * @throws IOException 读取标准输入失败时
      */
-    private static void loop(ConsoleView view, BufferedReader reader, ApplicationBootstrap bootstrap, ModelSession session, SessionCommandHandler commands) throws IOException {
+    private static void loop(ConsoleView view, BufferedReader reader, ApplicationBootstrap bootstrap, ModelSession session, SessionCommandHandler commands, CancelKeyMonitor monitor) throws IOException {
         String line;
         while ((line = reader.readLine()) != null) {
             String input = line.trim();
@@ -118,7 +131,7 @@ public final class ClaraApplication {
             }
             if (outcome == SessionCommandHandler.Outcome.INPUT) {
                 view.logUserInput(input);
-                converse(view, bootstrap, session.providerConfig(), input);
+                converse(view, bootstrap, session.providerConfig(), input, monitor);
             }
         }
     }
@@ -184,11 +197,15 @@ public final class ClaraApplication {
      * @param bootstrap      已装配的引导器，非 null
      * @param providerConfig 当前模型配置，非 null
      * @param input          用户输入，非空白
+     * @param monitor        ESC 取消监听器，非 null
      */
-    private static void converse(ConsoleView view, ApplicationBootstrap bootstrap, ProviderConfiguration providerConfig, String input) {
+    private static void converse(ConsoleView view, ApplicationBootstrap bootstrap, ProviderConfiguration providerConfig, String input, CancelKeyMonitor monitor) {
         long started = System.currentTimeMillis();
-        try {
-            ConsoleView.ConsoleStreamObserver observer = view.newObserver();
+        // 本轮取消令牌：交给监听器置位，随请求下发给编排层，进而让模型调用与脚本工具在检查点终止。
+        CancellationToken cancellationToken = new CancellationToken();
+        try (CancelKeyMonitor.Session ignored = monitor.watch(cancellationToken)) {
+            // 传入工具用途解析器：调用工具时在日志里附一句「这次调用是为了什么」（结合本次入参推导）。
+            ConsoleView.ConsoleStreamObserver observer = view.newObserver(bootstrap::describeToolInvocation);
             ConversationResult result = bootstrap.orchestrator().converse(ConversationRequest.builder()
                     .conversationId(conversationId)
                     .provider(providerConfig.getProvider())
@@ -198,6 +215,7 @@ public final class ClaraApplication {
                     .providerConfiguration(providerConfig)
                     .stream(true)
                     .observer(observer)
+                    .cancellationToken(cancellationToken)
                     .build());
             // 思考与正文已实时流式展示，这里只把完整记录补写进详细日志文件（控制台不重复打印）。
             view.logTurn(result);

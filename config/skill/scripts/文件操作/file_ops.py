@@ -3,6 +3,10 @@ import json
 import os
 import sys
 
+# 工具脚本按用途分目录存放，共享辅助模块位于 scripts 根目录，故先把 scripts 根加入模块搜索路径。
+SCRIPTS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, SCRIPTS_ROOT)
+
 import _textio
 import _toolmeta
 
@@ -44,9 +48,8 @@ if _toolmeta.describe(_TOOL):
 # 写入文件时的默认编码：入参 encoding 未指定时按 UTF-8 写；读取时则自动识别（见 _textio.decode）。
 DEFAULT_ENCODING = _textio.DEFAULT_ENCODING
 
-# 仓库根：本脚本位于 <repo>/config/skill/scripts/file_ops.py，故上溯三级即仓库根。
-HERE = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
+# 仓库根：scripts 根（见文件头部 SCRIPTS_ROOT）上溯三级即仓库根。
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPTS_ROOT, "..", "..", ".."))
 
 # 工作根：启动脚本 run.bat / run.sh 会把「用户执行命令时所在目录」写入环境变量 CLARA_WORK_DIR，
 # 该目录即本轮要分析的项目目录；相对 base_dir 与默认 base 都相对它解析。未设置时退回仓库根，

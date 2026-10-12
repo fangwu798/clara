@@ -28,6 +28,9 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
     private static final long CANCEL_POLL_MILLIS = 100L;
     private static final long STREAM_JOIN_MILLIS = 2000L;
 
+    /** 脚本标准错误回显前缀：标识该行来自脚本子进程的执行过程日志。 */
+    private static final String SCRIPT_LOG_PREFIX = "[tool] ";
+
     @Override
     public final String execute(ScriptExecutionSpec spec) {
         if (spec == null) {
@@ -68,7 +71,7 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
             forceUtf8Environment(builder);
             process = builder.start();
             stdoutThread = drain(process.getInputStream(), stdout);
-            stderrThread = drain(process.getErrorStream(), stderr);
+            stderrThread = drainEchoing(process.getErrorStream(), stderr);
             writeStdin(process, spec.getArgumentsJson());
             int exit = await(process, spec);
             join(stdoutThread);
@@ -134,16 +137,57 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
      * 在后台线程中排空输出流，避免进程因管道缓冲写满而死锁。
      */
     private Thread drain(InputStream in, final StringBuilder target) {
+        return startDrain(in, new StreamConsumer() {
+            @Override
+            public void consume(char[] buffer, int length, StringBuilder pending) {
+                target.append(buffer, 0, length);
+            }
+        });
+    }
+
+    /**
+     * 排空标准错误：既累积全文用于失败定位，又逐行回显到 {@code System.out}。
+     *
+     * <p>回显使工具执行过程（如 run_command 执行的外部命令输出）实时进入控制台与
+     * {@code logs} 下的运行日志，而非只在结束后一次性返回。stdout 是脚本结果的 JSON 通道，不回显。
+     */
+    private Thread drainEchoing(InputStream in, final StringBuilder target) {
+        return startDrain(in, new StreamConsumer() {
+            @Override
+            public void consume(char[] buffer, int length, StringBuilder pending) {
+                target.append(buffer, 0, length);
+                for (int index = 0; index < length; index++) {
+                    char current = buffer[index];
+                    if (current == '\n') {
+                        echo(pending);
+                    } else if (current != '\r') {
+                        pending.append(current);
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * 启动排空线程：把标准流按 UTF-8 解码后逐块交给消费者的行处理逻辑。
+     *
+     * @param in         子进程输出流
+     * @param consumer   分块消费者，负责累积并以换行为界处理行
+     * @return 后台守护线程
+     */
+    private Thread startDrain(final InputStream in, final StreamConsumer consumer) {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
+                    StringBuilder pending = new StringBuilder();
                     char[] buffer = new char[1024];
                     int read;
                     while ((read = reader.read(buffer)) != -1) {
-                        target.append(buffer, 0, read);
+                        consumer.consume(buffer, read, pending);
                     }
+                    echo(pending);
                     reader.close();
                 } catch (IOException ignored) {
                 }
@@ -152,6 +196,31 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
         thread.setDaemon(true);
         thread.start();
         return thread;
+    }
+
+    /**
+     * 回显一整行到 {@code System.out}（已接入控制台与运行日志的合流），并清空行缓冲。
+     */
+    private static void echo(StringBuilder pending) {
+        if (pending.length() > 0) {
+            System.out.println(SCRIPT_LOG_PREFIX + pending);
+        }
+        pending.setLength(0);
+    }
+
+    /**
+     * 标准输出的分块消费者：负责把读入字符累积到目标缓冲，并按需以换行为界处理行。
+     */
+    private interface StreamConsumer {
+
+        /**
+         * 消费本次读入的字符。
+         *
+         * @param buffer  读入缓冲，非 null
+         * @param length  本次有效字符数
+         * @param pending 行缓冲，跨块续接，非 null
+         */
+        void consume(char[] buffer, int length, StringBuilder pending);
     }
 
     /**

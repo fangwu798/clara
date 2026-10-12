@@ -1,5 +1,6 @@
 package com.clara.orchestration.api;
 
+import com.clara.context.CancellationToken;
 import com.clara.dto.memory.ContextControlConfig;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
@@ -21,6 +22,7 @@ public class ConversationRequestTest {
     public void builderPopulatesAllFields() {
         ContextControlConfig control = ContextControlConfig.defaults();
         IStreamObserver observer = event -> { };
+        CancellationToken cancellationToken = new CancellationToken();
 
         ConversationRequest request = ConversationRequest.builder()
                 .userId("u1")
@@ -33,6 +35,7 @@ public class ConversationRequestTest {
                 .stream(true)
                 .observer(observer)
                 .maxToolRoundTrips(5)
+                .cancellationToken(cancellationToken)
                 .build();
 
         assertEquals("u1", request.getUserId());
@@ -45,6 +48,7 @@ public class ConversationRequestTest {
         assertTrue(request.isStream());
         assertSame(observer, request.getObserver());
         assertEquals(5, request.getMaxToolRoundTrips());
+        assertSame(cancellationToken, request.getCancellationToken());
     }
 
     @Test
@@ -61,5 +65,6 @@ public class ConversationRequestTest {
         assertNull(request.getObserver());
         assertFalse(request.isStream());
         assertEquals(0, request.getMaxToolRoundTrips());
+        assertNull(request.getCancellationToken());
     }
 }

@@ -1,5 +1,6 @@
 package com.clara;
 
+import com.clara.config.ConfigLocator;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.memory.ITokenCountEstimator;
@@ -8,6 +9,7 @@ import com.clara.core.skill.IPromptProvider;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowEngine;
+import com.clara.dto.skill.ToolMethod;
 import com.clara.kernel.api.IStreamModel;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
 import com.clara.mcp.client.gateway.DefaultMcpGateway;
@@ -27,8 +29,10 @@ import com.clara.mcp.registry.config.McpServerConfigLoader;
 import com.clara.mcp.registry.config.McpServerRegistrar;
 import com.clara.mcp.client.McpClientFactory;
 import com.clara.mcp.transport.JacksonMcpJsonCodec;
+import com.clara.media.runtime.MediaRuntime;
 import com.clara.memory.persistence.ConversationStore;
 import com.clara.memory.persistence.InMemoryConversationStore;
+import com.clara.memory.persistence.local.LocalConversationStore;
 import com.clara.memory.semantic.local.LocalSemanticMemoryStore;
 import com.clara.memory.summarize.DefaultSummarizeCoordinator;
 import com.clara.memory.window.DefaultWindowMemory;
@@ -44,6 +48,7 @@ import com.clara.orchestration.record.CallRecordPublisher;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
 import com.clara.record.InMemoryCallRecordSink;
+import com.clara.session.ModelRegistry;
 import com.clara.skill.executor.SkillPermissionAuthorizer;
 import com.clara.skill.executor.SkillSchemaValidator;
 import com.clara.skill.prompt.DefaultPromptProvider;
@@ -57,9 +62,10 @@ import com.clara.skill.tool.builtin.BuiltinToolExecutor;
 import com.clara.tool.CompositeToolInvoker;
 import com.clara.tool.ExternalToolCatalog;
 import com.clara.tool.McpExternalToolRegistrar;
+import com.clara.tool.ToolInvocationPurpose;
 import com.clara.workflow.application.AgentActionFactory;
+import com.clara.workflow.application.ReviewActionFactory;
 import com.clara.workflow.application.ToolActionFactory;
-import com.clara.workflow.application.WorkflowModelContext;
 import com.clara.workflow.application.WorkflowRunTool;
 import com.clara.workflow.application.WorkflowRunner;
 import com.clara.workflow.checkpoint.InMemoryCheckpointStore;
@@ -96,8 +102,16 @@ import java.util.List;
  * <p>工作流配置化：工作流定义从 {@code config/workflow} 下的 YAML 加载（见 {@link WorkflowDefinitionRegistry}），
  * AGENT / TOOL 节点动作由 {@code AgentActionFactory} / {@code ToolActionFactory} 生成；内置工具
  * {@code run_workflow} 经 {@link WorkflowRunTool} 暴露给模型，据此以自然语言触发工作流（如读取本地目录代码
- * 并整理技术文档）。AGENT 节点所需的平台配置为会话级，由宿主在加载模型配置后经 {@link #workflowModelContext()}
- * 注入。
+ * 并整理技术文档）。AGENT 节点所需的平台配置为会话级，由宿主在加载模型配置后经 {@link #modelRegistry()}
+ * 绑定默认模型（节点可再按 {@code role} / {@code model} 指定各自的模型）。
+ *
+ * <p>媒体能力：{@link MediaRuntime} 惰性提供媒体存储（图片产物落成可引用资产）与异步媒体任务调度器，
+ * 未使用时不产生任何文件或锁；AGENT 节点声明 {@code capability: IMAGE} 时会把生成的图片落成资产。
+ *
+ * <p>对话历史：窗口记忆由工作目录下的本地文件存储承载（{@code <工作目录>/.clara/state/conversations}，见
+ * {@link LocalConversationStore}），因此「同一目录再次进入」能续接上次的上下文；存储同样惰性创建，且目录被
+ * 占用或不可写时降级为进程内存储（对话照常，只是重启后不保留）。是否落盘可用
+ * {@link #conversationHistoryDescription()} 查看。
  *
  * <p>调用记录：{@code ICallRecordSink} 由进程内实现 {@link InMemoryCallRecordSink} 提供，保留最近若干条
  * 记录供上层读取；{@code IWorkflowDefinitionResolver} 本阶段未接入，以 null 注入，编排层已做降级（不影响
@@ -105,8 +119,9 @@ import java.util.List;
  * {@link #externalToolCatalog()} 登记外部工具；也可由 {@link #loadMcpServers(String, Path)} 完成
  * 「配置加载 → 注册服务端 → 发现能力 → 登记外部工具」的一站式接入。
  *
- * <p>生命周期：构造本身不访问网络（仅装配各组件，MCP 服务端连接推迟到显式调用 {@link #loadMcpServers}）；
- * {@link #close()} 释放会话存储、语义记忆存储与工作流引擎，无状态组件（模型、估算器）自然随之释放。
+ * <p>生命周期：构造本身不访问网络（仅装配各组件，MCP 服务端连接推迟到显式调用 {@link #loadMcpServers}），
+ * 也不创建对话历史目录 / 不取历史文件锁（首次真正读写历史时才创建）；{@link #close()} 释放会话存储、
+ * 语义记忆存储与工作流引擎，无状态组件（模型、估算器）自然随之释放。
  */
 public final class ApplicationBootstrap implements Closeable {
 
@@ -119,6 +134,11 @@ public final class ApplicationBootstrap implements Closeable {
      * 供应商缺省标识：窗口记忆要求供应商非 null，未指定时以此占位。
      */
     private static final String DEFAULT_PROVIDER = "default";
+
+    /**
+     * 本地工作区标识：媒体资产与任务存储在本地单机部署下的工作区维度标识。
+     */
+    private static final String WORKSPACE_ID = "local";
 
     /**
      * MCP 客户端单次请求超时（毫秒）：装配期给出的默认值，随宿主登记服务端后生效。
@@ -148,7 +168,10 @@ public final class ApplicationBootstrap implements Closeable {
 
     private final IEmbeddingClient embeddingClient;
     private final ISemanticMemoryStore semanticMemoryStore;
-    private final ConversationStore conversationStore;
+    /**
+     * 对话历史存储；首次真正需要读写历史时才创建，见 {@link #conversationStore()}。
+     */
+    private ConversationStore conversationStore;
     private final ITokenCountEstimator tokenCountEstimator;
     private final SkillRegistry skillRegistry;
     private final McpServerRegistry mcpServerRegistry;
@@ -159,7 +182,8 @@ public final class ApplicationBootstrap implements Closeable {
     private final McpExternalToolRegistrar mcpExternalToolRegistrar;
     private final ExternalToolCatalog externalToolCatalog;
     private final IWorkflowEngine workflowEngine;
-    private final WorkflowModelContext workflowModelContext;
+    private final ModelRegistry modelRegistry;
+    private final MediaRuntime mediaRuntime;
     private final WorkflowDefinitionRegistry workflowDefinitionRegistry;
     private final WorkflowRunner workflowRunner;
     private final DefaultConversationOrchestrator orchestrator;
@@ -167,8 +191,8 @@ public final class ApplicationBootstrap implements Closeable {
     private final InMemoryCallRecordSink callRecordSink;
 
     /**
-     * 使用默认配置装配：离线哈希嵌入（{@link HashingEmbeddingClient}）、进程内会话与语义存储、
-     * tiktoken 估算器、内存检查点工作流引擎。
+     * 使用默认配置装配：离线哈希嵌入（{@link HashingEmbeddingClient}）、工作目录下的本地对话历史存储、
+     * 进程内语义存储、tiktoken 估算器、内存检查点工作流引擎。
      */
     public ApplicationBootstrap() {
         this(new HashingEmbeddingClient(EMBEDDING_DIMENSION), EMBEDDING_DIMENSION);
@@ -210,7 +234,6 @@ public final class ApplicationBootstrap implements Closeable {
         this.embeddingClient = embeddingClient;
         this.mcpClientFactory = mcpClientFactory;
         this.semanticMemoryStore = new LocalSemanticMemoryStore(embeddingDimension);
-        this.conversationStore = new InMemoryConversationStore();
         this.tokenCountEstimator = new TiktokenTokenCountEstimator(TiktokenTokenCountEstimator.DEFAULT_ENCODING);
 
         // clara-model：统一的模型调用入口（传输实现无状态、可全局共享）
@@ -253,7 +276,7 @@ public final class ApplicationBootstrap implements Closeable {
         DefaultConversationOrchestrator.WindowMemoryFactory windowMemoryFactory =
                 (conversationId, provider, model) -> {
                     String effectiveProvider = provider == null ? DEFAULT_PROVIDER : provider;
-                    return new DefaultWindowMemory(conversationId, effectiveProvider, model, conversationStore);
+                    return new DefaultWindowMemory(conversationId, effectiveProvider, model, conversationStore());
                 };
 
         this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler, capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator);
@@ -264,10 +287,12 @@ public final class ApplicationBootstrap implements Closeable {
         // clara-workflow：默认内存检查点工作流引擎；IWorkflowDefinitionResolver 本阶段未接入
         this.workflowEngine = new DefaultWorkflowEngine(new InMemoryCheckpointStore(), 4);
 
-        // 工作流配置化装配：模型上下文 + 动作工厂 → 定义目录加载 → 定义注册表 → 运行器 → 内置工具
-        this.workflowModelContext = new WorkflowModelContext();
+        // 工作流配置化装配：模型绑定注册表 + 媒体运行时 + 动作工厂 → 定义目录加载 → 定义注册表 → 运行器 → 内置工具
+        this.modelRegistry = new ModelRegistry(ConfigLocator.modelConfigs(), ConfigLocator.roleBindings());
+        this.mediaRuntime = new MediaRuntime(ConfigLocator.workspaceRoot(), WORKSPACE_ID);
         List<IWorkflowActionFactory> actionFactories = Arrays.asList(
-                new AgentActionFactory(orchestrator, promptProvider, workflowModelContext),
+                new AgentActionFactory(orchestrator, promptProvider, modelRegistry, mediaRuntime),
+                new ReviewActionFactory(orchestrator, promptProvider, modelRegistry),
                 new ToolActionFactory(toolInvoker));
         this.workflowDefinitionRegistry = new WorkflowDefinitionRegistry(DEFAULT_WORKFLOW_DIRECTORY, new WorkflowDefinitionLoader(actionFactories));
         // 目录不存在时不加载、不报错
@@ -305,6 +330,41 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     /**
+     * 对话历史的存放说明，用于启动横幅：确认历史是否落盘、落在哪里。
+     *
+     * <p>调用它即触发历史存储的创建（见 {@link #conversationStore()}），因此启动横幅上就能看到「历史能否
+     * 持久化」，而不是等第一次对话失败才发现目录被占用。
+     *
+     * @return 一行说明，非 null
+     */
+    public String conversationHistoryDescription() {
+        if (conversationStore() instanceof LocalConversationStore) {
+            return "本地持久化 " + ConfigLocator.workspaceRoot()
+                    .resolve(".clara").resolve("state").resolve("conversations")
+                    + "（同一目录再次进入可续接，删除该目录即清空）";
+        }
+        return "仅进程内（退出即丢失）";
+    }
+
+    /**
+     * 推导一次工具调用的用途说明，供控制台在「调用工具」日志里简要说明本次调用目的。
+     *
+     * <p>工具声明里的描述只能说明「这个工具是干什么的」，同一声明覆盖多种用法（如 {@code run_command} 既可编译
+     * 也可查看 Git 状态），故这里结合本次入参推导「这次调用是为了什么」，规则见
+     * {@link ToolInvocationPurpose}；描述随 {@link SkillRegistry} 的热加载而刷新。
+     *
+     * @param toolName      工具名，可为 null
+     * @param argumentsJson 本次调用的入参 JSON，可为 null
+     * @return 一句用途说明；无可展示内容时返回 null
+     */
+    public String describeToolInvocation(String toolName, String argumentsJson) {
+        ToolMethod method = toolName == null || toolName.trim().isEmpty()
+                ? null : skillRegistry.findToolByName(toolName.trim());
+        String declared = method == null ? null : method.getDescription();
+        return ToolInvocationPurpose.describe(toolName, argumentsJson, declared);
+    }
+
+    /**
      * 返回装配好的工作流引擎。
      *
      * @return 工作流引擎，非 null
@@ -332,12 +392,21 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     /**
-     * 返回工作流模型上下文，宿主在加载 / 切换模型配置后据此为 AGENT 节点绑定平台配置。
+     * 返回模型绑定注册表，宿主据此把默认模型（及可选角色）绑定给工作流 AGENT 节点。
      *
-     * @return 工作流模型上下文，非 null
+     * @return 模型绑定注册表，非 null
      */
-    public WorkflowModelContext workflowModelContext() {
-        return workflowModelContext;
+    public ModelRegistry modelRegistry() {
+        return modelRegistry;
+    }
+
+    /**
+     * 返回媒体运行时，宿主据此获取媒体存储（图片产物资产化）与异步媒体任务调度器。
+     *
+     * @return 媒体运行时，非 null
+     */
+    public MediaRuntime mediaRuntime() {
+        return mediaRuntime;
     }
 
     /**
@@ -467,11 +536,45 @@ public final class ApplicationBootstrap implements Closeable {
                 Paths.get("").toAbsolutePath(), null, MCP_REQUEST_TIMEOUT_MILLIS);
     }
 
+    /**
+     * 取对话历史存储，首次调用时才创建。
+     *
+     * <p>为什么惰性：「只装配、不对话」的场景（单元测试、仅做配置检查）不该在工作目录下生成 {@code .clara}
+     * 目录、更不该抢占历史文件锁，否则同机运行第二个实例会互相干扰。
+     *
+     * @return 对话历史存储，非 null
+     */
+    private synchronized ConversationStore conversationStore() {
+        if (conversationStore == null) {
+            conversationStore = createConversationStore();
+        }
+        return conversationStore;
+    }
+
+    /**
+     * 创建对话历史存储：优先用工作目录下的本地文件存储；目录被其他实例占用或不可写时降级为进程内存储。
+     *
+     * <p>降级只影响「重启后能否续接历史」，不阻断对话，故提示一次后继续。
+     */
+    private static ConversationStore createConversationStore() {
+        try {
+            return new LocalConversationStore(ConfigLocator.workspaceRoot());
+        } catch (RuntimeException unavailable) {
+            System.err.println("[memory] 本地对话历史不可用，本次运行的历史不会保留："
+                    + unavailable.getMessage());
+            return new InMemoryConversationStore();
+        }
+    }
+
     @Override
     public void close() {
+        closeQuietly(mediaRuntime);
+        closeQuietly(modelRegistry);
         closeQuietly(workflowEngine);
         closeQuietly(semanticMemoryStore);
-        conversationStore.close();
+        if (conversationStore != null) {
+            conversationStore.close();
+        }
     }
 
     private static void closeQuietly(Closeable closeable) {

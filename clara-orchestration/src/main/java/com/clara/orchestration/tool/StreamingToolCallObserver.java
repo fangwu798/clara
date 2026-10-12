@@ -3,6 +3,8 @@ package com.clara.orchestration.tool;
 import com.clara.core.model.IResponse;
 import com.clara.dto.model.StreamEvent;
 import com.clara.dto.tool.ToolCall;
+import com.clara.dto.tool.ToolCallFunction;
+import com.clara.enums.StreamEventEnum;
 import com.clara.kernel.stream.IStreamObserver;
 import com.clara.model.stream.RecordingObserver;
 
@@ -18,6 +20,10 @@ import java.util.List;
  * <p>为什么需要：OpenAI 兼容协议在流式下把工具调用拆成分片下发，响应对象不会自动累加工具调用；
  * 若不拼装，编排层会读不到工具调用，从而把工具轮误判为最终答复。这里复用
  * {@link RecordingObserver} 的拼装逻辑，在流结束后把结果交给编排层补齐到响应上。
+ *
+ * <p>另外，流结束时（{@code RESPONSE_COMPLETE}）会把每个拼装完成的调用以 {@code TOOL_CALL_COMPLETE}
+ * 补发给宿主观察者：增量分片本身不构成完整调用，只有此时宿主才能同时拿到工具名与完整入参（用于展示
+ * 「调用工具 + 本次调用的用途」）。补发发生在工具执行之前，因此提示先于执行出现。
  *
  * <p>线程安全：{@code onEvent} 在流的读取线程上回调，{@link #toolCalls()} 在流结束后由编排线程读取；
  * 读取发生在句柄进入终态之后（此时增量事件已全部回调完成），因此是安全的。
@@ -40,9 +46,13 @@ public final class StreamingToolCallObserver implements IStreamObserver {
     @Override
     public void onEvent(StreamEvent event) {
         recorder.onEvent(event);
-        if (delegate != null) {
-            delegate.onEvent(event);
+        if (delegate == null) {
+            return;
         }
+        if (event.getType() == StreamEventEnum.RESPONSE_COMPLETE) {
+            notifyAssembledToolCalls(event.getSequence());
+        }
+        delegate.onEvent(event);
     }
 
     /**
@@ -52,5 +62,20 @@ public final class StreamingToolCallObserver implements IStreamObserver {
      */
     public List<ToolCall> toolCalls() {
         return recorder.toolCalls();
+    }
+
+    /**
+     * 把拼装完成的工具调用以 {@code TOOL_CALL_COMPLETE} 事件补发给宿主观察者。
+     *
+     * @param sequence 终态事件的序号，补发事件沿用该序号
+     */
+    private void notifyAssembledToolCalls(long sequence) {
+        List<ToolCall> calls = recorder.toolCalls();
+        for (ToolCall call : calls) {
+            ToolCallFunction function = call.getFunction();
+            delegate.onEvent(new StreamEvent(StreamEventEnum.TOOL_CALL_COMPLETE, sequence,
+                    function == null ? null : function.getArguments(),
+                    call.getId(), function == null ? null : function.getName(), null, null));
+        }
     }
 }

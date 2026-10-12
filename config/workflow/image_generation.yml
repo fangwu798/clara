@@ -1,0 +1,18 @@
+workflowId: image_generation
+version: "1.0.0"
+# 对外只回传图片资产引用（assetId / storageUri 等），避免把 base64 图片数据整体回灌给对话模型。
+outputs: [image]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    # 文生图：以 openai.yml 的 IMAGE 能力（gpt-image-1）生成图片，产物落成媒体资产后写回作用域。
+    # 调用方需在输入中提供 subject；需已设置 CLARA_OPENAI_API_KEY。
+    - id: draw
+      type: AGENT
+      outputKeys: [image]
+      model: openai
+      capability: IMAGE
+      prompt: image_generator
+      promptVars:
+        subject: "${subject}"

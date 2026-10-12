@@ -1,0 +1,22 @@
+workflowId: image_edit
+version: "1.0.0"
+# 对外只回传图片资产引用。
+outputs: [image]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    # 图生图：以参考图 + 编辑指令生成新图，产物落成媒体资产后写回作用域。
+    # 调用方需提供 reference（公网图片 URL 或 data:image/<格式>;base64,<编码>）与 instruction（编辑要求）。
+    # 注意：参考图（image 字段）目前只为 VOLCENGINE 声明适配，故模型别名为 volcengine-response；
+    # 所选图片模型需支持参考图（见配置的 maxSourceImages）。
+    - id: edit
+      type: AGENT
+      outputKeys: [image]
+      model: volcengine-response
+      capability: IMAGE
+      prompt: image_editor
+      promptVars:
+        instruction: "${instruction}"
+      attachments:
+        - "${reference}"

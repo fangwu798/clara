@@ -5,10 +5,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -36,6 +40,11 @@ public final class ConfigLocator {
      * 配置根目录（相对运行目录），用于推导仓库根与日志目录。
      */
     private static final Path CONFIG_DIRECTORY = Paths.get("config");
+
+    /**
+     * 角色 → 模型别名映射文件（相对运行目录），可选。
+     */
+    private static final Path MODEL_ROLES = Paths.get("config", "model-roles.yml");
 
     /**
      * 主模型配置键名。
@@ -112,12 +121,7 @@ public final class ConfigLocator {
                 if (colon <= 0 || !DEFAULT_MODEL_KEY.equals(line.substring(0, colon).trim())) {
                     continue;
                 }
-                String value = line.substring(colon + 1).trim();
-                if (value.length() >= 2
-                        && ((value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"')
-                        || (value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\''))) {
-                    value = value.substring(1, value.length() - 1).trim();
-                }
+                String value = unquote(line.substring(colon + 1).trim());
                 return value.isEmpty() ? null : value;
             }
         } catch (IOException ignored) {
@@ -210,6 +214,93 @@ public final class ConfigLocator {
     }
 
     /**
+     * 工作区根目录：优先取启动脚本注入的 {@code CLARA_WORK_DIR}，未注入时退回进程当前工作目录。
+     *
+     * @return 已规范化的绝对路径，非 null
+     */
+    public static Path workspaceRoot() {
+        String configured = System.getenv("CLARA_WORK_DIR");
+        if (configured != null && !configured.trim().isEmpty()) {
+            return Paths.get(configured.trim()).toAbsolutePath().normalize();
+        }
+        return Paths.get("").toAbsolutePath().normalize();
+    }
+
+    /**
+     * 由工作目录推导的稳定会话标识，使「同一目录再次进入」能续接同一份对话历史。
+     *
+     * <p>形如 {@code cli-<工作目录绝对路径的 sha256 前 16 位>}：同一目录恒定、不同目录互不干扰，且不含路径
+     * 明文（不会出现在日志与历史文件名里）；换目录即换上下文，删掉工作目录下的 {@code .clara/state/conversations}
+     * 即清空历史。
+     *
+     * @return 会话标识，非 null
+     */
+    public static String cliSessionId() {
+        return "cli-" + sha256(workspaceRoot().toString()).substring(0, 16);
+    }
+
+    /**
+     * 读取角色 → 模型别名映射（{@code config/model-roles.yml}）。
+     *
+     * <p>格式：每行 {@code role: modelAlias}，忽略空行与以 {@code #} 开头的注释行；值两端引号会被去掉。
+     * 文件缺失、读取失败或行内缺少冒号时忽略该项；不配置时返回空映射，此时角色名直接作为模型别名使用。
+     *
+     * @return 角色到别名的映射，非 null（可为空）
+     */
+    public static Map<String, String> roleBindings() {
+        Path file = locateFile(MODEL_ROLES);
+        Map<String, String> bindings = new LinkedHashMap<String, String>();
+        if (!Files.isRegularFile(file)) {
+            return bindings;
+        }
+        try {
+            for (String raw : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+                String line = raw.trim();
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                int colon = line.indexOf(':');
+                if (colon <= 0) {
+                    continue;
+                }
+                String role = line.substring(0, colon).trim();
+                String alias = unquote(line.substring(colon + 1).trim());
+                if (!role.isEmpty() && !alias.isEmpty()) {
+                    bindings.put(role, alias);
+                }
+            }
+        } catch (IOException ignored) {
+            // 读取失败视为未配置
+        }
+        return bindings;
+    }
+
+    /**
+     * 由模型配置路径推导模型别名（文件名去掉 {@code yml} / {@code yaml} 扩展名）。
+     *
+     * @param configPath 模型配置文件路径，可为 null
+     * @return 模型别名；入参为 null 时返回 null
+     */
+    public static String aliasOf(Path configPath) {
+        if (configPath == null || configPath.getFileName() == null) {
+            return null;
+        }
+        return stem(configPath.getFileName().toString());
+    }
+
+    /**
+     * 去掉值两端的成对单 / 双引号。
+     */
+    private static String unquote(String value) {
+        if (value.length() >= 2
+                && ((value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"')
+                || (value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\''))) {
+            return value.substring(1, value.length() - 1).trim();
+        }
+        return value;
+    }
+
+    /**
      * 判断是否为可用的模型配置：扩展名为 yml/yaml，且不在 examples 目录、文件名不含 {@code .example.}。
      */
     private static boolean isModelConfig(Path path) {
@@ -222,6 +313,23 @@ public final class ConfigLocator {
         }
         String normalized = path.toString().replace('\\', '/').toLowerCase(Locale.ROOT);
         return !normalized.contains("/examples/");
+    }
+
+    /**
+     * 计算字符串的 SHA-256 十六进制摘要。
+     */
+    private static String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(digest.length * 2);
+            for (byte item : digest) {
+                builder.append(String.format("%02x", Integer.valueOf(item & 0xff)));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("SHA-256 unavailable", failure);
+        }
     }
 
     /**

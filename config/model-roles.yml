@@ -1,0 +1,11 @@
+# 角色 → 模型别名映射（可选）。
+#
+# key   ：AGENT 节点 role 属性 / REVIEW 节点 roles、moderator 的值（自由命名，如 architect / reviewer）；
+# value ：模型别名，即 config/model-providers 下模型配置文件名去掉 yml/yaml 扩展名。
+#
+# 未在此声明的 role 直接作为模型别名解析；解析不到别名时按配置错误 fail-fast（不静默降级）。
+# 示例（按需取消注释并改为本机可用配置；仓库现有别名为 deepseek-response / deepseek-completion /
+# kimi-response / kimi-completion / volcengine-response / volcengine-completion / openai）：
+# architect: deepseek-response
+# reviewer: kimi-response
+# tester: volcengine-response

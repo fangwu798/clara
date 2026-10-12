@@ -137,9 +137,14 @@ run.bat
 | /model | 选择并切换模型 |
 | /log（/verbose） | 切换精简/完整日志 |
 | /color | 开关 ANSI 颜色 |
+| ESC（执行中连按两次） | 取消本轮正在进行的模型调用与工具执行 |
 | exit / quit（/exit） | 退出 |
 
 完整日志始终写入 logs 目录下 clara-时间戳.log。
+
+执行中可按 ESC 请求取消：首次 ESC 仅提示（防误触），5 秒内再按一次 ESC（或回车 / y）才真正取消；取消后本轮模型流式读取与正在运行的脚本工具都会在检查点立即终止，本轮以 `CANCELLED` 状态收尾。该能力依赖终端原始模式（JLine），在非交互环境（如把标准输入重定向）下会提示不可用并自动跳过。
+
+对话历史按工作目录持久化：会话标识由工作目录推导（启动横幅的 `sessionId`），历史写入 `<工作目录>/.clara/state/conversations`，因此**退出后再次进入同一目录会续接上次的上下文**（换目录即换上下文）。删除该目录即清空历史；同一目录下同时只允许一个 Clara 实例（历史目录有排他锁），第二个实例会提示并降级为进程内历史（本次退出即丢失）。
 
 ### 4. CLI 执行工作区任务
 
@@ -331,6 +336,45 @@ clara-workflow 提供工作流定义、DAG 执行、预算控制、检查点与�
 典型流程：构造并校验工作流定义，按 DAG 拓扑执行；节点需人工确认时写检查点并返回 WAITING_INPUT；收到答案后按实例版本与幂等键恢复。
 
 注意：工作流定义需版本化；预算覆盖耗时、Token 与外部资源；检查点生产环境需持久化；恢复时同时校验 expectedInstanceVersion 与 idempotencyKey。
+
+## 多角色与多模态工作流
+
+工作流定义放在 config/workflow 下的 *.yml / *.yaml。AGENT 节点除 prompt / promptVars 外，支持以下可选属性：
+
+| 属性 | 说明 |
+| --- | --- |
+| role | 逻辑角色名，经 config/model-roles.yml 映射为模型别名；未映射时角色名直接作别名 |
+| model | 模型别名（即 config/model-providers 下配置文件的文件名），优先于 role |
+| capability | 能力种类名（CapabilityKindEnum 常量名），缺省 CHAT；IMAGE 走图片生成 |
+| attachments | 图片引用数组（公网 URL 或 data:image/<格式>;base64,<编码>），每项可含 ${...} 变量 |
+
+解析优先级：model > role > 会话默认模型。同一工作流的不同节点可绑定不同模型，因此多角色既可共用同一模型，也可各用不同模型。未注册的别名按配置错误直接失败，不做静默降级。
+
+内置示例（config/workflow）：
+
+| 工作流 | 用途 | 输入 |
+| --- | --- | --- |
+| review_panel | 多角色多轮评审后由主持人汇总结论 | topic |
+| image_generation | 文生图，产物落成媒体资产 | subject |
+| image_understanding | 图 → 文，图片随对话消息下发给多模态模型 | image |
+| image_edit | 图生图（参考图 + 编辑指令） | reference、instruction |
+
+交互式对话中用自然语言让助手调用内置工具 run_workflow 即可，例如：
+
+```text
+请运行工作流 image_generation，subject 用「一只在雪地里的柴犬」
+请运行工作流 image_understanding，image 用 https://example.com/a.png
+请运行工作流 review_panel，topic 用「是否引入事件总线」
+```
+
+生成类产物由 MediaStore 落成媒体资产，写入工作目录下 .clara/assets（首次用到时创建）；作用域回填 {assetId, storageUri, mimeType, size}，其中 storageUri 形如 clara-media:<sha256>。工作流若通过顶层 outputs 声明对外输出键，则只回传这些变量。
+
+说明：
+
+- 图片识别使用该节点绑定的对话模型，需选择多模态模型；图生图的参考图字段目前仅 VOLCENGINE 已声明协议适配。
+- 角色名需能解析到模型别名（见 config/model-roles.yml），否则该节点按配置错误失败。
+- 工作流定义与提示词在进程启动时扫描加载，修改配置后需重启进程。
+- 视频生成能力尚未接线（缺异步任务 provider 适配与回调解析实现）。
 
 ## 技能
 

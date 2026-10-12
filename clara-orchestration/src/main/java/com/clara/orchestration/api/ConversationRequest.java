@@ -1,5 +1,6 @@
 package com.clara.orchestration.api;
 
+import com.clara.context.CancellationToken;
 import com.clara.dto.memory.ContextControlConfig;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
@@ -7,6 +8,8 @@ import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.stream.IStreamObserver;
 import lombok.Builder;
 import lombok.Data;
+
+import java.util.List;
 
 /**
  * 一次对话请求：编排入口的入参载体，屏蔽客户端调用细节。
@@ -30,6 +33,8 @@ public final class ConversationRequest {
     private CapabilityKindEnum capabilityKind;
     /** 本轮用户输入文本。 */
     private String userInput;
+    /** 本轮随消息下发的图片引用（公网 URL 或 data URI）；非空时以多模态消息下发，用于图片识别。 */
+    private List<String> attachments;
     /** 本会话所属平台配置，用于绑定 {@code ConvContext}；可为 null。 */
     private ProviderConfiguration providerConfiguration;
     /** 上下文历史处理控制配置；为 null 时使用默认配置。 */
@@ -40,4 +45,6 @@ public final class ConversationRequest {
     private IStreamObserver observer;
     /** 单轮对话允许的最大工具往返次数；非正时使用编排默认值。 */
     private int maxToolRoundTrips;
+    /** 本会话的取消令牌；非空时编排层复用它，外部置位即可取消本轮模型调用与工具执行；为 null 时编排层自建。 */
+    private CancellationToken cancellationToken;
 }
