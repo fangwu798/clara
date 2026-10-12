@@ -8,11 +8,15 @@ import com.clara.dto.memory.MemoryEntry;
 import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
 import com.clara.enums.memory.MemorySourceTypeEnum;
+import com.clara.dto.tool.ToolContext;
+import com.clara.dto.tool.ToolSpecification;
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -48,46 +52,34 @@ public class SkillMatchCoordinatorTest {
     }
 
     @Test
-    public void matchRetrievesPromptsAndToolsFilteringThresholdAndDeduplicating() {
+    public void matchRetrievesPromptsFilteringThresholdAndDeduplicating() {
         List<MemoryMatch> prompts = Arrays.asList(
                 new MemoryMatch(entry(MemorySourceTypeEnum.PROMPT, "p1"), 0.9),
                 new MemoryMatch(entry(MemorySourceTypeEnum.PROMPT, "p1"), 0.8), // 同源去重
                 new MemoryMatch(entry(MemorySourceTypeEnum.PROMPT, "p2"), 0.1)); // 低于阈值
-        List<MemoryMatch> tools = Collections.singletonList(
-                new MemoryMatch(entry(MemorySourceTypeEnum.TOOL_DESCRIPTION, "get_weather"), 0.7));
 
         SkillMatchCoordinator coordinator = new SkillMatchCoordinator(text -> new float[] {1f, 0f},
-                store(prompts, tools), promptProvider("PROMPT-"));
+                store(prompts, empty()), promptProvider("PROMPT-"));
 
         SkillMatchCoordinator.MatchedSkill matched = coordinator.match("查询天气", control(3, 0.5));
 
         assertEquals(Collections.singletonList("PROMPT-p1"), matched.getPrompts());
-        assertEquals(1, matched.getTools().size());
-        assertEquals("get_weather", matched.getTools().get(0).getFunction().getName());
-        assertEquals("desc-get_weather", matched.getTools().get(0).getFunction().getDescription());
+        assertTrue(matched.getTools().isEmpty());
     }
 
     @Test
-    public void matchNormalizesToolNamesReplacingIllegalCharsAndTruncating() {
-        StringBuilder longId = new StringBuilder();
-        for (int i = 0; i < 200; i++) {
-            longId.append('a');
-        }
-        String dirtyId = "my tool.name!";
-
-        List<MemoryMatch> tools = Arrays.asList(
-                new MemoryMatch(entry(MemorySourceTypeEnum.TOOL_DESCRIPTION, dirtyId), 0.9),
-                new MemoryMatch(entry(MemorySourceTypeEnum.TOOL_DESCRIPTION, longId.toString()), 0.9));
+    public void matchReturnsAllCatalogToolsWhenCatalogProvided() {
+        List<ToolContext> catalogTools = Arrays.asList(
+                tool("get_weather"), tool("file_ops"));
 
         SkillMatchCoordinator coordinator = new SkillMatchCoordinator(text -> new float[] {1f},
-                store(empty(), tools), promptProvider("x"));
+                store(empty(), empty()), promptProvider("x"), () -> catalogTools);
 
         SkillMatchCoordinator.MatchedSkill matched = coordinator.match("hello", control(3, 0.5));
 
-        List<com.clara.dto.tool.ToolContext> result = matched.getTools();
-        assertEquals(2, result.size());
-        assertEquals("my_tool_name_", result.get(0).getFunction().getName());
-        assertEquals(128, result.get(1).getFunction().getName().length());
+        assertEquals(2, matched.getTools().size());
+        assertEquals("get_weather", matched.getTools().get(0).getFunction().getName());
+        assertEquals("file_ops", matched.getTools().get(1).getFunction().getName());
     }
 
     // ---- helpers -----------------------------------------------------------
@@ -117,6 +109,17 @@ public class SkillMatchCoordinatorTest {
                 return "";
             }
         };
+    }
+
+    private static ToolContext tool(String name) {
+        return new ToolContext(new ToolSpecification(name, "desc-" + name, schema()));
+    }
+
+    private static Map<String, Object> schema() {
+        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        schema.put("type", "object");
+        schema.put("properties", new LinkedHashMap<String, Object>());
+        return schema;
     }
 
     private static ISemanticMemoryStore store(final List<MemoryMatch> prompts,

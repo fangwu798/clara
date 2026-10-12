@@ -6,6 +6,10 @@ rem  Build first: mvn -q -pl clara-application -am package -DskipTests
 rem ============================================================
 setlocal
 
+rem Remember the directory the user launched this script from: that is the
+rem project directory to be analysed (Clara reads it as CLARA_WORK_DIR).
+set "CLARA_WORK_DIR=%CD%"
+
 rem Switch to the script directory (repo root) so that config/ can be located.
 cd /d "%~dp0"
 

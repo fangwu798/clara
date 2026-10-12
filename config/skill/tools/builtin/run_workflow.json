@@ -1,0 +1,9 @@
+{
+  "id": "run_workflow",
+  "name": "run_workflow",
+  "type": "BUILTIN",
+  "description": "运行一个已配置的工作流，一次调用即可完成多步骤任务。可用工作流：analyze_repo_docs（读取当前目录源码并整理技术文档）；design_business_solution（扫描当前目录 → 按前后端技术规范产出《需求与技术方案》：整体方案/微服务划分/业务领域隔离/代码结构规划/数据库字段/DTO 规划，并写入 development-plan/01-requirements-and-architecture.md）；plan_development（读取上一步的方案 → 产出《开发计划》：阶段/里程碑/任务拆分/依赖/验收，写入 development-plan/02-development-plan.md）。调用时机：要求「分析本地目录/读取仓库源码/整理技术文档」时用 analyze_repo_docs；要求「业务拆分/微服务划分/领域隔离/数据库字段/DTO 规划/需求与技术方案」时用 design_business_solution；要求「开发计划/排期/任务拆分」时，若尚未生成方案则先调用 design_business_solution，再调用 plan_development。入参 JSON：workflow(工作流标识)、inputs(对象，可选)。方案的产出会固定遵循随应用发布的前后端开发规范（config/standards/backend-technical-summary.md、config/standards/frontend-ued-summary.md）。",
+  "parameters": "{\"type\":\"object\",\"properties\":{\"workflow\":{\"type\":\"string\"},\"inputs\":{\"type\":\"object\"}},\"required\":[\"workflow\"]}",
+  "script": "run_workflow",
+  "metadata": { "domain": "workflow", "tags": "workflow,builtin" }
+}

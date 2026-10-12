@@ -81,7 +81,7 @@ public class DocumentParserContractTest {
     }
 
     private static List<String> texts(ParsedDocument value) {
-        List<String> result = new ArrayList<String>();
+        List<String> result = new ArrayList<>();
         for (DocumentNode node : value.getNodes()) result.add(node.getText());
         return result;
     }

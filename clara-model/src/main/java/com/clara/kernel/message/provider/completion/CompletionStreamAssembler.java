@@ -49,6 +49,26 @@ public final class CompletionStreamAssembler<R extends IResponse> extends Stream
 
     @Override
     protected StreamEvent nonTextDelta(Rule rule, JsonNode node) {
-        return new StreamEvent(rule.adapter.event(), nextSequence(), node.toString());
+        return new StreamEvent(rule.adapter.event(), nextSequence(), node.toString(), null, toolName(node),
+                null, null);
+    }
+
+    /**
+     * 从工具调用分片数组中取本次片段携带的函数名（同一调用只在首片出现）。
+     *
+     * @param node 工具调用分片数组，可为 null
+     * @return 首个非空函数名；没有时返回 null
+     */
+    private static String toolName(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return null;
+        }
+        for (JsonNode element : node) {
+            JsonNode function = element.get("function");
+            if (function != null && function.hasNonNull("name")) {
+                return function.get("name").asText();
+            }
+        }
+        return null;
     }
 }

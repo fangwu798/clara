@@ -28,7 +28,12 @@ public final class PythonScriptExecutor extends AbstractScriptExecutor {
         return Arrays.asList(pythonPath(), scriptFile.toString());
     }
 
-    private String pythonPath() {
+    /**
+     * 解析 Python 解释器路径：环境变量 {@code PYTHON_PATH} 优先，未配置时回退为 {@code python}。
+     *
+     * @return 解释器命令，非空白
+     */
+    public static String pythonPath() {
         String configured = System.getenv("PYTHON_PATH");
         return configured == null || configured.trim().isEmpty() ? "python" : configured;
     }

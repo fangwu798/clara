@@ -26,7 +26,7 @@ public final class DefaultWindowMemory implements IWindowMemory {
     private final ConversationStore store;
     private final ConversationKey key;
 
-    private List<IContent> history = new ArrayList<IContent>();
+    private List<IContent> history = new ArrayList<>();
     private long version = 0L;
     private boolean loaded = false;
 
@@ -37,7 +37,7 @@ public final class DefaultWindowMemory implements IWindowMemory {
      * @param provider       供应商标识，不可为 null
      * @param model          模型标识，不可为 null
      * @param store          底层会话存储，不可为 null
-     * @throws IllegalArgumentException 任一参数不合法时
+     * @throws IllegalArgumentException 任意参数不合法时
      */
     public DefaultWindowMemory(String conversationId, String provider, String model,
             ConversationStore store) {
@@ -74,7 +74,7 @@ public final class DefaultWindowMemory implements IWindowMemory {
             return;
         }
         ensureLoaded();
-        List<IContent> copy = new ArrayList<IContent>(messages.size());
+        List<IContent> copy = new ArrayList<>(messages.size());
         for (IContent message : messages) {
             if (message == null) {
                 throw new IllegalArgumentException("messages must not contain null");
@@ -89,7 +89,7 @@ public final class DefaultWindowMemory implements IWindowMemory {
     @Override
     public synchronized List<IContent> messages() {
         ensureLoaded();
-        return Collections.unmodifiableList(new ArrayList<IContent>(history));
+        return Collections.unmodifiableList(new ArrayList<>(history));
     }
 
     @Override
@@ -102,7 +102,7 @@ public final class DefaultWindowMemory implements IWindowMemory {
     public synchronized void clear() {
         ensureLoaded();
         store.clear(key);
-        history = new ArrayList<IContent>();
+        history = new ArrayList<>();
         version = 0L;
     }
 
@@ -111,7 +111,7 @@ public final class DefaultWindowMemory implements IWindowMemory {
             return;
         }
         ConversationSnapshot snapshot = store.loadSnapshot(key);
-        history = new ArrayList<IContent>(snapshot.messages());
+        history = new ArrayList<>(snapshot.messages());
         version = snapshot.version();
         loaded = true;
     }

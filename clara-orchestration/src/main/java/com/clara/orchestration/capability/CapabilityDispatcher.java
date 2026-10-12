@@ -27,9 +27,9 @@ public final class CapabilityDispatcher {
     private static final long STREAM_POLL_INTERVAL_MILLIS = 20L;
 
     /**
-     * 等待流终态的最长时长（毫秒），作为兜底避免流异常不结束时无限阻塞。
+     * 等待流终态的最长时长（毫秒），作为兜底避免流异常不结束时无限阻塞；取值不小于传输层读超时。
      */
-    private static final long STREAM_TERMINAL_MAX_WAIT_MILLIS = 300_000L;
+    private static final long STREAM_TERMINAL_MAX_WAIT_MILLIS = 900_000L;
 
     private final IStreamModel streamModel;
 

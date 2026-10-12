@@ -5,7 +5,9 @@ import com.clara.core.memory.IWindowMemory;
 import com.clara.core.message.IContent;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.dto.memory.WindowPolicy;
+import com.clara.dto.model.StreamEvent;
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.StreamEventEnum;
 import com.clara.core.model.IRequest;
 import com.clara.core.model.IResponse;
 import com.clara.kernel.api.IStreamModel;
@@ -134,6 +136,74 @@ public class DefaultConversationOrchestratorTest {
         assertEquals(ErrorCategory.RESOURCE_LIMIT, result.getError().getCategory());
         assertEquals(ErrorCodes.INVALID_ARGUMENT, result.getError().getCode());
         assertTrue(result.getError().getSafeMessage().contains("tool round trip limit exceeded"));
+        assertEquals(Collections.singletonList("call-1"), invoker.callIds);
+    }
+
+    @Test
+    public void converseHasNoToolRoundTripLimitByDefault() {
+        FakeWindowMemory window = new FakeWindowMemory("c1");
+        ScriptedModel model = new ScriptedModel();
+        for (int index = 0; index < 12; index++) {
+            model.script(toolCallResponse("call-" + index, "get_weather"));
+        }
+        model.script(contentResponse("done", null, null, null, null));
+        RecordingInvoker invoker = new RecordingInvoker();
+        DefaultConversationOrchestrator orchestrator = orchestrator(window, model, invoker);
+
+        ConversationResult result = orchestrator.converse(request("c1", "m1", "loop"));
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        assertEquals("done", result.getContent());
+        assertEquals(12, result.getToolRoundTrips());
+        assertEquals(12, invoker.callIds.size());
+    }
+
+    @Test
+    public void converseAccumulatesReasoningAcrossToolRounds() {
+        FakeWindowMemory window = new FakeWindowMemory("c1");
+        ScriptedModel model = new ScriptedModel();
+        HttpResponse toolRound = toolCallResponse("call-1", "get_weather");
+        toolRound.setReasoning("先查天气");
+        model.script(toolRound);
+        HttpResponse answer = contentResponse("done", null, null, null, null);
+        answer.setReasoning("再作答");
+        model.script(answer);
+        DefaultConversationOrchestrator orchestrator =
+                orchestrator(window, model, new RecordingInvoker());
+
+        ConversationResult result = orchestrator.converse(request("c1", "m1", "weather?"));
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        assertEquals("先查天气\n再作答", result.getReasoning());
+    }
+
+    @Test
+    public void converseRecoversToolCallsFromStreamDeltas() {
+        FakeWindowMemory window = new FakeWindowMemory("c1");
+        StreamingScriptedModel model = new StreamingScriptedModel();
+        // 第一轮：流式只下发工具调用参数分片，终态响应本身不含工具调用；第二轮给出最终答复。
+        model.script("[{\"index\":0,\"id\":\"call-1\",\"type\":\"function\","
+                + "\"function\":{\"name\":\"get_weather\",\"arguments\":\"{}\"}}]", null);
+        model.script(null, "done");
+        RecordingInvoker invoker = new RecordingInvoker();
+        DefaultConversationOrchestrator orchestrator = new DefaultConversationOrchestrator(
+                (conversationId, provider, modelId) -> window,
+                nullDepAssembler(),
+                new CapabilityDispatcher(model),
+                new ToolRoundTripCoordinator(invoker),
+                new CallRecordPublisher(null),
+                null);
+
+        ConversationResult result = orchestrator.converse(ConversationRequest.builder()
+                .conversationId("c1").model("m1").userInput("weather?")
+                .capabilityKind(CapabilityKindEnum.CHAT)
+                .stream(true)
+                .observer(event -> { })
+                .build());
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        assertEquals("done", result.getContent());
+        assertEquals(1, result.getToolRoundTrips());
         assertEquals(Collections.singletonList("call-1"), invoker.callIds);
     }
 
@@ -277,6 +347,70 @@ public class DefaultConversationOrchestratorTest {
         public <R extends IResponse> IStreamHandle chat(IRequest request, Class<R> responseType,
                 IStreamObserver observer) {
             throw new UnsupportedOperationException("streaming not used in this test");
+        }
+    }
+
+    private static final class StreamingScriptedModel implements IStreamModel {
+
+        private final Deque<String[]> scripts = new ArrayDeque<String[]>();
+
+        /**
+         * 登记一轮流式响应：toolDeltaPayload 为 {@code delta.tool_calls} 的 JSON 文本（可为 null），
+         * content 为正文（可为 null）；终态响应刻意不带工具调用，用于验证编排层从分片补齐。
+         */
+        void script(String toolDeltaPayload, String content) {
+            scripts.add(new String[] { toolDeltaPayload, content });
+        }
+
+        @Override
+        public <R extends IResponse> R chat(IRequest request, Class<R> responseType) {
+            throw new UnsupportedOperationException("non-streaming is not used in this test");
+        }
+
+        @Override
+        public <R extends IResponse> IStreamHandle chat(IRequest request, Class<R> responseType,
+                IStreamObserver observer) {
+            String[] script = scripts.poll();
+            String delta = script == null ? null : script[0];
+            String content = script == null ? null : script[1];
+            HttpResponse terminal = new HttpResponse();
+            terminal.setContent(content);
+            long sequence = 0L;
+            if (delta != null) {
+                observer.onEvent(new StreamEvent(StreamEventEnum.TOOL_ARGUMENT_DELTA, sequence++, delta,
+                        null, null, null, null));
+            }
+            if (content != null && !content.isEmpty()) {
+                observer.onEvent(new StreamEvent(StreamEventEnum.TEXT_DELTA, sequence++, content,
+                        null, null, null, null));
+            }
+            observer.onEvent(new StreamEvent(StreamEventEnum.RESPONSE_COMPLETE, sequence, "stop",
+                    null, null, terminal, null));
+            return new CompletedStreamHandle(terminal);
+        }
+    }
+
+    private static final class CompletedStreamHandle implements IStreamHandle {
+
+        private final IResponse response;
+
+        CompletedStreamHandle(IResponse response) {
+            this.response = response;
+        }
+
+        @Override
+        public boolean cancel() {
+            return false;
+        }
+
+        @Override
+        public boolean isDone() {
+            return true;
+        }
+
+        @Override
+        public IResponse result() {
+            return response;
         }
     }
 

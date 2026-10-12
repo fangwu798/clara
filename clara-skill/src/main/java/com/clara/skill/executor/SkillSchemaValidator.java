@@ -3,6 +3,7 @@ package com.clara.skill.executor;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.exception.ClaraException;
 import com.clara.skill.SkillErrors;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -16,25 +17,32 @@ import java.util.List;
  * <p>执行前校验入参是否符合工具方法的 {@code parameters} JSON Schema；执行后校验输出为合法 JSON。
  * 支持 {@code type / properties / required / items / enum / additionalProperties} 等常见关键字的子集，
  * 满足技能级输入输出合法性校验需求。
+ *
+ * <p>合法性约束：入参在调用工具方法前一律先做严格 JSON 解析（拒绝尾随内容与残缺结构），因此脚本
+ * 不会收到无法解析的入参；仅当工具方法声明了 {@code parameters} 时再进一步做 Schema 匹配。
  */
 public final class SkillSchemaValidator {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    /**
+     * 严格 JSON 解析器：开启 {@code FAIL_ON_TRAILING_TOKENS}，使 {@code {"a":1} 尾随内容} 这类
+     * 能被 Jackson 默认宽松放行、却会被下游脚本（如 Python {@code json}）拒绝的入参在调用前被拦下。
+     */
+    private final ObjectMapper mapper = new ObjectMapper()
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     /**
-     * 校验入参 JSON 是否符合工具方法声明的参数 Schema；未声明 Schema 时跳过。
+     * 校验入参合法性：始终先做严格 JSON 解析，再在声明了 Schema 时做结构匹配。
      *
      * @param method        工具方法，不可为 null
-     * @param argumentsJson 模型生成的入参 JSON，可为 null
-     * @throws ClaraException 入参不符合 Schema 时
+     * @param argumentsJson 模型生成的入参 JSON，可为 null（视为空对象）
+     * @throws ClaraException 入参不是合法 JSON 或不符合 Schema 时
      */
     public void validateInput(ToolMethod method, String argumentsJson) {
+        JsonNode instance = parseArguments(argumentsJson);
         if (method.getParameters() == null || method.getParameters().trim().isEmpty()) {
             return;
         }
         JsonNode schema = parseSchema(method.getParameters());
-        String json = argumentsJson == null || argumentsJson.trim().isEmpty() ? "{}" : argumentsJson;
-        JsonNode instance = parseInstance(json);
         if (!matches(schema, instance)) {
             throw SkillErrors.schemaInvalid("入参不符合工具方法 " + method.getName() + " 的参数 Schema");
         }
@@ -83,6 +91,22 @@ public final class SkillSchemaValidator {
             return mapper.readTree(json);
         } catch (IOException e) {
             return null;
+        }
+    }
+
+    /**
+     * 严格解析工具方法入参：空入参视作空对象；解析失败或存在尾随内容时抛「入参不是合法 JSON」。
+     *
+     * @param argumentsJson 模型生成的入参 JSON，可为 null
+     * @return 解析后的 JSON 节点，非 null
+     * @throws ClaraException 入参不是合法 JSON 时
+     */
+    private JsonNode parseArguments(String argumentsJson) {
+        String json = argumentsJson == null || argumentsJson.trim().isEmpty() ? "{}" : argumentsJson;
+        try {
+            return mapper.readTree(json);
+        } catch (IOException e) {
+            throw SkillErrors.schemaInvalid("工具方法入参不是合法 JSON：" + e.getMessage());
         }
     }
 

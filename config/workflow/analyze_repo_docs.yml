@@ -1,0 +1,43 @@
+workflowId: analyze_repo_docs
+version: "1.0.0"
+# 对外只回传最终文档，避免把批量读取的源码内容整体回灌给对话模型。
+outputs: [document]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    - id: scan
+      type: TOOL
+      outputKeys: [scan_result]
+      tool: file_ops
+      arguments:
+        op: scan
+        base_dir: "."
+        include: ["*.md", "*.java", "*.xml", "*.yml", "*.yaml", "*.json", "*.py"]
+        max_files: 300
+        max_depth: 6
+        with_size: true
+    - id: plan
+      type: AGENT
+      outputKeys: [plan]
+      prompt: repo_doc_planner
+      promptVars:
+        goal: "梳理并输出本项目（Clara 智能体平台）的技术文档"
+        listing: "${scan_result}"
+    - id: read
+      type: TOOL
+      outputKeys: [sources]
+      tool: file_ops
+      arguments:
+        op: read_many
+        base_dir: "."
+        paths: "${plan.files}"
+        max_bytes: 6000
+    - id: draft
+      type: AGENT
+      outputKeys: [document]
+      prompt: repo_doc_writer
+      promptVars:
+        goal: "梳理并输出本项目（Clara 智能体平台）的技术文档"
+        plan: "${plan}"
+        sources: "${sources}"

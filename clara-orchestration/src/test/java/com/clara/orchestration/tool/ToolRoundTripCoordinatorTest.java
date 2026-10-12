@@ -2,6 +2,10 @@ package com.clara.orchestration.tool;
 
 import com.clara.core.message.IContent;
 import com.clara.core.skill.IToolInvoker;
+import com.clara.exception.ClaraError;
+import com.clara.exception.ClaraException;
+import com.clara.exception.ErrorCategory;
+import com.clara.exception.ErrorCodes;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ToolContent;
 import com.clara.core.tool.IToolInvocation;
@@ -118,6 +122,51 @@ public class ToolRoundTripCoordinatorTest {
 
         assertEquals("resp-1", ((ToolContent) messages.get(1)).getToolCallId());
         assertEquals(Collections.singletonList("resp-1"), invoker.callIds);
+    }
+
+    @Test
+    public void performBackfillsErrorTextWhenInvocationFails() {
+        IToolInvoker failing = new IToolInvoker() {
+            @Override
+            public ToolResult invoke(IToolInvocation invocation) {
+                throw new IllegalStateException("boom");
+            }
+        };
+        ToolRoundTripCoordinator coordinator = new ToolRoundTripCoordinator(failing);
+
+        HttpResponse response = new HttpResponse();
+        response.setToolCalls(Collections.singletonList(chatCall("call-9", "get_weather", "{}")));
+
+        List<IContent> messages = coordinator.perform(response);
+
+        assertEquals(2, messages.size());
+        assertTrue(messages.get(1) instanceof ToolContent);
+        ToolContent content = (ToolContent) messages.get(1);
+        assertEquals("call-9", content.getToolCallId());
+        assertTrue(content.getContent().contains("error"));
+        assertTrue(content.getContent().contains("boom"));
+    }
+
+    @Test
+    public void performBackfillsStructuredClaraErrorWithCodeAndCategory() {
+        IToolInvoker failing = new IToolInvoker() {
+            @Override
+            public ToolResult invoke(IToolInvocation invocation) {
+                throw new ClaraException(new ClaraError(ErrorCodes.INVALID_ARGUMENT,
+                        ErrorCategory.VALIDATION, "入参不是合法 JSON", false, null, null, null, null,
+                        Collections.<String, String>emptyMap()));
+            }
+        };
+        ToolRoundTripCoordinator coordinator = new ToolRoundTripCoordinator(failing);
+
+        HttpResponse response = new HttpResponse();
+        response.setToolCalls(Collections.singletonList(chatCall("call-7", "file_ops", "{\"op\":\"write\"}")));
+
+        ToolContent content = (ToolContent) coordinator.perform(response).get(1);
+
+        assertEquals("call-7", content.getToolCallId());
+        assertTrue(content.getContent().contains(ErrorCodes.INVALID_ARGUMENT));
+        assertTrue(content.getContent().contains("入参不是合法 JSON"));
     }
 
     // ---- helpers -----------------------------------------------------------

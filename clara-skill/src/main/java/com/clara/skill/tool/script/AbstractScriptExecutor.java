@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -63,7 +64,9 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
         Thread stdoutThread = null;
         Thread stderrThread = null;
         try {
-            process = new ProcessBuilder(buildCommand(spec, scriptFile)).directory(workingDir).start();
+            ProcessBuilder builder = new ProcessBuilder(buildCommand(spec, scriptFile)).directory(workingDir);
+            forceUtf8Environment(builder);
+            process = builder.start();
             stdoutThread = drain(process.getInputStream(), stdout);
             stderrThread = drain(process.getErrorStream(), stderr);
             writeStdin(process, spec.getArgumentsJson());
@@ -149,6 +152,18 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
         thread.setDaemon(true);
         thread.start();
         return thread;
+    }
+
+    /**
+     * 统一子进程编码环境：强制 Python 以 UTF-8 读写标准流，避免中文 Windows 区域编码（GBK）
+     * 与 Java 侧（按 UTF-8 读写管道）不一致导致的中文乱码。对非 Python 解释器无副作用。
+     */
+    private static void forceUtf8Environment(ProcessBuilder builder) {
+        Map<String, String> environment = builder.environment();
+        environment.put("PYTHONUTF8", "1");
+        environment.put("PYTHONIOENCODING", "utf-8");
+        // 不写 __pycache__，避免在随应用发布的 config/skill/scripts 目录里生成字节码。
+        environment.put("PYTHONDONTWRITEBYTECODE", "1");
     }
 
     /**

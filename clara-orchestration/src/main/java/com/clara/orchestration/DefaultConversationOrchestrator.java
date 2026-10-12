@@ -4,6 +4,7 @@ import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.memory.IWindowMemory;
 import com.clara.core.message.IContent;
 import com.clara.dto.memory.ContextControlConfig;
+import com.clara.dto.tool.ToolCall;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.exception.ClaraError;
@@ -11,9 +12,11 @@ import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCategory;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
+import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.kernel.message.delta.UserContent;
+import com.clara.kernel.stream.IStreamObserver;
 import com.clara.context.ConvContext;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
@@ -21,6 +24,7 @@ import com.clara.orchestration.api.OrchestrationStatusEnum;
 import com.clara.orchestration.capability.CapabilityDispatcher;
 import com.clara.orchestration.context.ContextAssembler;
 import com.clara.orchestration.record.CallRecordPublisher;
+import com.clara.orchestration.tool.StreamingToolCallObserver;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
 
 import java.util.Collections;
@@ -35,8 +39,6 @@ import java.util.List;
  * <p>取消：全链路复用 {@link ConvContext} 的取消令牌，循环体与关键点快速失败；取消后以「已取消」终态收尾。
  */
 public final class DefaultConversationOrchestrator {
-
-    private static final int DEFAULT_MAX_TOOL_ROUND_TRIPS = 8;
 
     private final WindowMemoryFactory windowMemoryFactory;
     private final ContextAssembler contextAssembler;
@@ -78,27 +80,28 @@ public final class DefaultConversationOrchestrator {
      * @return 对话结果，非 null
      */
     public ConversationResult converse(ConversationRequest request) {
-        if (request == null || request.getConversationId() == null
-                || request.getConversationId().trim().isEmpty()) {
+        if (request == null || request.getConversationId() == null || request.getConversationId().trim().isEmpty()) {
             throw OrchestrationErrors.invalidArgument("conversationId must not be blank");
         }
         if (request.getModel() == null || request.getUserInput() == null) {
             throw OrchestrationErrors.invalidArgument("model and userInput are required");
         }
-        CapabilityKindEnum capabilityKind = request.getCapabilityKind() == null
-                ? CapabilityKindEnum.CHAT : request.getCapabilityKind();
-        ContextControlConfig control = request.getControl() == null
-                ? ContextControlConfig.defaults() : request.getControl();
+        CapabilityKindEnum capabilityKind = request.getCapabilityKind() == null ? CapabilityKindEnum.CHAT : request.getCapabilityKind();
+        ContextControlConfig control = resolveControl(request, capabilityKind);
         ModelProviderEnum provider = request.getProvider();
-        int maxToolRoundTrips = request.getMaxToolRoundTrips() > 0
-                ? request.getMaxToolRoundTrips() : DEFAULT_MAX_TOOL_ROUND_TRIPS;
+        // 宿主给定观察者即按流式调用（可实时展示思考与正文），否则退回非流式。
+        IStreamObserver hostObserver = request.getObserver();
+        // 工具往返默认不设上限：仅当请求显式给出正值时才按该值限制（<=0 表示不限制）。
+        int maxToolRoundTrips = request.getMaxToolRoundTrips();
 
         ConvContext context = new ConvContext(request.getUserId(), request.getConversationId(),
                 request.getProviderConfiguration(), capabilityKind);
         IWindowMemory windowMemory = windowMemoryFactory.create(request.getConversationId(),
                 provider == null ? null : provider.name(), request.getModel());
-        ConvContext.bind(context);
-        try {
+        // 用可嵌套的作用域绑定会话：工具往返可能再次进入本方法（如工作流 AGENT 节点经工具触发），
+        // 内层退出时必须还原外层绑定，故不能用 bind + finally clear（那会把外层会话一并清空）。
+        StringBuilder reasoning = new StringBuilder();
+        try (ConvContext.Scope ignored = ConvContext.open(context)) {
             windowMemory.append(Collections.singletonList(new UserContent(request.getUserInput())));
             int toolRoundTrips = 0;
             while (true) {
@@ -109,19 +112,23 @@ public final class DefaultConversationOrchestrator {
                         .model(request.getModel())
                         .messages(assembled.getMessages())
                         .tools(assembled.getTools().isEmpty() ? null : assembled.getTools())
-                        .stream(Boolean.valueOf(request.isStream()))
+                        .stream(Boolean.valueOf(request.isStream() || hostObserver != null))
                         .build();
-                HttpResponse response = capabilityDispatcher.invoke(httpRequest, request.getObserver());
+                StreamingToolCallObserver streamObserver = hostObserver == null
+                        ? null : new StreamingToolCallObserver(hostObserver);
+                HttpResponse response = capabilityDispatcher.invoke(httpRequest, streamObserver);
+                mergeStreamedToolCalls(response, streamObserver);
                 callRecordPublisher.publish(httpRequest, response, provider, request.getModel());
+                appendReasoning(reasoning, response);
                 if (response == null) {
                     if (context.isCancelled()) {
                         return cancelled(request.getConversationId(), toolRoundTrips);
                     }
                     return conversationResult(request.getConversationId(), null,
-                            OrchestrationStatusEnum.FAILED, toolRoundTrips, null, null);
+                            OrchestrationStatusEnum.FAILED, toolRoundTrips, null, null, reasoning.toString());
                 }
                 if (toolRoundTripCoordinator.hasToolCalls(response)) {
-                    if (toolRoundTrips >= maxToolRoundTrips) {
+                    if (maxToolRoundTrips > 0 && toolRoundTrips >= maxToolRoundTrips) {
                         throw OrchestrationErrors.toolRoundTripLimitExceeded(maxToolRoundTrips);
                     }
                     List<IContent> toolMessages = toolRoundTripCoordinator.perform(response);
@@ -132,26 +139,92 @@ public final class DefaultConversationOrchestrator {
                 String content = capabilityDispatcher.extract(capabilityKind, response);
                 windowMemory.append(Collections.singletonList(new AssistantContent(content)));
                 return conversationResult(request.getConversationId(), content,
-                        OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null);
+                        OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
+                        reasoning.toString());
             }
         } catch (ClaraException failure) {
             if (context.isCancelled() || failure.getError().getCategory() == ErrorCategory.CANCELLED) {
                 return cancelled(request.getConversationId(), 0);
             }
             return conversationResult(request.getConversationId(), null,
-                    OrchestrationStatusEnum.FAILED, 0, null, failure.getError());
-        } finally {
-            ConvContext.clear();
+                    OrchestrationStatusEnum.FAILED, 0, null, failure.getError(), reasoning.toString());
         }
+    }
+
+    /**
+     * 解析本轮上下文控制配置：请求显式指定优先，其次取平台配置中该能力的 {@code control} 节点，
+     * 都未提供时退回默认配置。
+     *
+     * <p>为什么回退到平台配置：{@code control}（检索条数、相似度阈值等）本就随平台能力配置声明
+     * （{@code ProviderCapabilityConfiguration#contextControlConfig()}），宿主往往只在请求里给模型与输入，
+     * 若不回退，平台配置里的 control 会被静默忽略。
+     *
+     * @param request 当前请求，非 null
+     * @param kind    能力种类，非 null
+     * @return 上下文控制配置，非 null
+     */
+    private static ContextControlConfig resolveControl(ConversationRequest request, CapabilityKindEnum kind) {
+        if (request.getControl() != null) {
+            return request.getControl();
+        }
+        ProviderConfiguration configuration = request.getProviderConfiguration();
+        if (configuration != null) {
+            try {
+                return configuration.getCapability(kind).contextControlConfig();
+            } catch (RuntimeException ignored) {
+                // 该能力未配置时退回默认，不阻断对话
+            }
+        }
+        return ContextControlConfig.defaults();
     }
 
     private static ConversationResult cancelled(String conversationId, int toolRoundTrips) {
         return conversationResult(conversationId, null, OrchestrationStatusEnum.CANCELLED,
-                toolRoundTrips, null, null);
+                toolRoundTrips, null, null, null);
+    }
+
+    /**
+     * 把流式拼装出的工具调用补齐到响应上。
+     *
+     * <p>为什么需要：Chat Completions 流式协议把工具调用拆成分片，响应对象不自动累加工具调用；若不补齐，
+     * 编排层会读不到工具调用，把工具轮误判为最终答复。
+     *
+     * @param response 本轮响应，可为 null
+     * @param observer 流式拼装观察者，可为 null（非流式时）
+     */
+    private static void mergeStreamedToolCalls(HttpResponse response, StreamingToolCallObserver observer) {
+        if (response == null || observer == null) {
+            return;
+        }
+        if (response.getToolCalls() != null && !response.getToolCalls().isEmpty()) {
+            return;
+        }
+        List<ToolCall> assembled = observer.toolCalls();
+        if (!assembled.isEmpty()) {
+            response.setToolCalls(assembled);
+        }
+    }
+
+    /**
+     * 追加一轮模型响应中的思维链（{@code reasoning}）文本，多轮之间以换行分隔，便于宿主展示与记录。
+     *
+     * @param reasoning 累积容器，非 null
+     * @param response  本轮模型响应，可为 null
+     */
+    private static void appendReasoning(StringBuilder reasoning, HttpResponse response) {
+        if (response == null || response.getReasoning() == null
+                || response.getReasoning().trim().isEmpty()) {
+            return;
+        }
+        if (reasoning.length() > 0) {
+            reasoning.append('\n');
+        }
+        reasoning.append(response.getReasoning().trim());
     }
 
     private static ConversationResult conversationResult(String conversationId, String content,
-            OrchestrationStatusEnum status, int toolRoundTrips, TokenUsage usage, ClaraError error) {
+            OrchestrationStatusEnum status, int toolRoundTrips, TokenUsage usage, ClaraError error,
+            String reasoning) {
         return ConversationResult.builder()
                 .conversationId(conversationId)
                 .content(content)
@@ -159,6 +232,7 @@ public final class DefaultConversationOrchestrator {
                 .toolRoundTrips(toolRoundTrips)
                 .usage(usage)
                 .error(error)
+                .reasoning(reasoning)
                 .build();
     }
 

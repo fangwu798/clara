@@ -6,6 +6,7 @@ import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.memory.IWindowMemory;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.skill.IToolInvoker;
+import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowEngine;
 import com.clara.kernel.api.IStreamModel;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
@@ -43,15 +44,27 @@ import com.clara.orchestration.record.CallRecordPublisher;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
 import com.clara.record.InMemoryCallRecordSink;
+import com.clara.skill.executor.SkillPermissionAuthorizer;
+import com.clara.skill.executor.SkillSchemaValidator;
 import com.clara.skill.prompt.DefaultPromptProvider;
+import com.clara.skill.registry.RegistryToolCatalog;
 import com.clara.skill.registry.SkillLoader;
 import com.clara.skill.registry.SkillRegistry;
 import com.clara.skill.tool.DefaultToolExecutor;
 import com.clara.skill.tool.DefaultToolInvoker;
+import com.clara.skill.tool.ScriptExecutorRegistry;
+import com.clara.skill.tool.builtin.BuiltinToolExecutor;
 import com.clara.tool.CompositeToolInvoker;
 import com.clara.tool.ExternalToolCatalog;
 import com.clara.tool.McpExternalToolRegistrar;
+import com.clara.workflow.application.AgentActionFactory;
+import com.clara.workflow.application.ToolActionFactory;
+import com.clara.workflow.application.WorkflowModelContext;
+import com.clara.workflow.application.WorkflowRunTool;
+import com.clara.workflow.application.WorkflowRunner;
 import com.clara.workflow.checkpoint.InMemoryCheckpointStore;
+import com.clara.workflow.definition.WorkflowDefinitionLoader;
+import com.clara.workflow.definition.WorkflowDefinitionRegistry;
 import com.clara.workflow.engine.DefaultWorkflowEngine;
 import com.clara.workspace.application.DefaultWorkspaceBusinessRunner;
 import com.clara.workspace.application.WorkspaceBusinessRunner;
@@ -60,6 +73,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -75,6 +89,15 @@ import java.util.List;
  * 工具路由目录（工具往返经 {@link CompositeToolInvoker} 在本地技能与外部工具间分派）；orchestration 侧由
  * {@code ContextAssembler} / {@code CapabilityDispatcher} / {@code ToolRoundTripCoordinator} /
  * {@code CallRecordPublisher} 组装 {@link DefaultConversationOrchestrator}。
+ *
+ * <p>工具声明：由 {@link RegistryToolCatalog} 从技能注册表取「已注册的全部工具」下发，模型自主选择调用；
+ * 语义匹配只用于提示词注入与知识召回，不决定工具是否可见。
+ *
+ * <p>工作流配置化：工作流定义从 {@code config/workflow} 下的 YAML 加载（见 {@link WorkflowDefinitionRegistry}），
+ * AGENT / TOOL 节点动作由 {@code AgentActionFactory} / {@code ToolActionFactory} 生成；内置工具
+ * {@code run_workflow} 经 {@link WorkflowRunTool} 暴露给模型，据此以自然语言触发工作流（如读取本地目录代码
+ * 并整理技术文档）。AGENT 节点所需的平台配置为会话级，由宿主在加载模型配置后经 {@link #workflowModelContext()}
+ * 注入。
  *
  * <p>调用记录：{@code ICallRecordSink} 由进程内实现 {@link InMemoryCallRecordSink} 提供，保留最近若干条
  * 记录供上层读取；{@code IWorkflowDefinitionResolver} 本阶段未接入，以 null 注入，编排层已做降级（不影响
@@ -118,6 +141,11 @@ public final class ApplicationBootstrap implements Closeable {
      */
     private static final Path DEFAULT_MCP_CONFIG_DIRECTORY = Paths.get("config", "mcp");
 
+    /**
+     * 工作流定义（YAML）的默认加载目录（相对运行目录）。
+     */
+    private static final Path DEFAULT_WORKFLOW_DIRECTORY = Paths.get("config", "workflow");
+
     private final IEmbeddingClient embeddingClient;
     private final ISemanticMemoryStore semanticMemoryStore;
     private final ConversationStore conversationStore;
@@ -131,6 +159,9 @@ public final class ApplicationBootstrap implements Closeable {
     private final McpExternalToolRegistrar mcpExternalToolRegistrar;
     private final ExternalToolCatalog externalToolCatalog;
     private final IWorkflowEngine workflowEngine;
+    private final WorkflowModelContext workflowModelContext;
+    private final WorkflowDefinitionRegistry workflowDefinitionRegistry;
+    private final WorkflowRunner workflowRunner;
     private final DefaultConversationOrchestrator orchestrator;
     private final WorkspaceBusinessRunner workspaceRunner;
     private final InMemoryCallRecordSink callRecordSink;
@@ -195,25 +226,22 @@ public final class ApplicationBootstrap implements Closeable {
         this.mcpServerRegistry = new InMemoryMcpServerRegistry();
         this.mcpCapabilityCatalog = new InMemoryMcpCapabilityCatalog();
         this.mcpGateway = new DefaultMcpGateway(mcpServerRegistry, mcpCapabilityCatalog, mcpClientFactory);
-        this.mcpDiscoveryService = new DefaultMcpDiscoveryService(mcpServerRegistry, mcpCapabilityCatalog,
-                mcpClientFactory, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCP_DISCOVERY_MAX_PAGES);
+        this.mcpDiscoveryService = new DefaultMcpDiscoveryService(mcpServerRegistry, mcpCapabilityCatalog, mcpClientFactory, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCP_DISCOVERY_MAX_PAGES);
         this.mcpExternalToolRegistrar = new McpExternalToolRegistrar();
         this.externalToolCatalog = new ExternalToolCatalog();
 
         // 工具调用：本地 skill 优先、外部 mcp 兜底，交给编排层的工具往返协调器
-        IToolInvoker localToolInvoker = new DefaultToolInvoker(new DefaultToolExecutor(skillRegistry));
-        IToolInvoker toolInvoker = new CompositeToolInvoker(skillRegistry, localToolInvoker, mcpGateway,
-                externalToolCatalog);
+        // 脚本执行器注册表默认含 Python / JavaScript / Shell，稍后追加内置执行器（工具名 run_workflow）
+        ScriptExecutorRegistry scriptExecutors = new ScriptExecutorRegistry();
+        IToolInvoker localToolInvoker = new DefaultToolInvoker(new DefaultToolExecutor(skillRegistry, scriptExecutors, new SkillSchemaValidator(), new SkillPermissionAuthorizer(), 30_000L));
+        IToolInvoker toolInvoker = new CompositeToolInvoker(skillRegistry, localToolInvoker, mcpGateway, externalToolCatalog);
 
         // clara-memory：窗口压缩编排（把被淘汰历史交给模型总结为摘要）
-        WindowCompressionCoordinator windowCompression = new WindowCompressionCoordinator(
-                new DefaultSummarizeCoordinator(streamModel, promptProvider));
+        WindowCompressionCoordinator windowCompression = new WindowCompressionCoordinator(new DefaultSummarizeCoordinator(streamModel, promptProvider));
 
         // orchestration 协作者
-        SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient,
-                semanticMemoryStore);
-        SkillMatchCoordinator skillMatch = new SkillMatchCoordinator(embeddingClient, semanticMemoryStore,
-                promptProvider);
+        SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore);
+        SkillMatchCoordinator skillMatch = new SkillMatchCoordinator(embeddingClient, semanticMemoryStore, promptProvider, new RegistryToolCatalog(skillRegistry));
         ContextAssembler contextAssembler = new ContextAssembler(windowCompression, semanticRecall, skillMatch);
         CapabilityDispatcher capabilityDispatcher = new CapabilityDispatcher(streamModel);
         ToolRoundTripCoordinator toolRoundTrip = new ToolRoundTripCoordinator(toolInvoker);
@@ -223,23 +251,30 @@ public final class ApplicationBootstrap implements Closeable {
 
         // 窗口记忆工厂：按「会话 + 供应商 + 模型」提供按会话隔离的窗口记忆实例
         DefaultConversationOrchestrator.WindowMemoryFactory windowMemoryFactory =
-                new DefaultConversationOrchestrator.WindowMemoryFactory() {
-                    @Override
-                    public IWindowMemory create(String conversationId, String provider, String model) {
-                        String effectiveProvider = provider == null ? DEFAULT_PROVIDER : provider;
-                        return new DefaultWindowMemory(conversationId, effectiveProvider, model,
-                                conversationStore);
-                    }
+                (conversationId, provider, model) -> {
+                    String effectiveProvider = provider == null ? DEFAULT_PROVIDER : provider;
+                    return new DefaultWindowMemory(conversationId, effectiveProvider, model, conversationStore);
                 };
 
-        this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler,
-                capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator);
+        this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler, capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator);
 
         // 核心业务入口：把工作区 run / resume / cancel 落到上面的对话编排能力，供 CLI 使用
         this.workspaceRunner = new DefaultWorkspaceBusinessRunner(orchestrator);
 
         // clara-workflow：默认内存检查点工作流引擎；IWorkflowDefinitionResolver 本阶段未接入
         this.workflowEngine = new DefaultWorkflowEngine(new InMemoryCheckpointStore(), 4);
+
+        // 工作流配置化装配：模型上下文 + 动作工厂 → 定义目录加载 → 定义注册表 → 运行器 → 内置工具
+        this.workflowModelContext = new WorkflowModelContext();
+        List<IWorkflowActionFactory> actionFactories = Arrays.asList(
+                new AgentActionFactory(orchestrator, promptProvider, workflowModelContext),
+                new ToolActionFactory(toolInvoker));
+        this.workflowDefinitionRegistry = new WorkflowDefinitionRegistry(DEFAULT_WORKFLOW_DIRECTORY, new WorkflowDefinitionLoader(actionFactories));
+        // 目录不存在时不加载、不报错
+        this.workflowDefinitionRegistry.reload();
+        this.workflowRunner = new WorkflowRunner(workflowEngine, workflowDefinitionRegistry);
+        // 内置工具与本地工具调用共享同一脚本执行器注册表，故可在运行器就绪后再注册内置执行器
+        scriptExecutors.register(new BuiltinToolExecutor(Collections.singletonList(new WorkflowRunTool(workflowRunner))));
     }
 
     /**
@@ -276,6 +311,33 @@ public final class ApplicationBootstrap implements Closeable {
      */
     public IWorkflowEngine workflowEngine() {
         return workflowEngine;
+    }
+
+    /**
+     * 返回装配好的工作流定义注册表，宿主可据此查询已加载的工作流标识。
+     *
+     * @return 工作流定义注册表，非 null
+     */
+    public WorkflowDefinitionRegistry workflowDefinitionRegistry() {
+        return workflowDefinitionRegistry;
+    }
+
+    /**
+     * 返回装配好的工作流运行器。
+     *
+     * @return 工作流运行器，非 null
+     */
+    public WorkflowRunner workflowRunner() {
+        return workflowRunner;
+    }
+
+    /**
+     * 返回工作流模型上下文，宿主在加载 / 切换模型配置后据此为 AGENT 节点绑定平台配置。
+     *
+     * @return 工作流模型上下文，非 null
+     */
+    public WorkflowModelContext workflowModelContext() {
+        return workflowModelContext;
     }
 
     /**

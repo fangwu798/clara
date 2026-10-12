@@ -7,7 +7,7 @@ transport:
   allowedOrigins:
     - https://api.deepseek.com
   connectTimeoutMillis: 10000
-  readTimeoutMillis: 180000
+  readTimeoutMillis: 600000
   maxRequestBytes: 8388608
   maxResponseBytes: 33554432
   allowHttp: false

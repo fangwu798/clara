@@ -2,6 +2,8 @@ package com.clara.orchestration.tool;
 
 import com.clara.core.message.IContent;
 import com.clara.core.skill.IToolInvoker;
+import com.clara.exception.ClaraError;
+import com.clara.exception.ClaraException;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ToolContent;
 import com.clara.dto.tool.ResponsesToolCall;
@@ -9,9 +11,13 @@ import com.clara.dto.tool.ToolCall;
 import com.clara.dto.tool.ToolCallContent;
 import com.clara.dto.tool.ToolCallFunction;
 import com.clara.dto.tool.ToolResult;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 工具往返协调器：检测模型响应中的工具调用，逐个执行并按 {@code callId} 构造结果消息回填。
@@ -20,6 +26,8 @@ import java.util.List;
  * 把「助手要求调用的工具消息」与「工具结果消息」按调用一一对应地写回历史，随后回到装配步骤再次请求。
  */
 public final class ToolRoundTripCoordinator {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final IToolInvoker toolInvoker;
 
@@ -56,6 +64,9 @@ public final class ToolRoundTripCoordinator {
      * <p>返回顺序为「助手工具调用消息」在前、「工具结果消息」按调用顺序在后；每条结果消息的
      * {@code tool_call_id} 与助手侧调用标识一一对应。
      *
+     * <p>容错语义：单个工具调用失败（含入参校验不通过、脚本执行失败等）不再中断整轮，而是把错误
+     * 文本作为该调用的结果回填给模型，使其能据错误信息自行修正后重试。
+     *
      * @param response 模型响应，不可为 null
      * @return 待追加的消息列表，非 null
      */
@@ -67,10 +78,46 @@ public final class ToolRoundTripCoordinator {
         List<IContent> messages = new ArrayList<IContent>();
         messages.add(new ToolCallContent(calls));
         for (ToolCall call : calls) {
-            ToolResult result = toolInvoker.invoke(call);
-            messages.add(new ToolContent(result.getCallId(), result.getOutput()));
+            messages.add(invokeSafely(call));
         }
         return messages;
+    }
+
+    /**
+     * 执行单个工具调用并把结果封装为工具结果消息；失败时以错误文本回填，不向上抛出。
+     */
+    private IContent invokeSafely(ToolCall call) {
+        try {
+            ToolResult result = toolInvoker.invoke(call);
+            return new ToolContent(result.getCallId(), result.getOutput());
+        } catch (RuntimeException error) {
+            return new ToolContent(call.getId(), errorPayload(error));
+        }
+    }
+
+    /**
+     * 把工具调用失败序列化为 {@code {"error":"..."}} 文本，回填给模型作为可读的失败观察。
+     */
+    private static String errorPayload(RuntimeException error) {
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("error", errorMessage(error));
+        try {
+            return JSON.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            return "{\"error\":\"工具调用失败\"}";
+        }
+    }
+
+    private static String errorMessage(RuntimeException error) {
+        if (error instanceof ClaraException) {
+            ClaraError claraError = ((ClaraException) error).getError();
+            return "[" + claraError.getCode() + "/" + claraError.getCategory() + "] "
+                    + claraError.getSafeMessage();
+        }
+        String message = error.getMessage();
+        return message == null || message.trim().isEmpty()
+                ? error.getClass().getSimpleName()
+                : message;
     }
 
     /**

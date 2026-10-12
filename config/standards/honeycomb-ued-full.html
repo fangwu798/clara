@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Honeycomb UED 完整平铺 · 基础样式 + 原则 + 组件 + 最佳实践 + 信息架构 + AI + 可视化 + 无障碍</title>
+<style>
+:root{
+  --hc-primary:#266EFF; --hc-primary-hover:#518BFF; --hc-primary-active:#2263E6;
+  --hc-primary-1:#EBF2FF; --hc-primary-2:#CCDDFF; --hc-primary-3:#A8C5FF; --hc-primary-4:#84ADFF;
+  --hc-success:#1CC78D; --hc-warning:#FF9902; --hc-danger:#FF4C4C;
+  --hc-text-1:#333333; --hc-text-2:#666666; --hc-text-3:#999999;
+  --hc-border:#DDDDDD; --hc-divider:#EAEAEA; --hc-fill-hover:#F5F5F5; --hc-nav-bg:#F8F8F8; --hc-table-head:#FBFBFB;
+  --hc-radius:3px; --hc-radius-lg:4px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei UI","Microsoft YaHei",sans-serif;font-size:13px;line-height:22px;color:var(--hc-text-1);background:#fff}
+.banner{background:linear-gradient(120deg,#266EFF 0%,#4A85F6 45%,#55B8FF 100%);color:#fff;padding:40px 24px 32px;text-align:center}
+.banner h1{font-size:26px;line-height:36px;font-weight:500;letter-spacing:1px}
+.banner p{font-size:13px;color:rgba(255,255,255,.85);margin-top:8px}
+.banner .tags{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.banner .tags span{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);border-radius:12px;padding:3px 12px;font-size:12px}
+.part{max-width:1320px;margin:0 auto;padding:28px 24px 8px}
+.part-h{display:flex;align-items:center;gap:12px;margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--hc-primary)}
+.part-h .tag{background:var(--hc-primary);color:#fff;font-size:12px;padding:3px 10px;border-radius:4px;flex:0 0 auto}
+.part-h h2{font-size:20px;font-weight:500}
+.part-h .en{font-size:12px;color:var(--hc-text-3)}
+/* 原则区 */
+.values{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.value{background:#fff;border:1px solid var(--hc-divider);border-top:3px solid var(--hc-primary);border-radius:var(--hc-radius-lg);padding:16px;text-align:center}
+.value .v{font-size:16px;font-weight:600;color:var(--hc-primary)}
+.value .d{font-size:12px;color:var(--hc-text-2);margin-top:6px}
+.pr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:8px}
+.pr-card{border:1px solid var(--hc-border);border-radius:var(--hc-radius-lg);padding:14px}
+.pr-card .pn{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.pr-card .pn .ic{width:28px;height:28px;border-radius:8px;background:var(--hc-primary-1);color:var(--hc-primary);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.pr-card .pn .t{font-size:14px;font-weight:500}
+.pr-card .pn .en{font-size:11px;color:var(--hc-text-3)}
+.pr-card .desc{color:var(--hc-text-2)}
+.pr-card .apply{font-size:12px;color:var(--hc-text-2);background:var(--hc-table-head);border-radius:var(--hc-radius);padding:8px 10px;margin-top:8px}
+.pr-card .apply b{color:var(--hc-primary);font-weight:500}
+.flat{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.flat .item{display:flex;gap:10px;padding:12px 14px;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);align-items:flex-start}
+.flat .item .k{width:18px;height:18px;border-radius:5px;background:var(--hc-primary-1);color:var(--hc-primary);display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 auto;margin-top:2px}
+.flat .item .tx b{display:block;font-size:13px}
+.flat .item .tx span{display:block;font-size:12px;color:var(--hc-text-2);margin-top:2px}
+/* 组件库 */
+.cat{margin-bottom:24px}
+.cat-h{font-size:15px;font-weight:500;margin-bottom:12px;padding-left:10px;border-left:3px solid var(--hc-primary)}
+.cat-h .en{font-size:12px;color:var(--hc-text-3);font-weight:400;margin-left:8px}
+.comp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.comp{background:#fff;border:1px solid var(--hc-border);border-radius:var(--hc-radius-lg);overflow:hidden;display:flex;flex-direction:column}
+.comp .hd{display:flex;align-items:baseline;gap:8px;padding:10px 14px;background:var(--hc-table-head);border-bottom:1px solid var(--hc-divider)}
+.comp .hd .n{font-size:13px;font-weight:500}
+.comp .hd .e{font-size:11px;color:var(--hc-text-3)}
+.comp .bd{padding:14px;flex:1;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.demo{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.demo.v{flex-direction:column;align-items:stretch}
+.demo .lbl{font-size:11px;color:var(--hc-text-3);width:100%}
+.sep{width:100%;height:1px;background:var(--hc-divider);margin:2px 0}
+/* 组件视觉 */
+.hc-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:80px;padding:7px 14px;border:1px solid var(--hc-border);border-radius:var(--hc-radius);background:#fff;color:var(--hc-text-1);font-size:13px;line-height:1;cursor:pointer}
+.hc-btn:hover{border-color:var(--hc-primary);color:var(--hc-primary)}
+.hc-btn.primary{background:var(--hc-primary);border-color:var(--hc-primary);color:#fff}
+.hc-btn.primary:hover{background:var(--hc-primary-hover);border-color:var(--hc-primary-hover)}
+.hc-btn.primary:active{background:var(--hc-primary-active)}
+.hc-btn.danger{color:var(--hc-danger);border-color:var(--hc-danger)}
+.hc-btn.link{min-width:0;border-color:transparent;background:none;color:var(--hc-primary);padding:4px 8px}
+.hc-btn.icon{min-width:0;width:30px;height:30px;padding:0}
+.hc-btn.dashed{border-style:dashed}
+.hc-btn[disabled]{background:var(--hc-fill-hover);border-color:var(--hc-divider);color:#C5C5C5;cursor:not-allowed}
+.hc-btn.lg{padding:10px 20px;font-size:14px}
+.hc-btn.sm{padding:5px 10px;font-size:12px;min-width:60px}
+.hc-btn.xs{padding:3px 8px;font-size:11px;min-width:44px}
+.hc-input{height:34px;padding:0 11px;border:1px solid var(--hc-border);border-radius:var(--hc-radius);font-size:13px;color:var(--hc-text-1);background:#fff;outline:none;width:100%}
+.hc-input:focus{border-color:var(--hc-primary)}
+.hc-input::placeholder{color:#C5C5C5}
+.hc-input.err{border-color:var(--hc-danger)}
+.hc-input[disabled],.hc-input.readonly{background:var(--hc-fill-hover);color:var(--hc-text-3)}
+.hc-input.lg{height:40px}.hc-input.sm{height:30px}.hc-input.xs{height:26px}
+.hc-select{height:34px;padding:0 26px 0 11px;border:1px solid var(--hc-border);border-radius:var(--hc-radius);font-size:13px;color:var(--hc-text-1);background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' fill='none'/%3E%3C/svg%3E") no-repeat right 9px center;appearance:none;outline:none;width:100%}
+.hc-select:focus{border-color:var(--hc-primary)}
+.hc-field{display:flex;flex-direction:column;gap:5px}
+.hc-field .lb{color:var(--hc-text-2);font-size:12px}
+.hc-field .lb .req{color:var(--hc-danger)}
+.hc-field .err{color:var(--hc-danger);font-size:12px}
+.hc-field .hint{color:var(--hc-text-3);font-size:11px}
+.hc-table{width:100%;border-collapse:collapse;font-size:12px}
+.hc-table th{background:var(--hc-table-head);color:var(--hc-text-2);font-weight:500;text-align:left;padding:9px 10px;border-bottom:1px solid var(--hc-divider)}
+.hc-table td{padding:9px 10px;border-bottom:1px solid var(--hc-divider)}
+.hc-table tbody tr:hover{background:var(--hc-fill-hover)}
+.hc-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.hc-table .sum{background:var(--hc-table-head);font-weight:500}
+.hc-table .sel{background:var(--hc-primary-1)}
+.hc-tag{display:inline-flex;align-items:center;height:22px;line-height:20px;padding:0 7px;font-size:12px;border-radius:4px;background:var(--hc-fill-hover);color:var(--hc-text-2)}
+.hc-tag.info{background:var(--hc-primary-1);color:var(--hc-primary)}
+.hc-tag.success{background:rgba(28,199,141,.12);color:#0FAE77}
+.hc-tag.warning{background:rgba(255,153,2,.12);color:#E08700}
+.hc-tag.danger{background:rgba(255,76,76,.12);color:#E33A3A}
+.hc-menu{width:100%;background:var(--hc-nav-bg);border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:5px}
+.hc-menu .grp{font-size:11px;color:var(--hc-text-3);padding:6px 10px 2px}
+.hc-menu .mi{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:var(--hc-radius);color:var(--hc-text-2);font-size:12px}
+.hc-menu .mi.on{background:#fff;color:var(--hc-primary);font-weight:500}
+.hc-menu .mi .arrow{margin-left:auto;color:var(--hc-text-3);font-size:10px}
+.hc-tabs{display:flex;border-bottom:1px solid var(--hc-divider)}
+.hc-tabs .t{padding:0 14px;line-height:36px;color:var(--hc-text-2);font-size:13px;position:relative}
+.hc-tabs .t.on{color:var(--hc-primary)}
+.hc-tabs .t.on::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:var(--hc-primary)}
+.hc-tabs.card .t{border:1px solid var(--hc-divider);border-bottom:none;border-radius:4px 4px 0 0;margin-right:4px;background:var(--hc-table-head)}
+.hc-tabs.card .t.on{background:#fff;color:var(--hc-primary);border-color:var(--hc-border)}
+.hc-tabs.card .t.on::after{display:none}
+.hc-crumb{font-size:12px;color:var(--hc-text-3);display:flex;gap:5px;align-items:center}
+.hc-crumb .cur{color:var(--hc-text-1)}
+.hc-steps{display:flex;align-items:flex-start;width:100%}
+.hc-steps .s{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;font-size:11px;color:var(--hc-text-3)}
+.hc-steps .s .ic{width:20px;height:20px;border-radius:50%;border:1px solid var(--hc-border);background:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.hc-steps .s.done .ic{background:var(--hc-success);border-color:var(--hc-success);color:#fff}
+.hc-steps .s.cur .ic{border-color:var(--hc-primary);color:var(--hc-primary)}
+.hc-steps .s.err .ic{border-color:var(--hc-danger);color:var(--hc-danger)}
+.hc-steps .s.err{color:var(--hc-danger)}
+.hc-steps .s .bar{position:absolute;top:9px;left:50%;width:100%;height:1px;background:var(--hc-divider)}
+.hc-steps .s:first-child .bar{display:none}
+.hc-steps .s.done .bar{background:var(--hc-success)}
+.hc-pager{display:flex;gap:5px;align-items:center;font-size:12px;color:var(--hc-text-2)}
+.hc-pager .p{min-width:26px;height:26px;border:1px solid var(--hc-border);border-radius:var(--hc-radius);background:#fff;display:flex;align-items:center;justify-content:center}
+.hc-pager .p.on{background:var(--hc-primary);border-color:var(--hc-primary);color:#fff}
+.hc-pager .p.ellipsis{border:none;background:none;color:var(--hc-text-3)}
+.hc-pager .go{display:flex;align-items:center;gap:4px}
+.hc-pager .go input{width:36px;height:26px;border:1px solid var(--hc-border);border-radius:var(--hc-radius);text-align:center;font-size:12px}
+.hc-tree{font-size:12px;color:var(--hc-text-2)}
+.hc-tree .nd{padding:3px 0;display:flex;align-items:center;gap:6px}
+.hc-tree .nd .sw{width:10px;color:var(--hc-text-3);text-align:center;cursor:pointer}
+.hc-tree .nd .lb.on{color:var(--hc-primary);background:var(--hc-primary-1);padding:1px 6px;border-radius:3px}
+.hc-tree .nd input{margin:0}
+.hc-tree .ch{padding-left:18px}
+.hc-alert{display:flex;gap:8px;padding:7px 14px;border-radius:var(--hc-radius);font-size:13px;margin-bottom:6px}
+.hc-alert.info{background:var(--hc-primary-1);color:var(--hc-primary)}
+.hc-alert.warning{background:rgba(255,153,2,.1);color:#E08700}
+.hc-alert.danger{background:rgba(255,76,76,.1);color:#E33A3A}
+.hc-alert.success{background:rgba(28,199,141,.1);color:#0FAE77}
+.hc-message{display:inline-flex;align-items:center;gap:8px;min-width:240px;padding:9px 12px;border-radius:2px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:13px;border:1px solid var(--hc-divider)}
+.hc-message .dot{width:8px;height:8px;border-radius:50%}
+.hc-notice{display:flex;gap:10px;width:100%;max-width:320px;background:#fff;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.hc-notice .ic{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:13px}
+.hc-dialog{width:100%;max-width:380px;background:#fff;border-radius:4px;box-shadow:0 4px 16px rgba(0,0,0,.18);overflow:hidden}
+.hc-dialog .hd{height:44px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--hc-divider);font-size:14px}
+.hc-dialog .bd{padding:16px;font-size:13px;color:var(--hc-text-2)}
+.hc-dialog .ft{display:flex;justify-content:flex-end;gap:10px;padding:10px 16px;border-top:1px solid var(--hc-divider)}
+.hc-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px;color:var(--hc-text-3);text-align:center}
+.hc-empty .e-ic{font-size:28px;color:#C5C5C5;margin-bottom:8px}
+.hc-empty .t{font-size:14px;color:var(--hc-text-1);margin-bottom:4px}
+.hc-card{background:#fff;border:1px solid var(--hc-border);border-radius:var(--hc-radius-lg);padding:14px}
+.hc-card .card-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;font-weight:500}
+.hc-popover{display:inline-block;background:#fff;border:1px solid var(--hc-border);border-radius:var(--hc-radius);box-shadow:0 2px 8px rgba(0,0,0,.14);padding:10px 12px;font-size:12px;color:var(--hc-text-2);max-width:220px;position:relative}
+.hc-progress{height:8px;border-radius:4px;background:var(--hc-fill-hover);overflow:hidden;width:100%}
+.hc-progress .bar{height:100%;border-radius:4px;background:var(--hc-primary)}
+.hc-progress .bar.success{background:var(--hc-success)}
+.hc-progress .bar.warning{background:var(--hc-warning)}
+.hc-progress .bar.danger{background:var(--hc-danger)}
+.hc-transfer{display:flex;gap:10px;align-items:center}
+.hc-transfer .box{flex:1;border:1px solid var(--hc-border);border-radius:var(--hc-radius);background:#fff;overflow:hidden}
+.hc-transfer .box .bh{padding:7px 10px;background:var(--hc-table-head);border-bottom:1px solid var(--hc-divider);font-size:12px;color:var(--hc-text-2)}
+.hc-transfer .box .it{padding:6px 10px;font-size:12px;border-bottom:1px solid var(--hc-divider);display:flex;align-items:center;gap:6px}
+.hc-transfer .mid{display:flex;flex-direction:column;gap:6px}
+.hc-richtext{border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden}
+.hc-richtext .tb{display:flex;gap:2px;padding:6px 8px;border-bottom:1px solid var(--hc-divider);background:var(--hc-table-head)}
+.hc-richtext .tb span{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:3px;font-size:12px;color:var(--hc-text-2)}
+.hc-richtext .bd{padding:10px;font-size:13px;color:var(--hc-text-2)}
+.hc-upload{border:1px dashed var(--hc-border);border-radius:var(--hc-radius);padding:18px;text-align:center;color:var(--hc-text-3);font-size:12px;background:var(--hc-table-head)}
+.hc-upload .file{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:8px 10px;margin-top:8px;font-size:12px;color:var(--hc-text-2);text-align:left}
+.hc-spinner{width:18px;height:18px;border:2px solid var(--hc-primary-2);border-top-color:var(--hc-primary);border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hc-check{display:flex;gap:12px;font-size:12px;color:var(--hc-text-2);align-items:center}
+.hc-check.v{flex-direction:column;align-items:flex-start;gap:6px}
+.hc-switch{display:inline-block;width:42px;height:19px;border-radius:10px;background:#D3D8DD;position:relative;transition:background .2s}
+.hc-switch.on{background:#34A6F8}
+.hc-switch::after{content:"";position:absolute;top:2px;left:3px;width:15px;height:15px;border-radius:50%;background:#fff;transition:left .2s}
+.hc-switch.on::after{left:24px}
+.hc-switch.dis{opacity:.5}
+.ig{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;color:#999;font-size:14px}
+.ig.filled{color:var(--hc-primary)}
+.ig.dis{color:#C5C5C5}
+/* 最佳实践 */
+.prac{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.prac-card{background:#fff;border:1px solid var(--hc-border);border-radius:var(--hc-radius-lg);overflow:hidden}
+.prac-card .ph{padding:12px 16px;background:var(--hc-table-head);border-bottom:1px solid var(--hc-divider);display:flex;justify-content:space-between;align-items:center}
+.prac-card .ph .n{font-size:14px;font-weight:500}
+.prac-card .ph .e{font-size:11px;color:var(--hc-text-3)}
+.prac-card .pb{padding:16px;min-height:200px}
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.page-head h3{font-size:17px;line-height:24px;font-weight:500}
+.page-head .acts{display:flex;gap:8px}
+.filter{display:flex;flex-wrap:wrap;gap:10px;padding:12px;background:var(--hc-table-head);border-radius:var(--hc-radius);align-items:flex-end;margin-bottom:12px}
+.filter .f{min-width:130px;flex:1}
+.filter .f .lb{font-size:11px;color:var(--hc-text-2);margin-bottom:3px}
+.profile{display:flex;gap:14px;align-items:center;padding:14px;background:var(--hc-table-head);border-radius:var(--hc-radius);margin-bottom:12px}
+.profile .avatar{width:40px;height:40px;border-radius:50%;background:var(--hc-primary-1);color:var(--hc-primary);display:flex;align-items:center;justify-content:center;font-size:16px}
+.profile .name{font-size:15px;font-weight:500}
+.profile .meta{font-size:11px;color:var(--hc-text-3)}
+.metric{background:#fff;border:1px solid var(--hc-divider);border-radius:var(--hc-radius-lg);padding:14px}
+.metric .lb{font-size:11px;color:var(--hc-text-3)}
+.metric .v{font-size:18px;line-height:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.metric .delta{font-size:11px;color:var(--hc-text-3)}
+.metric .delta.up{color:var(--hc-success)}
+.todo{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--hc-divider);font-size:12px}
+.todo:last-child{border-bottom:none}
+.todo .t{flex:1}
+.todo .t .sub{color:var(--hc-text-3);font-size:11px}
+.cp{display:flex;align-items:center;font-size:11px}
+.cp .node{display:flex;flex-direction:column;align-items:center;gap:3px;width:88px;color:var(--hc-text-2)}
+.cp .node .c{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid var(--hc-border);background:#fff}
+.cp .node.done .c{background:var(--hc-success);border-color:var(--hc-success);color:#fff}
+.cp .node.cur .c{border-color:var(--hc-primary);color:var(--hc-primary);box-shadow:0 0 0 3px var(--hc-primary-1)}
+.cp .node.err .c{border-color:var(--hc-danger);color:var(--hc-danger)}
+.cp .ln{height:2px;width:44px;background:var(--hc-divider);margin-bottom:24px}
+.cp .ln.done{background:var(--hc-success)}
+.exception{display:flex;flex-direction:column;align-items:center;padding:36px;text-align:center}
+.exception .code{font-size:52px;line-height:60px;color:var(--hc-primary-3);font-weight:700}
+.exception .t{font-size:15px;margin:6px 0}
+.exception .d{color:var(--hc-text-3);margin-bottom:16px}
+.dash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.perm{display:flex;gap:8px;padding:8px 10px;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);align-items:center;font-size:12px;color:var(--hc-text-2)}
+.perm .ic{width:26px;height:26px;border-radius:6px;background:var(--hc-fill-hover);display:flex;align-items:center;justify-content:center}
+.foot{max-width:1320px;margin:0 auto;padding:24px;color:var(--hc-text-3);font-size:12px;text-align:center;border-top:1px solid var(--hc-divider)}
+@media(max-width:1100px){.comp-grid{grid-template-columns:1fr}.pr-grid{grid-template-columns:1fr 1fr}.prac{grid-template-columns:1fr}}
+@media(max-width:760px){.pr-grid{grid-template-columns:1fr}.flat{grid-template-columns:1fr}.values{grid-template-columns:repeat(2,1fr)}.dash-grid{grid-template-columns:1fr}}
+/* ===== 交互增强（纯前端动态效果）===== */
+.hc-btn{transition:border-color .2s,color .2s,background .2s,transform .1s}
+.hc-btn:active:not([disabled]){transform:scale(.96)}
+.hc-tabs .t,.hc-pager .p,.hc-menu .mi,.hc-tree .sw,.hc-switch{cursor:pointer}
+.hc-tabs .t:hover,.hc-pager .p:hover:not(.on){color:var(--hc-primary)}
+.hc-pager .p:hover:not(.on){border-color:var(--hc-primary)}
+.hc-switch{cursor:pointer;user-select:none}
+.hc-switch:hover{box-shadow:0 0 0 3px var(--hc-primary-1)}
+.hc-toast{position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:9999;background:#fff;border:1px solid var(--hc-divider);border-radius:4px;box-shadow:0 4px 16px rgba(0,0,0,.2);padding:10px 18px;font-size:13px;color:var(--hc-text-1);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .3s;max-width:82%}
+.hc-toast .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.hc-dialog,.hc-notice,.hc-menu,.hc-popover{transition:transform .15s}
+/* ===== 基础样式规范区 ===== */
+.bs-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:8px}
+.bs-card{border:1px solid var(--hc-border);border-radius:var(--hc-radius-lg);padding:16px;background:#fff}
+.bs-card .bt{font-size:14px;font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.bs-card .bt .en{font-size:11px;color:var(--hc-text-3);font-weight:400}
+.bs-card .note{font-size:12px;color:var(--hc-text-2);line-height:20px}
+.bs-card .note b{color:var(--hc-text-1);font-weight:500}
+.sw-row{display:flex;flex-wrap:wrap;gap:10px}
+.sw{width:72px;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);overflow:hidden}
+.sw .c{height:40px}
+.sw .i{font-size:10px;color:var(--hc-text-2);padding:4px 6px;line-height:14px}
+.sw .i b{display:block;font-size:10px;color:var(--hc-text-1);font-weight:500}
+.ty-row{display:flex;align-items:baseline;gap:16px;padding:8px 10px;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);margin-bottom:8px}
+.ty-row .name{width:80px;flex:0 0 auto;font-size:11px;color:var(--hc-text-3)}
+.ty-row .sample{flex:1;color:var(--hc-text-1)}
+.sp-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.sp-row .lab{width:64px;font-size:11px;color:var(--hc-text-3);flex:0 0 auto}
+.sp-row .bar{height:14px;border-radius:3px;background:var(--hc-primary)}
+.sp-row .val{font-size:11px;color:var(--hc-text-2)}
+.grid-note{display:flex;gap:8px;flex-wrap:wrap}
+.grid-note span{border:1px solid var(--hc-primary);color:var(--hc-primary);font-size:11px;padding:2px 8px;border-radius:3px}
+pre.code{background:#F7F9FC;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:12px;font-family:Consolas,"Courier New",monospace;font-size:12px;line-height:18px;color:#333;overflow:auto;white-space:pre}
+@media(max-width:1100px){.bs-grid{grid-template-columns:1fr}}
+/* ===== 扩展色板 / 产品主题色 ===== */
+.pal-row{display:flex;align-items:stretch;margin-bottom:6px;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);overflow:hidden}
+.pal-row .pn{width:60px;flex:0 0 auto;font-size:11px;color:var(--hc-text-2);display:flex;align-items:center;justify-content:center;background:var(--hc-table-head);border-right:1px solid var(--hc-divider);font-weight:500}
+.pal-row .steps{flex:1;display:flex}
+.pal-row .st{flex:1;height:44px;cursor:default}
+.pal-hex{font-size:9px;color:var(--hc-text-3);line-height:14px;padding:0 2px 8px;font-family:Consolas,"Courier New",monospace}
+@media(max-width:760px){.pal-row{flex-direction:column}.pal-row .pn{width:100%;height:22px;border-right:none;border-bottom:1px solid var(--hc-divider)}}
+/* ===== 悬浮工具（目录/搜索/回顶/深色预览）===== */
+.hc-tools{position:fixed;right:18px;bottom:18px;z-index:999;display:flex;flex-direction:column;gap:10px}
+.hc-tool{width:44px;height:44px;border-radius:50%;border:1px solid var(--hc-divider);background:#fff;color:var(--hc-text-1);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.14);transition:transform .15s,border-color .2s}
+.hc-tool:hover{border-color:var(--hc-primary);color:var(--hc-primary);transform:translateY(-2px)}
+.hc-panel{position:fixed;right:18px;bottom:76px;z-index:998;width:300px;max-height:72vh;background:#fff;border:1px solid var(--hc-border);border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
+.hc-panel.open{display:flex}
+.hc-panel .ph{padding:12px 14px;border-bottom:1px solid var(--hc-divider);font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:space-between;background:var(--hc-table-head)}
+.hc-panel .psearch{padding:10px 12px;border-bottom:1px solid var(--hc-divider)}
+.hc-panel .psearch input{width:100%;height:30px;border:1px solid var(--hc-border);border-radius:var(--hc-radius);padding:0 10px;font-size:12px;outline:none}
+.hc-panel .psearch input:focus{border-color:var(--hc-primary)}
+.hc-panel .plist{flex:1;overflow:auto;padding:8px}
+.hc-panel .plist .pl{display:block;width:100%;text-align:left;padding:7px 10px;border-radius:var(--hc-radius);font-size:12px;color:var(--hc-text-2);cursor:pointer;background:none;border:none}
+.hc-panel .plist .pl:hover{background:var(--hc-primary-1);color:var(--hc-primary)}
+.hc-panel .plist .gr{font-size:11px;color:var(--hc-text-3);padding:8px 10px 2px;cursor:default}
+.hc-panel .pf{padding:8px 10px;border-top:1px solid var(--hc-divider);display:flex;gap:8px;align-items:center;justify-content:space-between}
+.hc-panel .pf button{border:1px solid var(--hc-border);border-radius:var(--hc-radius);background:#fff;color:var(--hc-text-2);font-size:11px;padding:5px 10px;cursor:pointer}
+.hc-panel .pf button.on{background:var(--hc-primary);border-color:var(--hc-primary);color:#fff}
+/* 复制按钮 */
+pre.code{position:relative}
+pre.code .copy{border:1px solid var(--hc-divider);background:#fff;border-radius:3px;font-size:11px;color:var(--hc-text-2);padding:2px 9px;cursor:pointer;position:absolute;top:6px;right:6px;opacity:0;transition:opacity .2s;line-height:16px}
+pre.code:hover .copy{opacity:1}
+pre.code .copy:hover{border-color:var(--hc-primary);color:var(--hc-primary)}
+/* Toolbar 图标 hover */
+.tb-ic{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--hc-radius);cursor:pointer;color:var(--hc-text-2);font-size:13px;transition:background .15s,color .15s}
+.tb-ic:hover{background:var(--hc-primary-1);color:var(--hc-primary)}
+/* Dialog 演示 */
+.hc-dialog-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:none;align-items:center;justify-content:center}
+.hc-dialog-mask.open{display:flex}
+.hc-dialog-box{width:420px;max-width:90vw;background:#fff;border-radius:4px;box-shadow:0 8px 30px rgba(0,0,0,.2);overflow:hidden}
+.hc-dialog-box .dh{padding:0 20px;height:48px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--hc-divider);font-size:14px;font-weight:500}
+.hc-dialog-box .dh .x{cursor:pointer;color:var(--hc-text-3);font-size:14px}
+.hc-dialog-box .db{padding:20px;font-size:13px;line-height:22px}
+.hc-dialog-box .df{padding:12px 20px;border-top:1px solid var(--hc-divider);display:flex;justify-content:flex-end;gap:8px}
+/* 深色预览主题 */
+body.dark{background:#120A36;color:#E6E9F2}
+body.dark{--hc-text-1:#E6E9F2;--hc-text-2:#AEB7CE;--hc-text-3:#79839F;--hc-border:#39436B;--hc-divider:#2A3357;--hc-fill-hover:#1B2250;--hc-nav-bg:#0F1450;--hc-table-head:#171F52}
+body.dark .comp,body.dark .bs-card,body.dark .pr-card,body.dark .value,body.dark .hc-panel,body.dark .hc-dialog-box{background:#0F1450;border-color:#2A3357}
+body.dark .flat .item{border-color:#2A3357;background:#0F1450}
+body.dark .hc-table th{background:#171F52;color:#AEB7CE}
+body.dark .hc-table td{border-color:#2A3357}
+body.dark .hc-input,body.dark .hc-select{background:#0F1450;border-color:#39436B;color:#E6E9F2}
+body.dark .hc-btn:not(.primary):not(.danger):not(.link):not(.icon){background:#0F1450;border-color:#39436B;color:#E6E9F2}
+body.dark .hc-menu{background:#0F1450}
+body.dark .hc-menu .mi.on{background:#1B2250}
+body.dark .hc-tag{background:#1B2250;color:#AEB7CE}
+body.dark pre.code{background:#1B2250;color:#E6E9F2;border-color:#2A3357}
+body.dark .ty-row{border-color:#2A3357}
+body.dark .foot{color:#79839F}
+body.dark .hc-tool{background:#0F1450;border-color:#2A3357;color:#E6E9F2}
+body.dark .prac,body.dark .dash{border-color:#2A3357;background:#0F1450}
+body.dark .tb-ic:hover{background:#1B2250}
+@media print{.hc-tools,.hc-panel,.hc-dialog-mask{display:none!important}pre.code .copy{display:none}}
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <h1>Honeycomb Design · UED 完整平铺（多示例版）</h1>
+  <p>基础样式 · 设计原则 · 组件全样式 · 最佳实践 · 信息架构 · 数据文案 · AI · 可视化 · 无障碍验收 — 一次拉平，供设计、开发、评审与测试对照</p>
+  <div class="tags"><span>一致</span><span>灵活</span><span>高效</span><span>开放</span><span>主色 #266EFF</span><span>桌面基线 1440px</span><span>9 大区块</span><span>49 组件 · 多示例</span><span>12 最佳实践页</span><span>V1.0 · 2026-09-04 快照</span></div>
+</div>
+
+<!-- ========== PART A 设计原则 ========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">A</span><h2>UED 设计原则</h2><span class="en">Design Principles — 平铺</span></div>
+  <div class="values">
+    <div class="value"><div class="v">一致</div><div class="d">跨系统交互一致性有效融合</div></div>
+    <div class="value"><div class="v">灵活</div><div class="d">模式规则具弹性，适配独特业务</div></div>
+    <div class="value"><div class="v">高效</div><div class="d">减少认知成本，提升交互确定性</div></div>
+    <div class="value"><div class="v">开放</div><div class="d">公开进行中组件，共建完善</div></div>
+  </div>
+  <div class="pr-grid">
+    <div class="pr-card"><div class="pn"><span class="ic">▦</span><div><div class="t">框架 Frame</div></div></div><div class="desc">先确定平台层级和页面骨架，再组织业务模块。</div><div class="apply"><b>应用：</b>顶栏、侧栏、工作区、卡片区、大屏</div></div>
+    <div class="pr-card"><div class="pn"><span class="ic">◫</span><div><div class="t">亲密性 Intimacy</div></div></div><div class="desc">相关信息靠近，无关信息用更大间距分组隔开。</div><div class="apply"><b>应用：</b>表单项、指标组、工具栏与表格</div></div>
+    <div class="pr-card"><div class="pn"><span class="ic">⇶</span><div><div class="t">对齐 Align</div></div></div><div class="desc">标题、标签、数字金额遵循稳定对齐线。</div><div class="apply"><b>应用：</b>标签右对齐、金额右对齐、操作列对齐</div></div>
+    <div class="pr-card"><div class="pn"><span class="ic">◍</span><div><div class="t">重复 Repeat</div></div></div><div class="desc">同类组件、文案格式和图标排版保持一致。</div><div class="apply"><b>应用：</b>卡片列表、状态标签、行操作</div></div>
+    <div class="pr-card"><div class="pn"><span class="ic">◐</span><div><div class="t">对比 Contrast</div></div></div><div class="desc">用字号、字重、颜色、留白表达主次与状态。</div><div class="apply"><b>应用：</b>主按钮、关键指标、异常信息</div></div>
+    <div class="pr-card"><div class="pn"><span class="ic">↻</span><div><div class="t">即时反馈 Feedback</div></div></div><div class="desc">操作后及时显示成功、失败、校验或刷新状态。</div><div class="apply"><b>应用：</b>Message、Alert、表单校验、Loading</div></div>
+  </div>
+  <div style="margin-bottom:16px"><div class="flat">
+    <div class="item"><span class="k">1</span><div class="tx"><b>产品气质：克制、清晰、稳定</b><span>信息密度优先于装饰；颜色承担状态与信息编码职责。</span></div></div>
+    <div class="item"><span class="k">2</span><div class="tx"><b>复用驱动效率</b><span>标准组件、页面模板、业务组件减少重复设计与开发。</span></div></div>
+    <div class="item"><span class="k">3</span><div class="tx"><b>组件九态矩阵</b><span>Default / Hover / Focus / Active / Selected / Disabled / Loading / Error / Empty。</span></div></div>
+    <div class="item"><span class="k">4</span><div class="tx"><b>数据格式与文案</b><span>空值 --、0 有效；状态文本为主颜色为辅；按钮“动词+对象”；错误先结果后原因。</span></div></div>
+    <div class="item"><span class="k">5</span><div class="tx"><b>无障碍</b><span>对比度≥4.5:1；全键盘可用；focus-visible 清晰；状态不只靠颜色。</span></div></div>
+    <div class="item"><span class="k">6</span><div class="tx"><b>AI 交互按生命周期验收</b><span>开始/提示/执行/结果/结束，覆盖上传、处理中、转人工等阶段。</span></div></div>
+  </div></div>
+</section>
+
+<!-- ========== PART B 基础样式规范（Design Tokens）========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">B</span><h2>基础样式规范</h2><span class="en">Design Tokens & 基础组件样式 — 色彩 / 字体 / 间距 / 尺寸 / 按钮 / 图标</span></div>
+
+  <div class="cat"><div class="cat-h">色彩 Color<span class="en">--hc-* 语义 Token</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">品牌与交互色 <span class="en">--hc-primary 系列</span></div>
+        <div class="sw-row">
+          <div class="sw"><div class="c" style="background:#266EFF"></div><div class="i"><b>primary</b>#266EFF</div></div>
+          <div class="sw"><div class="c" style="background:#518BFF"></div><div class="i"><b>hover</b>#518BFF</div></div>
+          <div class="sw"><div class="c" style="background:#2263E6"></div><div class="i"><b>active</b>#2263E6</div></div>
+          <div class="sw"><div class="c" style="background:#EBF2FF"></div><div class="i"><b>1 浅底</b>#EBF2FF</div></div>
+          <div class="sw"><div class="c" style="background:#CCDDFF"></div><div class="i"><b>2</b>#CCDDFF</div></div>
+          <div class="sw"><div class="c" style="background:#A8C5FF"></div><div class="i"><b>3</b>#A8C5FF</div></div>
+          <div class="sw"><div class="c" style="background:#84ADFF"></div><div class="i"><b>4</b>#84ADFF</div></div>
+          <div class="sw"><div class="c" style="background:#6397FF"></div><div class="i"><b>5</b>#6397FF</div></div>
+          <div class="sw"><div class="c" style="background:#4583FF"></div><div class="i"><b>6</b>#4583FF</div></div>
+          <div class="sw"><div class="c" style="background:#175BE5"></div><div class="i"><b>8</b>#175BE5</div></div>
+          <div class="sw"><div class="c" style="background:#044AD6"></div><div class="i"><b>9</b>#044AD6</div></div>
+          <div class="sw"><div class="c" style="background:#003EBD"></div><div class="i"><b>10</b>#003EBD</div></div>
+        </div>
+        <div class="note" style="margin-top:10px">默认系统主题「景泰蓝」渐变 <b>#266EFF → #4A85F6 → #55B8FF</b>；可选产品主题：天空蓝 #02A7F5、宝石蓝 #3A82CF、橄榄绿 #2D9F61、欢快橙 #FA5A1E、活力火 #F23C39、经典黑 #434459。业务界面应通过语义 Token 引用，不在组件中直接绑定某一档原始色值。</div>
+      </div>
+      <div class="bs-card"><div class="bt">功能色 <span class="en">语义 Token</span></div>
+        <div class="sw-row">
+          <div class="sw" style="width:126px"><div class="c" style="background:#266EFF"></div><div class="i"><b>info 信息/链接</b>#266EFF</div></div>
+          <div class="sw" style="width:126px"><div class="c" style="background:#1CC78D"></div><div class="i"><b>success 成功</b>#1CC78D</div></div>
+          <div class="sw" style="width:126px"><div class="c" style="background:#FF9902"></div><div class="i"><b>warning 警示</b>#FF9902</div></div>
+          <div class="sw" style="width:126px"><div class="c" style="background:#FF4C4C"></div><div class="i"><b>danger 危险</b>#FF4C4C</div></div>
+        </div>
+        <div class="note" style="margin-top:10px">info 不与普通正文仅靠颜色区分；success 配合图标或文字；warning 避免用于普通装饰；danger 删除确认必须同时写明后果。旧 Element 时代功能色（#13CE66 / #F7BA2A / #FF4949）新页面应迁移到上表，避免同屏混用。</div>
+      </div>
+      <div class="bs-card"><div class="bt">中性色 <span class="en">文字 / 边框 / 背景</span></div>
+        <div class="sw-row">
+          <div class="sw"><div class="c" style="background:#333333"></div><div class="i"><b>text-1 主文</b>#333</div></div>
+          <div class="sw"><div class="c" style="background:#666666"></div><div class="i"><b>text-2 次文</b>#666</div></div>
+          <div class="sw"><div class="c" style="background:#999999"></div><div class="i"><b>text-3 说明</b>#999</div></div>
+          <div class="sw"><div class="c" style="background:#C5C5C5"></div><div class="i"><b>icon 禁用</b>#C5C5C5</div></div>
+          <div class="sw"><div class="c" style="background:#DDDDDD"></div><div class="i"><b>border 边框</b>#DDD</div></div>
+          <div class="sw"><div class="c" style="background:#EAEAEA"></div><div class="i"><b>divider 分割</b>#EAEAEA</div></div>
+          <div class="sw"><div class="c" style="background:#F5F5F5"></div><div class="i"><b>fill hover</b>#F5F5F5</div></div>
+          <div class="sw"><div class="c" style="background:#F8F8F8"></div><div class="i"><b>nav 导航</b>#F8F8F8</div></div>
+          <div class="sw"><div class="c" style="background:#FBFBFB"></div><div class="i"><b>table 表头</b>#FBFBFB</div></div>
+          <div class="sw"><div class="c" style="background:#FFFFFF;border-bottom:1px solid var(--hc-border)"></div><div class="i"><b>surface 底</b>#FFF</div></div>
+        </div>
+        <div class="note" style="margin-top:10px">正文浅色背景上用 #333 / #666 / #999 三层，不用纯黑制造过强对比。</div>
+      </div>
+      <div class="bs-card"><div class="bt">数据可视化色板 <span class="en">分类色序列</span></div>
+        <div class="note" style="margin-bottom:8px">分类色顺序稳定，同一指标跨页面保持同色。该序列属图表分类色，不等同于品牌主色。</div>
+        <div class="sw-row">
+          <div class="sw" style="width:64px"><div class="c" style="background:#FF5001"></div><div class="i"><b>1</b>#FF5001</div></div>
+          <div class="sw" style="width:64px"><div class="c" style="background:#FF9102"></div><div class="i"><b>2</b>#FF9102</div></div>
+          <div class="sw" style="width:64px"><div class="c" style="background:#04B77D"></div><div class="i"><b>3</b>#04B77D</div></div>
+          <div class="sw" style="width:64px"><div class="c" style="background:#3397FF"></div><div class="i"><b>4</b>#3397FF</div></div>
+          <div class="sw" style="width:64px"><div class="c" style="background:#6B4EFF"></div><div class="i"><b>5</b>#6B4EFF</div></div>
+        </div>
+        <div class="note" style="margin-top:10px">状态数据沿用成功 / 警示 / 错误功能色语义；深色大屏用「科技蓝」主题，普通报表用「极简白」主题。分类数量超过可辨色数时优先分组、筛选或拆图，不堆叠近似色。</div>
+      </div>
+      <div class="bs-card" style="grid-column:1/-1">
+        <div class="bt">扩展基础色板 <span class="en">8 色系 × 10 阶（由浅至深）· 供语义 Token 映射引用</span></div>
+        <div class="pal-row"><div class="pn">天蓝</div><div class="steps"><div class="st" style="background:#D9EDFF" title="#D9EDFF"></div><div class="st" style="background:#B3DAFF" title="#B3DAFF"></div><div class="st" style="background:#8CC8FF" title="#8CC8FF"></div><div class="st" style="background:#66B5FF" title="#66B5FF"></div><div class="st" style="background:#40A3FF" title="#40A3FF"></div><div class="st" style="background:#1990FF" title="#1990FF"></div><div class="st" style="background:#1784EB" title="#1784EB"></div><div class="st" style="background:#1579D6" title="#1579D6"></div><div class="st" style="background:#126BBD" title="#126BBD"></div><div class="st" style="background:#105CA3" title="#105CA3"></div></div></div>
+        <div class="pal-hex">天蓝：#D9EDFF #B3DAFF #8CC8FF #66B5FF #40A3FF #1990FF #1784EB #1579D6 #126BBD #105CA3</div>
+        <div class="pal-row"><div class="pn">青</div><div class="steps"><div class="st" style="background:#E5F7F8" title="#E5F7F8"></div><div class="st" style="background:#C2EFF0" title="#C2EFF0"></div><div class="st" style="background:#8ADDE2" title="#8ADDE2"></div><div class="st" style="background:#58CBD3" title="#58CBD3"></div><div class="st" style="background:#2CB8C5" title="#2CB8C5"></div><div class="st" style="background:#05A4B6" title="#05A4B6"></div><div class="st" style="background:#038698" title="#038698"></div><div class="st" style="background:#016979" title="#016979"></div><div class="st" style="background:#004D5B" title="#004D5B"></div><div class="st" style="background:#003B47" title="#003B47"></div></div></div>
+        <div class="pal-hex">青：#E5F7F8 #C2EFF0 #8ADDE2 #58CBD3 #2CB8C5 #05A4B6 #038698 #016979 #004D5B #003B47</div>
+        <div class="pal-row"><div class="pn">绿</div><div class="steps"><div class="st" style="background:#EDFDF7" title="#EDFDF7"></div><div class="st" style="background:#C9F9E8" title="#C9F9E8"></div><div class="st" style="background:#A5F3D9" title="#A5F3D9"></div><div class="st" style="background:#70EBC2" title="#70EBC2"></div><div class="st" style="background:#3CD4A1" title="#3CD4A1"></div><div class="st" style="background:#1CC78D" title="#1CC78D"></div><div class="st" style="background:#13A374" title="#13A374"></div><div class="st" style="background:#167E5A" title="#167E5A"></div><div class="st" style="background:#126246" title="#126246"></div><div class="st" style="background:#0F523A" title="#0F523A"></div></div></div>
+        <div class="pal-hex">绿：#EDFDF7 #C9F9E8 #A5F3D9 #70EBC2 #3CD4A1 #1CC78D #13A374 #167E5A #126246 #0F523A</div>
+        <div class="pal-row"><div class="pn">橄榄绿</div><div class="steps"><div class="st" style="background:#F3F8EC" title="#F3F8EC"></div><div class="st" style="background:#E3F0D0" title="#E3F0D0"></div><div class="st" style="background:#C8E2A5" title="#C8E2A5"></div><div class="st" style="background:#ADD37E" title="#ADD37E"></div><div class="st" style="background:#93C55B" title="#93C55B"></div><div class="st" style="background:#7BB63C" title="#7BB63C"></div><div class="st" style="background:#649830" title="#649830"></div><div class="st" style="background:#4E7926" title="#4E7926"></div><div class="st" style="background:#395B1B" title="#395B1B"></div><div class="st" style="background:#253D12" title="#253D12"></div></div></div>
+        <div class="pal-hex">橄榄绿：#F3F8EC #E3F0D0 #C8E2A5 #ADD37E #93C55B #7BB63C #649830 #4E7926 #395B1B #253D12</div>
+        <div class="pal-row"><div class="pn">黄</div><div class="steps"><div class="st" style="background:#FFFAEA" title="#FFFAEA"></div><div class="st" style="background:#FEEFC3" title="#FEEFC3"></div><div class="st" style="background:#FCE187" title="#FCE187"></div><div class="st" style="background:#FBD34B" title="#FBD34B"></div><div class="st" style="background:#FBC824" title="#FBC824"></div><div class="st" style="background:#F0BA06" title="#F0BA06"></div><div class="st" style="background:#E0AC01" title="#E0AC01"></div><div class="st" style="background:#CEA405" title="#CEA405"></div><div class="st" style="background:#AF8B04" title="#AF8B04"></div><div class="st" style="background:#886C05" title="#886C05"></div></div></div>
+        <div class="pal-hex">黄：#FFFAEA #FEEFC3 #FCE187 #FBD34B #FBC824 #F0BA06 #E0AC01 #CEA405 #AF8B04 #886C05</div>
+        <div class="pal-row"><div class="pn">靛蓝</div><div class="steps"><div class="st" style="background:#ECEFF8" title="#ECEFF8"></div><div class="st" style="background:#D1D8F0" title="#D1D8F0"></div><div class="st" style="background:#A7B3E1" title="#A7B3E1"></div><div class="st" style="background:#8090D3" title="#8090D3"></div><div class="st" style="background:#5E6FC4" title="#5E6FC4"></div><div class="st" style="background:#3F51B5" title="#3F51B5"></div><div class="st" style="background:#3342A1" title="#3342A1"></div><div class="st" style="background:#28348C" title="#28348C"></div><div class="st" style="background:#1F2878" title="#1F2878"></div><div class="st" style="background:#171D63" title="#171D63"></div></div></div>
+        <div class="pal-hex">靛蓝：#ECEFF8 #D1D8F0 #A7B3E1 #8090D3 #5E6FC4 #3F51B5 #3342A1 #28348C #1F2878 #171D63</div>
+        <div class="pal-row"><div class="pn">紫</div><div class="steps"><div class="st" style="background:#F3EDF9" title="#F3EDF9"></div><div class="st" style="background:#E2D1F4" title="#E2D1F4"></div><div class="st" style="background:#C4A7E9" title="#C4A7E9"></div><div class="st" style="background:#A67FDD" title="#A67FDD"></div><div class="st" style="background:#885BD2" title="#885BD2"></div><div class="st" style="background:#6A3BC7" title="#6A3BC7"></div><div class="st" style="background:#5730B3" title="#5730B3"></div><div class="st" style="background:#47269E" title="#47269E"></div><div class="st" style="background:#361C8A" title="#361C8A"></div><div class="st" style="background:#281475" title="#281475"></div></div></div>
+        <div class="pal-hex">紫：#F3EDF9 #E2D1F4 #C4A7E9 #A67FDD #885BD2 #6A3BC7 #5730B3 #47269E #361C8A #281475</div>
+        <div class="pal-row"><div class="pn">玫红</div><div class="steps"><div class="st" style="background:#FDECEF" title="#FDECEF"></div><div class="st" style="background:#FBCFD8" title="#FBCFD8"></div><div class="st" style="background:#F6A0B5" title="#F6A0B5"></div><div class="st" style="background:#F27396" title="#F27396"></div><div class="st" style="background:#ED487B" title="#ED487B"></div><div class="st" style="background:#E91E63" title="#E91E63"></div><div class="st" style="background:#C51356" title="#C51356"></div><div class="st" style="background:#A20B48" title="#A20B48"></div><div class="st" style="background:#7E053A" title="#7E053A"></div><div class="st" style="background:#5A012B" title="#5A012B"></div></div></div>
+        <div class="pal-hex">玫红：#FDECEF #FBCFD8 #F6A0B5 #F27396 #ED487B #E91E63 #C51356 #A20B48 #7E053A #5A012B</div>
+        <div class="note" style="margin-top:4px">业务界面应通过语义 Token 引用某一档色值，不在组件中直接绑定原始色值；跨产品主题由 Token 统一切换。</div>
+      </div>
+      <div class="bs-card" style="grid-column:1/-1">
+        <div class="bt">产品主题色 <span class="en">默认景泰蓝 + 可选主题</span></div>
+        <div class="sw-row">
+          <div class="sw" style="width:180px"><div class="c" style="background:linear-gradient(120deg,#266EFF,#4A85F6,#55B8FF)"></div><div class="i"><b>景泰蓝（默认）</b>#266EFF→#55B8FF</div></div>
+          <div class="sw" style="width:110px"><div class="c" style="background:#02A7F5"></div><div class="i"><b>天空蓝</b>#02A7F5</div></div>
+          <div class="sw" style="width:110px"><div class="c" style="background:#3A82CF"></div><div class="i"><b>宝石蓝</b>#3A82CF</div></div>
+          <div class="sw" style="width:110px"><div class="c" style="background:#2D9F61"></div><div class="i"><b>橄榄绿</b>#2D9F61</div></div>
+          <div class="sw" style="width:110px"><div class="c" style="background:#FA5A1E"></div><div class="i"><b>欢快橙</b>#FA5A1E</div></div>
+          <div class="sw" style="width:110px"><div class="c" style="background:#F23C39"></div><div class="i"><b>活力火</b>#F23C39</div></div>
+          <div class="sw" style="width:110px"><div class="c" style="background:#434459"></div><div class="i"><b>经典黑</b>#434459</div></div>
+          <div class="sw" style="width:110px"><div class="c" style="background:#333742"></div><div class="i"><b>经典黑深</b>#333742</div></div>
+        </div>
+        <div class="note" style="margin-top:10px">主题主色是产品级 Token，业务界面统一引用；同一产品内主色保持一致，不在页面中散落多套主题色。深色大屏「科技蓝」主题另见可视化区。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cat"><div class="cat-h">字体排版 Typography<span class="en">字阶 / 行高 / 字重</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">字阶与行高 <span class="en">--hc-font-*（字号 / 行高）</span></div>
+        <div class="ty-row"><span class="name">--hc-font-20</span><span class="sample" style="font-size:20px;line-height:28px">特殊提示、关键大标题 · 20/28px · 字重 500/600</span></div>
+        <div class="ty-row"><span class="name">--hc-font-16</span><span class="sample" style="font-size:16px;line-height:24px">详情页标题 · 16/24px · 字重 500</span></div>
+        <div class="ty-row"><span class="name">--hc-font-14</span><span class="sample" style="font-size:14px;line-height:22px">导航、Tabs、分组标题（推荐基准）· 14/22px · 400/500</span></div>
+        <div class="ty-row"><span class="name">--hc-font-13</span><span class="sample" style="font-size:13px;line-height:22px">正文、表格与表单主体 · 13/22px · 字重 400</span></div>
+        <div class="ty-row"><span class="name">--hc-font-12</span><span class="sample" style="font-size:12px;line-height:22px">辅助说明、时间、次级元数据 · 12/22px · 字重 400</span></div>
+      </div>
+      <div class="bs-card"><div class="bt">字体族与字重 <span class="en">Font Family</span></div>
+        <pre class="code">font-family: "Helvetica Neue", Helvetica, Arial,
+  "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;</pre>
+        <div class="note" style="margin-top:10px">Mac 中文优先 <b>PingFang SC</b>，Windows 优先 <b>Microsoft YaHei</b>；英文与数字优先 Helvetica / Arial。业务系统通常只使用 <b>3–5 个字阶</b>；常规字重只用 400 Regular、500 Medium，英文强调可用 600 Semibold。不依赖用户未必安装的定制字体。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cat"><div class="cat-h">间距与栅格 Spacing & Grid<span class="en">4px 基准 · 24 栅格</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">间距刻度 <span class="en">--hc-space-*</span></div>
+        <div class="sp-row"><span class="lab">space-1</span><div class="bar" style="width:4px"></div><span class="val">4px 基础单位</span></div>
+        <div class="sp-row"><span class="lab">space-2</span><div class="bar" style="width:8px"></div><span class="val">8px</span></div>
+        <div class="sp-row"><span class="lab">space-3</span><div class="bar" style="width:12px"></div><span class="val">12px</span></div>
+        <div class="sp-row"><span class="lab">space-4</span><div class="bar" style="width:16px"></div><span class="val">16px</span></div>
+        <div class="sp-row"><span class="lab">space-6</span><div class="bar" style="width:24px"></div><span class="val">24px</span></div>
+        <div class="sp-row"><span class="lab">space-8</span><div class="bar" style="width:32px"></div><span class="val">32px</span></div>
+        <div class="note" style="margin-top:8px">常用间距 <b>8 / 12 / 16 / 24 / 32px</b>；特殊模块可用其他 <b>4px 倍数</b>（如 20px），不使用无规律的间距值。</div>
+      </div>
+      <div class="bs-card"><div class="bt">PC 栅格 <span class="en">24 栅格</span></div>
+        <div class="grid-note">
+          <span>24 栅格</span><span>内容区 1208px（1440 基准）</span><span>页边距 12px</span><span>水槽 12px</span>
+        </div>
+        <div style="display:flex;gap:2px;margin:12px 0 8px">
+          <div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div><div style="flex:1;height:18px;background:var(--hc-primary-1);border-radius:2px"></div>
+        </div>
+        <div class="note">推荐画板 <b>1440 × 820px</b>；兼容 1280 / 1366 / 1600 / 1920。断点收敛：compact &lt;720、medium 720–1199、wide ≥1200。移动端不是桌面等比缩小，需重定信息优先级与触控热区。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cat"><div class="cat-h">尺寸 · 圆角 · 边框 · 阴影 Metrics<span class="en">--hc-radius · 控件尺寸</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">输入控件尺寸 <span class="en">输入框高度</span></div>
+        <table class="hc-table">
+          <tr><th>规格</th><th>高度</th><th>说明</th></tr>
+          <tr><td>大</td><td>42px</td><td>首屏大表单</td></tr>
+          <tr><td>默认</td><td>36px</td><td>标准业务输入框（原站组件 CSS）</td></tr>
+          <tr><td>小</td><td>32px</td><td>紧凑场景</td></tr>
+          <tr><td>迷你</td><td>28px</td><td>工具栏 / 筛选行</td></tr>
+        </table>
+        <div class="note" style="margin-top:8px">默认输入框 <b>36px 高、12px 水平内边距、3px 圆角、边框 #DDD</b>；Focus 边框 <b>#266EFF</b>；Placeholder 不代替字段名。</div>
+      </div>
+      <div class="bs-card"><div class="bt">控件尺寸与圆角 <span class="en">数值一览</span></div>
+        <table class="hc-table">
+          <tr><th>项目</th><th>规范值</th></tr>
+          <tr><td>控件圆角（按钮 / 输入框 / 文本域）</td><td>3px</td></tr>
+          <tr><td>对话框圆角</td><td>4px</td></tr>
+          <tr><td>单选 / 复选</td><td>16 × 16px</td></tr>
+          <tr><td>Switch</td><td>46 × 20px，圆角 10px（默认 #D3D8DD / 选中 #34A6F8）</td></tr>
+          <tr><td>基础边框</td><td>1px solid #DDDDDD</td></tr>
+          <tr><td>对话框阴影</td><td>0 2px 4px rgba(0,0,0,.2)</td></tr>
+          <tr><td>动效时长</td><td>200–300ms（边框 / 背景 / 侧栏 / 浮层）</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="cat"><div class="cat-h">按钮基础样式 Button<span class="en">类型 / 状态 / 尺寸 / 规格</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">类型与状态 <span class="en">视觉示例（可点击）</span></div>
+        <div class="demo" style="margin-bottom:12px">
+          <button class="hc-btn primary">主按钮</button>
+          <button class="hc-btn">次按钮</button>
+          <button class="hc-btn dashed">虚线按钮</button>
+          <button class="hc-btn link">文字按钮</button>
+          <button class="hc-btn icon">⚙</button>
+          <button class="hc-btn danger">危险操作</button>
+          <button class="hc-btn" disabled>禁用</button>
+        </div>
+        <div class="demo">
+          <span class="hc-tag info">Default #266EFF</span>
+          <span class="hc-tag info">Hover #518BFF</span>
+          <span class="hc-tag warning">Active #2263E6</span>
+          <span class="hc-tag">次按钮 白底 #DDD 边框</span>
+          <span class="hc-tag danger">危险 #FF4C4C</span>
+        </div>
+        <div class="note" style="margin-top:10px">同一操作区只设 <b>一个主按钮</b>；取消在左、确定在右；表单主操作位置跨页面一致。图标按钮必须有 Tooltip；加载时保留原宽度；禁用 / 加载不可重复触发。危险按钮写具体动作（如「删除合同」），不写模糊的「确定」。</div>
+      </div>
+      <div class="bs-card"><div class="bt">尺寸规格 <span class="en">内边距 / 最小宽 / 字号</span></div>
+        <table class="hc-table">
+          <tr><th>规格</th><th>内边距（垂直 × 水平）</th><th>最小宽</th><th>字号</th></tr>
+          <tr><td>大</td><td>11px × 19px</td><td>—</td><td>14px</td></tr>
+          <tr><td>默认</td><td>8px × 15px</td><td>100px</td><td>13px</td></tr>
+          <tr><td>小</td><td>8px × 9px</td><td>—</td><td>12px</td></tr>
+          <tr><td>迷你</td><td>7px × 15px</td><td>—</td><td>11px</td></tr>
+        </table>
+        <pre class="code" style="margin-top:10px">.hc-btn {
+  min-width: 100px; padding: 8px 15px;
+  border: 1px solid #ddd; border-radius: 3px;
+  background: #fff; color: #333;
+  font: 400 13px/1 system-ui, sans-serif; cursor: pointer;
+}
+.hc-btn:hover { color: #266eff; border-color: #266eff; }
+.hc-btn:focus-visible { outline: 2px solid #84adff; outline-offset: 2px; }
+.hc-btn--primary { color:#fff; background:#266eff; border-color:#266eff; }
+.hc-btn--primary:hover { background:#518bff; border-color:#518bff; }
+.hc-btn--primary:active { background:#2263e6; border-color:#2263e6; }</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="cat"><div class="cat-h">图标与通用状态 Icon & State<span class="en">线宽 / 颜色 / 状态矩阵</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">图标规范</div>
+        <div class="note">基于关键线和网格绘制，视觉重心居中；同一组图标<b>线宽、圆角、透视一致</b>。常规线性图标默认 <b>#999999</b>，禁用 <b>#C5C5C5</b>；选中或可操作状态用主题色。图标与文字并用时间距 <b>4–8px</b>；不混用线性与面性风格。图标按钮使用熟悉的符号（搜索 / 刷新 / 下载 / 更多 / 关闭），并提供 Tooltip / 可访问名称。</div>
+      </div>
+      <div class="bs-card"><div class="bt">通用状态矩阵 <span class="en">每个可交互组件必备</span></div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>Default</b><span>可识别、可操作，层级符合任务</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>Hover</b><span>改变边框 / 文字 / 背景，不引起布局位移</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>Focus</b><span>清晰焦点环，不被 outline:none 吞掉</span></div></div>
+          <div class="item"><span class="k">4</span><div class="tx"><b>Active</b><span>使用 #2263E6 更深状态色反馈按下</span></div></div>
+          <div class="item"><span class="k">5</span><div class="tx"><b>Selected</b><span>主题色 / 选中图标 / 浅主题背景</span></div></div>
+          <div class="item"><span class="k">6</span><div class="tx"><b>Disabled</b><span>#F5F5F5 背景、弱化文本、not-allowed</span></div></div>
+          <div class="item"><span class="k">7</span><div class="tx"><b>Loading</b><span>保持组件尺寸，阻止重复提交</span></div></div>
+          <div class="item"><span class="k">8</span><div class="tx"><b>Error</b><span>错误色 + 图标 + 可执行文案，焦点移到首错</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PART C 组件全样式（多示例）========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">C</span><h2>组件全样式 · 多示例</h2><span class="en">Components — 每个组件给出多组示例</span></div>
+
+  <!-- 通用 / 导航 -->
+  <div class="cat"><div class="cat-h">组件使用要点速查 <span class="en">§4 按分类速查 · 设计 / 开发对照</span></div>
+    <div class="bs-card">
+      <table class="hc-table">
+        <tr><th style="width:130px">组件</th><th>关键设计要点</th></tr>
+        <tr><td colspan="2" style="background:var(--hc-table-head);color:var(--hc-text-2);font-weight:500">通用 / 导航</td></tr>
+        <tr><td>Toolbar</td><td>批量操作仅在选中后启用并显示选中数；导入任务显示校验、进度与结果下载</td></tr>
+        <tr><td>Steps</td><td>表达有先后依赖的任务；显示完成 / 当前 / 等待 / 错误；允许返回时保留已填数据</td></tr>
+        <tr><td>Pagination</td><td>数据导航；切页后焦点 / 滚动回到数据区起点；分页默认右下，左侧可展示总数</td></tr>
+        <tr><td>Menu</td><td>表达稳定信息架构；当前项主题色 + 浅色背景突出；允许收起</td></tr>
+        <tr><td>Breadcrumb</td><td>显示层级位置；末级不可点击；标题不与末级面包屑重复堆叠</td></tr>
+        <tr><td>Tabs</td><td>平级视图，不用 Tabs 代替步骤流程；默认 14px、标签高 49px、激活底线 3px</td></tr>
+        <tr><td>Tree</td><td>层级浏览；节点选择与展开必须使用不同热区，避免误操作</td></tr>
+        <tr><td>Search</td><td>简单筛选可立即生效；多条件组合用「查询」；规则不得在同页混用</td></tr>
+        <tr><td colspan="2" style="background:var(--hc-table-head);color:var(--hc-text-2);font-weight:500">数据录入</td></tr>
+        <tr><td>Textbox</td><td>Label 简短稳定，必填标记紧邻 Label；Placeholder 仅做格式提示，不代替字段名</td></tr>
+        <tr><td>Select</td><td>选项超过 7–10 项提供搜索；层级选项改用 TreeSelect / Cascader</td></tr>
+        <tr><td>TreeSelect / Cascader</td><td>层级 / 多级选择；跨实体复杂选择使用弹出选择器</td></tr>
+        <tr><td>AutoComplete</td><td>联想补全，命中关键词高亮；保留用户已输入内容</td></tr>
+        <tr><td>DatePicker / TimePicker / RangePicker</td><td>日期金额等遵循数据格式规则；范围输入必须明确起止与单位</td></tr>
+        <tr><td>Spinner</td><td>步进数值输入；明确单位与小数位</td></tr>
+        <tr><td>Radio</td><td>互斥且选项通常 ≤5–7 项；必须有默认值时选安全、常用项</td></tr>
+        <tr><td>Checkbox</td><td>允许零到多项；全选使用 indeterminate 表达部分选中</td></tr>
+        <tr><td>Switch</td><td>设置立即生效时使用；需提交或有严重后果时改用 Checkbox + 保存</td></tr>
+        <tr><td>Upload</td><td>明确文件类型、数量、单文件大小；逐项显示上传中 / 成功 / 失败与重试</td></tr>
+        <tr><td>Richtext</td><td>工具栏只暴露业务需要的格式；只读与禁用状态必须区分</td></tr>
+        <tr><td>Form</td><td>简单表单优先单列，高频短字段可双列；组间距大于组内间距；未保存离开提醒</td></tr>
+        <tr><td colspan="2" style="background:var(--hc-table-head);color:var(--hc-text-2);font-weight:500">数据展示</td></tr>
+        <tr><td>Grid 表格</td><td>文本左对齐、日期统一、数字金额右对齐、状态全表一致；行操作只留 1–3 个高频；Hover / 选中需明确区分</td></tr>
+        <tr><td>Tag</td><td>短状态或分类，不承载长句；相同语义跨页面保持相同颜色</td></tr>
+        <tr><td>InfoProfile</td><td>对象摘要，可组合状态、关键指标与工具栏；详情信息移入详情区</td></tr>
+        <tr><td>Card</td><td>独立可重复的信息对象；不将普通页面分区全部卡片化；标题/摘要/指标/状态/操作顺序固定</td></tr>
+        <tr><td>List</td><td>列表项保持标题、摘要、指标、状态、操作的固定顺序与高度策略</td></tr>
+        <tr><td>Brieffile</td><td>文件条目逐项展示；提供预览、下载与来源信息</td></tr>
+        <tr><td>Percentage</td><td>进度展示；用状态色区分正常 / 警告 / 危险</td></tr>
+        <tr><td>CriticalPath</td><td>当前节点、阻塞、逾期和完成必须可区分；过程详情提供责任人、时间、输入输出与异常原因</td></tr>
+        <tr><td colspan="2" style="background:var(--hc-table-head);color:var(--hc-text-2);font-weight:500">反馈与浮层</td></tr>
+        <tr><td>Alert</td><td>页面内持续可见的重要信息；不用于普通成功提示</td></tr>
+        <tr><td>Message</td><td>轻量、自动消失的操作结果；不承载需要决策或长文本的内容</td></tr>
+        <tr><td>Notification</td><td>跨页面、较完整的异步结果</td></tr>
+        <tr><td>Dialog</td><td>需聚焦的确认或短任务；标题栏 48px、正文内边距 20px；焦点管理，关闭后归还触发点</td></tr>
+        <tr><td>Popconfirm</td><td>后果明确的单步确认；高风险 / 复杂影响用 Dialog</td></tr>
+        <tr><td>Popover</td><td>依附触发元素的补充信息 / 轻操作</td></tr>
+        <tr><td>Empty</td><td>区分首次无数据 / 筛选无结果 / 加载失败 / 无权限，并给出对应单一主行动</td></tr>
+        <tr><td colspan="2" style="background:var(--hc-table-head);color:var(--hc-text-2);font-weight:500">业务组件</td></tr>
+        <tr><td>Checklist / ClassSelection / PopupSelection</td><td>配置型勾选、分类选择、弹出选择；明确已选数量与可选项</td></tr>
+        <tr><td>Transfer</td><td>穿梭移动，两端数量实时更新；选项过多提供搜索</td></tr>
+        <tr><td>Layout</td><td>页面骨架（上左右 / 上下）；保持固定导航 + 24 栅格内容区</td></tr>
+      </table>
+      <div class="note" style="margin-top:8px">每个可交互组件必备 9 态：Default / Hover / Focus / Active / Selected / Disabled / Loading / Error / Empty（详见基础样式 · 图标与通用状态）。</div>
+    </div>
+  </div>
+  <div class="cat"><div class="cat-h">通用 / 导航<span class="en">General & Navigation</span></div>
+    <div class="comp-grid">
+      <div class="comp"><div class="hd"><span class="n">Button 按钮</span><span class="e">尺寸 / 类型 / 状态</span></div>
+        <div class="bd">
+          <div class="demo"><span class="lbl">类型</span><button class="hc-btn primary">主按钮</button><button class="hc-btn">次按钮</button><button class="hc-btn dashed">虚线按钮</button><button class="hc-btn danger">危险</button><button class="hc-btn link">文字链接</button><button class="hc-btn icon">🔍</button></div>
+          <div class="sep"></div>
+          <div class="demo"><span class="lbl">尺寸</span><button class="hc-btn primary lg">大按钮</button><button class="hc-btn primary">默认</button><button class="hc-btn primary sm">小</button><button class="hc-btn primary xs">迷你</button></div>
+          <div class="sep"></div>
+          <div class="demo"><span class="lbl">状态</span><button class="hc-btn primary" disabled>禁用</button><button class="hc-btn" disabled>禁用</button><button class="hc-btn primary">加载中 <span class="hc-spinner" style="width:12px;height:12px;border-width:2px"></span></button><button class="hc-btn">🔍 带图标</button></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Icon 图标</span><span class="e">线性 / 面性 / 尺寸 / 状态</span></div>
+        <div class="bd">
+          <div class="demo"><span class="lbl">线性图标（默认 #999，16px）</span><span class="ig">🔍</span><span class="ig">↻</span><span class="ig">⬇</span><span class="ig">⋯</span><span class="ig">✕</span><span class="ig">＋</span><span class="ig">✎</span><span class="ig">🗑</span><span class="ig">✓</span><span class="ig">🔔</span><span class="ig">📎</span><span class="ig">⏱</span></div>
+          <div class="sep"></div>
+          <div class="demo"><span class="lbl">状态</span><span class="ig filled">✓</span><span class="ig" style="color:var(--hc-success)">✓</span><span class="ig" style="color:var(--hc-warning)">!</span><span class="ig" style="color:var(--hc-danger)">✕</span><span class="ig dis">✕</span><span class="ig" style="font-size:22px">🔍</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Toolbar 工具栏</span><span class="e">批量操作 / 列设置 / 视图</span></div>
+        <div class="bd">
+          <div class="demo" style="justify-content:space-between;width:100%"><span style="font-size:12px;color:var(--hc-text-2)">已选 <b style="color:var(--hc-primary)">3</b> 项</span><div style="display:flex;gap:6px"><button class="hc-btn sm">批量审批</button><button class="hc-btn sm" disabled>批量导出</button></div></div>
+          <div class="sep"></div>
+          <div class="demo" style="justify-content:space-between;width:100%"><div style="display:flex;gap:6px"><button class="hc-btn sm">导入</button><button class="hc-btn sm">导出</button><button class="hc-btn sm">刷新</button></div><div style="display:flex;gap:8px;align-items:center;color:var(--hc-text-3);font-size:12px"><span class="tb-ic" title="列设置">≡</span><span class="tb-ic" title="视图切换">⊞</span></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Search 搜索</span><span class="e">常规 / 带筛选</span></div>
+        <div class="bd">
+          <div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden;flex:1"><span style="padding:0 8px;color:#999">🔍</span><input class="hc-input" style="border:none" placeholder="搜索合同名称 / 编号" /><button class="hc-btn primary" style="min-width:60px">搜索</button></div></div>
+          <div class="sep"></div>
+          <div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden;flex:1"><select class="hc-select" style="width:120px;border:none;border-right:1px solid var(--hc-divider);border-radius:0">全部类型</select><input class="hc-input" style="border:none" placeholder="输入关键字" /><button class="hc-btn primary" style="min-width:60px">搜索</button></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Breadcrumb 面包屑</span><span class="e">多级导航</span></div>
+        <div class="bd">
+          <div class="hc-crumb">首页 <span>/</span> 合同管理 <span>/</span> 合同列表 <span>/</span> <span class="cur">合同详情</span></div>
+          <div class="sep"></div>
+          <div class="hc-crumb">工作台 <span>/</span> <span class="cur">成本分析</span></div>
+          <div class="demo"><span class="lbl">末级不可点击；标题不与末级面包屑重复堆叠。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Tabs 选项卡</span><span class="e">下划线 / 卡片式</span></div>
+        <div class="bd">
+          <div class="hc-tabs"><span class="t on">合同列表</span><span class="t">待我审批</span><span class="t">已作废</span><span class="t">归档</span></div>
+          <div class="sep"></div>
+          <div class="hc-tabs card"><span class="t on">基本信息</span><span class="t">付款计划</span><span class="t">审批记录</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Menu 菜单</span><span class="e">分组 / 展开收起</span></div>
+        <div class="bd">
+          <div class="hc-menu">
+            <div class="grp">业务</div><div class="mi">工作台</div><div class="mi on">合同管理 <span class="arrow">▾</span></div><div class="mi">供应商</div>
+            <div class="grp">分析</div><div class="mi">成本分析</div><div class="mi">报表中心 <span class="arrow">▸</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Steps 步骤条</span><span class="e">完成 / 当前 / 错误 / 等待</span></div>
+        <div class="bd">
+          <div class="hc-steps"><div class="s done"><div class="ic">✓</div>填写信息<div class="bar"></div></div><div class="s done"><div class="ic">✓</div>审批<div class="bar"></div></div><div class="s cur"><div class="ic">3</div>确认<div class="bar"></div></div><div class="s"><div class="ic">4</div>完成</div></div>
+          <div class="sep"></div>
+          <div class="hc-steps"><div class="s done"><div class="ic">✓</div>起草<div class="bar"></div></div><div class="s err"><div class="ic">!</div>会签<div class="bar"></div></div><div class="s cur"><div class="ic">3</div>法务<div class="bar"></div></div><div class="s"><div class="ic">4</div>归档</div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Pagination 分页</span><span class="e">简洁 / 跳页</span></div>
+        <div class="bd">
+          <div class="hc-pager"><span>共 128 条</span><span class="p">‹</span><span class="p on">1</span><span class="p">2</span><span class="p">3</span><span class="p">4</span><span class="p ellipsis">…</span><span class="p">13</span><span class="p">›</span></div>
+          <div class="sep"></div>
+          <div class="hc-pager"><span class="p">‹</span><span class="p on">1</span><span class="p">2</span><span class="p">3</span><span class="p">4</span><span class="p">5</span><span class="p">6</span><span class="p">›</span><span style="margin-left:8px">每页 <b>10</b> 条 ▾</span><span class="go">跳至<input value="3" /> 页</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Tree 树</span><span class="e">展开 / 选中 / 勾选</span></div>
+        <div class="bd">
+          <div class="hc-tree"><div class="nd"><span class="sw">▾</span><span class="lb on">集团总部</span></div><div class="ch"><div class="nd"><span class="sw">▸</span>华东大区</div><div class="nd"><span class="sw">▾</span><span class="lb">华南大区</span></div><div class="ch"><div class="nd"><span class="sw"></span>广州公司</div><div class="nd"><span class="sw"></span>深圳公司</div></div></div></div>
+          <div class="sep"></div>
+          <div class="hc-tree"><div class="nd"><input type="checkbox" checked /> 集团总部</div><div class="ch"><div class="nd"><input type="checkbox" checked /> 华东大区</div><div class="nd"><input type="checkbox" /> 华南大区</div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Iframe 嵌入</span><span class="e">容器形态</span></div>
+        <div class="bd">
+          <div style="border:1px solid var(--hc-border);border-radius:var(--hc-radius);padding:16px;text-align:center;color:var(--hc-text-3);font-size:12px;background:var(--hc-table-head)">iframe 容器 · 嵌入第三方页面 / 报表 / 地图</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据录入 -->
+  <div class="cat"><div class="cat-h">数据录入<span class="en">Data Input</span></div>
+    <div class="comp-grid">
+      <div class="comp"><div class="hd"><span class="n">Textbox 文本框</span><span class="e">尺寸 / 前后缀 / 状态</span></div>
+        <div class="bd">
+          <div class="demo v"><span class="lbl">尺寸：大 / 默认 / 小</span><div class="demo"><input class="hc-input lg" style="width:200px" placeholder="大尺寸" /><input class="hc-input" style="width:200px" placeholder="默认尺寸" /><input class="hc-input sm" style="width:200px" placeholder="小尺寸" /></div></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">前后缀</span><div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><span style="padding:0 8px;color:#999">¥</span><input class="hc-input" style="border:none" placeholder="金额" /><span style="padding:0 8px;color:var(--hc-text-3)">元</span></div><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><span style="padding:0 8px;color:#999">🔍</span><input class="hc-input" style="border:none" placeholder="搜索关键字" /></div></div></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">状态：正常 / 只读 / 禁用 / 错误</span><div class="demo"><input class="hc-input" style="width:200px" value="正常输入" /><input class="hc-input readonly" style="width:200px" value="只读内容" /><input class="hc-input" style="width:200px" value="禁用" disabled /><input class="hc-input err" style="width:200px" value="错误" /><span style="width:100%;font-size:11px;color:var(--hc-danger)">✕ 格式错误，请重新输入</span></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Spinner 数字输入</span><span class="e">步进 / 禁减</span></div>
+        <div class="bd">
+          <div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><span style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--hc-text-3);border-right:1px solid var(--hc-divider)">−</span><input class="hc-input" style="border:none;text-align:center;width:80px" value="12" /><span style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--hc-text-3);border-left:1px solid var(--hc-divider)">＋</span></div></div>
+          <div class="sep"></div>
+          <div class="demo"><span class="lbl">带单位与小数</span><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><span style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--hc-text-3);border-right:1px solid var(--hc-divider)">−</span><input class="hc-input" style="border:none;text-align:center;width:120px" value="86.4" /><span style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--hc-text-3);border-left:1px solid var(--hc-divider)">＋</span><span style="padding:0 8px;color:var(--hc-text-3)">万</span></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Select 下拉选择</span><span class="e">单选 / 多选 / 面板</span></div>
+        <div class="bd">
+          <div class="demo"><select class="hc-select" style="width:200px"><option>采购合同</option><option>销售合同</option></select></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">多选（标签展示）</span><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);padding:4px 6px;width:100%"><span class="hc-tag info">采购合同 ✕</span><span class="hc-tag info">服务合同 ✕</span><span style="color:#999;font-size:12px">选择…</span></div></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">展开面板</span><div style="border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden;width:100%"><div style="display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid var(--hc-divider);background:var(--hc-table-head)"><span style="color:#999">🔍</span><input class="hc-input" style="border:none;background:none" placeholder="搜索选项" /></div><div style="padding:6px 10px;background:var(--hc-primary-1);color:var(--hc-primary);font-size:12px">采购合同 ✓</div><div style="padding:6px 10px;font-size:12px;color:var(--hc-text-2)">销售合同</div><div style="padding:6px 10px;font-size:12px;color:var(--hc-text-2)">服务合同</div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">TreeSelect 树选择</span><span class="e">组织 / 多选</span></div>
+        <div class="bd">
+          <div class="demo"><select class="hc-select"><option>集团总部 / 华东大区 / 上海公司</option></select></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">多选标签</span><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);padding:4px 6px;width:100%"><span class="hc-tag info">华东大区 ✕</span><span class="hc-tag info">华南大区 ✕</span><span style="color:#999;font-size:12px">选择组织…</span></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Cascader 级联</span><span class="e">省市区 / 多级</span></div>
+        <div class="bd">
+          <div class="demo"><select class="hc-select"><option>湖北省 / 武汉市 / 洪山区</option></select></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">展开多级面板</span><div style="display:flex;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden;width:100%;font-size:12px"><div style="flex:1;padding:6px 0;border-right:1px solid var(--hc-divider)"><div style="padding:4px 10px;color:var(--hc-primary);background:var(--hc-primary-1)">湖北省 ›</div><div style="padding:4px 10px;color:var(--hc-text-2)">广东省</div><div style="padding:4px 10px;color:var(--hc-text-2)">浙江省</div></div><div style="flex:1;padding:6px 0;border-right:1px solid var(--hc-divider)"><div style="padding:4px 10px;color:var(--hc-primary);background:var(--hc-primary-1)">武汉市 ›</div><div style="padding:4px 10px;color:var(--hc-text-2)">宜昌市</div></div><div style="flex:1;padding:6px 0"><div style="padding:4px 10px;color:var(--hc-text-2)">洪山区 ✓</div><div style="padding:4px 10px;color:var(--hc-text-2)">武昌区</div></div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">AutoComplete 自动补全</span><span class="e">联想 / 高亮</span></div>
+        <div class="bd">
+          <div class="demo"><input class="hc-input" value="恒泰" /></div>
+          <div class="demo v"><span class="lbl">联想面板（命中高亮）</span><div style="background:#fff;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden;width:100%;font-size:12px"><div style="padding:6px 10px;color:var(--hc-text-1)"><b style="color:var(--hc-primary)">恒泰</b>华府一期</div><div style="padding:6px 10px;color:var(--hc-text-2)"><b style="color:var(--hc-primary)">恒泰</b>置业有限公司</div><div style="padding:6px 10px;color:var(--hc-text-2)"><b style="color:var(--hc-primary)">恒泰</b>建材供应</div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">DatePicker 日期</span><span class="e">日期 / 面板</span></div>
+        <div class="bd">
+          <div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><input class="hc-input" style="border:none;width:160px" value="2026-09-03" /><span style="padding:0 8px;color:#999">📅</span></div></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">日期面板</span><div style="border:1px solid var(--hc-border);border-radius:var(--hc-radius);width:210px;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--hc-divider);font-size:12px"><span>‹</span><b>2026 年 9 月</b><span>›</span></div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:8px;font-size:11px;text-align:center;color:var(--hc-text-3)"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 8px 8px;font-size:11px;text-align:center"><span style="color:#C5C5C5">31</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span style="background:var(--hc-primary);color:#fff;border-radius:4px">11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span><span>29</span><span>30</span></div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">TimePicker 时间</span><span class="e">时分 / 秒</span></div>
+        <div class="bd">
+          <div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden;width:150px"><input class="hc-input" style="border:none" value="14:30" /><span style="padding:0 8px;color:#999">🕐</span></div></div>
+          <div class="sep"></div>
+          <div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden;width:180px"><input class="hc-input" style="border:none" value="14:30:00" /><span style="padding:0 8px;color:#999">🕐</span></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">RangePicker 范围</span><span class="e">日期范围</span></div>
+        <div class="bd">
+          <div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden;width:100%"><input class="hc-input" style="border:none" value="2026-09-01" /><span style="color:var(--hc-text-3)">~</span><input class="hc-input" style="border:none" value="2026-09-30" /></div></div>
+          <div class="demo"><span class="lbl">范围输入必须明确起止与单位。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Radio 单选</span><span class="e">横排 / 竖排 / 禁用</span></div>
+        <div class="bd">
+          <div class="hc-check"><label><input type="radio" name="r1" checked /> 按合同结算</label><label><input type="radio" name="r1" /> 按形象进度</label><label><input type="radio" name="r1" disabled /> 其他（禁用）</label></div>
+          <div class="sep"></div>
+          <div class="hc-check v"><label><input type="radio" name="r2" checked /> 按月度付款</label><label><input type="radio" name="r2" /> 按季度付款</label><label><input type="radio" name="r2" /> 按里程碑付款</label></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Checkbox 复选</span><span class="e">全选 / 半选 / 禁用</span></div>
+        <div class="bd">
+          <div class="hc-check"><label><input type="checkbox" checked /> 含税价</label><label><input type="checkbox" /> 含运费</label><label><input type="checkbox" checked /> 含安装</label></div>
+          <div class="sep"></div>
+          <div class="hc-check"><label><input type="checkbox" checked /> 全选（半选态）</label></div>
+          <div class="demo"><span class="lbl">部分选中使用 indeterminate 半选态。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Switch 开关</span><span class="e">开 / 关 / 禁用</span></div>
+        <div class="bd">
+          <div class="demo"><span class="hc-switch on"></span><span class="hc-switch"></span><span class="hc-switch dis"></span><span style="font-size:12px;color:var(--hc-text-2)">启用自动提醒</span></div>
+          <div class="sep"></div>
+          <div class="demo"><span class="lbl">设置立即生效时使用；需提交时改用 Checkbox+保存。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Upload 上传</span><span class="e">空态 / 列表状态</span></div>
+        <div class="bd">
+          <div class="hc-upload" style="padding:12px">📎 点击或拖拽文件到此处上传<br /><span style="font-size:11px">支持 PDF / JPG，单个 ≤20MB</span></div>
+          <div class="hc-upload" style="padding:8px;background:#fff">
+            <div class="file"><span>📄</span><span style="flex:1">合同扫描件.pdf <span style="color:var(--hc-text-3)">(2.4MB)</span></span><span style="color:var(--hc-success)">✓ 完成</span></div>
+            <div class="file"><span>📄</span><span style="flex:1">报价单.xlsx</span><span style="color:var(--hc-warning)">⋯ 上传中 45%</span></div>
+            <div class="file"><span>📄</span><span style="flex:1">发票.pdf <span style="color:var(--hc-danger)">格式不支持</span></span><span style="color:var(--hc-danger)">✕ 重试</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Richtext 富文本</span><span class="e">工具栏 / 内容区</span></div>
+        <div class="bd">
+          <div class="hc-richtext"><div class="tb"><span><b>B</b></span><span><i>I</i></span><span><u>U</u></span><span>≡</span><span>•</span><span>1.</span><span>🔗</span><span>🖼</span><span>🔤</span><span>🧮</span></div><div class="bd">请输入合同条款说明…</div></div>
+          <div class="hc-richtext"><div class="tb"><span><b>B</b></span><span><i>I</i></span><span><u>U</u></span></div><div class="bd" style="background:var(--hc-table-head);color:var(--hc-text-3)">只读内容，不可编辑</div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">AddressSelect 地址</span><span class="e">省市区</span></div>
+        <div class="bd">
+          <div class="demo"><select class="hc-select"><option>湖北省 武汉市 洪山区</option></select></div>
+          <div class="demo"><span class="lbl">行政区划联动选择，支持到街道。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">LookPopup 弹出选择</span><span class="e">回填</span></div>
+        <div class="bd">
+          <div class="demo"><div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><input class="hc-input" style="border:none" value="张明 / 采购部" /><span style="padding:0 8px;color:#999">⋯</span></div></div>
+          <div class="demo"><span class="lbl">跨实体复杂选择，弹出选择器。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">ProjectSelect 项目选择</span><span class="e">地产项目</span></div>
+        <div class="bd">
+          <div class="demo"><select class="hc-select"><option>恒泰华府一期</option><option>翡翠湾项目</option></select></div>
+          <div class="demo"><span class="lbl">地产项目上下文专用选择。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Form 表单</span><span class="e">单列 / 双列 / 分组 / 校验</span></div>
+        <div class="bd">
+          <div class="demo v"><span class="lbl">双列表单</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%"><div class="hc-field"><span class="lb">合同名称<span class="req">*</span></span><input class="hc-input" value="恒泰华府一期总承包" /></div><div class="hc-field"><span class="lb">合同类型<span class="req">*</span></span><select class="hc-select"><option>采购合同</option></select></div><div class="hc-field"><span class="lb">金额（元）</span><input class="hc-input" value="12,860,000" /></div><div class="hc-field"><span class="lb">签订日期</span><input class="hc-input" value="2026-09-03" /></div></div></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">校验反馈</span><div class="hc-field" style="width:100%"><span class="lb">结束日期<span class="req">*</span></span><input class="hc-input err" value="2026-08-15" /><span class="err">结束日期不能早于开始日期，请重新选择。</span></div></div>
+          <div class="demo" style="justify-content:flex-end"><button class="hc-btn">取消</button><button class="hc-btn primary">保存</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据展示 -->
+  <div class="cat"><div class="cat-h">数据展示<span class="en">Data Display</span></div>
+    <div class="comp-grid">
+      <div class="comp"><div class="hd"><span class="n">Grid 表格</span><span class="e">多选 / 排序 / 汇总 / 编辑</span></div>
+        <div class="bd">
+          <div class="demo v"><span class="lbl">多选 + 选中行 + 金额右对齐</span><table class="hc-table"><thead><tr><th style="width:26px"><input type="checkbox" checked /></th><th>合同名称 ⇅</th><th>状态</th><th style="text-align:right">金额（元）</th><th>操作</th></tr></thead><tbody><tr class="sel"><td><input type="checkbox" checked /></td><td>恒泰华府一期总承包</td><td><span class="hc-tag info">审批中</span></td><td class="num">12,860,000</td><td><button class="hc-btn link">查看</button></td></tr><tr><td><input type="checkbox" /></td><td>翡翠湾监理服务</td><td><span class="hc-tag success">已生效</span></td><td class="num">3,200,000</td><td><button class="hc-btn link">查看</button></td></tr><tr><td><input type="checkbox" /></td><td>云栖台园林分包</td><td><span class="hc-tag warning">待付款</span></td><td class="num">890,500</td><td><button class="hc-btn link">查看</button></td></tr><tr class="sum"><td colspan="3">合计（3 项）</td><td class="num">16,950,500</td><td></td></tr></tbody></table></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Tag 标签</span><span class="e">状态 / 语义色</span></div>
+        <div class="bd">
+          <div class="demo"><span class="hc-tag">默认</span><span class="hc-tag info">审批中</span><span class="hc-tag success">已生效</span><span class="hc-tag warning">待付款</span><span class="hc-tag danger">已作废</span></div>
+          <div class="sep"></div>
+          <div class="demo"><span class="hc-tag">草稿</span><span class="hc-tag info">进行中</span><span class="hc-tag success">已完成</span><span class="hc-tag warning">已逾期</span><span class="hc-tag danger">已终止</span></div>
+          <div class="demo"><span class="lbl">相同语义跨页面保持相同颜色；不承载长句。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">InfoProfile 简档</span><span class="e">概要 / 指标 + 操作</span></div>
+        <div class="bd">
+          <div class="profile" style="margin:0"><div class="avatar">合</div><div style="flex:1"><div class="name">恒泰华府一期总承包 <span class="hc-tag info">审批中</span></div><div class="meta">编号：HT-2026-0812 · 张明 · 2026-08-12</div></div><div style="display:flex;gap:6px"><button class="hc-btn sm">历史</button><button class="hc-btn sm primary">处理</button></div></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">带关键指标</span><div style="display:flex;gap:10px;width:100%"><div style="flex:1;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:8px;text-align:center"><div style="font-size:11px;color:var(--hc-text-3)">合同金额</div><div style="font-size:15px;font-weight:600">¥1,286万</div></div><div style="flex:1;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:8px;text-align:center"><div style="font-size:11px;color:var(--hc-text-3)">已付款</div><div style="font-size:15px;font-weight:600;color:var(--hc-success)">¥620万</div></div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">List 列表</span><span class="e">待办 / 带操作</span></div>
+        <div class="bd">
+          <div style="border:1px solid var(--hc-divider);border-radius:var(--hc-radius);overflow:hidden">
+            <div class="todo"><span class="hc-tag warning">待审批</span><span class="t">恒泰华府总承包<div class="sub">张明 · 2026-09-02</div></span><button class="hc-btn link">去处理</button></div>
+            <div class="todo"><span class="hc-tag danger">已逾期</span><span class="t">云栖台园林付款<div class="sub">截止 2026-08-31</div></span><button class="hc-btn link">去处理</button></div>
+            <div class="todo"><span class="hc-tag success">已办结</span><span class="t">翡翠湾监理服务<div class="sub">李娜 · 2026-09-01</div></span><button class="hc-btn link">查看</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Card 卡片</span><span class="e">对象 / 指标 / 操作</span></div>
+        <div class="bd">
+          <div class="hc-card"><div class="card-h"><span>恒泰建材供应</span><span class="hc-tag success">合作中</span></div><div style="font-size:12px;color:var(--hc-text-3)">合作 3 年 · 在供合同 24 份</div><div style="display:flex;gap:8px;margin:8px 0"><div style="flex:1;background:var(--hc-table-head);border-radius:4px;padding:6px;text-align:center"><div style="font-size:10px;color:var(--hc-text-3)">累计金额</div><div style="font-size:13px;font-weight:600">¥3,860万</div></div><div style="flex:1;background:var(--hc-table-head);border-radius:4px;padding:6px;text-align:center"><div style="font-size:10px;color:var(--hc-text-3)">履约评价</div><div style="font-size:13px;font-weight:600;color:var(--hc-success)">A+</div></div></div><div style="display:flex;justify-content:flex-end"><button class="hc-btn link">查看详情</button><button class="hc-btn link">发起合同</button></div></div>
+          <div class="sep"></div>
+          <div class="hc-card" style="padding:12px"><div class="card-h"><span>简版卡片</span><span style="font-size:11px;color:var(--hc-text-3)">2026-09-02</span></div><div style="font-size:12px;color:var(--hc-text-2)">消息摘要内容，用于消息中心列表。</div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Brieffile 简档文件</span><span class="e">文件条目</span></div>
+        <div class="bd">
+          <div class="demo v">
+            <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:9px;width:100%"><span style="width:30px;height:30px;border-radius:6px;background:var(--hc-primary-1);display:flex;align-items:center;justify-content:center">📄</span><div style="flex:1"><div style="font-size:12px">合同扫描件.pdf</div><div style="font-size:11px;color:var(--hc-text-3)">2.4 MB · 2026-09-02</div></div><button class="hc-btn link">下载</button><button class="hc-btn link">预览</button></div>
+            <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:9px;width:100%"><span style="width:30px;height:30px;border-radius:6px;background:rgba(28,199,141,.12);display:flex;align-items:center;justify-content:center;color:#0FAE77">🖼</span><div style="flex:1"><div style="font-size:12px">现场照片.jpg</div><div style="font-size:11px;color:var(--hc-text-3)">1.1 MB · 2026-09-01</div></div><button class="hc-btn link">预览</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Percentage 百分比</span><span class="e">进度 / 状态色</span></div>
+        <div class="bd">
+          <div class="demo v"><span class="lbl">回款进度 68%</span><div class="hc-progress"><div class="bar" style="width:68%"></div></div></div>
+          <div class="sep"></div>
+          <div class="demo v"><span class="lbl">状态色：正常 / 警告 / 危险</span><div class="hc-progress"><div class="bar success" style="width:100%"></div></div><div class="hc-progress"><div class="bar warning" style="width:55%"></div></div><div class="hc-progress"><div class="bar danger" style="width:20%"></div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">CriticalPath 关键路径</span><span class="e">完成 / 当前 / 异常</span></div>
+        <div class="bd">
+          <div class="cp"><div class="node done"><div class="c">✓</div>起草<div class="ln done"></div></div><div class="node done"><div class="c">✓</div>会签<div class="ln done"></div></div><div class="node cur"><div class="c">3</div>法务<div class="ln"></div></div><div class="node"><div class="c">4</div>归档<div class="ln"></div></div><div class="node"><div class="c">5</div>生效</div></div>
+          <div class="sep"></div>
+          <div class="cp"><div class="node done"><div class="c">✓</div>起草<div class="ln done"></div></div><div class="node err"><div class="c">!</div>会签<div class="ln"></div></div><div class="node"><div class="c">3</div>法务</div></div>
+          <div class="demo"><span class="lbl">当前、阻塞、逾期、完成必须可区分；过程详情给责任人/时间/原因。</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 反馈 -->
+  <div class="cat"><div class="cat-h">反馈与浮层<span class="en">Feedback & Overlay</span></div>
+    <div class="comp-grid">
+      <div class="comp"><div class="hd"><span class="n">Alert 警示</span><span class="e">信息 / 成功 / 警告 / 错误</span></div>
+        <div class="bd">
+          <div class="hc-alert info">ℹ 本次导入 128 条，3 条存在格式问题。</div>
+          <div class="hc-alert success">✓ 合同已保存并提交审批。</div>
+          <div class="hc-alert warning">⚠ 合同将于 3 天后到期，请及时处理续签。</div>
+          <div class="hc-alert danger">✕ 数据保存失败，请稍后重试。</div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Message 消息</span><span class="e">成功 / 信息 / 警告 / 错误</span></div>
+        <div class="bd">
+          <div class="hc-message"><span class="dot" style="background:var(--hc-success)"></span>保存成功，已进入审批流程。</div>
+          <div class="hc-message"><span class="dot" style="background:var(--hc-primary)"></span>已为您刷新数据。</div>
+          <div class="hc-message"><span class="dot" style="background:var(--hc-warning)"></span>该合同即将到期。</div>
+          <div class="hc-message"><span class="dot" style="background:var(--hc-danger)"></span>保存失败，请检查必填项。</div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Notification 通知</span><span class="e">类型 + 时间</span></div>
+        <div class="bd">
+          <div class="hc-notice"><span class="ic" style="background:var(--hc-primary-1);color:var(--hc-primary)">🔔</span><div><div style="font-size:13px;font-weight:500">合同审批通过</div><div style="font-size:12px;color:var(--hc-text-2)">“恒泰华府一期总承包”已通过法务审批。</div><div style="font-size:11px;color:var(--hc-text-3);margin-top:4px">2 分钟前</div></div></div>
+          <div class="hc-notice"><span class="ic" style="background:rgba(255,153,2,.12);color:#E08700">⚠</span><div><div style="font-size:13px;font-weight:500">付款即将逾期</div><div style="font-size:12px;color:var(--hc-text-2)">“云栖台园林景观”第 3 期款项还有 2 天到期。</div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Popover 气泡</span><span class="e">方向示例</span></div>
+        <div class="bd">
+          <div class="demo" style="justify-content:center;gap:20px"><span class="hc-popover">⬆ 建议：使用“按形象进度”结算可缩短付款周期。</span></div>
+          <div class="demo" style="justify-content:center;gap:20px"><span class="hc-popover">⬅ 左对齐示例：点击图标可查看操作说明。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Popconfirm 确认</span><span class="e">轻量确认</span></div>
+        <div class="bd">
+          <div class="demo" style="justify-content:center"><div style="display:flex;gap:10px;align-items:flex-start;border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:12px;max-width:260px"><span style="color:var(--hc-danger)">⚠</span><div style="flex:1"><div style="font-size:12px">确认删除该合同？删除后不可恢复。</div><div style="display:flex;gap:6px;margin-top:8px"><button class="hc-btn sm">取消</button><button class="hc-btn sm danger">删除合同</button></div></div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Dialog 对话框</span><span class="e">确认 / 表单</span></div>
+        <div class="bd">
+          <div class="hc-dialog"><div class="hd">驳回申请 <span>✕</span></div><div class="bd">请输入驳回原因，将通知提交人重新修改。</div><div class="ft"><button class="hc-btn">取消</button><button class="hc-btn primary">确认驳回</button></div></div>
+          <div class="sep"></div>
+          <div class="hc-dialog"><div class="hd">新增合同</div><div class="bd"><div class="hc-field" style="margin-bottom:8px"><span class="lb">合同名称<span class="req">*</span></span><input class="hc-input" placeholder="请输入" /></div><div class="hc-field"><span class="lb">类型</span><select class="hc-select"><option>采购合同</option></select></div></div><div class="ft"><button class="hc-btn">取消</button><button class="hc-btn primary">保存</button></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Empty 空状态</span><span class="e">无数据 / 无结果 / 无权限</span></div>
+        <div class="bd">
+          <div class="hc-empty" style="border:1px dashed var(--hc-divider);border-radius:var(--hc-radius)"><div class="e-ic">▢</div><div class="t">暂无合同</div><div>点击下方按钮新建第一条合同</div><button class="hc-btn primary" style="margin-top:8px">新建合同</button></div>
+          <div class="sep"></div>
+          <div class="hc-empty" style="padding:16px"><div class="e-ic">🔍</div><div class="t">未找到符合条件的合同</div><button class="hc-btn" style="margin-top:6px">清空筛选条件</button></div>
+          <div class="hc-empty" style="padding:16px"><div class="e-ic">🔒</div><div class="t">暂无查看权限</div><button class="hc-btn" style="margin-top:6px">申请权限</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 业务 -->
+  <div class="cat"><div class="cat-h">业务组件<span class="en">Business</span></div>
+    <div class="comp-grid">
+      <div class="comp"><div class="hd"><span class="n">Checklist 勾选清单</span><span class="e">全部 / 部分勾选</span></div>
+        <div class="bd">
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--hc-text-2)"><label><input type="checkbox" checked /> 营业执照已核验</label><label><input type="checkbox" checked /> 资质证书齐全</label><label><input type="checkbox" /> 安全许可在有效期</label><label><input type="checkbox" /> 银行账户信息完整</label></div>
+          <div class="sep"></div>
+          <div class="hc-tag info" style="align-self:flex-start">已完成 2 / 4 项</div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">ClassSelection 分类选择</span><span class="e">多级分类</span></div>
+        <div class="bd">
+          <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:12px;color:var(--hc-text-3)">选择材料类别</span><select class="hc-select"><option>土建类</option><option>机电类</option><option>装饰类</option></select><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="hc-tag info">钢材 ✕</span><span class="hc-tag info">混凝土 ✕</span><span class="hc-tag">＋ 添加子类</span></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">PopupSelection 弹出选择</span><span class="e">回填 / 多选</span></div>
+        <div class="bd">
+          <div style="display:flex;align-items:center;border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><input class="hc-input" style="border:none" value="已选 3 家供应商" /><span style="padding:0 8px;color:#999">⋯</span></div>
+          <div class="demo"><span class="lbl">弹出面板支持搜索、多选、分页。</span></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Transfer 穿梭框</span><span class="e">左右移动</span></div>
+        <div class="bd">
+          <div class="hc-transfer"><div class="box"><div class="bh">可选角色（5）</div><div class="it">☐ 合同管理员</div><div class="it">☐ 成本工程师</div><div class="it">☐ 法务</div><div class="it">☐ 资料员</div></div><div class="mid"><button class="hc-btn sm" style="min-width:40px">›</button><button class="hc-btn sm" style="min-width:40px">‹</button></div><div class="box"><div class="bh">已选角色（2）</div><div class="it">✓ 项目负责人</div><div class="it">✓ 商务经理</div></div></div>
+        </div>
+      </div>
+      <div class="comp"><div class="hd"><span class="n">Layout 布局</span><span class="e">上左右 / 上下</span></div>
+        <div class="bd">
+          <div style="border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><div style="height:22px;background:var(--hc-nav-bg);border-bottom:1px solid var(--hc-divider);display:flex;align-items:center;padding:0 8px;font-size:10px;color:var(--hc-text-3)">顶栏</div><div style="display:flex;min-height:56px"><div style="width:70px;background:var(--hc-nav-bg);border-right:1px solid var(--hc-divider);font-size:10px;color:var(--hc-text-3);display:flex;align-items:center;justify-content:center">侧栏</div><div style="flex:1;display:flex;flex-direction:column;gap:6px;padding:8px"><div style="height:14px;background:var(--hc-fill-hover);border-radius:3px"></div><div style="flex:1;background:var(--hc-fill-hover);border-radius:3px"></div></div></div></div>
+          <div class="sep"></div>
+          <div style="border:1px solid var(--hc-border);border-radius:var(--hc-radius);overflow:hidden"><div style="height:22px;background:var(--hc-nav-bg);border-bottom:1px solid var(--hc-divider);display:flex;align-items:center;padding:0 8px;font-size:10px;color:var(--hc-text-3)">顶栏</div><div style="display:flex;flex-direction:column;gap:6px;padding:8px;min-height:56px"><div style="height:14px;background:var(--hc-fill-hover);border-radius:3px"></div><div style="flex:1;background:var(--hc-fill-hover);border-radius:3px"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PART C 最佳实践 ========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">D</span><h2>最佳实践页</h2><span class="en">Best Practice — 可运行的页面模式</span></div>
+  <div class="prac">
+    <div class="prac-card"><div class="ph"><span class="n">工作台 Workbench</span><span class="e">/practice/Workbench</span></div>
+      <div class="pb">
+        <div class="page-head"><div><div class="hc-crumb">首页 / 工作台</div><h3 style="margin-top:4px">工作台</h3></div><button class="hc-btn">自定义布局</button></div>
+        <div class="dash-grid">
+          <div class="metric"><div class="lb">待我处理</div><div class="v">12</div><div class="delta up">↑ 较昨日 +3</div></div>
+          <div class="metric"><div class="lb">本月合同额（万元）</div><div class="v">8,642</div><div class="delta up">↑ 环比 +12.5%</div></div>
+          <div class="metric"><div class="lb">异常告警</div><div class="v" style="color:var(--hc-danger)">3</div><div class="delta">需尽快处理</div></div>
+        </div>
+        <div style="border:1px solid var(--hc-divider);border-radius:var(--hc-radius)">
+          <div style="padding:8px 12px;border-bottom:1px solid var(--hc-divider);font-weight:500;font-size:12px">待我处理</div>
+          <div class="todo"><span class="hc-tag warning">待审批</span><span class="t">恒泰华府一期总承包<div class="sub">张明 · 2026-09-02</div></span></div>
+          <div class="todo"><span class="hc-tag danger">已逾期</span><span class="t">云栖台园林景观付款<div class="sub">截止 2026-08-31</div></span></div>
+        </div>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：Metric 指标卡 + List 待办 + Alert + Menu 快捷入口</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">基础列表 BasicList</span><span class="e">/practice/BasicList</span></div>
+      <div class="pb">
+        <div class="page-head"><h3>供应商列表</h3><button class="hc-btn primary">新增供应商</button></div>
+        <table class="hc-table"><thead><tr><th>供应商</th><th>状态</th><th>类别</th><th>操作</th></tr></thead><tbody>
+          <tr><td>恒泰建材供应</td><td><span class="hc-tag success">合作中</span></td><td>土建类</td><td><button class="hc-btn link">查看</button></td></tr>
+          <tr><td>青山园林工程</td><td><span class="hc-tag warning">评估中</span></td><td>景观类</td><td><button class="hc-btn link">查看</button></td></tr>
+          <tr><td>华中机电安装</td><td><span class="hc-tag info">待审核</span></td><td>机电类</td><td><button class="hc-btn link">查看</button></td></tr>
+        </tbody></table>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：Breadcrumb + Button + Grid + Tag + Pagination</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">查询列表 QueryList</span><span class="e">/practice/QueryList</span></div>
+      <div class="pb">
+        <div class="page-head"><div><div class="hc-crumb">合同管理 / 合同列表</div><h3 style="margin-top:4px">合同列表</h3></div><div class="acts"><button class="hc-btn">导入</button><button class="hc-btn primary">新建合同</button></div></div>
+        <div class="filter"><div class="f"><div class="lb">合同名称</div><input class="hc-input" placeholder="请输入" /></div><div class="f"><div class="lb">状态</div><select class="hc-select"><option>全部状态</option></select></div><div class="f"><div class="lb">签订日期</div><input class="hc-input" placeholder="起 ~ 止" /></div><div style="display:flex;gap:8px"><button class="hc-btn">重置</button><button class="hc-btn primary">查询</button></div></div>
+        <table class="hc-table"><thead><tr><th>合同名称</th><th>状态</th><th style="text-align:right">金额（元）</th><th>操作</th></tr></thead><tbody>
+          <tr><td>恒泰华府一期总承包</td><td><span class="hc-tag info">审批中</span></td><td class="num">12,860,000.00</td><td><button class="hc-btn link">查看</button><button class="hc-btn link">更多</button></td></tr>
+          <tr><td>翡翠湾项目监理服务</td><td><span class="hc-tag success">已生效</span></td><td class="num">3,200,000.00</td><td><button class="hc-btn link">查看</button><button class="hc-btn link">更多</button></td></tr>
+        </tbody></table>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：筛选 Select/DatePicker + Toolbar 批量 + Grid + 分页</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">卡片列表 CardList</span><span class="e">/practice/CardList</span></div>
+      <div class="pb">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="hc-card"><div class="card-h"><span>恒泰建材</span><span class="hc-tag success">合作中</span></div><div style="font-size:12px;color:var(--hc-text-3)">合同 24 · 金额 ¥3,860万</div><div style="margin:8px 0;font-size:12px;color:var(--hc-text-2)">履约评价 <b style="color:var(--hc-success)">A+</b></div><button class="hc-btn link">查看详情</button></div>
+          <div class="hc-card"><div class="card-h"><span>青山园林</span><span class="hc-tag warning">评估中</span></div><div style="font-size:12px;color:var(--hc-text-3)">合同 8 · 金额 ¥1,120万</div><div style="margin:8px 0;font-size:12px;color:var(--hc-text-2)">履约评价 <b>A</b></div><button class="hc-btn link">查看详情</button></div>
+        </div>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：Card + Tag + 指标摘要 + 操作</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">基础表单 BasicForm</span><span class="e">/practice/BasicForm</span></div>
+      <div class="pb">
+        <div class="page-head"><h3>新增供应商</h3></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="hc-field"><span class="lb">供应商名称<span class="req">*</span></span><input class="hc-input" value="恒泰建材供应" /></div>
+          <div class="hc-field"><span class="lb">类别<span class="req">*</span></span><select class="hc-select"><option>土建类</option></select></div>
+          <div class="hc-field"><span class="lb">联系人</span><input class="hc-input" placeholder="请输入" /></div>
+          <div class="hc-field"><span class="lb">联系电话</span><input class="hc-input" placeholder="请输入" /></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="hc-btn">取消</button><button class="hc-btn primary">保存</button></div>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：Form + Textbox + Select + Button 操作区</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">高级表单 AdvancedForm</span><span class="e">/practice/AdvancedForm</span></div>
+      <div class="pb">
+        <div class="hc-steps" style="margin-bottom:10px"><div class="s done"><div class="ic">✓</div>填写<div class="bar"></div></div><div class="s done"><div class="ic">✓</div>附件<div class="bar"></div></div><div class="s cur"><div class="ic">3</div>确认<div class="bar"></div></div><div class="s"><div class="ic">4</div>完成</div></div>
+        <div style="font-size:12px;font-weight:500;margin-bottom:8px">基础信息</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="hc-field"><span class="lb">合同名称<span class="req">*</span></span><input class="hc-input" value="恒泰华府一期总承包" /></div>
+          <div class="hc-field"><span class="lb">合同金额（元）<span class="req">*</span></span><input class="hc-input" value="12,860,000.00" /></div>
+        </div>
+        <div style="font-size:12px;font-weight:500;margin:10px 0 8px">附件资料</div>
+        <div class="hc-upload" style="padding:12px">📎 点击或拖拽文件上传（支持 PDF ≤20MB）</div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="hc-btn">暂存</button><button class="hc-btn primary">提交审批</button></div>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：Steps + Form 分区 + Upload + 暂存/提交</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">基础详情 BasicDetail</span><span class="e">/practice/BasicDetail</span></div>
+      <div class="pb">
+        <div class="page-head"><div><div class="hc-crumb">合同管理 / 合同详情</div><h3 style="margin-top:4px">恒泰华府一期总承包</h3></div><div class="acts"><button class="hc-btn">历史</button><button class="hc-btn primary">编辑</button></div></div>
+        <div class="profile" style="margin:0 0 10px"><div class="avatar">合</div><div style="flex:1"><div class="name">恒泰华府一期总承包 <span class="hc-tag info">审批中</span></div><div class="meta">编号：HT-2026-0812 · 签订 2026-08-12</div></div></div>
+        <table class="hc-table"><tbody><tr><td style="color:var(--hc-text-2);width:90px">签约方</td><td>恒泰置业有限公司</td></tr><tr><td style="color:var(--hc-text-2)">工期</td><td>2026-09-01 ~ 2028-06-30</td></tr><tr><td style="color:var(--hc-text-2)">付款方式</td><td>按形象进度，月度结算</td></tr></tbody></table>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：InfoProfile + 概要表 + Tabs 明细视图</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">高级详情 AdvancedDetail</span><span class="e">/practice/AdvancedDetail</span></div>
+      <div class="pb">
+        <div class="profile" style="margin:0 0 10px"><div class="avatar">合</div><div style="flex:1"><div class="name">恒泰华府一期总承包</div><div class="meta">编号：HT-2026-0812</div></div><div style="text-align:right"><div style="font-size:11px;color:var(--hc-text-3)">合同金额</div><div style="font-size:16px;font-weight:600">¥12,860,000</div></div></div>
+        <div class="hc-tabs" style="margin-bottom:10px"><span class="t on">基本信息</span><span class="t">付款计划</span><span class="t">审批记录</span></div>
+        <div class="cp"><div class="node done"><div class="c">✓</div>起草<div class="ln done"></div></div><div class="node done"><div class="c">✓</div>会签<div class="ln done"></div></div><div class="node cur"><div class="c">3</div>法务<div class="ln"></div></div><div class="node"><div class="c">4</div>归档<div class="ln"></div></div><div class="node"><div class="c">5</div>生效</div></div>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：InfoProfile + CriticalPath + 明细 Grid + Tabs</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">仪表板 Dashboard</span><span class="e">/practice/Dashboard</span></div>
+      <div class="pb">
+        <div class="dash-grid">
+          <div class="metric"><div class="lb">本年签约额（亿）</div><div class="v">86.4</div><div class="delta up">↑ 12.5%</div></div>
+          <div class="metric"><div class="lb">回款率</div><div class="v">78.2%</div><div class="delta up">↑ 3.1%</div></div>
+          <div class="metric"><div class="lb">在建项目</div><div class="v">46</div><div class="delta">正常</div></div>
+        </div>
+        <div style="border:1px solid var(--hc-divider);border-radius:var(--hc-radius);padding:12px">
+          <div style="font-size:12px;font-weight:500;margin-bottom:8px">季度签约额趋势</div>
+          <div style="display:flex;align-items:flex-end;gap:18px;height:90px">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:34px;height:40px;background:linear-gradient(180deg,#518BFF,#266EFF);border-radius:2px"></div><span style="font-size:11px;color:var(--hc-text-3)">Q1</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:34px;height:62px;background:linear-gradient(180deg,#518BFF,#266EFF);border-radius:2px"></div><span style="font-size:11px;color:var(--hc-text-3)">Q2</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:34px;height:82px;background:linear-gradient(180deg,#518BFF,#266EFF);border-radius:2px"></div><span style="font-size:11px;color:var(--hc-text-3)">Q3</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:34px;height:56px;background:linear-gradient(180deg,#55B8FF,#4A85F6);border-radius:2px"></div><span style="font-size:11px;color:var(--hc-text-3)">Q4</span></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：Metric 指标 + 折线/柱状 Chart</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">权限 Permission</span><span class="e">/practice/Permission</span></div>
+      <div class="pb">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="perm"><span class="ic">👤</span>未登录 · 请先登录系统</div>
+          <div class="perm"><span class="ic">🔒</span>无角色 · 请联系管理员分配角色</div>
+          <div class="perm"><span class="ic">🗄</span>无数据权限 · 仅可见本部门数据</div>
+          <div class="perm"><span class="ic">🚫</span>功能未开通 · 申请开通“成本分析”模块</div>
+        </div>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：Empty 权限态 + Button 申请权限（区分四类）</div>
+      </div>
+    </div>
+    <div class="prac-card"><div class="ph"><span class="n">异常 / 404 Unusual</span><span class="e">/practice/Unusual / 404</span></div>
+      <div class="pb">
+        <div class="exception">
+          <div class="code">404</div>
+          <div class="t">抱歉，您访问的页面不存在</div>
+          <div class="d">页面可能已被删除或地址输入有误，请检查后重试。</div>
+          <div style="display:flex;gap:8px"><button class="hc-btn">返回上一页</button><button class="hc-btn primary">返回首页</button></div>
+        </div>
+        <div style="font-size:11px;color:var(--hc-text-3);margin-top:8px">组件：Empty 异常态 + 返回路径（不形成导航死路）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PART E 信息架构与全局框架 ========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">E</span><h2>信息架构与全局框架</h2><span class="en">Information Architecture — 产品气质 / 一级导航 / 五段式框架 / 布局度量</span></div>
+  <div class="cat"><div class="cat-h">产品气质 <span class="en">§1.2</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">定位与气质</div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>克制 · 清晰 · 稳定</b><span>面向高频、复杂、长时间使用的企业业务</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>信息密度优先</b><span>颜色首先承担状态与信息编码职责，不做装饰</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>标准化提效</b><span>通过标准组件、页面模板、业务组件减少重复设计开发</span></div></div>
+          <div class="item"><span class="k">4</span><div class="tx"><b>桌面基线 1440px</b><span>兼容 1280 / 1366 / 1600 / 1920</span></div></div>
+        </div>
+      </div>
+      <div class="bs-card"><div class="bt">一级导航 <span class="en">原站栏目</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span class="hc-tag info">首页 /</span><span class="hc-tag info">设计 /design/</span><span class="hc-tag info">指南 /guide/</span><span class="hc-tag info">组件 /component/</span><span class="hc-tag info">最佳实践 /practice/</span><span class="hc-tag info">资源 /resource/</span><span class="hc-tag info">AI /ai/</span><span class="hc-tag info">可视化 /chart/</span><span class="hc-tag">移动端 · 外链</span>
+        </div>
+        <div class="note" style="margin-top:10px">一级导航仅保留当前工作域；页面内导航使用左侧分组 + 右侧锚点目录。文档标题 H1–H6 字号 36 / 26 / 20 / 18 / 16 / 14px，字重 500。</div>
+      </div>
+    </div>
+  </div>
+  <div class="cat"><div class="cat-h">业务产品推荐框架 <span class="en">§2.3 五段式布局（归纳）</span></div>
+    <div class="bs-grid">
+      <div class="bs-card" style="grid-column:1/-1">
+        <div class="hc-steps" style="margin-bottom:8px">
+          <div class="s cur"><span class="ic">1</span>顶部应用栏</div>
+          <div class="s cur"><span class="ic">2</span>左侧导航</div>
+          <div class="s cur"><span class="ic">3</span>内容头部</div>
+          <div class="s cur"><span class="ic">4</span>内容主体</div>
+          <div class="s cur"><span class="ic">5</span>临时任务</div>
+        </div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>顶部应用栏</b><span>品牌、应用/项目上下文、全局搜索、帮助、通知、用户菜单</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>左侧导航</b><span>一级业务模块固定；允许收起；当前项用主题色 + 浅色背景突出</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>内容头部</b><span>面包屑、页面标题、状态、主操作；避免同时出现多个等权主按钮</span></div></div>
+          <div class="item"><span class="k">4</span><div class="tx"><b>内容主体</b><span>筛选区、工具栏、数据区、分页区；复杂任务用 Tabs / 步骤条拆分</span></div></div>
+          <div class="item"><span class="k">5</span><div class="tx"><b>临时任务</b><span>轻量确认 Popconfirm / 聚焦任务 Dialog / 保留上下文的复杂编辑 Drawer</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cat"><div class="cat-h">文档站布局度量 <span class="en">§2.2 原站 CSS 实测</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">布局数值</div>
+        <table class="hc-table">
+          <tr><th>项目</th><th>规范值</th></tr>
+          <tr><td>顶栏高度</td><td>60px，白底、底部 1px 分隔线</td></tr>
+          <tr><td>一级导航链接</td><td>14px / 400，行高约 56px，激活与 Hover 用 3px 底线</td></tr>
+          <tr><td>设计文档侧栏</td><td>220px</td></tr>
+          <tr><td>正文最大宽度</td><td>1240px（主区 0 60px 内边距）</td></tr>
+          <tr><td>文档标题 H1–H6</td><td>36 / 26 / 20 / 18 / 16 / 14px，字重 500</td></tr>
+          <tr><td>窄屏断点</td><td>侧栏切换为抽屉式</td></tr>
+        </table>
+      </div>
+      <div class="bs-card"><div class="bt">布局示意</div>
+        <pre class="code">┌───────────────────────────────────────────────┐
+│ Logo     一级导航              登录 / 外链入口 │
+├────────────┬────────────────────┬─────────────┤
+│ 二级侧栏   │ 正文：标题/说明/   │ 当前页目录  │
+│ 220px      │ 示例/API  1240px   │ 随正文定位  │
+├────────────┴────────────────────┴─────────────┤
+│ 上一篇 / 下一篇 · 页脚 · 版权                 │
+└───────────────────────────────────────────────┘</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PART F 数据 · 文案 · 反馈选型 ========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">F</span><h2>数据 · 文案 · 反馈选型</h2><span class="en">Content & Feedback — 数据格式 / 文案 / 空状态 / 浮层选择</span></div>
+  <div class="cat"><div class="cat-h">数据与文案规范 <span class="en">§6</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">数据格式 <span class="en">§6.1</span></div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>数值</b><span>一致的小数位与千分位；金额同时明确币种</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>日期</b><span>同页统一 YYYY-MM-DD；需要时显示时间与时区</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>百分比</b><span>不得混用 0.25 与 25% 两种写法</span></div></div>
+          <div class="item"><span class="k">4</span><div class="tx"><b>空值 / 零值</b><span>空值用 --；0 是有效数据，不得显示为空</span></div></div>
+          <div class="item"><span class="k">5</span><div class="tx"><b>脱敏</b><span>按数据等级全量或部分脱敏；查看原文需授权并记录审计</span></div></div>
+          <div class="item"><span class="k">6</span><div class="tx"><b>状态</b><span>文本为主、颜色为辅；状态名用业务结果，不用内部代码</span></div></div>
+          <div class="item"><span class="k">7</span><div class="tx"><b>Loading</b><span>骨架屏适合稳定布局；Spinner 适合局部短等待；长任务显示阶段或进度</span></div></div>
+        </div>
+      </div>
+      <div class="bs-card"><div class="bt">文案规则 <span class="en">§6.2</span></div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>一致</b><span>同一动作只用一个名称（统一「保存」，不混用提交/确认）</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>易读</b><span>先结果后原因，短句、主动语态，避免内部术语与重复敬语</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>按钮</b><span>动词或「动词 + 对象」：新建合同、重新上传</span></div></div>
+          <div class="item"><span class="k">4</span><div class="tx"><b>错误</b><span>说明问题与修复方法（「结束日期不能早于开始日期，请重新选择」）</span></div></div>
+          <div class="item"><span class="k">5</span><div class="tx"><b>标点</b><span>中文用全角标点；英文产品名 / 数字 / 单位按团队词典统一</span></div></div>
+          <div class="item"><span class="k">6</span><div class="tx"><b>命名</b><span>设计图层 / 组件 / 埋点 / 代码命名可互相映射，禁止 copy 2 等无语义名</span></div></div>
+        </div>
+      </div>
+      <div class="bs-card"><div class="bt">空状态文案矩阵 <span class="en">§10.3</span></div>
+        <table class="hc-table">
+          <tr><th>场景</th><th>标题</th><th>行动</th></tr>
+          <tr><td>首次无数据</td><td>暂无合同</td><td>新建合同（有权限时）</td></tr>
+          <tr><td>筛选无结果</td><td>未找到符合条件的合同</td><td>清空筛选条件</td></tr>
+          <tr><td>加载失败</td><td>合同加载失败</td><td>重新加载 + 错误编号</td></tr>
+          <tr><td>无权限</td><td>暂无合同查看权限</td><td>申请权限 或 返回</td></tr>
+        </table>
+        <div class="note" style="margin-top:8px">Empty 区分首次 / 筛选 / 失败 / 无权限，并提供对应单一主行动。</div>
+      </div>
+      <div class="bs-card"><div class="bt">反馈与浮层选型 <span class="en">§4.6 什么时候用哪个</span></div>
+        <table class="hc-table">
+          <tr><th>组件</th><th>适用</th><th>不适用</th></tr>
+          <tr><td>Message</td><td>轻量、自动消失的操作结果</td><td>需要用户决策或阅读长文本</td></tr>
+          <tr><td>Notification</td><td>跨页面、较完整的异步结果</td><td>当前字段校验</td></tr>
+          <tr><td>Alert</td><td>页面内持续可见的重要信息</td><td>普通成功提示</td></tr>
+          <tr><td>Popover</td><td>依附触发元素的补充信息 / 轻操作</td><td>长表单或关键确认</td></tr>
+          <tr><td>Popconfirm</td><td>后果明确的单步确认</td><td>高风险、复杂影响说明</td></tr>
+          <tr><td>Dialog</td><td>需要聚焦的确认或短任务</td><td>超长、多区复杂编辑</td></tr>
+          <tr><td>Drawer</td><td>保留当前上下文的详情或复杂编辑</td><td>极简确认</td></tr>
+          <tr><td>Loading</td><td>数据或操作处理中</td><td>无法估算且长期阻塞（应补进度/说明）</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PART G AI 交互专项 ========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">G</span><h2>AI 交互专项</h2><span class="en">AI Interaction — 对话生命周期 / 组件清单 / 错误分级</span></div>
+  <div class="cat"><div class="cat-h">对话生命周期 <span class="en">§7.1</span></div>
+    <div class="bs-grid">
+      <div class="bs-card" style="grid-column:1/-1">
+        <div class="hc-steps" style="flex-wrap:wrap;margin-bottom:8px">
+          <div class="s done"><span class="ic">1</span>触发入口</div>
+          <div class="s done"><span class="ic">2</span>开场与能力预期</div>
+          <div class="s done"><span class="ic">3</span>用户输入</div>
+          <div class="s done"><span class="ic">4</span>理解 / 澄清</div>
+          <div class="s done"><span class="ic">5</span>执行过程</div>
+          <div class="s done"><span class="ic">6</span>结果展示</div>
+          <div class="s done"><span class="ic">7</span>结果确认 / 继续处理</div>
+          <div class="s done"><span class="ic">8</span>结束</div>
+          <div class="s err"><span class="ic">!</span>错误 / 不支持 / 转人工</div>
+        </div>
+        <div class="note">开始：热情但简短，明确能做什么，由用户主导。提示：给建议而非命令，无匹配项时提供改写或替代路径。执行：侧栏辅助适合保留业务上下文；静默处理只用于低风险、可撤销动作。结果：按结果结构选消息卡 / 表单卡 / 检查卡，显示置信度或证据时不制造虚假精确性。结束：支持完成、放弃、不支持与系统问题，保存上下文并允许重新开始。</div>
+      </div>
+    </div>
+  </div>
+  <div class="cat"><div class="cat-h">AI 组件清单 <span class="en">§7.2</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">通用与开场</div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>Button / Bubble</b><span>操作明确、角色可辨</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>Conversations</b><span>历史可管理</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>Welcome / Prompts</b><span>说明能力边界，示例可直接触发</span></div></div>
+        </div>
+      </div>
+      <div class="bs-card"><div class="bt">输入 / 输出 / 反馈</div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>输入</b><span>Skill Catalog、Sender、Attachment、Image、Screenshot — 格式/大小提示、上传状态、发送可取消</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>输出</b><span>Text、Image、Code、Table、Form、Attachment — 来源、复制/下载、结构化编辑与确认</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>反馈</b><span>Exception Notification、Message Hint — 可恢复错误与下一步行动</span></div></div>
+        </div>
+      </div>
+      <div class="bs-card" style="grid-column:1/-1"><div class="bt">错误分级 <span class="en">§7.1 不同错误给不同恢复动作</span></div>
+        <table class="hc-table">
+          <tr><th>错误类型</th><th>恢复动作</th></tr>
+          <tr><td>无法解析</td><td>引导重述或给出示例</td></tr>
+          <tr><td>输入无效</td><td>指出具体无效字段并给修正方式</td></tr>
+          <tr><td>能力不支持</td><td>说明边界并提供替代路径</td></tr>
+          <tr><td>系统异常</td><td>友好报错 + 重试 / 转人工</td></tr>
+        </table>
+        <div class="note" style="margin-top:8px">AI 业务案例覆盖：新增督办、生成价格方案、合同审查、价格审查、明源知识库、在线客服。设计评审必须以完整生命周期验收，不只是评审一张对话截图。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PART H 可视化与终端适配 ========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">H</span><h2>可视化与终端适配</h2><span class="en">Visualization & Terminal — 图表选型 / 主题色板 / 终端布局</span></div>
+  <div class="cat"><div class="cat-h">图表选型矩阵 <span class="en">§8.2</span></div>
+    <div class="bs-grid">
+      <div class="bs-card" style="grid-column:1/-1">
+        <table class="hc-table">
+          <tr><th>目标</th><th>推荐图表</th><th>避免</th></tr>
+          <tr><td>趋势</td><td>折线、面积</td><td>类别过多的多折线</td></tr>
+          <tr><td>类别比较</td><td>柱状、条形</td><td>难比较角度的饼图</td></tr>
+          <tr><td>构成占比</td><td>饼 / 环（少量分类）、百分比环</td><td>大量或接近比例的扇区</td></tr>
+          <tr><td>多维画像</td><td>雷达（维度有限）</td><td>量纲未标准化</td></tr>
+          <tr><td>阶段转化</td><td>漏斗 / 金字塔</td><td>无顺序关系的分类</td></tr>
+          <tr><td>单指标达成</td><td>仪表盘 / 进度</td><td>多个仪表盘堆叠</td></tr>
+        </table>
+        <div class="note" style="margin-top:8px">所有图表页统一包含：介绍、应用场景、使用原则、标准样式和变体。轴、图例、Tooltip、单位、空数据、异常值与数据更新时间必须完整设计。</div>
+      </div>
+      <div class="bs-card"><div class="bt">极简白主题 <span class="en">12 色序列</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <span style="width:26px;height:22px;background:#5182E4;border-radius:3px" title="#5182E4"></span><span style="width:26px;height:22px;background:#69D4DB;border-radius:3px" title="#69D4DB"></span><span style="width:26px;height:22px;background:#F7CB4A;border-radius:3px" title="#F7CB4A"></span><span style="width:26px;height:22px;background:#9BCC66;border-radius:3px" title="#9BCC66"></span><span style="width:26px;height:22px;background:#3DB37E;border-radius:3px" title="#3DB37E"></span><span style="width:26px;height:22px;background:#F88C48;border-radius:3px" title="#F88C48"></span><span style="width:26px;height:22px;background:#F25352;border-radius:3px" title="#F25352"></span><span style="width:26px;height:22px;background:#CD62D6;border-radius:3px" title="#CD62D6"></span><span style="width:26px;height:22px;background:#8A54D4;border-radius:3px" title="#8A54D4"></span><span style="width:26px;height:22px;background:#52B4F1;border-radius:3px" title="#52B4F1"></span><span style="width:26px;height:22px;background:#51B3BB;border-radius:3px" title="#51B3BB"></span><span style="width:26px;height:22px;background:#D42D6B;border-radius:3px" title="#D42D6B"></span>
+        </div>
+        <div class="note" style="margin-top:8px">普通报表与 PC 工作台采用「极简白」主题。分类色顺序稳定，同一指标跨页面保持同色。</div>
+      </div>
+      <div class="bs-card"><div class="bt">科技蓝主题 <span class="en">12 色序列 · 深色大屏</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <span style="width:26px;height:22px;background:#009FFF;border-radius:3px" title="#009FFF"></span><span style="width:26px;height:22px;background:#00CD8F;border-radius:3px" title="#00CD8F"></span><span style="width:26px;height:22px;background:#FFE555;border-radius:3px" title="#FFE555"></span><span style="width:26px;height:22px;background:#FFAD68;border-radius:3px" title="#FFAD68"></span><span style="width:26px;height:22px;background:#FF5F5E;border-radius:3px" title="#FF5F5E"></span><span style="width:26px;height:22px;background:#C878D8;border-radius:3px" title="#C878D8"></span><span style="width:26px;height:22px;background:#6563ED;border-radius:3px" title="#6563ED"></span><span style="width:26px;height:22px;background:#2F82FE;border-radius:3px" title="#2F82FE"></span><span style="width:26px;height:22px;background:#8ED1F1;border-radius:3px" title="#8ED1F1"></span><span style="width:26px;height:22px;background:#B2EA71;border-radius:3px" title="#B2EA71"></span><span style="width:26px;height:22px;background:#46C850;border-radius:3px" title="#46C850"></span><span style="width:26px;height:22px;background:#00AEB2;border-radius:3px" title="#00AEB2"></span>
+        </div>
+        <div class="note" style="margin-top:8px">深色大屏采用「科技蓝」主题（底色约 #120A36、面板约 #0F1450）。深色主题必须重新核验文字、网格线和 Tooltip 对比度，不能直接反转浅色主题。</div>
+      </div>
+      <div class="bs-card"><div class="bt">终端布局 <span class="en">§8.3</span></div>
+        <table class="hc-table">
+          <tr><th>终端</th><th>画板 / 栅格</th><th>布局规则</th></tr>
+          <tr><td>大屏</td><td>1920 × 1080，16:9</td><td>中心核心周边次要 / 1:1:1 均分 / 地图 3D 重点区</td></tr>
+          <tr><td>图表 PC</td><td>1440 × 820，24 栅格，页边距 20px、水槽 16px</td><td>左右动态缩放；上下定宽、两侧留白自适应</td></tr>
+          <tr><td>移动</td><td>750 × 1334 设计基准</td><td>列表 / 卡片 / 平铺三类；减少同时展示维度，详情下钻</td></tr>
+        </table>
+        <div class="note" style="margin-top:8px">图表 PC 的 20px 页边距、16px 水槽是可视化专项值；普通业务页面仍用 12px 页边距与水槽，不得混用。可视化页统一介绍 / 应用场景 / 使用原则 / 标准样式 / 变体。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PART I 无障碍与交付验收 ========== -->
+<section class="part">
+  <div class="part-h"><span class="tag">I</span><h2>无障碍与交付验收</h2><span class="en">A11y & Delivery — 无障碍清单 / 设计交付物 / 前端验收</span></div>
+  <div class="cat"><div class="cat-h">无障碍与可用性 <span class="en">§9</span></div>
+    <div class="bs-grid">
+      <div class="bs-card"><div class="bt">无障碍清单</div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>对比度</b><span>正文与背景至少 4.5:1，大字 3:1；状态不能只依赖颜色</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>键盘</b><span>全部功能可键盘操作，焦点顺序与视觉一致；focus-visible 清晰可见</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>可访问名称</b><span>图标按钮 / 输入框 / 上传 / 图表 / 浮层提供名称；装饰图片用空 alt</span></div></div>
+          <div class="item"><span class="k">4</span><div class="tx"><b>语义</b><span>表格正确表头关联；排序用 aria-sort；错误字段用 aria-describedby</span></div></div>
+          <div class="item"><span class="k">5</span><div class="tx"><b>动效</b><span>尊重 prefers-reduced-motion；自动轮播可暂停；消息停留时间允许阅读</span></div></div>
+          <div class="item"><span class="k">6</span><div class="tx"><b>缩放</b><span>页面缩放 200% 不丢内容或操作；320px 宽度不出现无意义重叠</span></div></div>
+        </div>
+        <div class="note" style="margin-top:10px;font-weight:500;color:var(--hc-text-1)">主色 / 状态色 WCAG 对比度实测（浅色底 #FFFFFF）</div>
+        <table class="hc-table">
+          <tr><th style="width:180px">色值</th><th style="width:90px">对比度</th><th>结论</th></tr>
+          <tr><td>主色 #266EFF（白字）</td><td>4.41 : 1</td><td>大字号 / 加粗可用；正文级建议用 #2263E6（5.26:1）</td></tr>
+          <tr><td>Hover #518BFF（白字）</td><td>3.24 : 1</td><td>仅大字号 / 图标场景</td></tr>
+          <tr><td>success #1CC78D</td><td>2.19 : 1</td><td>仅作非文字状态色，需配合图标 / 文字</td></tr>
+          <tr><td>warning #FF9902</td><td>2.14 : 1</td><td>仅作警示状态色，避免承载文字信息</td></tr>
+          <tr><td>danger #FF4C4C</td><td>3.29 : 1</td><td>正文级文字建议加深色变体</td></tr>
+          <tr><td>正文 #333333</td><td>12.63 : 1</td><td>达标 ✓</td></tr>
+          <tr><td>次要 #666666</td><td>5.74 : 1</td><td>达标 ✓</td></tr>
+          <tr><td>说明 #999999</td><td>2.85 : 1</td><td>仅作辅助装饰，重要信息勿用</td></tr>
+        </table>
+      </div>
+      <div class="bs-card"><div class="bt">设计交付物 <span class="en">§11.1</span></div>
+        <div class="flat">
+          <div class="item"><span class="k">1</span><div class="tx"><b>页面流与状态流</b><span>正常 / 空 / 加载 / 错误 / 无权限 / 边界数据</span></div></div>
+          <div class="item"><span class="k">2</span><div class="tx"><b>Token 高保真稿</b><span>使用语义化 Token，不散落无命名色值和间距</span></div></div>
+          <div class="item"><span class="k">3</span><div class="tx"><b>变体与交互说明</b><span>触发 / 反馈 / 焦点 / 关闭 / 撤销 / 超时</span></div></div>
+          <div class="item"><span class="k">4</span><div class="tx"><b>响应式稿</b><span>至少覆盖 compact、medium、wide 三档关键变化</span></div></div>
+          <div class="item"><span class="k">5</span><div class="tx"><b>内容清单</b><span>标题 / 字段 / 按钮 / 状态 / 错误和空状态文案</span></div></div>
+        </div>
+      </div>
+      <div class="bs-card" style="grid-column:1/-1"><div class="bt">前端验收 checklist <span class="en">§11.2 逐项自检</span></div>
+        <div class="flat">
+          <div class="item"><span class="k">☐</span><div class="tx"><b>统一体系</b><span>使用统一色彩、字号、字重、行高和 4 点间距体系</span></div></div>
+          <div class="item"><span class="k">☐</span><div class="tx"><b>多宽适配</b><span>1440 基准正确，1280 / 1366 / 1600 / 1920 无遮挡或溢出</span></div></div>
+          <div class="item"><span class="k">☐</span><div class="tx"><b>状态完整</b><span>所有交互组件具备 Hover / Focus / Active / Disabled / Loading / Error 状态</span></div></div>
+          <div class="item"><span class="k">☐</span><div class="tx"><b>表格数据</b><span>数字右对齐，空值、零值、超长文本与大数据量显示正确</span></div></div>
+          <div class="item"><span class="k">☐</span><div class="tx"><b>表单可用</b><span>键盘可用、错误可定位、重复提交被阻止、未保存离开有提醒</span></div></div>
+          <div class="item"><span class="k">☐</span><div class="tx"><b>弹窗焦点</b><span>焦点管理正确，关闭后焦点回到触发元素</span></div></div>
+          <div class="item"><span class="k">☐</span><div class="tx"><b>状态可恢复</b><span>空、错、无权限、断网和超时状态均可恢复</span></div></div>
+          <div class="item"><span class="k">☐</span><div class="tx"><b>无障碍通过</b><span>颜色对比度、可访问名称、语义标签和减少动效通过检查</span></div></div>
+          <div class="item"><span class="k">☐</span><div class="tx"><b>缩放无重叠</b><span>浏览器缩放 200% 及 320px 宽度下内容不重叠</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="foot">Honeycomb UED 完整平铺 · 多示例版 — 基础样式规范 + 原则 + 组件全样式（多示例）+ 最佳实践页 + 信息架构 + 数据文案 + AI + 可视化 + 无障碍验收 · 依据 honeycomb.mingyuanyun.com 设计体系快照整理</div>
+<div class="hc-tools">
+  <button class="hc-tool" id="hcToc" title="目录 / 搜索">☰</button>
+  <button class="hc-tool" id="hcTop" title="回到顶部">↑</button>
+</div>
+<div class="hc-panel" id="hcPanel">
+  <div class="ph"><span>快速定位</span><span id="hcClose" style="cursor:pointer;color:var(--hc-text-3)">✕</span></div>
+  <div class="psearch"><input id="hcSearch" placeholder="搜索组件 / 区块…" /></div>
+  <div class="plist" id="hcList"></div>
+  <div class="pf">
+    <button id="hcDark">深色预览</button>
+    <button id="hcUp">↑ 回顶</button>
+  </div>
+</div>
+<div class="hc-dialog-mask" id="hcDialog">
+  <div class="hc-dialog-box">
+    <div class="dh"><span>删除合同</span><span class="x" data-close>✕</span></div>
+    <div class="db">确定要删除合同「恒泰华府一期总承包」吗？删除后不可恢复。此操作将同步影响关联的付款计划与审批记录。</div>
+    <div class="df"><button class="hc-btn" data-close>取消</button><button class="hc-btn primary" id="hcDialogOk">确认删除</button></div>
+  </div>
+</div>
+<script>
+(function(){
+  /* ---- 顶部 toast（纯前端演示反馈） ---- */
+  var toastEl=null;
+  function toast(msg,type){
+    if(!toastEl){ toastEl=document.createElement('div'); toastEl.className='hc-toast'; document.body.appendChild(toastEl); }
+    var dot=document.createElement('span'); dot.className='dot';
+    dot.style.background = type==='success'?'#1CC78D':type==='danger'?'#FF4C4C':type==='warning'?'#FF9902':'#266EFF';
+    toastEl.innerHTML=''; toastEl.appendChild(dot); toastEl.appendChild(document.createTextNode(msg));
+    toastEl.style.opacity='1';
+    clearTimeout(toastEl._t);
+    toastEl._t=setTimeout(function(){ toastEl.style.opacity='0'; },1600);
+  }
+
+  /* ---- 按钮：点击 loading + toast 反馈（纯前端） ---- */
+  document.addEventListener('click', function(e){
+    var btn=e.target.closest('.hc-btn');
+    if(!btn || btn.disabled || btn.classList.contains('loading')) return;
+    if(btn.closest('.hc-dialog') || btn.closest('.hc-transfer') || btn.closest('.hc-richtext')) return; // 由专门处理
+    var txt=(btn.textContent||'').trim().replace(/\s+/g,' ').slice(0,14);
+    if(!btn.classList.contains('link') && !btn.classList.contains('icon')){
+      btn.classList.add('loading');
+      var old=btn.innerHTML;
+      btn.innerHTML=old+' <span class="hc-spinner" style="width:12px;height:12px;border-width:2px;vertical-align:-2px"></span>';
+      setTimeout(function(){ btn.classList.remove('loading'); btn.innerHTML=old; },550);
+    }
+    toast((txt||'操作')+' 已执行', btn.classList.contains('danger')?'danger':(btn.classList.contains('primary')?'success':''));
+  });
+
+  /* ---- Dialog：确认 / 取消 / 关闭 ---- */
+  document.addEventListener('click', function(e){
+    var x=e.target;
+    if(x && x.textContent.trim()==='✕' && x.closest('.hc-dialog .hd')){ toast('已关闭弹窗'); return; }
+    var btn=e.target.closest('.hc-dialog .ft .hc-btn');
+    if(btn && !btn.classList.contains('loading')){
+      toast(btn.classList.contains('primary')?'已提交（模拟）':'已取消', btn.classList.contains('primary')?'success':'');
+    }
+  });
+
+  /* ---- Switch 开关 ---- */
+  document.addEventListener('click', function(e){
+    var sw=e.target.closest('.hc-switch');
+    if(sw){ sw.classList.toggle('on'); toast(sw.classList.contains('on')?'已开启':'已关闭','success'); }
+  });
+
+  /* ---- Spinner 数字步进 ---- */
+  document.addEventListener('click', function(e){
+    var t=e.target;
+    if(t && t.tagName==='SPAN' && (t.textContent==='−'||t.textContent==='＋')){
+      var wrap=t.parentElement, inp=wrap?wrap.querySelector('input'):null;
+      if(inp && inp.closest('.comp')){ var v=parseFloat(String(inp.value).replace(/,/g,''))||0; inp.value=t.textContent==='−'?(v-1):(v+1); }
+    }
+  });
+
+  /* ---- Tabs 切换 ---- */
+  document.addEventListener('click', function(e){
+    var tab=e.target.closest('.hc-tabs .t');
+    if(tab){ Array.prototype.forEach.call(tab.parentElement.children,function(x){x.classList.remove('on');}); tab.classList.add('on'); }
+  });
+
+  /* ---- 分页切换 ---- */
+  document.addEventListener('click', function(e){
+    var p=e.target.closest('.hc-pager .p');
+    if(p && !p.classList.contains('ellipsis') && p.textContent.trim()!=='‹' && p.textContent.trim()!=='›'){
+      Array.prototype.forEach.call(p.parentElement.children,function(x){x.classList.remove('on');}); p.classList.add('on');
+      toast('已跳转到第 '+p.textContent.trim()+' 页');
+    }
+  });
+
+  /* ---- 侧边菜单切换 ---- */
+  document.addEventListener('click', function(e){
+    var mi=e.target.closest('.hc-menu .mi');
+    if(mi){ Array.prototype.forEach.call(mi.parentElement.children,function(x){x.classList.remove('on');}); mi.classList.add('on'); }
+  });
+
+  /* ---- Tree 展开 / 收起 ---- */
+  document.addEventListener('click', function(e){
+    var sw=e.target.closest('.hc-tree .sw');
+    if(sw){
+      var nd=sw.parentElement, ch=nd.nextElementSibling;
+      if(ch && ch.classList.contains('ch')){
+        var hidden=ch.style.display==='none';
+        ch.style.display=hidden?'':'none';
+        sw.textContent=hidden?'▾':'▸';
+      }
+    }
+  });
+
+  /* ---- Transfer 穿梭框 ---- */
+  document.addEventListener('click', function(e){
+    var b=e.target.closest('.hc-transfer .mid button');
+    if(b){
+      var tf=b.closest('.hc-transfer'), left=tf.children[0], right=tf.children[2];
+      if(b.textContent.indexOf('›')>=0){
+        var it=left.querySelector('.it'); if(it){ right.appendChild(it); toast('已添加到已选','success'); }
+      } else {
+        var it=right.querySelector('.it'); if(it){ left.appendChild(it); toast('已移回可选'); }
+      }
+    }
+  });
+
+  /* ---- DatePicker 面板选日期 ---- */
+  document.addEventListener('click', function(e){
+    var d=e.target;
+    if(d && d.tagName==='SPAN' && /^\d{1,2}$/.test(d.textContent.trim())){
+      var g=d.parentElement;
+      if(g && g.style.display==='grid' && g.style.gridTemplateColumns && g.style.gridTemplateColumns.indexOf('repeat(7')>=0){
+        Array.prototype.forEach.call(g.children,function(x){x.style.background='';x.style.color='';x.style.borderRadius='';});
+        d.style.background='#266EFF'; d.style.color='#fff'; d.style.borderRadius='4px';
+        toast('已选择日期');
+      }
+    }
+  });
+
+  /* ---- 悬浮工具：目录 / 搜索 / 回顶 / 深色预览 ---- */
+  var hcPanel=document.getElementById('hcPanel');
+  var hcToc=document.getElementById('hcToc');
+  var hcSearch=document.getElementById('hcSearch');
+  var hcList=document.getElementById('hcList');
+  var hcClose=document.getElementById('hcClose');
+  var hcTop=document.getElementById('hcTop');
+  var hcUp=document.getElementById('hcUp');
+  var hcDark=document.getElementById('hcDark');
+  function buildToc(){
+    hcList.innerHTML='';
+    document.querySelectorAll('.part-h').forEach(function(h){
+      var b=document.createElement('button'); b.className='pl';
+      b.textContent=(h.querySelector('.tag')?h.querySelector('.tag').textContent+' · ':'')+h.querySelector('h2').textContent;
+      b.onclick=function(){ hcPanel.classList.remove('open'); h.scrollIntoView({behavior:'smooth',block:'start'}); };
+      hcList.appendChild(b);
+    });
+    var grp=document.createElement('div'); grp.className='gr'; grp.textContent='— 组件分组 —'; hcList.appendChild(grp);
+    document.querySelectorAll('.part .cat-h').forEach(function(c){
+      var part=c.closest('.part'); if(!part)return;
+      var tag=part.querySelector('.part-h .tag'); if(!tag||tag.textContent!=='C')return;
+      var b=document.createElement('button'); b.className='pl';
+      b.textContent='▸ '+c.textContent.replace(/\s+/g,' ').trim();
+      b.onclick=function(){ hcPanel.classList.remove('open'); c.scrollIntoView({behavior:'smooth',block:'start'}); };
+      hcList.appendChild(b);
+    });
+  }
+  if(hcToc)hcToc.onclick=function(){ hcPanel.classList.toggle('open'); if(hcPanel.classList.contains('open'))buildToc(); };
+  if(hcClose)hcClose.onclick=function(){ hcPanel.classList.remove('open'); };
+  function scrollTop(){ window.scrollTo({top:0,behavior:'smooth'}); }
+  if(hcTop)hcTop.onclick=scrollTop;
+  if(hcUp)hcUp.onclick=scrollTop;
+  if(hcDark)hcDark.onclick=function(){
+    document.body.classList.toggle('dark');
+    var on=document.body.classList.contains('dark');
+    hcDark.textContent=on?'浅色模式':'深色预览';
+    hcDark.classList.toggle('on',on);
+    toast(on?'已切换深色预览（科技蓝大屏基调）':'已切回浅色主题', on?'':'');
+  };
+  if(hcSearch)hcSearch.addEventListener('input',function(){
+    var q=this.value.trim().toLowerCase(),hit=0;
+    document.querySelectorAll('.comp').forEach(function(c){
+      var m=!q||c.textContent.toLowerCase().indexOf(q)>=0;
+      c.style.display=m?'':'none';
+      if(m)hit++;
+    });
+    var hint=document.getElementById('hcHit');
+    if(q&&!hint){ hint=document.createElement('div'); hint.id='hcHit'; hint.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #ddd;border-radius:4px;padding:6px 14px;font-size:12px;z-index:1200;box-shadow:0 4px 12px rgba(0,0,0,.12)'; document.body.appendChild(hint); }
+    if(hint){ hint.textContent=q?('匹配 '+hit+' 个组件'):''; hint.style.display=q?'':'none'; }
+  });
+
+  /* ---- 代码一键复制 ---- */
+  document.querySelectorAll('pre.code').forEach(function(pre){
+    var b=document.createElement('button'); b.className='copy'; b.textContent='复制';
+    b.onclick=function(){
+      var c=pre.cloneNode(true); var cb=c.querySelector('.copy'); if(cb)cb.remove();
+      var txt=c.textContent;
+      function ok(){ toast('已复制代码'); }
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(ok).catch(function(){ fallback(); });
+      } else { fallback(); }
+      function fallback(){
+        var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select();
+        try{ document.execCommand('copy'); ok(); }catch(e){ toast('复制失败，请手动选择'); }
+        document.body.removeChild(ta);
+      }
+    };
+    pre.appendChild(b);
+  });
+
+  /* ---- Dialog 演示（真实弹出 / 关闭） ---- */
+  var hcDialog=document.getElementById('hcDialog');
+  function openDialog(){ if(hcDialog)hcDialog.classList.add('open'); }
+  function closeDialog(){ if(hcDialog)hcDialog.classList.remove('open'); }
+  document.querySelectorAll('.comp').forEach(function(c){
+    var n=c.querySelector('.hd .n'); if(!n)return; var name=n.textContent;
+    if(/Dialog/.test(name)){
+      var bb=document.createElement('button'); bb.className='hc-btn sm'; bb.style.marginLeft='auto'; bb.textContent='打开演示';
+      bb.onclick=openDialog;
+      c.querySelector('.hd').appendChild(bb);
+    }
+    if(/Message/.test(name)){
+      var row=document.createElement('div'); row.className='demo'; row.style.marginTop='2px';
+      [['信息',''],['成功','success'],['警告','warning'],['错误','danger']].forEach(function(pair){
+        var b=document.createElement('button'); b.className='hc-btn sm'; b.textContent=pair[0];
+        b.onclick=function(){ toast('这是一条'+pair[0]+'提示（演示）',pair[1]); };
+        row.appendChild(b);
+      });
+      c.querySelector('.bd').appendChild(row);
+    }
+    if(/Toolbar/.test(name)){
+      c.querySelectorAll('.bd span,.bd i').forEach(function(ic){
+        if(!ic.className&&/^[^\u4e00-\u9fa5]{1,2}$/.test(ic.textContent.trim())){
+          ic.className='tb-ic'; if(!ic.title)ic.title=ic.textContent.trim()||'图标操作';
+        }
+      });
+    }
+  });
+  if(hcDialog){
+    hcDialog.addEventListener('click',function(e){
+      if(e.target===hcDialog||e.target.closest('[data-close]')){ closeDialog(); return; }
+      if(e.target.closest('#hcDialogOk')){ closeDialog(); toast('已删除合同（模拟）','danger'); }
+    });
+  }
+})();
+</script>
+</body>
+</html>

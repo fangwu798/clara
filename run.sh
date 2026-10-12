@@ -6,6 +6,9 @@
 #        mvn -q -pl clara-application -am package -DskipTests
 # ============================================================
 
+# 记住用户启动脚本时所在的目录：即要分析的项目目录（Clara 以 CLARA_WORK_DIR 读取）。
+export CLARA_WORK_DIR="$(pwd)"
+
 # 切到脚本所在目录（仓库根），保证 config/ 可被定位
 cd "$(dirname "$0")" || exit 1
 

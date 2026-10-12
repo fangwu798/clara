@@ -16,6 +16,8 @@ public final class ConversationResult {
     private String conversationId;
     /** 最终回复内容（对话为文本，图片等能力为对应产出）。 */
     private String content;
+    /** 本轮编排中模型返回的思维链（thinking）累积文本；无思维链时为 null。 */
+    private String reasoning;
     /** 编排终态。 */
     private OrchestrationStatusEnum status;
     /** 本次编排发生的工具往返次数。 */

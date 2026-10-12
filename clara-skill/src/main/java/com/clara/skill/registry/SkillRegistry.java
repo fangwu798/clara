@@ -23,15 +23,20 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 技能注册表：按分类扫描 {@code tools/} 与 {@code prompt/} 目录（内置 {@code resource/config} 与
- * 运行期 {@code config/skill} 两处来源），识别技能与提示词，支持热加载与同名覆盖，并把描述向量化
+ * 技能注册表：按分类扫描 {@code tools/}、{@code prompt/} 与 {@code scripts/} 目录（内置 {@code resource/config}
+ * 与运行期 {@code config/skill} 两处来源），识别技能与提示词，支持热加载与同名覆盖，并把描述向量化
  * 写入语义记忆存储（来源 {@code PROMPT} / {@code TOOL_DESCRIPTION}）。
+ *
+ * <p>工具来源有两种：{@code tools/} 下的 JSON 声明（如内置 {@code BUILTIN} 工具），以及 {@code scripts/} 下
+ * 自描述的 Python 脚本（以 {@code --describe} 输出元数据，定义与执行体同文件）；两者以工具标识合并，运行时
+ * 目录覆盖内置目录。
  */
 public final class SkillRegistry {
 
     private final File builtinRoot;
     private final File runtimeRoot;
     private final SkillLoader loader;
+    private final ScriptToolLoader scriptToolLoader;
     private final IEmbeddingClient embeddingClient;
     private final ISemanticMemoryStore memoryStore;
 
@@ -50,9 +55,26 @@ public final class SkillRegistry {
      */
     public SkillRegistry(File builtinRoot, File runtimeRoot, SkillLoader loader,
             IEmbeddingClient embeddingClient, ISemanticMemoryStore memoryStore) {
+        this(builtinRoot, runtimeRoot, loader, new ScriptToolLoader(), embeddingClient, memoryStore);
+    }
+
+    /**
+     * 显式装配脚本工具加载器构造。
+     *
+     * @param builtinRoot      内置技能根目录（对应 {@code resource/config}），可为 null
+     * @param runtimeRoot      运行期技能根目录（对应 {@code config/skill}），可为 null
+     * @param loader           JSON 文件解析器，可为 null（使用默认解析器）
+     * @param scriptToolLoader 脚本工具加载器（执行 {@code --describe}），可为 null（使用默认加载器）
+     * @param embeddingClient  描述向量化客户端，可为 null（null 时跳过语义记忆索引）
+     * @param memoryStore      语义记忆存储，可为 null（null 时跳过语义记忆索引）
+     */
+    public SkillRegistry(File builtinRoot, File runtimeRoot, SkillLoader loader,
+            ScriptToolLoader scriptToolLoader, IEmbeddingClient embeddingClient,
+            ISemanticMemoryStore memoryStore) {
         this.builtinRoot = builtinRoot;
         this.runtimeRoot = runtimeRoot;
         this.loader = loader == null ? new SkillLoader() : loader;
+        this.scriptToolLoader = scriptToolLoader == null ? new ScriptToolLoader() : scriptToolLoader;
         this.embeddingClient = embeddingClient;
         this.memoryStore = memoryStore;
     }
@@ -172,12 +194,26 @@ public final class SkillRegistry {
         }
         scanTools(targetTools, new File(root, "tools"));
         scanPrompts(targetPrompts, new File(root, "prompt"));
+        scanScriptTools(targetTools, new File(root, "scripts"));
     }
 
     private void scanTools(Map<String, ToolMethod> target, File dir) {
         for (File file : listFiles(dir)) {
             ToolMethod method = loader.parseTool(file);
             target.put(method.getId(), method);
+        }
+    }
+
+    /**
+     * 扫描自描述脚本工具：对 {@code scripts/} 下非下划线开头的 {@code .py} 执行 {@code --describe}
+     * 取回工具声明；脚本非工具或加载失败时跳过，不影响其余工具。
+     */
+    private void scanScriptTools(Map<String, ToolMethod> target, File dir) {
+        for (File file : listScriptFiles(dir)) {
+            ToolMethod method = scriptToolLoader.load(file);
+            if (method != null) {
+                target.put(method.getId(), method);
+            }
         }
     }
 
@@ -201,6 +237,27 @@ public final class SkillRegistry {
             if (child.isDirectory()) {
                 result.addAll(listFiles(child));
             } else if (child.isFile() && child.getName().endsWith(".json")) {
+                result.add(child);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 列出 {@code scripts/} 下的工具脚本：仅顶层 {@code .py}，跳过下划线开头的共享辅助模块。
+     */
+    private List<File> listScriptFiles(File dir) {
+        if (dir == null || !dir.isDirectory()) {
+            return Collections.emptyList();
+        }
+        List<File> result = new ArrayList<>();
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return result;
+        }
+        for (File child : children) {
+            String name = child.getName();
+            if (child.isFile() && name.endsWith(".py") && !name.startsWith("_")) {
                 result.add(child);
             }
         }

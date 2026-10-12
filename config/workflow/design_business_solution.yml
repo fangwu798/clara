@@ -1,0 +1,71 @@
+workflowId: design_business_solution
+version: "1.0.0"
+# 对外只回传最终方案文本，避免把批量读取的源码整体回灌给对话模型。
+outputs: [solution]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    # 0) 读取随应用发布的前后端开发规范（固定约束，方案必须遵循，来源为仓库根 config/standards/）。
+    - id: read_standards
+      type: TOOL
+      outputKeys: [standards]
+      tool: file_ops
+      arguments:
+        op: read_many
+        base_dir: "@repo"
+        paths:
+          - "config/standards/backend-technical-summary.md"
+          - "config/standards/frontend-ued-summary.md"
+        max_bytes: 60000
+    # 1) 扫描当前分析目录（run.bat 执行时所在目录，经 CLARA_WORK_DIR 传入）的目录树。
+    - id: scan
+      type: TOOL
+      outputKeys: [scan_result]
+      tool: file_ops
+      arguments:
+        op: scan
+        base_dir: "."
+        include: ["*.md", "*.txt", "*.java", "*.kt", "*.ts", "*.tsx", "*.js", "*.vue", "*.xml", "*.yml", "*.yaml", "*.json", "*.sql", "*.py", "*.go"]
+        exclude: ["*development-plan*", "*node_modules*"]
+        max_files: 400
+        max_depth: 8
+        with_size: true
+    # 2) 规划：挑选最能反映业务与架构的文件，并给出方案大纲。
+    - id: plan
+      type: AGENT
+      outputKeys: [plan]
+      prompt: solution_file_planner
+      promptVars:
+        goal: "梳理业务需求，产出「需求 + 技术方案」：整体方案、微服务划分、业务领域隔离、代码结构规划、数据库字段设计、DTO 对象规划"
+        listing: "${scan_result}"
+    # 3) 批量读取被挑选的文件内容。
+    - id: read
+      type: TOOL
+      outputKeys: [sources]
+      tool: file_ops
+      arguments:
+        op: read_many
+        base_dir: "."
+        paths: "${plan.files}"
+        max_bytes: 7000
+    # 4) 按前后端技术规范产出完整的需求与技术方案（Markdown）。
+    - id: design
+      type: AGENT
+      outputKeys: [solution]
+      prompt: solution_architect
+      promptVars:
+        goal: "梳理业务需求，产出「需求 + 技术方案」：整体方案、微服务划分、业务领域隔离、代码结构规划、数据库字段设计、DTO 对象规划"
+        plan: "${plan}"
+        sources: "${sources}"
+        standards: "${standards}"
+    # 5) 就地落盘到分析目录下的 development-plan/。
+    - id: persist
+      type: TOOL
+      outputKeys: [persisted]
+      tool: file_ops
+      arguments:
+        op: write
+        base_dir: "."
+        path: "development-plan/01-requirements-and-architecture.md"
+        content: "${solution}"

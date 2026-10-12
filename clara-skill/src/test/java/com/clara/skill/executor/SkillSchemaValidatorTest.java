@@ -37,6 +37,23 @@ public class SkillSchemaValidatorTest {
         validator.validateInput(methodWithSchema(schema), "{\"text\":123}");
     }
 
+    @Test(expected = ClaraException.class)
+    public void validateInputRejectsMalformedJson() {
+        String schema = "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}}}";
+        validator.validateInput(methodWithSchema(schema), "{\"text\":\"a\" \"b\"}");
+    }
+
+    @Test(expected = ClaraException.class)
+    public void validateInputRejectsTrailingContent() {
+        String schema = "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}}}";
+        validator.validateInput(methodWithSchema(schema), "{\"text\":\"a\"} extra");
+    }
+
+    @Test(expected = ClaraException.class)
+    public void validateInputRejectsMalformedJsonEvenWithoutSchema() {
+        validator.validateInput(methodWithSchema(null), "not-json");
+    }
+
     @Test
     public void isValidReturnsTrueAndFalse() {
         String schema = "{\"type\":\"object\",\"properties\":{\"n\":{\"type\":\"integer\"}},\"required\":[\"n\"]}";

@@ -1,0 +1,47 @@
+workflowId: plan_development
+version: "1.0.0"
+# 对外只回传开发计划文本。
+outputs: [dev_plan]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    # 0) 读取随应用发布的前后端开发规范（固定约束，计划必须遵循，来源为仓库根 config/standards/）。
+    - id: read_standards
+      type: TOOL
+      outputKeys: [standards]
+      tool: file_ops
+      arguments:
+        op: read_many
+        base_dir: "@repo"
+        paths:
+          - "config/standards/backend-technical-summary.md"
+          - "config/standards/frontend-ued-summary.md"
+        max_bytes: 60000
+    # 1) 读取上一步（design_business_solution）在分析目录下产出的需求与技术方案。
+    - id: read_solution
+      type: TOOL
+      outputKeys: [solution_text]
+      tool: file_ops
+      arguments:
+        op: read
+        base_dir: "."
+        path: "development-plan/01-requirements-and-architecture.md"
+    # 2) 依据方案规划开发计划（阶段 / 里程碑 / 任务拆分 / 依赖 / 验收标准）。
+    - id: plan
+      type: AGENT
+      outputKeys: [dev_plan]
+      prompt: dev_plan_writer
+      promptVars:
+        solution: "${solution_text}"
+        standards: "${standards}"
+    # 3) 就地落盘到分析目录下的 development-plan/。
+    - id: persist
+      type: TOOL
+      outputKeys: [persisted]
+      tool: file_ops
+      arguments:
+        op: write
+        base_dir: "."
+        path: "development-plan/02-development-plan.md"
+        content: "${dev_plan}"
