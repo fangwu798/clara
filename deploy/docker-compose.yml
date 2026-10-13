@@ -77,3 +77,16 @@ services:
     depends_on:
       - etcd    # 元数据存储
       - minio   # 对象存储
+
+  # attu：Milvus 官方 Web 控制台（人工查看集合与实体数据）。
+  # 只是 Milvus 的图形客户端，不参与存储；容器内通过 compose 网络直连 standalone 的 gRPC 19530。
+  # 9600 为浏览器访问端口（http://localhost:9600）。
+  attu:
+    container_name: clara-milvus-attu
+    image: zilliz/attu:v2.5
+    environment:
+      MILVUS_URL: standalone:19530   # compose 网络内直连 Milvus 服务名
+    ports:
+      - "9600:3000"   # Web 控制台：http://localhost:9600
+    depends_on:
+      - standalone   # 依赖 Milvus 服务本体
