@@ -78,7 +78,7 @@ public class SkillRegistryHotReloadTest {
 
         File root = folder.newFolder("skill-grouped");
         File scripts = newFolder(root, "scripts");
-        write(new File(newFolder(scripts, "文件操作"), "nested_tool.py"),
+        write(new File(newFolder(scripts, "file-ops"), "nested_tool.py"),
                 scriptSource("nested_tool", "nested"));
         // 下划线开头的目录（如共享辅助模块目录、__pycache__）不参与工具发现
         write(new File(newFolder(scripts, "_shared"), "helper_tool.py"),

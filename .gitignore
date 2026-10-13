@@ -28,3 +28,6 @@ target/
 # JVM 崩溃产物（HotSpot error / replay 文件）。
 replay_pid*.log
 hs_err_pid*.log
+
+# Python 字节码缓存（手工执行 config/skill/scripts 下的脚本时会生成，框架执行时已禁用）。
+__pycache__/

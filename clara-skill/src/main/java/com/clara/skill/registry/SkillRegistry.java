@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>工具来源有两种：{@code tools/} 下的 JSON 声明（如内置 {@code BUILTIN} 工具），以及 {@code scripts/} 下
  * 自描述的 Python 脚本（以 {@code --describe} 输出元数据，定义与执行体同文件）；两者以工具标识合并，运行时
- * 目录覆盖内置目录。{@code scripts/} 按用途分子目录组织（如 {@code 文件操作/}、{@code 程序编译/}），
+ * 目录覆盖内置目录。{@code scripts/} 按用途分子目录组织（如 {@code file-ops/}、{@code compile/}），
  * 扫描为递归进行，目录层级不影响工具发现。
  *
  * <p>运行期改动：每次读取（提示词取值、工具查找、工具与提示词列举）都先比对运行期 {@code prompt/} 与

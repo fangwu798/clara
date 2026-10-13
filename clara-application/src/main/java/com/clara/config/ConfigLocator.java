@@ -99,6 +99,15 @@ public final class ConfigLocator {
     }
 
     /**
+     * 定位本地运行配置文件 {@code config/clara.yml}（主模型、语义记忆等本地开关都写在这里）。
+     *
+     * @return 配置文件路径（找不到时返回相对路径本身），非 null
+     */
+    public static Path claraConfigFile() {
+        return locateFile(CLARA_CONFIG);
+    }
+
+    /**
      * 读取 {@code config/clara.yml} 的 {@code defaultModel}（主模型）。
      *
      * <p>该文件只有一个顶层标量键，故按行简单解析（不做通用 YAML 解析）：取首个非注释的
@@ -107,7 +116,7 @@ public final class ConfigLocator {
      * @return 主模型标识，未配置时 null
      */
     public static String defaultModel() {
-        Path configFile = locateFile(CLARA_CONFIG);
+        Path configFile = claraConfigFile();
         if (!Files.isRegularFile(configFile)) {
             return null;
         }

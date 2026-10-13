@@ -5,3 +5,20 @@
 #   示例：deepseek-completion / deepseek-response / volcengine-response / kimi-completion / openai。
 # 未配置或未匹配到时，启动会列出全部模型配置（已忽略 examples 样例）供手动选择。
 defaultModel: deepseek-completion
+
+# 语义记忆（可选）。配了 milvus 且 enabled 不为 false 时：
+#   1) 所有对话记录都会向量化写入 Milvus（来源 CONVERSATION，按会话隔离，用于长程/跨窗口关联）；
+#   2) 每轮按相似度从 Milvus 召回历史上下文，注入到提示词。
+# 未配置该节点、或 enabled: false 时保持原样：语义记忆用进程内实现，不写对话记录。
+# 服务端可用 deploy/docker-compose.yml 起（etcd + MinIO + milvus standalone，gRPC 端口 19530）。
+milvus:
+  enabled: false
+  host: 127.0.0.1
+  port: 19530
+  collection: clara_conversations
+  # 向量维度必须与嵌入模型一致；当前默认的离线占位嵌入（HashingEmbeddingClient）为 1024。
+  # 换成真实嵌入模型时，这里要改成该模型的输出维度，并让入库与检索保持同一模型。
+  dimension: 1024
+  # Milvus 开启鉴权时填写，否则留空。
+  # username: root
+  # password: Milvus

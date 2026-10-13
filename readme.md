@@ -316,6 +316,21 @@ Clara 使用 ClaraException 携带结构化 ClaraError，主要字段：
 - 限制内存驻留可用 BoundedCachingConversationStore 包装，支持 LRU 与条数上限。
 - 关闭应用时显式关闭 Closeable 存储。
 
+### 语义记忆与 Milvus（可选）
+
+语义记忆用于长程/跨窗口关联：把对话记录向量化沉淀，并每轮按相似度召回注入上下文。默认关闭，开启方式：
+
+1. 起服务：`docker compose -f deploy/docker-compose.yml up -d`（etcd + MinIO + milvus standalone，gRPC 端口 19530）。
+2. 在 `config/clara.yml` 增加 `milvus` 节点（字段与注释见该文件），确保可连上；启动横幅的 `semantic` 一行会显示最终用的是 `local` 还是 `milvus`，据此确认是否生效。
+
+开启后：所有对话记录（按会话隔离，来源 CONVERSATION）写入 Milvus；每轮按相似度召回历史上下文注入提示词（默认召回 3 条、阈值 0.7，见 `ContextControlConfig`）。
+
+注意事项：
+
+- `milvus.dimension` 必须与嵌入模型输出维度一致；默认离线占位嵌入 `HashingEmbeddingClient` 为 1024，换真实嵌入模型时同步修改，并保证入库与检索用同一模型。
+- 不写 `milvus` 节点、或写 `enabled: false` 时保持原样：语义记忆用进程内实现，不写对话记录。
+- Milvus 连不上时启动会提示并回退为进程内实现（本次不写对话记录），不阻断对话。
+
 ## MCP
 
 clara-mcp 支持 stdio 与 Streamable HTTP，围绕注册、初始化、能力发现、目录与统一调用组织：

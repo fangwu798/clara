@@ -4,7 +4,7 @@
 框架解析后即得到该工具的声明；正常调用（无 --describe）时脚本仍从 stdin 读入参执行。
 
 约定：
-- 工具脚本按用途分子目录存放（如 文件操作/、检索/、文档/、命令执行/、程序编译/、数据库/、网络/）；
+- 工具脚本按用途分子目录存放（如 file-ops/、search/、document/、command/、compile/、database/、network/）；
   框架递归扫描 scripts/ 下任意层级的 .py，目录层级不影响工具发现。
 - 共享辅助模块置于 scripts 根目录并以下划线开头（如 _textio.py、_toolmeta.py）；框架跳过下划线开头的
   目录与文件（顺带排除 __pycache__），不把它们当工具。工具脚本需先把 scripts 根目录插入 sys.path，

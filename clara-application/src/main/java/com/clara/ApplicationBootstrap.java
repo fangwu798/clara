@@ -1,6 +1,7 @@
 package com.clara;
 
 import com.clara.config.ConfigLocator;
+import com.clara.config.MilvusSettings;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.memory.ITokenCountEstimator;
@@ -34,7 +35,13 @@ import com.clara.memory.persistence.ConversationStore;
 import com.clara.memory.persistence.InMemoryConversationStore;
 import com.clara.memory.persistence.local.LocalConversationStore;
 import com.clara.memory.semantic.local.LocalSemanticMemoryStore;
+import com.clara.memory.semantic.milvus.MilvusBackend;
+import com.clara.memory.semantic.milvus.MilvusBackendConfig;
+import com.clara.memory.semantic.milvus.MilvusBackendFactory;
+import com.clara.memory.semantic.milvus.MilvusCollectionSpec;
+import com.clara.memory.semantic.milvus.MilvusSemanticMemoryStore;
 import com.clara.memory.summarize.DefaultSummarizeCoordinator;
+import com.clara.memory.window.ConversationIndexingWindowMemory;
 import com.clara.memory.window.DefaultWindowMemory;
 import com.clara.model.embedding.HashingEmbeddingClient;
 import com.clara.model.provider.CompatibleStream;
@@ -169,6 +176,14 @@ public final class ApplicationBootstrap implements Closeable {
     private final IEmbeddingClient embeddingClient;
     private final ISemanticMemoryStore semanticMemoryStore;
     /**
+     * 是否启用「对话记录写入语义记忆」：仅当 clara.yml 配置并成功连上 Milvus 时为 true；否则行为与原来一致。
+     */
+    private final boolean conversationIndexing;
+    /**
+     * 语义记忆的存放说明（local / milvus 及地址），用于启动横幅确认配置是否生效。
+     */
+    private final String semanticMemoryDescription;
+    /**
      * 对话历史存储；首次真正需要读写历史时才创建，见 {@link #conversationStore()}。
      */
     private ConversationStore conversationStore;
@@ -233,7 +248,18 @@ public final class ApplicationBootstrap implements Closeable {
         }
         this.embeddingClient = embeddingClient;
         this.mcpClientFactory = mcpClientFactory;
-        this.semanticMemoryStore = new LocalSemanticMemoryStore(embeddingDimension);
+
+        // 语义记忆：clara.yml 配了 milvus 就用 Milvus（对话记录写入并召回），否则维持进程内实现、行为不变。
+        MilvusSettings milvus = MilvusSettings.load(ConfigLocator.claraConfigFile(), embeddingDimension);
+        MilvusSemanticMemoryStore milvusStore = milvus == null ? null : connectMilvus(milvus);
+        this.semanticMemoryStore = milvusStore == null
+                ? new LocalSemanticMemoryStore(embeddingDimension) : milvusStore;
+        this.conversationIndexing = milvusStore != null;
+        this.semanticMemoryDescription = milvusStore == null
+                ? "进程内 local（不写对话记录）"
+                : "milvus " + milvus.getHost() + ":" + milvus.getPort() + "/" + milvus.getCollection()
+                        + "（对话记录写入并召回）";
+
         this.tokenCountEstimator = new TiktokenTokenCountEstimator(TiktokenTokenCountEstimator.DEFAULT_ENCODING);
 
         // clara-model：统一的模型调用入口（传输实现无状态、可全局共享）
@@ -276,7 +302,12 @@ public final class ApplicationBootstrap implements Closeable {
         DefaultConversationOrchestrator.WindowMemoryFactory windowMemoryFactory =
                 (conversationId, provider, model) -> {
                     String effectiveProvider = provider == null ? DEFAULT_PROVIDER : provider;
-                    return new DefaultWindowMemory(conversationId, effectiveProvider, model, conversationStore());
+                    IWindowMemory memory = new DefaultWindowMemory(conversationId, effectiveProvider, model,
+                            conversationStore());
+                    // 启用外部向量库时，顺手把每条对话记录写入语义记忆，供后续按会话召回。
+                    return conversationIndexing
+                            ? new ConversationIndexingWindowMemory(memory, embeddingClient, semanticMemoryStore)
+                            : memory;
                 };
 
         this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler, capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator);
@@ -344,6 +375,15 @@ public final class ApplicationBootstrap implements Closeable {
                     + "（同一目录再次进入可续接，删除该目录即清空）";
         }
         return "仅进程内（退出即丢失）";
+    }
+
+    /**
+     * 语义记忆的存放说明，用于启动横幅：确认 clara.yml 里的 milvus 配置是否生效。
+     *
+     * @return 一行说明，非 null
+     */
+    public String semanticMemoryDescription() {
+        return semanticMemoryDescription;
     }
 
     /**
@@ -563,6 +603,31 @@ public final class ApplicationBootstrap implements Closeable {
             System.err.println("[memory] 本地对话历史不可用，本次运行的历史不会保留："
                     + unavailable.getMessage());
             return new InMemoryConversationStore();
+        }
+    }
+
+    /**
+     * 连接 Milvus 语义记忆存储：构造期即校验集合存在且维度一致。
+     *
+     * <p>连不上时给出原因并返回 null，由调用方回退为进程内实现——配了向量库但没起服务不该让整个应用起不来，
+     * 横幅上的 {@code semantic} 一行会写明最终用的是哪一个。
+     *
+     * @param settings Milvus 配置，非 null
+     * @return Milvus 语义记忆存储；不可用时 null
+     */
+    private static MilvusSemanticMemoryStore connectMilvus(MilvusSettings settings) {
+        try {
+            MilvusBackend backend = MilvusBackendFactory.create(new MilvusBackendConfig(
+                    settings.getHost(), settings.getPort(), settings.getUsername(), settings.getPassword(),
+                    MilvusBackendConfig.DEFAULT_DATABASE,
+                    MilvusBackendConfig.DEFAULT_CONNECT_TIMEOUT_MILLIS,
+                    MilvusBackendConfig.DEFAULT_IDLE_TIMEOUT_MILLIS));
+            return new MilvusSemanticMemoryStore(
+                    new MilvusCollectionSpec(settings.getCollection(), settings.getDimension()), backend);
+        } catch (RuntimeException unavailable) {
+            System.err.println("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）："
+                    + unavailable.getMessage());
+            return null;
         }
     }
 

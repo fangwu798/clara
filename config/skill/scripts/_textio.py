@@ -1,7 +1,7 @@
 """脚本间共享的文本 I/O 工具：统一 UTF-8 标准流 + 文本文件编码自动识别与读取。
 
 本模块位于 config/skill/scripts 根目录，被各用途子目录下的工具脚本（如
-文件操作/file_ops.py、检索/text_search.py、文档/doc_outline.py）复用。
+file-ops/file_ops.py、search/text_search.py、document/doc_outline.py）复用。
 这些脚本以「独立进程 + stdin/stdout JSON」方式运行，Python 只把脚本自身所在目录加入
 sys.path，故工具脚本需先把 scripts 根目录插入 sys.path 再 `import _textio`（见各脚本文件头部）。
 """

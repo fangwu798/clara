@@ -289,6 +289,7 @@ public final class ConsoleView implements Closeable {
         emit("  workflowEngine : " + bootstrap.workflowEngine().getClass().getName());
         emit("  embeddingClient: " + bootstrap.embeddingClient().getClass().getName());
         emit("  memory         : " + bootstrap.conversationHistoryDescription());
+        emit("  semantic       : " + bootstrap.semanticMemoryDescription());
         emit("  model          : " + describe(providerConfig) + "   [" + configPath + "]");
         emit("  modelSource    : " + source);
         emit("  workDir        : " + workDirectory());
