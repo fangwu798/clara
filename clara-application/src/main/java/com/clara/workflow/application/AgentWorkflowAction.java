@@ -6,6 +6,7 @@ import com.clara.core.workflow.IWorkflowAction;
 import com.clara.dto.workflow.ExecutionScope;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.stream.IStreamObserver;
 import com.clara.media.MediaAsset;
 import com.clara.media.asset.MediaAssetIngestor;
 import com.clara.orchestration.api.ConversationRequest;
@@ -40,6 +41,11 @@ import java.util.Map;
 public final class AgentWorkflowAction implements IWorkflowAction {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    /**
+     * 进度明细中「提示词 / 输入」预览的最大字符数；过短了看不出内容，过长了会在窄终端里折行错位。
+     */
+    private static final int PREVIEW_MAX_CHARS = 60;
 
     private final AgentActionContext context;
     private final String nodeId;
@@ -90,16 +96,30 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         }
         Object instanceValue = scope.get("instanceId");
         String instanceId = instanceValue == null ? nodeId : String.valueOf(instanceValue);
+        Map<String, String> resolved = resolveVars(scope);
+        String userInput = userInput(resolved);
+        // 工作流节点调用是同步的；图片生成约 1 分钟，期间若无过程信息用户会以为卡住。这里先打一行进度，
+        // 说明「哪个节点、调用什么能力、用哪个模型」，下一行给出本次实际输入（如精炼后的画面描述）。
+        progress("节点 " + nodeId + "：调用" + capabilityLabel(capability) + "能力（model=" + model + "）");
+        String preview = inputPreview(resolved);
+        if (!preview.isEmpty()) {
+            progressDetail("提示词：" + preview);
+        }
+        // 文本类节点复用当轮对话的流式观察者，实时显示思考 / 正文；图片 / 视频接口本身不产生思考、也不支持
+        // 流式，故只保留前后进度行。
+        IStreamObserver observer = WorkflowProgress.observer();
+        boolean streaming = capability == CapabilityKindEnum.CHAT && observer != null;
 
         ConversationResult result = context.orchestrator().converse(ConversationRequest.builder()
                 .conversationId(conversationId(instanceId))
                 .provider(configuration.getProvider())
                 .model(model)
                 .capabilityKind(capability)
-                .userInput(userInput(scope))
+                .userInput(userInput)
                 .attachments(attachments(scope))
                 .providerConfiguration(configuration)
-                .stream(false)
+                .stream(streaming)
+                .observer(streaming ? observer : null)
                 .cancellationToken(currentCancellationToken())
                 .build());
 
@@ -108,10 +128,71 @@ public final class AgentWorkflowAction implements IWorkflowAction {
                     + result.getStatus() + (result.getError() == null
                     ? "" : "，错误 " + result.getError().getSafeMessage()) + "）");
         }
+        progress("节点 " + nodeId + "：完成");
         Object output = output(capability, result.getContent());
         Map<String, Object> response = new LinkedHashMap<String, Object>();
         response.put("output", output);
         return response;
+    }
+
+    /**
+     * 输出一行工作流节点进度，供用户在长耗时节点执行时观察进展。
+     *
+     * @param message 进度内容，非 null
+     */
+    private static void progress(String message) {
+        WorkflowProgress.notice("[workflow] " + message);
+    }
+
+    /**
+     * 能力的中文名，用于进度展示。
+     */
+    private static String capabilityLabel(CapabilityKindEnum capability) {
+        if (capability == CapabilityKindEnum.IMAGE) {
+            return "图片生成";
+        }
+        if (capability == CapabilityKindEnum.VIDEO) {
+            return "视频生成";
+        }
+        return "文本";
+    }
+
+    /**
+     * 节点输入摘要：优先展示节点声明的变量取值（如生图节点精炼后的画面描述），比整段内部提示词模板更贴近
+     * 实际下发内容、也更短；无可展示取值时回退为提示词模板本身的摘要。
+     */
+    private String inputPreview(Map<String, String> resolved) {
+        List<String> parts = new ArrayList<String>();
+        for (Map.Entry<String, String> entry : resolved.entrySet()) {
+            if (blank(entry.getValue())) {
+                continue;
+            }
+            parts.add(resolved.size() > 1 ? entry.getKey() + "=" + entry.getValue() : entry.getValue());
+        }
+        String text = parts.isEmpty() ? context.promptProvider().prompt(promptId) : String.join("；", parts);
+        return summarize(text);
+    }
+
+    /**
+     * 压缩空白并截断为单行摘要，用于进度明细行。
+     */
+    private static String summarize(String text) {
+        if (blank(text)) {
+            return "";
+        }
+        String single = text.replaceAll("\\s+", " ").trim();
+        if (single.isEmpty()) {
+            return "";
+        }
+        return single.length() <= PREVIEW_MAX_CHARS
+                ? single : single.substring(0, PREVIEW_MAX_CHARS) + "…";
+    }
+
+    /**
+     * 输出进度明细行，缩进与 {@code [workflow] } 前缀对齐。
+     */
+    private static void progressDetail(String message) {
+        WorkflowProgress.notice("           " + message);
     }
 
     /**
@@ -182,15 +263,38 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         return resolved.isEmpty() ? null : resolved;
     }
 
-    private String userInput(ExecutionScope scope) {
-        StringBuilder builder = new StringBuilder();
-        builder.append(context.promptProvider().prompt(promptId));
+    /**
+     * 解析节点声明的提示词变量为实际取值（键 → 字符串值）。
+     */
+    private Map<String, String> resolveVars(ExecutionScope scope) {
+        Map<String, String> resolved = new LinkedHashMap<String, String>();
         for (Map.Entry<String, Object> entry : promptVars.entrySet()) {
-            Object resolved = WorkflowVariableResolver.resolveValue(entry.getValue(), scope, nodeId);
-            builder.append('\n').append("## ").append(entry.getKey()).append('\n')
-                    .append(WorkflowVariableResolver.stringify(resolved));
+            Object value = WorkflowVariableResolver.resolveValue(entry.getValue(), scope, nodeId);
+            resolved.put(entry.getKey(), WorkflowVariableResolver.stringify(value));
         }
-        return builder.toString();
+        return resolved;
+    }
+
+    /**
+     * 组装节点输入：提示词模板文本 + 变量。
+     *
+     * <p>模板可用 {@code ${变量名}} 占位，命中时按占位位置替换（不再追加「## 名称」段）；未命中的变量仍以
+     * 「## 名称」分段追加，兼容既有提示词。占位写法让上游产出（如精炼后的生图提示词）能原样作为节点输入。
+     */
+    private String userInput(Map<String, String> resolved) {
+        String base = context.promptProvider().prompt(promptId);
+        StringBuilder builder = new StringBuilder(base);
+        for (Map.Entry<String, String> entry : resolved.entrySet()) {
+            if (!base.contains("${" + entry.getKey() + "}")) {
+                builder.append('\n').append("## ").append(entry.getKey()).append('\n')
+                        .append(entry.getValue());
+            }
+        }
+        String text = builder.toString();
+        for (Map.Entry<String, String> entry : resolved.entrySet()) {
+            text = text.replace("${" + entry.getKey() + "}", entry.getValue());
+        }
+        return text;
     }
 
     /**

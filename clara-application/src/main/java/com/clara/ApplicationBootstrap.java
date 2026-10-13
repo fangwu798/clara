@@ -2,16 +2,24 @@ package com.clara;
 
 import com.clara.config.ConfigLocator;
 import com.clara.config.MilvusSettings;
+import com.clara.context.ConvContext;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.memory.IWindowMemory;
+import com.clara.core.message.IContent;
+import com.clara.core.model.IResponse;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowEngine;
+import com.clara.dto.record.CallRecord;
 import com.clara.dto.skill.ToolMethod;
+import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.ModelProviderEnum;
 import com.clara.kernel.api.IStreamModel;
+import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
 import com.clara.mcp.client.gateway.DefaultMcpGateway;
 import com.clara.mcp.client.gateway.McpGateway;
@@ -49,6 +57,7 @@ import com.clara.model.token.TiktokenTokenCountEstimator;
 import com.clara.orchestration.DefaultConversationOrchestrator;
 import com.clara.orchestration.capability.CapabilityDispatcher;
 import com.clara.orchestration.context.ContextAssembler;
+import com.clara.orchestration.context.HistorySanitizer;
 import com.clara.orchestration.context.SemanticRecallCoordinator;
 import com.clara.orchestration.context.WindowCompressionCoordinator;
 import com.clara.orchestration.record.CallRecordPublisher;
@@ -89,6 +98,8 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * 程序装配入口：按默认配置构造各模块实现，并组合成可运行的对话编排能力。
@@ -202,6 +213,8 @@ public final class ApplicationBootstrap implements Closeable {
     private final WorkflowDefinitionRegistry workflowDefinitionRegistry;
     private final WorkflowRunner workflowRunner;
     private final DefaultConversationOrchestrator orchestrator;
+    private final DefaultConversationOrchestrator.WindowMemoryFactory windowMemoryFactory;
+    private final WindowCompressionCoordinator windowCompression;
     private final WorkspaceBusinessRunner workspaceRunner;
     private final InMemoryCallRecordSink callRecordSink;
 
@@ -286,7 +299,7 @@ public final class ApplicationBootstrap implements Closeable {
         IToolInvoker toolInvoker = new CompositeToolInvoker(skillRegistry, localToolInvoker, mcpGateway, externalToolCatalog);
 
         // clara-memory：窗口压缩编排（把被淘汰历史交给模型总结为摘要）
-        WindowCompressionCoordinator windowCompression = new WindowCompressionCoordinator(new DefaultSummarizeCoordinator(streamModel, promptProvider));
+        this.windowCompression = new WindowCompressionCoordinator(new DefaultSummarizeCoordinator(streamModel, promptProvider));
 
         // orchestration 协作者
         SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore);
@@ -299,7 +312,7 @@ public final class ApplicationBootstrap implements Closeable {
         CallRecordPublisher callRecordPublisher = new CallRecordPublisher(callRecordSink);
 
         // 窗口记忆工厂：按「会话 + 供应商 + 模型」提供按会话隔离的窗口记忆实例
-        DefaultConversationOrchestrator.WindowMemoryFactory windowMemoryFactory =
+        this.windowMemoryFactory =
                 (conversationId, provider, model) -> {
                     String effectiveProvider = provider == null ? DEFAULT_PROVIDER : provider;
                     IWindowMemory memory = new DefaultWindowMemory(conversationId, effectiveProvider, model,
@@ -340,6 +353,99 @@ public final class ApplicationBootstrap implements Closeable {
      */
     public DefaultConversationOrchestrator orchestrator() {
         return orchestrator;
+    }
+
+    /**
+     * 手动压缩指定会话的上下文：把当前全部历史交给模型归纳为一条摘要，并用该摘要替换历史。
+     *
+     * <p>用途：长对话历史（尤其工具结果）会随每轮请求重发、持续膨胀，占用大量上下文与费用。本方法提供
+     * 「立即压缩」能力，供交互端 {@code /compress} 指令调用；压缩后后续轮次只携带摘要。
+     *
+     * <p>压缩本身是一次独立的同步模型调用（不进入历史、不产生调用记录，与超限自动压缩一致）；非法助手消息
+     * 会先被净化，避免把脏历史发给模型。历史为空或压缩实现不可用时不做任何改动。
+     *
+     * @param conversationId        会话标识，不可为空白
+     * @param providerConfiguration 当前平台配置（提供端点与凭据），不可为 null
+     * @param model                 当前模型标识，不可为空白
+     * @return 被归纳的历史消息条数；无可压缩内容时返回 0
+     */
+    public int compressConversation(String conversationId, ProviderConfiguration providerConfiguration, String model) {
+        if (conversationId == null || conversationId.trim().isEmpty()
+                || providerConfiguration == null || model == null || model.trim().isEmpty()) {
+            return 0;
+        }
+        ModelProviderEnum provider = providerConfiguration.getProvider();
+        IWindowMemory memory = windowMemoryFactory.create(conversationId, provider.name(), model);
+        List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(memory.messages());
+        if (history.isEmpty()) {
+            return 0;
+        }
+        // 归纳走模型调用，需要绑定会话上下文（平台配置 + 能力种类），与编排层自动压缩时的绑定一致。
+        IContent summary;
+        ConvContext context = new ConvContext(null, conversationId, providerConfiguration, CapabilityKindEnum.CHAT);
+        try (ConvContext.Scope ignored = ConvContext.open(context)) {
+            summary = windowCompression.summarize(history);
+        }
+        if (summary == null) {
+            return 0;
+        }
+        memory.clear();
+        memory.append(Collections.singletonList(summary));
+        return history.size();
+    }
+
+    /**
+     * 统计 token 用量说明（供交互端 {@code /usage} 展示）。
+     *
+     * <p>统计两类口径：
+     * <ol>
+     *   <li>当前会话全部历史记录占用的 token 估算（基于持久化历史 + token 估算器，跨重启有效）；</li>
+     *   <li>本次进程内已发生的模型调用累计用量（从调用记录汇总，进程内保留最近若干条）。</li>
+     * </ol>
+     *
+     * @param conversationId        会话标识，不可为空白
+     * @param providerConfiguration 当前平台配置，可为 null（未绑定时只统计进程内调用）
+     * @param model                 当前模型标识，可为 null
+     * @return 多行用量说明，非 null
+     */
+    public String conversationUsageReport(String conversationId, ProviderConfiguration providerConfiguration,
+            String model) {
+        StringBuilder report = new StringBuilder();
+        report.append("会话：").append(conversationId);
+        if (providerConfiguration != null && model != null && !model.trim().isEmpty()) {
+            ModelProviderEnum provider = providerConfiguration.getProvider();
+            IWindowMemory memory = windowMemoryFactory.create(conversationId, provider.name(), model);
+            List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(memory.messages());
+            long tokens = tokenCountEstimator == null ? 0L : tokenCountEstimator.estimate(history);
+            report.append('\n').append("历史记录：").append(history.size()).append(" 条")
+                    .append("，估算 token：").append(tokens);
+        } else {
+            report.append('\n').append("历史记录：未知（未绑定模型配置）");
+        }
+
+        long input = 0L;
+        long output = 0L;
+        long total = 0L;
+        int calls = 0;
+        for (CallRecord record : callRecordSink.snapshot()) {
+            IResponse response = record.response();
+            if (!(response instanceof HttpResponse)) {
+                continue;
+            }
+            HttpResponse http = (HttpResponse) response;
+            long in = http.getInputTokens() == null ? 0L : http.getInputTokens().longValue();
+            long out = http.getOutputTokens() == null ? 0L : http.getOutputTokens().longValue();
+            long sum = http.getTotalTokens() == null
+                    ? in + out : http.getTotalTokens().longValue();
+            calls++;
+            input += in;
+            output += out;
+            total += sum == 0L ? in + out : sum;
+        }
+        report.append('\n').append("本次进程累计调用：").append(calls).append(" 次")
+                .append("（输入 ").append(input).append(" / 输出 ").append(output)
+                .append(" / 合计 ").append(total).append(" tokens）");
+        return report.toString();
     }
 
     /**
@@ -616,6 +722,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @return Milvus 语义记忆存储；不可用时 null
      */
     private static MilvusSemanticMemoryStore connectMilvus(MilvusSettings settings) {
+        quietMilvusLogging();
         try {
             MilvusBackend backend = MilvusBackendFactory.create(new MilvusBackendConfig(
                     settings.getHost(), settings.getPort(), settings.getUsername(), settings.getPassword(),
@@ -629,6 +736,17 @@ public final class ApplicationBootstrap implements Closeable {
                     + unavailable.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 抑制 Milvus SDK 自带 gRPC 的告警噪音。
+     *
+     * <p>milvus-sdk-java 内部打包了 shaded gRPC，并以 {@code java.util.logging} 打日志；空闲连接保活 ping
+     * 超时或关连接时会打印告警堆栈（含其 shaded 内部类的 {@code NoClassDefFoundError}），属 SDK 内部行为、
+     * 不影响功能。这里把 {@code io.milvus} 日志层级抬到 {@code SEVERE}，只保留严重错误，避免控制台刷屏。
+     */
+    private static void quietMilvusLogging() {
+        Logger.getLogger("io.milvus").setLevel(Level.SEVERE);
     }
 
     @Override

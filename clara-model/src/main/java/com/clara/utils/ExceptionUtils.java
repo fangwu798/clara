@@ -166,8 +166,32 @@ public final class ExceptionUtils {
      * @return 映射后的异常
      */
     public static ClaraException providerFailure(ModelProviderEnum provider, int status) {
+        return providerFailure(provider, status, null);
+    }
+
+    /**
+     * 按 HTTP 状态码与平台返回的错误提示构造「平台调用失败」的异常。
+     *
+     * <p>与 {@link #providerFailure(ModelProviderEnum, int)} 的区别：额外把平台错误响应体里的提示文本写入
+     * {@code safeDetails} 的 {@code providerMessage} 键，供上层展示具体失败原因（如余额不足、参数非法）。
+     * 归类与可重试规则不变（401 鉴权、403 授权、429 限流、其余外部服务；429 与 5xx 可重试），状态码仍写入
+     * providerCode 与消息模板。
+     *
+     * @param provider        平台，可为 null（表示不归因到具体平台）
+     * @param status          平台返回的 HTTP 状态码
+     * @param providerMessage 平台返回的错误提示文本，可为 null（不写入细节）
+     * @return 映射后的异常
+     */
+    public static ClaraException providerFailure(ModelProviderEnum provider, int status, String providerMessage) {
         ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION : status == 403 ? ErrorCategory.AUTHORIZATION : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
-        return fail(ErrorCodes.MODEL_PROVIDER_FAILED, category, status == 429 || status >= 500, provider, String.valueOf(status));
+        Map<String, String> details = new LinkedHashMap<String, String>();
+        if (providerMessage != null && !providerMessage.trim().isEmpty()) {
+            details.put("providerMessage", providerMessage.trim());
+        }
+        return new ClaraException(new ClaraError(ErrorCodes.MODEL_PROVIDER_FAILED, category,
+                message(ErrorCodes.MODEL_PROVIDER_FAILED, provider, String.valueOf(status)),
+                status == 429 || status >= 500, null, provider == null ? null : provider.name(),
+                String.valueOf(status), null, details));
     }
 
     /**

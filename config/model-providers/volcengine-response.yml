@@ -27,3 +27,15 @@ capabilities:
       maxOutputs: 1
       maxSourceImages: 0
       watermark: false
+  # 文生视频（异步任务）：endpoint 为提交地址，taskQueryEndpoint 为按任务标识查询状态的地址。
+  # 供 `java -jar clara.jar video --prompt "..."` 使用；需已设置 CLARA_VOLCENGINE_API_KEY。
+  VIDEO:
+    endpoint: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    taskQueryEndpoint: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    modelId: doubao-seedance-2-5-260628
+    apiProfile: ark-v3-content-tasks
+    parameters:
+      maxPromptChars: 32000
+      # 轮询间隔与最大轮询次数（生成通常数分钟，按需调整）。
+      pollIntervalMillis: 3000
+      maxPollAttempts: 100

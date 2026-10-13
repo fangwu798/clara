@@ -20,9 +20,9 @@ import java.util.Set;
 /**
  * 上下文装配器：把「历史恢复、窗口裁剪、超限压缩、检索注入、技能装配」组合成一份本轮请求消息。
  *
- * <p>装配顺序：先按窗口策略裁剪历史；窗口发生淘汰且启用压缩时，把被淘汰的消息组压缩为摘要；随后完成
- * 技能匹配（提示词 + 工具声明）与对话知识找回；最后把 system 指令（技能提示词 + 压缩摘要 + 检索知识）
- * 归一化到消息首位。
+ * <p>装配顺序：先按窗口策略裁剪历史；窗口发生淘汰且启用压缩时，把被淘汰的消息组压缩为摘要；随后压缩历史
+ * 工具结果（只压当前提问之前的历史部分，控制请求体膨胀）；再完成技能匹配（提示词 + 工具声明）与对话知识
+ * 找回；最后把 system 指令（技能提示词 + 压缩摘要 + 检索知识）归一化到消息首位。
  */
 public final class ContextAssembler {
 
@@ -67,8 +67,11 @@ public final class ContextAssembler {
                 effective.getWindowMaxMessages(), effective.getWindowMaxSizeBytes(),
                 effective.getWindowMaxTokensPercent());
 
-        List<IContent> history = windowMemory.messages();
-        List<IContent> windowed = windowMemory.window(policy, estimator);
+        List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.messages());
+        List<IContent> windowed = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.window(policy, estimator));
+        // 压缩历史工具结果（只压当前提问之前的历史部分，本轮工具结果原样保留），控制请求体膨胀。
+        // 注意：淘汰判定仍用未压缩的 windowed（按对象同一性比对），避免压缩后的新对象被误判为淘汰。
+        List<IContent> prepared = ToolOutputCompactor.compact(windowed, effective.getToolOutputMaxChars());
         String userInput = latestUserInput(windowMemory.conversationId(), history);
 
         List<IContent> systemParts = new ArrayList<IContent>();
@@ -87,7 +90,7 @@ public final class ContextAssembler {
         if (!systemText.isEmpty()) {
             messages.add(new SystemContent(systemText));
         }
-        messages.addAll(windowed);
+        messages.addAll(prepared);
         return new AssembledContext(messages, matched.getTools());
     }
 

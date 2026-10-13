@@ -18,10 +18,11 @@ _TOOL = {
     "id": "http_fetch",
     "name": "http_fetch",
     "type": "PYTHON",
-    "description": "通过 HTTP GET 访问外部网络地址并返回状态码与响应体片段（用于外部网络查询能力验证）。入参 JSON：url(必填)、max_bytes(可选，默认 4096，响应体最大读取字节数)。返回：{url, status, body, body_length} 或 {url, error}。",
+    "description": "通过 HTTP GET 访问外部网络地址并返回状态码与响应体片段（用于外部网络查询能力验证）。入参 JSON：url(必填)、max_bytes(可选，默认 4096，响应体最大读取字节数)。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。返回：{url, status, body, body_length} 或 {url, error}。",
     "parameters": {
         "type": "object",
         "properties": {
+            "purpose": {"type": "string"},
             "url": {"type": "string"},
             "max_bytes": {"type": "integer"},
         },

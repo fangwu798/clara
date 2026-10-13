@@ -58,6 +58,13 @@
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
             </dependency>
+            <!-- 无操作日志绑定：为依赖 SLF4J 的三方库（如 Milvus SDK）提供 binding，消除
+                 "Failed to load class org.slf4j.impl.StaticLoggerBinder"，且不引入额外日志实现。 -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-nop</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.apache.poi</groupId>
                 <artifactId>poi-ooxml</artifactId>
@@ -151,6 +158,13 @@
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-api</artifactId>
+                <version>2.24.3</version>
+            </dependency>
+            <!-- 把 Log4j2 API（POI 等三方库使用）桥接到 SLF4J，再由 slf4j-nop 静默，
+                 消除 "Log4j API could not find a logging provider"。 -->
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-to-slf4j</artifactId>
                 <version>2.24.3</version>
             </dependency>
         </dependencies>

@@ -70,4 +70,29 @@ public class ToolInvocationPurposeTest {
         assertEquals(DECLARED, ToolInvocationPurpose.describe("run_command", "not-json", DECLARED));
         assertEquals(DECLARED, ToolInvocationPurpose.describe("run_command", null, DECLARED));
     }
+
+    @Test
+    public void infersWorkflowPurposeFromWorkflowArgument() {
+        String declared = "运行一个已配置的工作流，一次调用即可完成多步骤任务。";
+
+        assertEquals("运行工作流 image_generation：文生图，按主题生成图片",
+                ToolInvocationPurpose.describe("run_workflow",
+                        "{\"workflow\":\"image_generation\",\"inputs\":{\"subject\":\"猫\"}}", declared));
+    }
+
+    @Test
+    public void echoesUnknownWorkflowId() {
+        String declared = "运行一个已配置的工作流，一次调用即可完成多步骤任务。";
+
+        assertEquals("运行工作流 my_custom_flow",
+                ToolInvocationPurpose.describe("run_workflow", "{\"workflow\":\"my_custom_flow\"}", declared));
+    }
+
+    @Test
+    public void declaredPurposeWinsForWorkflow() {
+        String declared = "运行一个已配置的工作流，一次调用即可完成多步骤任务。";
+
+        assertEquals("生成一张头像", ToolInvocationPurpose.describe("run_workflow",
+                "{\"purpose\":\"生成一张头像\",\"workflow\":\"image_generation\"}", declared));
+    }
 }

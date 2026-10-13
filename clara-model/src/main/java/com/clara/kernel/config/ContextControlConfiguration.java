@@ -55,6 +55,10 @@ public final class ContextControlConfiguration {
      * 检索相似度阈值，取值在 [0, 1] 区间。
      */
     private final double similarityThreshold;
+    /**
+     * 历史工具结果单条最大保留字符数，-1 表示不限；只压缩当前提问之前的历史工具结果。
+     */
+    private final int toolOutputMaxChars;
 
     /**
      * 创建上下文历史处理控制配置，缺失字段按默认值回填并校验取值。
@@ -67,6 +71,7 @@ public final class ContextControlConfiguration {
      * @param vectorizeEnabled       是否启用向量化入库（YAML 键 {@code vectorizeEnabled}），可为 null
      * @param retrievalCount         每次检索返回条数（YAML 键 {@code retrievalCount}），可为 null
      * @param similarityThreshold    检索相似度阈值（YAML 键 {@code similarityThreshold}），可为 null
+     * @param toolOutputMaxChars     历史工具结果单条最大保留字符数（YAML 键 {@code toolOutputMaxChars}），可为 null
      * @throws IllegalArgumentException 任一字段取值不合法时
      */
     @JsonCreator
@@ -78,7 +83,8 @@ public final class ContextControlConfiguration {
             @JsonProperty("compressEnabled") Boolean compressEnabled,
             @JsonProperty("vectorizeEnabled") Boolean vectorizeEnabled,
             @JsonProperty("retrievalCount") Integer retrievalCount,
-            @JsonProperty("similarityThreshold") Double similarityThreshold) {
+            @JsonProperty("similarityThreshold") Double similarityThreshold,
+            @JsonProperty("toolOutputMaxChars") Integer toolOutputMaxChars) {
         this.contextWindowTokens = contextWindowTokens != null ? contextWindowTokens : -1L;
         this.windowMaxMessages = windowMaxMessages != null ? windowMaxMessages : -1;
         this.windowMaxSizeBytes = windowMaxSizeBytes != null ? windowMaxSizeBytes : -1L;
@@ -87,6 +93,8 @@ public final class ContextControlConfiguration {
         this.vectorizeEnabled = vectorizeEnabled != null && vectorizeEnabled;
         this.retrievalCount = retrievalCount != null ? retrievalCount : 3;
         this.similarityThreshold = similarityThreshold != null ? similarityThreshold : 0.7;
+        this.toolOutputMaxChars = toolOutputMaxChars != null
+                ? toolOutputMaxChars : ContextControlConfig.DEFAULT_TOOL_OUTPUT_MAX_CHARS;
         validate();
     }
 
@@ -112,6 +120,9 @@ public final class ContextControlConfiguration {
         if (Double.isNaN(similarityThreshold) || similarityThreshold < 0.0 || similarityThreshold > 1.0) {
             throw new IllegalArgumentException("similarityThreshold must be within [0, 1]");
         }
+        if (toolOutputMaxChars == 0 || toolOutputMaxChars < -1) {
+            throw new IllegalArgumentException("toolOutputMaxChars must be -1 or positive");
+        }
     }
 
     /**
@@ -121,6 +132,7 @@ public final class ContextControlConfiguration {
      */
     public ContextControlConfig toContextControlConfig() {
         return new ContextControlConfig(contextWindowTokens, windowMaxMessages, windowMaxSizeBytes,
-                windowMaxTokensPercent, compressEnabled, vectorizeEnabled, retrievalCount, similarityThreshold);
+                windowMaxTokensPercent, compressEnabled, vectorizeEnabled, retrievalCount, similarityThreshold,
+                toolOutputMaxChars);
     }
 }

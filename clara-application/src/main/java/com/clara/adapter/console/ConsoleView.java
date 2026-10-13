@@ -3,6 +3,7 @@ package com.clara.adapter.console;
 import com.clara.ApplicationBootstrap;
 import com.clara.dto.model.StreamEvent;
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.exception.ClaraError;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.stream.IStreamObserver;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
@@ -304,11 +305,13 @@ public final class ConsoleView implements Closeable {
      * 末尾补一个空行与后续对话分隔。
      */
     public void printHints() {
-        println("输入内容回车发送；/model 切换模型；/log 切换精简/全量日志；/color 开关颜色；"
+        println("输入内容回车发送；/? 查看命令提示；/model 切换模型；/compress 压缩当前上下文；/new 开始新对话；"
+                + "/usage 统计 token 用量；/log 切换精简/全量日志；/color 开关颜色；"
                 + "exit 或 quit 结束；执行中按 ESC 两次可取消本轮模型调用与工具执行。"
-                + "需要读取本地目录、整理技术文档、生成需求与技术方案或开发计划时，"
+                + "需要读取本地目录、整理技术文档、生成需求与技术方案或开发计划、生成/编辑/识别图片时，"
                 + "可直接用自然语言提出（模型会调用 run_workflow 工作流，如 analyze_repo_docs / "
-                + "design_business_solution / plan_development）。");
+                + "design_business_solution / plan_development / image_generation / image_edit / "
+                + "image_understanding）。");
         println();
     }
 
@@ -523,6 +526,13 @@ public final class ConsoleView implements Closeable {
             return printed;
         }
 
+        /**
+         * 结束当前流式段（若有）：插入外部内容（如工作流节点进度提示）前调用，避免与流式文本粘连。
+         */
+        public void endStream() {
+            end();
+        }
+
         @Override
         public void onEvent(StreamEvent event) {
             switch (event.getType()) {
@@ -548,12 +558,27 @@ public final class ConsoleView implements Closeable {
                     break;
                 case ERROR:
                     end();
-                    view.emit("[error] " + (event.getError() == null
-                            ? "" : event.getError().getSafeMessage()), ANSI_RED);
+                    view.emit(errorLine(event.getError()), ANSI_RED);
                     break;
                 default:
                     break;
             }
+        }
+
+        /**
+         * 组装错误提示行：基础文案 +（平台返回的错误提示，若有）。
+         *
+         * <p>非 2xx 时错误细节里的 {@code providerMessage} 承载平台原文（如「Insufficient Balance」），
+         * 展示出来便于直接判断失败原因；无该细节时退化为仅展示基础文案。
+         */
+        private static String errorLine(ClaraError error) {
+            if (error == null) {
+                return "[error] ";
+            }
+            String message = error.getSafeDetails().get("providerMessage");
+            return message == null || message.trim().isEmpty()
+                    ? "[error] " + error.getSafeMessage()
+                    : "[error] " + error.getSafeMessage() + "：" + message.trim();
         }
 
         /**

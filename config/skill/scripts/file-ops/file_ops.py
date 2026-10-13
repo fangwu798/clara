@@ -18,10 +18,11 @@ _TOOL = {
     "id": "file_ops",
     "name": "file_ops",
     "type": "PYTHON",
-    "description": "对指定目录下的文件执行新增/读取/追加/替换/删除/存在性/列举/递归扫描/批量读取等操作。入参 JSON：op(write|read|append|replace|delete|exists|list|scan|read_many)、path(相对 base_dir 或绝对路径)、base_dir(可选根目录，缺省为当前分析目录 CLARA_WORK_DIR，即执行 run.bat 时所在目录；以 @repo 开头表示按仓库根解析，用于读取随应用发布的固定文件如 config/standards 下的开发规范)、encoding(可选；读取时默认自动识别文件编码，如识别不准再显式指定（gbk、utf-8-sig 等）；写入新文件默认 utf-8)、content、find、replace；scan 额外支持 include/exclude(glob 列表)、max_files(默认 200)、max_depth(默认 6)、with_size；read_many 额外支持 paths(路径列表)、max_bytes(单文件截断字节，默认 20000)。适用于对单个或少量文件做精确读写与目录列举；若要一次性读取整个仓库并整理文档，请改用 run_workflow 工作流。",
+    "description": "对指定目录下的文件执行新增/读取/追加/替换/删除/存在性/列举/递归扫描/批量读取等操作。入参 JSON：op(write|read|append|replace|delete|exists|list|scan|read_many)、path(相对 base_dir 或绝对路径)、base_dir(可选根目录，缺省为当前分析目录 CLARA_WORK_DIR，即执行 run.bat 时所在目录；以 @repo 开头表示按仓库根解析，用于读取随应用发布的固定文件如 config/standards 下的开发规范)、encoding(可选；读取时默认自动识别文件编码，如识别不准再显式指定（gbk、utf-8-sig 等）；写入新文件默认 utf-8)、content、find、replace；scan 额外支持 include/exclude(glob 列表)、max_files(默认 200)、max_depth(默认 6)、with_size；read_many 额外支持 paths(路径列表)、max_bytes(单文件截断字节，默认 20000)。适用于对单个或少量文件做精确读写与目录列举；若要一次性读取整个仓库并整理文档，请改用 run_workflow 工作流。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
     "parameters": {
         "type": "object",
         "properties": {
+            "purpose": {"type": "string"},
             "op": {"type": "string", "enum": ["write", "read", "append", "replace", "delete",
                                              "exists", "list", "scan", "read_many"]},
             "path": {"type": "string"},

@@ -18,10 +18,11 @@ _TOOL = {
     "id": "doc_outline",
     "name": "doc_outline",
     "type": "PYTHON",
-    "description": "低成本阅读 Markdown/文本长文档：op=outline 返回文档标题大纲（层级/标题/行号），op=slice 按行区间返回带行号的原文片段。用于先看大文档结构、再按需读取局部，避免整篇读取浪费上下文。入参 JSON：op(可选，outline|slice，默认 outline)、path(必填，相对 base_dir 的文件路径)、base_dir(可选根目录，缺省为 CLARA_WORK_DIR；以 @repo 开头按仓库根解析)、encoding(可选，默认自动识别文件编码，需要时可显式指定 gbk、utf-8-sig 等)；outline 额外支持 max_level(默认 6，仅取不超过该层级的标题)、max_items(默认 500)；slice 额外支持 start(默认 1，起始行，含)、end(默认 start+max_lines-1，结束行，含)、max_lines(默认 200，单次上限)。返回：op=outline 时 {op,path,total_lines,headings:[{level,title,line}],count,truncated}；op=slice 时 {op,path,total_lines,start,end,lines:[{line,text}],truncated}。",
+    "description": "低成本阅读 Markdown/文本长文档：op=outline 返回文档标题大纲（层级/标题/行号），op=slice 按行区间返回带行号的原文片段。用于先看大文档结构、再按需读取局部，避免整篇读取浪费上下文。入参 JSON：op(可选，outline|slice，默认 outline)、path(必填，相对 base_dir 的文件路径)、base_dir(可选根目录，缺省为 CLARA_WORK_DIR；以 @repo 开头按仓库根解析)、encoding(可选，默认自动识别文件编码，需要时可显式指定 gbk、utf-8-sig 等)；outline 额外支持 max_level(默认 6，仅取不超过该层级的标题)、max_items(默认 500)；slice 额外支持 start(默认 1，起始行，含)、end(默认 start+max_lines-1，结束行，含)、max_lines(默认 200，单次上限)。返回：op=outline 时 {op,path,total_lines,headings:[{level,title,line}],count,truncated}；op=slice 时 {op,path,total_lines,start,end,lines:[{line,text}],truncated}。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
     "parameters": {
         "type": "object",
         "properties": {
+            "purpose": {"type": "string"},
             "op": {"type": "string", "enum": ["outline", "slice"]},
             "path": {"type": "string"},
             "base_dir": {"type": "string"},

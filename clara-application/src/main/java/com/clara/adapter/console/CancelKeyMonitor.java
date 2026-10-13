@@ -220,12 +220,12 @@ public final class CancelKeyMonitor implements Closeable {
             CancelConfirmation.Decision decision = confirmation.onKey(key, System.currentTimeMillis());
             if (decision == CancelConfirmation.Decision.PROMPT) {
                 view.emit("[cancel] 已按下 ESC，再按一次 ESC（或回车 / y）确认取消当前执行；其他键忽略。",
-                        ConsoleView.ANSI_GRAY);
+                        ConsoleView.ANSI_RED);
                 return false;
             }
             if (decision == CancelConfirmation.Decision.CANCEL) {
                 cancellationToken.cancel();
-                view.emit("[cancel] 已请求取消当前执行…", ConsoleView.ANSI_GRAY);
+                view.emit("[cancel] 已请求取消当前执行…", ConsoleView.ANSI_RED);
                 return true;
             }
             if (awaiting) {

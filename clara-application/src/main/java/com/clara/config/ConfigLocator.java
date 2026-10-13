@@ -1,5 +1,9 @@
 package com.clara.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -52,6 +56,16 @@ public final class ConfigLocator {
     private static final String DEFAULT_MODEL_KEY = "defaultModel";
 
     /**
+     * 启用供应商列表键名（{@code config/clara.yml}）。
+     */
+    private static final String ENABLED_PROVIDERS_KEY = "enabledProviders";
+
+    /**
+     * YAML 映射器，用于读取 {@code enabledProviders} 列表（支持流式与块式序列）。
+     */
+    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
+
+    /**
      * 定位目录时的向上回溯最大层数。
      */
     private static final int SEARCH_DEPTH = 6;
@@ -74,12 +88,89 @@ public final class ConfigLocator {
     }
 
     /**
-     * 扫描模型配置：递归收集 {@code *.yml} / {@code *.yaml}，忽略 {@code examples} 目录与 {@code .example.yml}
+     * 扫描模型配置：递归收集 {@code *.yml} / {@code *.yaml}，忽略 {@code examples} 目录与 {@code *.example.yml}
      * 样例文件。
+     *
+     * <p>启用过滤：{@code config/clara.yml} 配置了 {@code enabledProviders} 时，只返回别名在启用列表内的
+     * 配置（未启用的一律不加载、{@code /model} 也不列出）；未配置该列表时返回全部。
      *
      * @return 排序后的配置路径列表，非 null
      */
     public static List<Path> modelConfigs() {
+        List<Path> all = scanModelConfigs();
+        List<String> enabled = enabledProviders();
+        if (enabled.isEmpty()) {
+            return all;
+        }
+        List<Path> filtered = new ArrayList<>();
+        for (Path path : all) {
+            String alias = aliasOf(path);
+            if (alias != null && containsIgnoreCase(enabled, alias)) {
+                filtered.add(path);
+            }
+        }
+        return filtered;
+    }
+
+    /**
+     * 读取 {@code config/clara.yml} 的启用供应商列表 {@code enabledProviders}。
+     *
+     * <p>格式：YAML 序列（{@code [a, b]} 单行流式或 {@code - a} 块式均可）或逗号分隔字符串；元素为模型别名
+     * （{@code config/model-providers} 下文件名去掉扩展名）。文件缺失、未配置该键或读取失败时返回空列表
+     * （表示不限制，加载全部模型配置）。
+     *
+     * @return 启用别名列表，非 null（可为空）
+     */
+    public static List<String> enabledProviders() {
+        Path configFile = claraConfigFile();
+        if (!Files.isRegularFile(configFile)) {
+            return Collections.emptyList();
+        }
+        JsonNode node;
+        try {
+            JsonNode root = YAML.readTree(Files.readAllBytes(configFile));
+            node = root == null ? null : root.get(ENABLED_PROVIDERS_KEY);
+        } catch (IOException ignored) {
+            // 读取失败视为未配置
+            return Collections.emptyList();
+        }
+        if (node == null || node.isNull()) {
+            return Collections.emptyList();
+        }
+        List<String> result = new ArrayList<>();
+        if (node.isArray()) {
+            for (JsonNode item : node) {
+                addAlias(result, item == null ? null : item.asText());
+            }
+        } else {
+            for (String part : node.asText().split(",")) {
+                addAlias(result, part);
+            }
+        }
+        return result;
+    }
+
+    private static void addAlias(List<String> target, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            target.add(value.trim());
+        }
+    }
+
+    private static boolean containsIgnoreCase(List<String> values, String value) {
+        for (String item : values) {
+            if (item.equalsIgnoreCase(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 扫描 {@code config/model-providers} 下的全部模型配置（不做启用过滤）。
+     *
+     * @return 排序后的配置路径列表，非 null
+     */
+    private static List<Path> scanModelConfigs() {
         Path directory = modelDirectory();
         if (directory == null || !Files.isDirectory(directory)) {
             return Collections.emptyList();

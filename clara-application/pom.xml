@@ -16,6 +16,8 @@
         </dependency>
         <dependency><groupId>org.apache.poi</groupId><artifactId>poi-ooxml</artifactId></dependency>
         <dependency><groupId>org.apache.poi</groupId><artifactId>poi-scratchpad</artifactId></dependency>
+        <!-- POI 经 Log4j2 API 打日志；桥接到 SLF4J（再经 slf4j-nop 静默），消除启动告警。 -->
+        <dependency><groupId>org.apache.logging.log4j</groupId><artifactId>log4j-to-slf4j</artifactId><scope>runtime</scope></dependency>
         <dependency><groupId>org.apache.pdfbox</groupId><artifactId>pdfbox</artifactId></dependency>
         <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
         <!-- 读取 config/clara.yml 的嵌套配置（如 milvus 语义记忆节点）。 -->

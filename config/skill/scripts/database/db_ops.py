@@ -27,11 +27,13 @@ _TOOL = {
         "max_rows(查询返回行数上限，默认 200)、create_if_missing(SQLite 文件不存在时是否新建，默认 false)、"
         "timeout_seconds(连接/等待超时秒数，默认 30)、"
         "read_only(默认 true：仅允许 SELECT/PRAGMA/EXPLAIN/SHOW 等只读语句；写入必须显式传 read_only=false)。"
+        "另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。"
         "默认只读，写库前请先确认目标库与语句。"
     ),
     "parameters": {
         "type": "object",
         "properties": {
+            "purpose": {"type": "string"},
             "op": {"type": "string",
                    "enum": ["query", "execute", "script", "tables", "schema", "info"]},
             "db_type": {"type": "string", "enum": ["sqlite", "mysql", "postgres"]},

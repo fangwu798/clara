@@ -3,6 +3,7 @@ package com.clara.kernel.http.execute;
 import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.enums.FinishReasonEnum;
+import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.StreamEventEnum;
 import com.clara.core.model.IRequest;
 import com.clara.core.model.IResponse;
@@ -10,14 +11,19 @@ import com.clara.kernel.api.execute.IHttpExecute;
 import com.clara.kernel.api.execute.ISseListener;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
+import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.http.execute.sse.SseEvent;
 import com.clara.kernel.stream.IStreamHandle;
 import com.clara.kernel.stream.IStreamObserver;
+import com.clara.dto.model.RawHttpResponse;
 import com.clara.dto.model.StreamEvent;
 import com.clara.utils.ExceptionUtils;
 import com.clara.kernel.message.provider.ProviderResponseDecoder;
 import com.clara.kernel.message.provider.StreamAssembler;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -55,6 +61,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * {@link ClaraError} 的 {@code ERROR} 事件表达。
  */
 public final class StreamHandle implements IStreamHandle, ISseListener {
+
+    /**
+     * 解析非 2xx 错误响应体用的 JSON 读取器；只读、可复用，无配置变更，线程安全。
+     */
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /**
+     * 回传平台错误提示的最大字符数，超出部分截断，避免超长响应体淹没控制台。
+     */
+    private static final int MAX_PROVIDER_MESSAGE_CHARS = 500;
 
     /**
      * 底层传输实现。
@@ -161,14 +177,72 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
 
     /**
      * 执行一次读取并把结果落到终态上。
+     *
+     * <p>为什么在这里判定状态码：流式调用只有 2xx 才会拿到 SSE 事件并回调 {@link #onEvent}；非 2xx
+     * （如 402 / 401 / 429）传输层只回传错误响应体、不产生任何事件，若不在此处按状态码失败，本轮会以
+     * 「空响应正常完成」收尾，平台的错误会被静默吞掉。
      */
     private void read() {
         try {
-            transport.execute(request, StreamHandle.this);
+            RawHttpResponse response = transport.execute(request, StreamHandle.this);
+            if (response != null && !isSuccess(response.getStatusCode())) {
+                fail(ExceptionUtils.providerFailure(provider(), response.getStatusCode(),
+                        providerErrorMessage(response)));
+                return;
+            }
             complete();
         } catch (RuntimeException exception) {
             fail(exception);
         }
+    }
+
+    /**
+     * 从非 2xx 错误响应体中尽力提取平台给出的错误提示文本。
+     *
+     * <p>兼容 OpenAI 兼容家族的 {@code {"error":{"message":...}}} 与直接 {@code {"message":...}} 两种形状；
+     * 响应体不是 JSON（如网关 HTML 错误页）或没有 message 时返回 null，此时仅保留状态码信息。
+     *
+     * @param response 非 2xx 的原始响应，非 null
+     * @return 平台错误提示文本；无法提取时为 null
+     */
+    private static String providerErrorMessage(RawHttpResponse response) {
+        try {
+            byte[] body = response.getBody();
+            if (body == null || body.length == 0) {
+                return null;
+            }
+            JsonNode root = MAPPER.readTree(body);
+            JsonNode error = root.get("error");
+            JsonNode message = error != null && error.isObject() ? error.get("message") : root.get("message");
+            if (message == null || !message.isTextual() || message.textValue().trim().isEmpty()) {
+                return null;
+            }
+            String text = message.textValue().trim();
+            return text.length() <= MAX_PROVIDER_MESSAGE_CHARS
+                    ? text : text.substring(0, MAX_PROVIDER_MESSAGE_CHARS) + "…";
+        } catch (IOException | RuntimeException exception) {
+            return null;
+        }
+    }
+
+    /**
+     * 判定 HTTP 状态码是否为成功（2xx）。
+     *
+     * @param statusCode HTTP 状态码
+     * @return 2xx 时返回 true
+     */
+    private static boolean isSuccess(int statusCode) {
+        return statusCode >= 200 && statusCode < 300;
+    }
+
+    /**
+     * 取本次调用所属平台，用于把非 2xx 归因到具体平台。
+     *
+     * @return 平台枚举；线程上下文未绑定平台配置时为 null
+     */
+    private ModelProviderEnum provider() {
+        ProviderConfiguration configuration = context == null ? null : context.getProviderConfiguration();
+        return configuration == null ? null : configuration.getProvider();
     }
 
     /**

@@ -13,6 +13,7 @@ import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
 import com.clara.dto.memory.WindowPolicy;
 import com.clara.enums.memory.MemorySourceTypeEnum;
+import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.SystemContent;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
@@ -107,6 +108,24 @@ public class ContextAssemblerTest {
         for (IContent message : messages) {
             assertFalse(message instanceof SystemContent);
         }
+        assertSame(user, messages.get(0));
+    }
+
+    @Test
+    public void assembleDropsAssistantMessageWithBlankContentAndNoToolCalls() {
+        AssistantContent invalid = new AssistantContent(null);
+        UserContent user = new UserContent("q");
+        FakeWindowMemory window = new FakeWindowMemory("c1", Arrays.<IContent>asList(invalid, user));
+
+        ContextAssembler assembler = new ContextAssembler(
+                new WindowCompressionCoordinator(null),
+                new SemanticRecallCoordinator(null, null),
+                new SkillMatchCoordinator(null, null, null));
+
+        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(false), null);
+
+        List<IContent> messages = assembled.getMessages();
+        assertEquals(1, messages.size());
         assertSame(user, messages.get(0));
     }
 

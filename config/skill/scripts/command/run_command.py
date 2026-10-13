@@ -28,11 +28,18 @@ _TOOL = {
         "其它用 /bin/sh -c；与 argv 二选一，argv 优先)、"
         "cwd(工作目录，缺省为 CLARA_WORK_DIR（执行 run.bat 时所在目录）；以 @repo 开头表示按仓库根解析；可为绝对路径)、"
         "stdin(写入子进程标准输入的文本)、env(追加的环境变量对象)、"
-        "timeout_seconds(超时秒数，默认 60，上限 600；超时后终止子进程)、"
+        "timeout_seconds(超时秒数，默认 300，上限 600；超时后终止子进程)、"
         "max_output_bytes(标准输出与标准错误各自回显与回传的字节上限，默认 20000，超出部分省略)、"
         "encoding(输出解码编码，缺省自动识别，中文 Windows 下可自动识别 GBK)。"
         "示例：{\"argv\":[\"mvn\",\"-v\"],\"cwd\":\"@repo\"}、{\"command\":\"git status --short\"}、"
         "{\"argv\":[\"powershell\",\"-NoProfile\",\"-Command\",\"Get-ChildItem\"],\"cwd\":\"@repo\"}。"
+        "生成图片/视频：调用 clara.jar 内置的生图/生视频能力（已配置的字节 Seedream 文生图 / Seedance 文生视频），"
+        "如 {\"argv\":[\"java\",\"-jar\",\"clara.jar\",\"image\",\"--prompt\",\"夕阳下的海边灯塔\"],\"cwd\":\"@repo\","
+        "\"timeout_seconds\":180} 或 "
+        "{\"argv\":[\"java\",\"-jar\",\"clara.jar\",\"video\",\"--prompt\",\"一只在草地上奔跑的小狗\"],\"cwd\":\"@repo\","
+        "\"timeout_seconds\":600}；命令返回单行 JSON，其中 file 为生成文件的绝对路径"
+        "（缺省落在工作目录的 clara-output/ 下），可直接把该路径告知用户。"
+        "当用户的意图是「生成/画一张图片」或「生成一段视频」时，优先用这种方式，不要回答「无法生成图片/视频」。"
     ),
     "parameters": {
         "type": "object",
@@ -62,7 +69,7 @@ WORK_ROOT = os.environ.get("CLARA_WORK_DIR") or REPO_ROOT
 # 仓库根相对前缀：以 @repo 开头时按仓库根解析，与「当前分析目录」（CLARA_WORK_DIR）区分开。
 REPO_PREFIX = "@repo"
 
-DEFAULT_TIMEOUT_SECONDS = 60.0
+DEFAULT_TIMEOUT_SECONDS = 300.0
 MAX_TIMEOUT_SECONDS = 600.0
 DEFAULT_MAX_OUTPUT_BYTES = 20000
 

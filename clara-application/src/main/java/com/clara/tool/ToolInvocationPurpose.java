@@ -23,6 +23,7 @@ import java.util.Map;
  *   <li>模型在入参里显式声明的 {@code purpose}（最准确，适用于任意工具）；</li>
  *   <li>若工具是 {@code run_command}，按本次实际命令（{@code argv} 首项或 {@code command} 首个词）映射为一句
  *       用途；识别不出时退回命令原文；</li>
+ *   <li>若工具是 {@code run_workflow}，按本次 {@code workflow} 入参给出「运行哪个工作流 + 它的作用」；</li>
  *   <li>退回工具声明里的描述。</li>
  * </ol>
  *
@@ -36,9 +37,19 @@ public final class ToolInvocationPurpose {
     private static final String RUN_COMMAND_TOOL = "run_command";
 
     /**
+     * 「运行工作流」的工具名：其用途取决于本次运行的工作流。
+     */
+    private static final String RUN_WORKFLOW_TOOL = "run_workflow";
+
+    /**
      * 入参中模型声明本次调用目的的字段名。
      */
     private static final String PURPOSE_FIELD = "purpose";
+
+    /**
+     * {@code run_workflow} 入参中工作流标识的字段名。
+     */
+    private static final String WORKFLOW_FIELD = "workflow";
 
     /**
      * 命令原文兜底展示的最大字符数，超出以省略号截断。
@@ -51,6 +62,11 @@ public final class ToolInvocationPurpose {
      * 常见命令（命令行首个词，小写、不含扩展名）→ 一句用途说明。
      */
     private static final Map<String, String> COMMAND_PURPOSES = commandPurposes();
+
+    /**
+     * 内置/随应用发布的工作流标识 → 一句作用说明（与 {@code config/workflow} 下的定义对应）。
+     */
+    private static final Map<String, String> WORKFLOW_PURPOSES = workflowPurposes();
 
     private ToolInvocationPurpose() {
     }
@@ -68,13 +84,38 @@ public final class ToolInvocationPurpose {
         if (!blank(declared)) {
             return declared.trim();
         }
-        if (RUN_COMMAND_TOOL.equals(toolName == null ? null : toolName.trim())) {
+        String name = toolName == null ? null : toolName.trim();
+        if (RUN_COMMAND_TOOL.equals(name)) {
             String command = commandPurpose(argumentsJson);
             if (!blank(command)) {
                 return command;
             }
         }
+        if (RUN_WORKFLOW_TOOL.equals(name)) {
+            String workflow = workflowPurpose(argumentsJson);
+            if (!blank(workflow)) {
+                return workflow;
+            }
+        }
         return declaredDescription;
+    }
+
+    /**
+     * 按 {@code run_workflow} 的 {@code workflow} 入参推导用途：「运行工作流 &lt;标识&gt;（&lt;作用&gt;）」；
+     * 标识不在已知表中时只回显标识。
+     *
+     * @param argumentsJson 入参 JSON，可为 null
+     * @return 用途说明；入参里没有工作流标识时返回 null
+     */
+    private static String workflowPurpose(String argumentsJson) {
+        JsonNode root = parse(argumentsJson);
+        JsonNode node = root == null ? null : root.get(WORKFLOW_FIELD);
+        if (node == null || !node.isTextual() || blank(node.textValue())) {
+            return null;
+        }
+        String workflowId = node.textValue().trim();
+        String purpose = WORKFLOW_PURPOSES.get(workflowId);
+        return purpose == null ? "运行工作流 " + workflowId : "运行工作流 " + workflowId + "：" + purpose;
     }
 
     /**
@@ -250,6 +291,22 @@ public final class ToolInvocationPurpose {
         map.put("remove-item", "删除文件或目录");
         map.put("taskkill", "结束进程");
         map.put("stop-process", "结束进程");
+        return Collections.unmodifiableMap(map);
+    }
+
+    /**
+     * 工作流的用途表。只覆盖随应用发布的高频工作流，其余由「运行工作流 &lt;标识&gt;」兜底；
+     * 新增工作流时在此补充一句作用说明即可。
+     */
+    private static Map<String, String> workflowPurposes() {
+        Map<String, String> map = new LinkedHashMap<String, String>();
+        map.put("analyze_repo_docs", "读取当前目录源码并整理技术文档");
+        map.put("design_business_solution", "产出《需求与技术方案》");
+        map.put("plan_development", "产出《开发计划》");
+        map.put("image_generation", "文生图，按主题生成图片");
+        map.put("image_edit", "图生图，按参考图编辑");
+        map.put("image_understanding", "图片识别与信息提取");
+        map.put("review_panel", "多角色评审");
         return Collections.unmodifiableMap(map);
     }
 }

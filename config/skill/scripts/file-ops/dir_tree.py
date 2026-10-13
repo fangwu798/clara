@@ -17,10 +17,11 @@ _TOOL = {
     "id": "dir_tree",
     "name": "dir_tree",
     "type": "PYTHON",
-    "description": "以缩进文本输出目录树，用于快速了解目录层级结构。相较 file_ops scan 的平铺列表，本工具保留层级关系，并可限制深度/条数。入参 JSON：path(可选，相对 base_dir 的目录，缺省为当前分析目录)、base_dir(可选根目录，缺省为 CLARA_WORK_DIR；以 @repo 开头按仓库根解析)、max_depth(默认 4，展示层级数)、max_entries(默认 1000，行数上限)、dirs_only(可选，默认 false，仅目录)、with_size(可选，默认 false，显示文件字节数)。默认跳过 .git/target/node_modules/logs 等噪声目录。返回：{root, tree:[缩进行], dir_count, file_count, truncated}。",
+    "description": "以缩进文本输出目录树，用于快速了解目录层级结构。相较 file_ops scan 的平铺列表，本工具保留层级关系，并可限制深度/条数。入参 JSON：path(可选，相对 base_dir 的目录，缺省为当前分析目录)、base_dir(可选根目录，缺省为 CLARA_WORK_DIR；以 @repo 开头按仓库根解析)、max_depth(默认 4，展示层级数)、max_entries(默认 1000，行数上限)、dirs_only(可选，默认 false，仅目录)、with_size(可选，默认 false，显示文件字节数)。默认跳过 .git/target/node_modules/logs 等噪声目录。返回：{root, tree:[缩进行], dir_count, file_count, truncated}。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
     "parameters": {
         "type": "object",
         "properties": {
+            "purpose": {"type": "string"},
             "path": {"type": "string"},
             "base_dir": {"type": "string"},
             "max_depth": {"type": "integer"},

@@ -42,10 +42,11 @@ public final class ClaraCli {
             if (options.getUi() == CliUiMode.TUI) {
                 error.println("TUI unavailable; using plain mode");
             }
-            if (options.getCommand() == CliCommand.RESUME)
-                return render(options, resume(options), input, output, error);
+            if (options.getCommand() == CliCommand.RESUME) {
+                return render(options, resume(options), input, output);
+            }
             WorkspaceRunRequest request = new WorkspaceRunRequest(options.getUser(), options.getRunId(), options.getWorkspace(), options.getGoal(), options.getSkill(), options.getMode(), options.isApprove(), Collections.<String, Object>emptyMap(), options.getProvider(), options.getModel());
-            return render(options, runner.run(request), input, output, error);
+            return render(options, runner.run(request), input, output);
         } catch (ClaraException e) {
             writeError(options, output, error, e.getError());
             return CliExitCodes.from(e.getError());
@@ -65,14 +66,16 @@ public final class ClaraCli {
     }
 
     private WorkspaceResumeRequest resumeRequest(CliOptions options, Map<String, Object> value) {
-        Object version = value.get("expectedInstanceVersion"), key = value.get("idempotencyKey"), answer = value.get("answer");
+        Object version = value.get("expectedInstanceVersion");
+        Object key = value.get("idempotencyKey");
+        Object answer = value.get("answer");
         if (!(version instanceof Number) || !(key instanceof String) || !(answer instanceof Map)) {
             throw new IllegalArgumentException("answer file is invalid");
         }
         return new WorkspaceResumeRequest(options.getUser(), options.getRunId(), options.getWorkspace(), options.getInteractionId(), ((Number) version).longValue(), (String) key, stringMap((Map<?, ?>) answer), options.getProvider(), options.getModel());
     }
 
-    private int render(CliOptions options, WorkspaceRunResult result, InputStream input, PrintStream out, PrintStream error) throws IOException {
+    private int render(CliOptions options, WorkspaceRunResult result, InputStream input, PrintStream out) throws IOException {
         if (options.getUi() == CliUiMode.JSON_STREAM) return stream(options, result, input, out);
         if (options.getUi() == CliUiMode.JSON_DETACHED) {
             json.writeValue(out, result);

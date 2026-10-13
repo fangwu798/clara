@@ -34,11 +34,13 @@ _TOOL = {
         "javac(javac 可执行文件路径，缺省优先取 JAVA_HOME/bin/javac，其次 PATH)、"
         "max_diagnostics(回传的诊断条数上限，默认 100)、max_sources(收集源文件数上限，默认 500)、"
         "timeout_seconds(超时秒数，默认 120，上限 600)。"
+        "另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。"
         "编译整个 Maven 工程请改用 run_command 执行 mvn 编译；本工具针对单批源码做快速语法/类型检查。"
     ),
     "parameters": {
         "type": "object",
         "properties": {
+            "purpose": {"type": "string"},
             "op": {"type": "string", "enum": ["compile", "version"]},
             "sources": {"type": "array", "items": {"type": "string"}},
             "source_dir": {"type": "string"},

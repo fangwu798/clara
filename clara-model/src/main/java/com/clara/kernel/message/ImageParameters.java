@@ -78,10 +78,11 @@ public abstract class ImageParameters extends BasicParameters {
     /**
      * 是否在生成的图片上添加水印（右下角「AI 生成」字样）。
      *
-     * <p>平台默认<b>加水印</b>，需要无水印必须显式下发 {@code false}。
+     * <p>平台默认<b>加水印</b>；本项目默认<b>不加</b>：未显式设置时下发 {@code false}，如需水印请显式传
+     * {@code true}。
      */
     @JsonProperty("watermark")
-    @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "true", note = "默认加水印；要无水印必须显式下发 false")
+    @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "false", note = "项目默认无水印：未设置时下发 false；需要水印显式传 true")
     private Boolean watermark;
 
     /**

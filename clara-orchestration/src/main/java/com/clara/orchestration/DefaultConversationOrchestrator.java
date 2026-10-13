@@ -108,15 +108,18 @@ public final class DefaultConversationOrchestrator {
             int toolRoundTrips = 0;
             while (true) {
                 context.throwIfCancelled();
-                ContextAssembler.AssembledContext assembled =
-                        contextAssembler.assemble(windowMemory, control, tokenCountEstimator);
                 HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
                         .model(request.getModel())
-                        .messages(assembled.getMessages())
-                        .tools(assembled.getTools().isEmpty() ? null : assembled.getTools())
                         .stream(Boolean.valueOf(request.isStream() || hostObserver != null));
-                // 对话能力走 messages；图片 / 视频生成等非对话能力以「本轮输入」作为生成提示词。
-                if (capabilityKind != CapabilityKindEnum.CHAT) {
+                // 只有对话能力下发 messages 与 tools；图片 / 视频生成等非对话能力以「本轮输入」作为生成
+                // 提示词，且不得携带对话工具——如火山方舟生图接口不支持 tools，带上会被平台以
+                // InvalidParameter 直接拒绝。
+                if (capabilityKind == CapabilityKindEnum.CHAT) {
+                    ContextAssembler.AssembledContext assembled =
+                            contextAssembler.assemble(windowMemory, control, tokenCountEstimator);
+                    requestBuilder.messages(assembled.getMessages())
+                            .tools(assembled.getTools().isEmpty() ? null : assembled.getTools());
+                } else {
                     requestBuilder.prompt(request.getUserInput());
                 }
                 // 图片生成能力把随请求下发的图片引用作为参考图（图生图）；无附件时即文生图。
@@ -147,7 +150,11 @@ public final class DefaultConversationOrchestrator {
                     continue;
                 }
                 String content = capabilityDispatcher.extract(capabilityKind, response);
-                windowMemory.append(Collections.singletonList(new AssistantContent(content)));
+                // 只记录有正文的助手回复：正文为空且不带工具调用的 assistant 消息会被平台判为非法
+                // （Invalid assistant message: content or tool_calls must be set），因此不写入历史。
+                if (content != null && !content.trim().isEmpty()) {
+                    windowMemory.append(Collections.singletonList(new AssistantContent(content)));
+                }
                 return conversationResult(request.getConversationId(), content,
                         OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
                         reasoning.toString());
