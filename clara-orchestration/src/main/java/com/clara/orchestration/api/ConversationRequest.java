@@ -5,7 +5,7 @@ import com.clara.dto.memory.ContextControlConfig;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamObserver;
 import lombok.Builder;
 import lombok.Data;
 

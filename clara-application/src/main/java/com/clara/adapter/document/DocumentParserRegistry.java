@@ -3,6 +3,8 @@ package com.clara.adapter.document;
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
 import com.clara.workspace.api.*;
+import com.clara.workspace.application.FileDocument;
+import com.clara.workspace.application.ParsedDocument;
 
 import java.util.*;
 

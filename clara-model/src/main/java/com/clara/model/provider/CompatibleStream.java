@@ -2,10 +2,10 @@ package com.clara.model.provider;
 
 import com.clara.core.model.IRequest;
 import com.clara.core.model.IResponse;
-import com.clara.kernel.api.IStreamModel;
+import com.clara.core.model.IStreamModel;
 import com.clara.kernel.api.execute.IHttpExecute;
-import com.clara.kernel.stream.IStreamHandle;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamHandle;
+import com.clara.core.model.IStreamObserver;
 
 /**
  * {@link IStreamModel} 的唯一实现：把统一调用转发给传输实现，自身不含任何平台分支。

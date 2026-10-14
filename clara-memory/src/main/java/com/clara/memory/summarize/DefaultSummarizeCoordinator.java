@@ -2,7 +2,7 @@ package com.clara.memory.summarize;
 
 import com.clara.core.memory.ISummarizeCoordinator;
 import com.clara.core.skill.IPromptProvider;
-import com.clara.kernel.api.IStreamModel;
+import com.clara.core.model.IStreamModel;
 import com.clara.core.message.IContent;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;

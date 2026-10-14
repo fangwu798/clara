@@ -43,12 +43,6 @@ public class WindowsSingleHostStoragePolicyTest {
         assertEquals(32L * WindowsSingleHostStoragePolicy.MIB,
                 policy.workspacePolicy().getMaxFileBytes());
         assertFalse(policy.workspacePolicy().isFollowLinks());
-        assertEquals(10000, policy.mediaJobStoreConfig().getMaxJobs());
-        assertEquals(16L * WindowsSingleHostStoragePolicy.MIB,
-                policy.mediaJobStoreConfig().getMaxFileBytes());
-        assertEquals(5L * 60L * 1000L,
-                policy.mediaCallbackSecurityPolicy().getMaxClockSkewMillis());
-        assertEquals(100000, policy.mediaCallbackSecurityPolicy().getMaxTrackedNonces());
         assertEquals(180L * WindowsSingleHostStoragePolicy.DAY_MILLIS,
                 policy.getAuditRetentionMillis());
         assertEquals(4L * WindowsSingleHostStoragePolicy.HOUR_MILLIS,

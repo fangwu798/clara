@@ -1,8 +1,11 @@
 package com.clara.adapter.document;
+import com.clara.enums.document.DocumentFormat;
+import com.clara.enums.document.DocumentNodeType;
 
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
 import com.clara.workspace.api.*;
+import com.clara.workspace.application.*;
 
 import java.nio.*;
 import java.nio.charset.*;

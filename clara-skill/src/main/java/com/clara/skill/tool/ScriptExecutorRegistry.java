@@ -1,5 +1,6 @@
 package com.clara.skill.tool;
 
+import com.clara.api.IScriptExecutor;
 import com.clara.enums.skill.ScriptTypeEnum;
 import com.clara.exception.ClaraException;
 import com.clara.skill.SkillErrors;

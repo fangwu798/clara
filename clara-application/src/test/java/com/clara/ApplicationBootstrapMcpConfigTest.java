@@ -19,7 +19,7 @@ import com.clara.mcp.registry.capability.McpResourceDescriptor;
 import com.clara.mcp.registry.capability.McpResourceTemplateDescriptor;
 import com.clara.mcp.registry.capability.McpToolDescriptor;
 import com.clara.model.embedding.HashingEmbeddingClient;
-import com.clara.tool.ExternalToolBinding;
+import com.clara.mcp.tool.ExternalToolBinding;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

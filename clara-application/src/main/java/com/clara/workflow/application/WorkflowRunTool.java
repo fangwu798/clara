@@ -1,6 +1,7 @@
 package com.clara.workflow.application;
 
-import com.clara.skill.tool.builtin.IBuiltinTool;
+import com.clara.api.IBuiltinTool;
+import com.clara.workflow.runtime.WorkflowRunner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

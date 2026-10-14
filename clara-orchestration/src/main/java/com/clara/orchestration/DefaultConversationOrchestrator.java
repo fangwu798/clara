@@ -17,7 +17,7 @@ import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.kernel.message.delta.UserVisionContent;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamObserver;
 import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.orchestration.api.ConversationRequest;

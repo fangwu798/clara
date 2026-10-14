@@ -53,6 +53,11 @@
             <artifactId>clara-skill</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 汉字转拼音：工作目录名为中文时转写为 ASCII 项目名（供 Milvus 集合命名）。 -->
+        <dependency>
+            <groupId>com.belerweb</groupId>
+            <artifactId>pinyin4j</artifactId>
+        </dependency>
         <!-- 控制台单键 ESC 监听（执行中取消本轮模型调用与工具执行）。 -->
         <dependency>
             <groupId>org.jline</groupId>

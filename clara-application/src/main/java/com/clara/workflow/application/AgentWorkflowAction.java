@@ -6,13 +6,16 @@ import com.clara.core.workflow.IWorkflowAction;
 import com.clara.dto.workflow.ExecutionScope;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamObserver;
 import com.clara.media.MediaAsset;
 import com.clara.media.asset.MediaAssetIngestor;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
 import com.clara.session.ModelBinding;
+import com.clara.workflow.runtime.AgentNodeOptions;
+import com.clara.workflow.runtime.WorkflowProgress;
+import com.clara.workflow.runtime.WorkflowVariableResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

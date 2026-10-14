@@ -23,7 +23,9 @@ milvus:
   enabled: true
   host: 127.0.0.1
   port: 19530
-  collection: clara_conversations
+  # collection 可选：不写时按「当前目录名 + _conversations」自动命名（即项目名），
+  # 让不同项目 / 目录使用各自独立的集合、互不串数据。
+  # collection: my_conversations
   # 向量维度必须与嵌入模型一致；当前默认的离线占位嵌入（HashingEmbeddingClient）为 1024。
   # 换成真实嵌入模型时，这里要改成该模型的输出维度，并让入库与检索保持同一模型。
   dimension: 1024

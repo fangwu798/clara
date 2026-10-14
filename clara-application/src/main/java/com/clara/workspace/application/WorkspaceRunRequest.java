@@ -1,7 +1,7 @@
 package com.clara.workspace.application;
+import com.clara.enums.workspace.WorkspaceAccessMode;
 
 import com.clara.enums.ModelProviderEnum;
-import com.clara.workspace.api.WorkspaceAccessMode;
 
 import java.nio.file.Path;
 import java.util.*;

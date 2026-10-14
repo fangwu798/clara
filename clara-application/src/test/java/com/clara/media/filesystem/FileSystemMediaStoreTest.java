@@ -4,13 +4,8 @@ import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCodes;
 import com.clara.media.MediaAsset;
 import com.clara.media.MediaInput;
-import com.clara.media.MediaContentSafetyScanner;
-import com.clara.media.MediaSafetyAssessment;
 import com.clara.media.MediaType;
 import com.clara.media.MediaUpload;
-import com.clara.media.MediaValidation;
-import com.clara.media.validation.MediaValidationPolicy;
-import com.clara.media.validation.WaveAudioMetadataProbe;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;
@@ -97,37 +92,6 @@ public class FileSystemMediaStoreTest {
         store.close();
     }
 
-    @Test
-    public void persistsVerifiedWaveDurationAfterSafetyScan() throws Exception {
-        Path workspace = folder.newFolder("wave").toPath();
-        Map<String, String> extensions = Collections.singletonMap(".wav", "audio/wav");
-        Map<String, java.util.List<String>> magic = Collections.singletonMap("audio/wav",
-                Collections.singletonList("52494646"));
-        MediaValidationPolicy policy = new MediaValidationPolicy(50000, 100000, 60000,
-                100, 100, 5000, extensions, magic, true, true);
-        final boolean[] scanned = new boolean[1];
-        MediaContentSafetyScanner scanner = new MediaContentSafetyScanner() {
-            public MediaSafetyAssessment scan(MediaUpload upload, MediaValidation validation, MediaInput content) {
-                scanned[0] = true;
-                return MediaSafetyAssessment.allowed();
-            }
-        };
-        FileSystemMediaStore store = FileSystemMediaStore.inspected(
-                new FileSystemMediaStoreConfig(workspace, policy),
-                Collections.singletonList(new WaveAudioMetadataProbe(8, 1024)), scanner);
-        final byte[] wave = wave(8000, 16000);
-        MediaUpload upload = new MediaUpload("tenant", MediaType.AUDIO, "sample.wav", "audio/wav",
-                null, null, null, null, null, Collections.<String, String>emptyMap(), new MediaInput() {
-            public InputStream open() {
-                return new ByteArrayInputStream(wave);
-            }
-        });
-        MediaAsset asset = store.put(upload);
-        assertEquals(1000L, asset.getDurationMs().longValue());
-        assertTrue(scanned[0]);
-        store.close();
-    }
-
     private static FileSystemMediaStoreConfig config(Path workspace, long fileLimit, long tenantLimit) {
         Map<String, String> extensions = new LinkedHashMap<String, String>();
         extensions.put(".png", "image/png");
@@ -164,36 +128,6 @@ public class FileSystemMediaStoreTest {
         } catch (IOException e) {
             throw new AssertionError(e);
         }
-    }
-
-    private static byte[] wave(int sampleRate, int dataBytes) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        output.write("RIFF".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-        le32(output, 36L + dataBytes);
-        output.write("WAVEfmt ".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-        le32(output, 16);
-        le16(output, 1);
-        le16(output, 1);
-        le32(output, sampleRate);
-        le32(output, sampleRate * 2L);
-        le16(output, 2);
-        le16(output, 16);
-        output.write("data".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-        le32(output, dataBytes);
-        output.write(new byte[dataBytes]);
-        return output.toByteArray();
-    }
-
-    private static void le16(ByteArrayOutputStream output, int value) {
-        output.write(value);
-        output.write(value >>> 8);
-    }
-
-    private static void le32(ByteArrayOutputStream output, long value) {
-        output.write((int) value);
-        output.write((int) (value >>> 8));
-        output.write((int) (value >>> 16));
-        output.write((int) (value >>> 24));
     }
 
     private static byte[] read(InputStream input) throws IOException {

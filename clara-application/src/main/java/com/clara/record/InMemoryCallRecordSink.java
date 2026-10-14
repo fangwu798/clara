@@ -25,7 +25,7 @@ public final class InMemoryCallRecordSink implements ICallRecordSink {
     public static final int DEFAULT_CAPACITY = 100;
 
     private final int capacity;
-    private final Deque<CallRecord> records = new ArrayDeque<CallRecord>();
+    private final Deque<CallRecord> records = new ArrayDeque<>();
 
     /**
      * 使用默认容量（{@value #DEFAULT_CAPACITY}）创建接收方。

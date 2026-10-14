@@ -4,7 +4,7 @@ import com.clara.context.CancellationToken;
 import com.clara.dto.memory.ContextControlConfig;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamObserver;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

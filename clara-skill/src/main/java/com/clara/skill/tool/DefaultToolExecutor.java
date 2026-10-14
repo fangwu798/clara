@@ -1,5 +1,6 @@
 package com.clara.skill.tool;
 
+import com.clara.api.IScriptExecutor;
 import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.core.skill.IToolExecutor;

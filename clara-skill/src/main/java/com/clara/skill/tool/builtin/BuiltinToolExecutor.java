@@ -1,8 +1,9 @@
 package com.clara.skill.tool.builtin;
 
+import com.clara.api.IBuiltinTool;
 import com.clara.enums.skill.ScriptTypeEnum;
 import com.clara.skill.SkillErrors;
-import com.clara.skill.tool.IScriptExecutor;
+import com.clara.api.IScriptExecutor;
 import com.clara.skill.tool.ScriptExecutionSpec;
 
 import java.util.List;

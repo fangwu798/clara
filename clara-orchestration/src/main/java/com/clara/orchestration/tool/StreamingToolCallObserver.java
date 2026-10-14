@@ -5,7 +5,7 @@ import com.clara.dto.model.StreamEvent;
 import com.clara.dto.tool.ToolCall;
 import com.clara.dto.tool.ToolCallFunction;
 import com.clara.enums.StreamEventEnum;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamObserver;
 import com.clara.model.stream.RecordingObserver;
 
 import java.util.List;

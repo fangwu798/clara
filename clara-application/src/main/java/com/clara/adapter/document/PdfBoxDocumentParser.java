@@ -1,4 +1,6 @@
 package com.clara.adapter.document;
+import com.clara.enums.document.DocumentFormat;
+import com.clara.enums.document.DocumentNodeType;
 
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCategory;
@@ -7,6 +9,7 @@ import com.clara.workspace.api.*;
 
 import java.util.*;
 
+import com.clara.workspace.application.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 
@@ -23,7 +26,7 @@ public final class PdfBoxDocumentParser implements DocumentParser {
         this.maxPages = maxPages;
     }
 
-    public boolean supports(com.clara.workspace.api.FileDescriptor f) {
+    public boolean supports(FileDescriptor f) {
         return f.getRelativePath().toLowerCase(Locale.ROOT).endsWith(".pdf");
     }
 

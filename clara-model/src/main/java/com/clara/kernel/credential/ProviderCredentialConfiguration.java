@@ -1,7 +1,7 @@
 package com.clara.kernel.credential;
 
 
-import com.clara.kernel.api.credential.ICredentialResolver;
+import com.clara.core.model.ICredentialResolver;
 import com.clara.utils.StringUtils;
 import com.clara.utils.deserialize.SecretCharsDeserializer;
 import com.fasterxml.jackson.annotation.JsonCreator;

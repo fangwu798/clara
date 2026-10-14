@@ -1,4 +1,6 @@
 package com.clara.adapter.document;
+import com.clara.enums.document.DocumentFormat;
+import com.clara.enums.document.DocumentNodeType;
 
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
@@ -7,13 +9,15 @@ import com.clara.workspace.api.*;
 import java.io.*;
 import java.util.*;
 
+import com.clara.workspace.application.*;
+import com.clara.workspace.application.FileDescriptor;
 import org.apache.poi.ss.usermodel.*;
 
 /**
  * 将POIExcel文档数据解析为领域对象。
  */
 public final class PoiExcelDocumentParser implements DocumentParser {
-    public boolean supports(com.clara.workspace.api.FileDescriptor f) {
+    public boolean supports(FileDescriptor f) {
         String p = f.getRelativePath().toLowerCase(Locale.ROOT);
         return p.endsWith(".xlsx") || p.endsWith(".xls");
     }

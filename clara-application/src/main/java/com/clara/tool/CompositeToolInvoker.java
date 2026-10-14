@@ -12,6 +12,8 @@ import com.clara.exception.ErrorCodes;
 import com.clara.mcp.client.gateway.McpGateway;
 import com.clara.mcp.client.call.McpToolCall;
 import com.clara.mcp.client.call.McpToolResult;
+import com.clara.mcp.tool.ExternalToolBinding;
+import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.skill.registry.SkillRegistry;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

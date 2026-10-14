@@ -111,8 +111,7 @@ public final class UsageTrendChart {
         out.append(leftPad).append(" +").append(repeat('-', WIDTH)).append('\n');
         int gap = Math.max(1, WIDTH + 2 - startLabel.length() - endLabel.length());
         out.append(leftPad).append("  ").append(startLabel).append(repeat(' ', gap)).append(endLabel).append('\n');
-        out.append("共 ").append(samples.size()).append(" 个采样点，末次累计 ")
-                .append(samples.get(samples.size() - 1)[1]).append(" tokens");
+        out.append("共 ").append(samples.size()).append(" 个采样点，末次累计 ").append(samples.get(samples.size() - 1)[1]).append(" tokens");
         return out.toString();
     }
 

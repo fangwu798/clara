@@ -35,18 +35,6 @@ public class MediaRuntimeTest {
     }
 
     @Test
-    public void assemblesJobSchedulerInfrastructure() throws Exception {
-        Path root = folder.newFolder("workspace").toPath();
-        MediaRuntime runtime = new MediaRuntime(root, "test");
-        try {
-            assertNotNull(runtime.mediaJobScheduler());
-            assertTrue(Files.exists(root.resolve(".clara").resolve("state").resolve("media-jobs")));
-        } finally {
-            runtime.close();
-        }
-    }
-
-    @Test
     public void releasesAssetDirectoryLockOnClose() throws Exception {
         Path root = folder.newFolder("workspace").toPath();
         MediaRuntime first = new MediaRuntime(root, "test");

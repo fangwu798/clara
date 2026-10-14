@@ -1,11 +1,12 @@
 package com.clara.adapter.document;
-
-import com.clara.workspace.api.*;
+import com.clara.enums.document.DocumentFormat;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import com.clara.workspace.application.*;
+import com.clara.workspace.application.FileDescriptor;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -77,7 +78,7 @@ public class DocumentParserContractTest {
     }
 
     private static FileDocument file(String path, String mime, byte[] bytes) {
-        return new FileDocument(new com.clara.workspace.api.FileDescriptor(path, mime, bytes.length, 1L, "sha"), bytes);
+        return new FileDocument(new FileDescriptor(path, mime, bytes.length, 1L, "sha"), bytes);
     }
 
     private static List<String> texts(ParsedDocument value) {

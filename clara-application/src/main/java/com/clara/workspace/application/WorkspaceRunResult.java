@@ -1,4 +1,5 @@
 package com.clara.workspace.application;
+import com.clara.enums.workspace.WorkspaceRunStatus;
 
 import com.clara.dto.interaction.InteractionRequest;
 

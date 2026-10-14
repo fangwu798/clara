@@ -6,8 +6,6 @@ import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
 import com.clara.media.MediaAsset;
 import com.clara.media.MediaInput;
-import com.clara.media.MediaContentSafetyScanner;
-import com.clara.media.MediaMetadataProbe;
 import com.clara.media.MediaStore;
 import com.clara.media.MediaType;
 import com.clara.media.MediaUpload;
@@ -34,13 +32,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
-import java.util.List;
 import java.util.UUID;
 
 /**
  * 在工作区内以内容摘要为资产 ID，原子保存媒体内容和清单，并执行租户隔离、校验及过期清理。
  *
- * <p>常规用法：普通场景使用构造函数，需探测音视频元数据或内容安全检查时使用 {@link #inspected}；
+ * <p>常规用法：普通场景使用单参构造函数；需自定义校验器（如注入元数据探针或内容安全检查）时使用三参构造函数；
  * 通过 {@link #put} 写入，通过 {@code get/open/delete} 访问，定期调用 {@link #cleanupExpired}。
  * 最后调用 {@link #close()} 释放目录锁。
  *
@@ -58,13 +55,6 @@ public final class FileSystemMediaStore implements MediaStore, Closeable {
 
     public FileSystemMediaStore(FileSystemMediaStoreConfig config) {
         this(config, new DefaultMediaValidator(config == null ? null : config.getValidationPolicy()), new ObjectMapper());
-    }
-
-    public static FileSystemMediaStore inspected(FileSystemMediaStoreConfig config,
-                                                 List<MediaMetadataProbe> metadataProbes, MediaContentSafetyScanner safetyScanner) {
-        return new FileSystemMediaStore(config,
-                new DefaultMediaValidator(config == null ? null : config.getValidationPolicy(),
-                        metadataProbes, safetyScanner), new ObjectMapper());
     }
 
     public FileSystemMediaStore(FileSystemMediaStoreConfig config, MediaValidator validator, ObjectMapper json) {

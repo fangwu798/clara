@@ -1,7 +1,10 @@
 package com.clara.adapter.cli;
+import com.clara.enums.cli.CliCommand;
+import com.clara.enums.cli.CliUiMode;
+import com.clara.enums.cli.CliOutputFormat;
+import com.clara.enums.workspace.WorkspaceAccessMode;
 
 import com.clara.enums.ModelProviderEnum;
-import com.clara.workspace.api.WorkspaceAccessMode;
 
 import java.nio.file.Path;
 

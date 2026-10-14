@@ -5,7 +5,7 @@ import com.clara.dto.model.StreamEvent;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamObserver;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.orchestration.api.ConversationResult;
 
@@ -218,7 +218,8 @@ public final class ConsoleView implements Closeable {
             fileOut.println("[thinking] " + result.getReasoning().trim());
         }
         if (result.getContent() != null) {
-            fileOut.println("[assistant] " + result.getContent());
+            fileOut.println("[assistant]");
+            fileOut.println("            " + result.getContent());
         }
     }
 

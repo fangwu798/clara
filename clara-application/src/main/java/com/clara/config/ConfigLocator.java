@@ -18,6 +18,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
+import net.sourceforge.pinyin4j.PinyinHelper;
+import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType;
+import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
+import net.sourceforge.pinyin4j.format.HanyuPinyinToneType;
+import net.sourceforge.pinyin4j.format.HanyuPinyinVCharType;
+import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 
 /**
  * 配置定位与读取：集中承担「模型配置目录 / 文件的定位、模型清单扫描、主模型解析、日志目录推导」。
@@ -49,6 +55,11 @@ public final class ConfigLocator {
      * 角色 → 模型别名映射文件（相对运行目录），可选。
      */
     private static final Path MODEL_ROLES = Paths.get("config", "model-roles.yml");
+
+    /**
+     * 拼音输出格式：无声调、小写、{@code ü} 写作 {@code v}，保证转写结果仅含 ASCII 字母 / 数字。
+     */
+    private static final HanyuPinyinOutputFormat PINYIN_FORMAT = pinyinFormat();
 
     /**
      * 主模型配置键名。
@@ -324,6 +335,88 @@ public final class ConfigLocator {
             return Paths.get(configured.trim()).toAbsolutePath().normalize();
         }
         return Paths.get("").toAbsolutePath().normalize();
+    }
+
+    /**
+     * 项目名：供外部向量库（Milvus）按项目隔离存储——不同项目各自使用独立的集合名，避免互相串数据。
+     *
+     * <p>取「工作目录的文件名」：优先启动脚本注入的 {@code CLARA_WORK_DIR}，未注入时用进程当前工作目录，
+     * 即「你从哪个目录启动，就以该目录名作为项目名」。
+     *
+     * <p>Milvus 集合名只允许 ASCII（字母 / 数字 / 下划线，且以字母或下划线开头），因此：目录名本身合法时
+     * 原样返回（如 {@code clara}）；含中文等非 ASCII 字符时用拼音转写（如 {@code 我的项目 → wodexiangmu}）；
+     * 其余非法字符折叠为下划线。转写后仍为空（如目录名全为符号）时，退回 {@code p + 目录绝对路径 SHA-256 前 12 位}，
+     * 保证合法、稳定且不同目录不冲突。
+     *
+     * @return ASCII 安全的项目名，非 null
+     */
+    public static String projectName() {
+        Path directory = workspaceRoot();
+        Path name = directory.getFileName();
+        String raw = name == null ? "" : name.toString().trim();
+        String identifier = toAsciiIdentifier(raw);
+        if (identifier.isEmpty()) {
+            return "p" + sha256(directory.toString()).substring(0, 12);
+        }
+        return identifier;
+    }
+
+    /**
+     * 把任意目录名规范化为合法的 Milvus 标识：汉字转拼音（无声调），仅保留 ASCII 字母 / 数字，其余字符折叠为
+     * 下划线并去除首尾多余下划线；以数字开头时补 {@code p} 前缀。
+     *
+     * @return 规范化结果，可能为空（输入无任何可映射字符时）
+     */
+    private static String toAsciiIdentifier(String raw) {
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < raw.length(); index++) {
+            char c = raw.charAt(index);
+            if (isAsciiLetter(c) || (c >= '0' && c <= '9')) {
+                builder.append(Character.toLowerCase(c));
+            } else if (c == '_') {
+                builder.append('_');
+            } else {
+                builder.append(pinyinOf(c));
+            }
+        }
+        String normalized = builder.toString().replaceAll("_+", "_").replaceAll("^_+|_+$", "");
+        if (!normalized.isEmpty() && normalized.charAt(0) >= '0' && normalized.charAt(0) <= '9') {
+            normalized = "p" + normalized;
+        }
+        return normalized;
+    }
+
+    /**
+     * 是否为 ASCII 字母（大小写）。
+     */
+    private static boolean isAsciiLetter(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    /**
+     * 构造不会抛异常的拼音输出格式（固定配置，独立成方法便于静态初始化）。
+     */
+    private static HanyuPinyinOutputFormat pinyinFormat() {
+        HanyuPinyinOutputFormat format = new HanyuPinyinOutputFormat();
+        format.setCaseType(HanyuPinyinCaseType.LOWERCASE);
+        format.setToneType(HanyuPinyinToneType.WITHOUT_TONE);
+        format.setVCharType(HanyuPinyinVCharType.WITH_V);
+        return format;
+    }
+
+    /**
+     * 单字符转拼音：汉字返回无声调拼音（如 {@code 中 → zhong}），非汉字或转换失败返回下划线占位。
+     */
+    private static String pinyinOf(char c) {
+        try {
+            String[] pinyin = PinyinHelper.toHanyuPinyinStringArray(c, PINYIN_FORMAT);
+            if (pinyin != null && pinyin.length > 0 && !pinyin[0].isEmpty()) {
+                return pinyin[0];
+            }
+        } catch (BadHanyuPinyinOutputFormatCombination ignored) {
+            // 输出格式固定且合法，正常不会抛出；兜底按分隔符处理。
+        }
+        return "_";
     }
 
     /**

@@ -4,7 +4,7 @@ package com.clara.kernel.config;
 import com.clara.context.ConvContext;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.api.credential.ICredentialResolver;
+import com.clara.core.model.ICredentialResolver;
 import com.clara.kernel.config.resolver.ConfigResolvers;
 import com.clara.kernel.credential.ProviderCredentialConfiguration;
 import com.clara.exception.ClaraException;

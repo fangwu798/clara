@@ -29,6 +29,7 @@
         <jtokkit.version>1.1.0</jtokkit.version>
         <milvus.version>2.6.25</milvus.version>
         <jline.version>3.25.1</jline.version>
+        <pinyin4j.version>2.5.1</pinyin4j.version>
         <maven.compiler.version>3.11.0</maven.compiler.version>
         <maven.resources.version>3.3.1</maven.resources.version>
         <maven.surefire.version>3.2.5</maven.surefire.version>
@@ -100,6 +101,12 @@
                 <groupId>org.jline</groupId>
                 <artifactId>jline-terminal-jna</artifactId>
                 <version>${jline.version}</version>
+            </dependency>
+            <!-- 汉字转拼音：非 ASCII（中文）工作目录名转写为 ASCII 项目名，用于 Milvus 集合命名。 -->
+            <dependency>
+                <groupId>com.belerweb</groupId>
+                <artifactId>pinyin4j</artifactId>
+                <version>${pinyin4j.version}</version>
             </dependency>
             <!-- Milvus SDK 传递依赖的统一版本约束：SDK 直接声明的版本高于部分传递版本，
                  统一到 SDK 的声明值以通过 dependencyConvergence 校验。 -->

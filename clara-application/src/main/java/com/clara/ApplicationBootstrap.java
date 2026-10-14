@@ -1,7 +1,7 @@
 package com.clara;
 
 import com.clara.config.ConfigLocator;
-import com.clara.config.MilvusSettings;
+import com.clara.memory.semantic.milvus.MilvusSettings;
 import com.clara.context.ConvContext;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
@@ -17,7 +17,7 @@ import com.clara.dto.record.CallRecord;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
-import com.clara.kernel.api.IStreamModel;
+import com.clara.core.model.IStreamModel;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
@@ -76,20 +76,20 @@ import com.clara.skill.tool.DefaultToolInvoker;
 import com.clara.skill.tool.ScriptExecutorRegistry;
 import com.clara.skill.tool.builtin.BuiltinToolExecutor;
 import com.clara.tool.CompositeToolInvoker;
-import com.clara.tool.ExternalToolCatalog;
-import com.clara.tool.McpExternalToolRegistrar;
+import com.clara.mcp.tool.ExternalToolCatalog;
+import com.clara.mcp.tool.McpExternalToolRegistrar;
 import com.clara.tool.ToolInvocationPurpose;
 import com.clara.workflow.application.AgentActionFactory;
 import com.clara.workflow.application.ReviewActionFactory;
-import com.clara.workflow.application.ToolActionFactory;
+import com.clara.workflow.runtime.ToolActionFactory;
 import com.clara.workflow.application.WorkflowRunTool;
-import com.clara.workflow.application.WorkflowRunner;
+import com.clara.workflow.runtime.WorkflowRunner;
 import com.clara.workflow.checkpoint.InMemoryCheckpointStore;
 import com.clara.workflow.definition.WorkflowDefinitionLoader;
 import com.clara.workflow.definition.WorkflowDefinitionRegistry;
 import com.clara.workflow.engine.DefaultWorkflowEngine;
 import com.clara.workspace.application.DefaultWorkspaceBusinessRunner;
-import com.clara.workspace.application.WorkspaceBusinessRunner;
+import com.clara.workspace.api.WorkspaceBusinessRunner;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -167,7 +167,7 @@ public final class ApplicationBootstrap implements Closeable {
      * MCP 发现支持的协议版本列表：当前仅支持 {@code 2024-11-05}，服务端协商出其它版本将标记为不兼容。
      */
     private static final List<String> MCP_SUPPORTED_PROTOCOL_VERSIONS =
-            Collections.unmodifiableList(Collections.singletonList("2024-11-05"));
+            Collections.singletonList("2024-11-05");
 
     /**
      * MCP 发现单类能力的最大分页页数，防止服务端返回无限分页。
@@ -263,15 +263,12 @@ public final class ApplicationBootstrap implements Closeable {
         this.mcpClientFactory = mcpClientFactory;
 
         // 语义记忆：clara.yml 配了 milvus 就用 Milvus（对话记录写入并召回），否则维持进程内实现、行为不变。
-        MilvusSettings milvus = MilvusSettings.load(ConfigLocator.claraConfigFile(), embeddingDimension);
+        MilvusSettings milvus = MilvusSettings.load(ConfigLocator.claraConfigFile(), embeddingDimension,
+                ConfigLocator.projectName());
         MilvusSemanticMemoryStore milvusStore = milvus == null ? null : connectMilvus(milvus);
-        this.semanticMemoryStore = milvusStore == null
-                ? new LocalSemanticMemoryStore(embeddingDimension) : milvusStore;
+        this.semanticMemoryStore = milvusStore == null ? new LocalSemanticMemoryStore(embeddingDimension) : milvusStore;
         this.conversationIndexing = milvusStore != null;
-        this.semanticMemoryDescription = milvusStore == null
-                ? "进程内 local（不写对话记录）"
-                : "milvus " + milvus.getHost() + ":" + milvus.getPort() + "/" + milvus.getCollection()
-                        + "（对话记录写入并召回）";
+        this.semanticMemoryDescription = milvusStore == null ? "进程内 local（不写对话记录）" : "milvus " + milvus.getHost() + ":" + milvus.getPort() + "/" + milvus.getCollection() + "（对话记录写入并召回）";
 
         this.tokenCountEstimator = new TiktokenTokenCountEstimator(TiktokenTokenCountEstimator.DEFAULT_ENCODING);
 
@@ -370,8 +367,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @return 被归纳的历史消息条数；无可压缩内容时返回 0
      */
     public int compressConversation(String conversationId, ProviderConfiguration providerConfiguration, String model) {
-        if (conversationId == null || conversationId.trim().isEmpty()
-                || providerConfiguration == null || model == null || model.trim().isEmpty()) {
+        if (conversationId == null || conversationId.trim().isEmpty() || providerConfiguration == null || model == null || model.trim().isEmpty()) {
             return 0;
         }
         ModelProviderEnum provider = providerConfiguration.getProvider();
@@ -729,11 +725,9 @@ public final class ApplicationBootstrap implements Closeable {
                     MilvusBackendConfig.DEFAULT_DATABASE,
                     MilvusBackendConfig.DEFAULT_CONNECT_TIMEOUT_MILLIS,
                     MilvusBackendConfig.DEFAULT_IDLE_TIMEOUT_MILLIS));
-            return new MilvusSemanticMemoryStore(
-                    new MilvusCollectionSpec(settings.getCollection(), settings.getDimension()), backend);
+            return new MilvusSemanticMemoryStore(new MilvusCollectionSpec(settings.getCollection(), settings.getDimension()), backend);
         } catch (RuntimeException unavailable) {
-            System.err.println("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）："
-                    + unavailable.getMessage());
+            System.err.println("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）：" + unavailable.getMessage());
             return null;
         }
     }

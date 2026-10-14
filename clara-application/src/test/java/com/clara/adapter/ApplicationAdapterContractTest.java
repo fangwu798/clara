@@ -1,7 +1,7 @@
 package com.clara.adapter;
+import com.clara.enums.workspace.WorkspaceRunStatus;
 
 import com.clara.adapter.cli.*;
-import com.clara.adapter.rest.*;
 import com.clara.core.interaction.IAnswerSchemaValidator;
 import com.clara.core.interaction.IInteractionResumeCoordinator;
 import com.clara.core.interaction.ITimeSource;
@@ -16,6 +16,7 @@ import com.clara.exception.ClaraException;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ErrorCategory;
 import com.clara.workflow.interaction.InMemoryInteractionService;
+import com.clara.workspace.api.WorkspaceBusinessRunner;
 import com.clara.workspace.application.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +31,9 @@ import org.junit.rules.TemporaryFolder;
 
 import static org.junit.Assert.*;
 
+/**
+ * CLI 适配器契约测试：等待挂起、json-detached / json-stream 输出契约、错误码映射与 TUI 回退。
+ */
 public class ApplicationAdapterContractTest {
     @Rule
     public final TemporaryFolder folder = new TemporaryFolder();
@@ -58,20 +62,6 @@ public class ApplicationAdapterContractTest {
             }
         }, 10);
         interaction = service.request(new InteractionContext("i1", "run", "instance", "task", 2L, 10L, 1000L), new Question(InteractionTypeEnum.TEXT_INPUT, "Name?", Collections.<InteractionOption>emptyList(), "{}", Collections.<String, Object>emptyMap(), true, "name", 100));
-    }
-
-    @Test
-    public void restAndSsePreserveWaitingContract() throws Exception {
-        WorkspaceRunResult waiting = waiting();
-        WorkspaceRunController controller = new WorkspaceRunController(new FakeRunner(waiting, success()));
-        RestResponse<WorkspaceRunResult> response = controller.run(runRequest());
-        assertEquals(202, response.getStatus());
-        List<SseEvent> events = new WorkspaceRunSseAdapter(json).events(waiting);
-        assertEquals(1, events.size());
-        assertEquals("interaction.required", events.get(0).getType());
-        assertTrue(events.get(0).encode().contains("event: interaction.required"));
-        assertTrue(events.get(0).getData().contains("\"protocolVersion\":1"));
-        assertTrue(events.get(0).getData().contains("\"interactionId\":\"i1\""));
     }
 
     @Test
@@ -109,7 +99,7 @@ public class ApplicationAdapterContractTest {
     }
 
     @Test
-    public void mapsAuthorizationFailureToStableRestAndCliCodes() throws Exception {
+    public void mapsAuthorizationFailureToStableCliCode() throws Exception {
         final ClaraException denied = new ClaraException(new ClaraError("DENIED", ErrorCategory.AUTHORIZATION, "denied", false, null, null, null, null, Collections.<String, String>emptyMap()));
         WorkspaceBusinessRunner runner = new WorkspaceBusinessRunner() {
             public WorkspaceRunResult run(WorkspaceRunRequest r) {
@@ -124,7 +114,6 @@ public class ApplicationAdapterContractTest {
                 throw denied;
             }
         };
-        assertEquals(403, new WorkspaceRunController(runner).run(runRequest()).getStatus());
         int exit = new ClaraCli(runner, json).execute(new String[]{"run", "--workspace", workspace.toString(), "--run-id", "run", "--goal", "goal"}, new ByteArrayInputStream(new byte[0]), stream(new ByteArrayOutputStream()), stream(new ByteArrayOutputStream()));
         assertEquals(CliExitCodes.DENIED, exit);
     }
@@ -138,10 +127,6 @@ public class ApplicationAdapterContractTest {
         assertTrue(utf8(output).contains("SUCCEEDED run=run"));
         assertTrue(utf8(errors).contains("using plain mode"));
         assertEquals(CliExitCodes.INVALID, cli.execute(new String[]{"run", "--workspace", workspace.toString(), "--approve-changes"}, new ByteArrayInputStream(new byte[0]), stream(new ByteArrayOutputStream()), stream(new ByteArrayOutputStream())));
-    }
-
-    private WorkspaceRunRequest runRequest() {
-        return new WorkspaceRunRequest("user", "run", workspace, "goal", null, com.clara.workspace.api.WorkspaceAccessMode.PREVIEW_WRITE, false, null, null, null);
     }
 
     private WorkspaceRunResult waiting() {

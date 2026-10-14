@@ -14,6 +14,8 @@ import com.clara.mcp.client.call.McpResourceContent;
 import com.clara.mcp.client.call.McpResourceRequest;
 import com.clara.mcp.client.call.McpToolCall;
 import com.clara.mcp.client.call.McpToolResult;
+import com.clara.mcp.tool.ExternalToolBinding;
+import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.skill.registry.SkillRegistry;
 import org.junit.Rule;
 import org.junit.Test;

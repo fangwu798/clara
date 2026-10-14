@@ -1,4 +1,6 @@
 package com.clara.adapter.document;
+import com.clara.enums.document.DocumentFormat;
+import com.clara.enums.document.DocumentNodeType;
 
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
@@ -7,6 +9,8 @@ import com.clara.workspace.api.*;
 import java.io.*;
 import java.util.*;
 
+import com.clara.workspace.application.*;
+import com.clara.workspace.application.FileDescriptor;
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.xwpf.usermodel.*;
@@ -15,7 +19,7 @@ import org.apache.poi.xwpf.usermodel.*;
  * 将POIWord文档数据解析为领域对象。
  */
 public final class PoiWordDocumentParser implements DocumentParser {
-    public boolean supports(com.clara.workspace.api.FileDescriptor f) {
+    public boolean supports(FileDescriptor f) {
         String p = f.getRelativePath().toLowerCase(Locale.ROOT);
         return p.endsWith(".docx") || p.endsWith(".doc");
     }

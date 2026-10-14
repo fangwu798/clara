@@ -2,7 +2,7 @@
 
 Clara 是一套面向 Java 8 的 AI 应用运行时库。它提供模型调用、会话记忆、MCP 客户端、工作流编排、任务规划、技能注册与执行、工作区文档读写与媒体生成等能力，并拆分为可独立复用的 Maven 模块，便于嵌入 Java 系统。
 
-> Clara 当前是「库 + 控制台」形态，不是开箱即用的独立服务。仓库没有 Spring Boot 或 Web 容器；clara-application 提供 CLI、REST 与 SSE 三类访问边界，由宿主应用负责装配、配置、鉴权、持久化与交互 UI。
+> Clara 当前是「库 + 控制台」形态，不是开箱即用的独立服务。仓库没有 Spring Boot 或 Web 容器；clara-application 提供 CLI 与控制台访问边界，REST / SSE 等边界由宿主应用按需自建。宿主负责装配、配置、鉴权、持久化与交互 UI。
 
 ## 项目目标
 
@@ -12,54 +12,55 @@ Clara 是一套面向 Java 8 的 AI 应用运行时库。它提供模型调用�
 - 为有状态、长耗时、需要人工确认的业务提供重试、恢复与幂等能力。
 - 为网络、凭据、文件系统与工具访问建立明确安全边界。
 
-## 模块说明
+## 架构
+
+![Clara 架构总览](docs/diagrams/architecture.svg)
+
+### 模块说明
 
 | 模块 | 职责 | 主要使用场景 |
 | --- | --- | --- |
 | clara-bom | 统一管理各模块版本 | 外部项目通过 dependencyManagement 导入 |
-| clara-core | 能力/角色/协议枚举与结构化错误模型 | 所有模块的公共基础 |
-| clara-model | 调用上下文、Provider 配置、HTTP/SSE 传输、媒体资产与异步 Job | 同步/流式对话、Embedding、Token 估算与 OpenAI/DeepSeek/火山方舟/阿里云/Kimi/Anthropic 协议适配 |
+| clara-core | 能力/角色/协议及各领域枚举（含 workspace / document / cli）、结构化错误模型与跨模块契约（含媒体契约与值对象） | 所有模块的公共基础 |
+| clara-model | 调用上下文、Provider 配置、HTTP/SSE 传输、模型调用实现（协议编解码、Token 估算、嵌入） | 同步/流式对话、Embedding、Token 估算与 OpenAI/DeepSeek/火山方舟/阿里云/Kimi/Anthropic 协议适配 |
 | clara-memory | 窗口记忆、会话持久化、语义记忆 | 消息/Token 窗口裁剪、本地/JDBC 会话存储、Milvus 召回 |
-| clara-mcp | MCP 客户端、服务注册表、能力目录与传输 | stdio 或 Streamable HTTP 接入外部 MCP 工具、资源与提示词 |
-| clara-workflow | 工作流定义、DAG 执行、任务规划、预算台账、人工交互网关 | 多步骤任务、并行/条件/循环节点、失败恢复与 WAITING_INPUT 挂起 |
+| clara-mcp | MCP 客户端、服务注册表、能力目录与传输、外部工具路由 | stdio 或 Streamable HTTP 接入外部 MCP 工具、资源与提示词 |
+| clara-workflow | 工作流定义、DAG 执行、任务规划、预算台账、人工交互网关、内置动作与运行支撑 | 多步骤任务、并行/条件/循环节点、失败恢复与 WAITING_INPUT 挂起 |
 | clara-orchestration | 对话编排、上下文组装、工具往返、技能匹配 | 组合模型、记忆、技能、工具与工作流 |
 | clara-skill | 技能注册表、执行器、Schema 校验与工具执行 | 业务能力封装为可版本化、可授权的技能 |
-| clara-application | 应用装配、CLI/REST/SSE 适配器、文档解析、工作区读写 | 构建可执行 clara.jar |
+| clara-application | 应用装配、CLI 与控制台入口、文档解析、会话/工具/媒体装配 | 构建可执行 clara.jar |
 
-模块依赖关系：
+### 模块依赖
 
-```mermaid
-flowchart TD
-    core[clara-core]
-    model[clara-model] --> core
-    memory[clara-memory] --> core
-    memory --> model
-    mcp[clara-mcp] --> core
-    mcp --> model
-    workflow[clara-workflow] --> core
-    workflow --> mcp
-    skill[clara-skill] --> core
-    skill --> model
-    orchestration[clara-orchestration] --> core
-    orchestration --> model
-    orchestration --> memory
-    orchestration --> mcp
-    orchestration --> workflow
-    orchestration --> skill
-    application[clara-application] --> core
-    application --> model
-    application --> memory
-    application --> mcp
-    application --> workflow
-    application --> orchestration
-    application --> skill
-```
-
-clara-core 不依赖任何业务模块；clara-orchestration 仅通过接口使用各能力，不接触 Provider/Store/Transport 实现；clara-application 负责整体装配，业务模块不得反向依赖应用模块。
+- **clara-core 不依赖任何业务模块**，只提供契约、枚举与错误模型。
+- 各能力模块（model / memory / mcp / workflow / skill）依赖 core，并按需相互依赖（如 memory 依赖 model）。
+- **clara-orchestration 仅通过接口使用各能力**，不接触 Provider / Store / Transport 实现。
+- **clara-application 负责整体装配**，业务模块不得反向依赖应用模块。
 
 ### clara-bom 是否参与构建
 
 仓库内部由根 pom.xml 统一聚合与版本管理，clara-bom 只作为对外发布的版本清单。对外发布时建议保留；若项目永远只在仓库内使用，可删除 clara-bom 并从根 POM 的 modules 中移除。
+
+## 核心业务流程
+
+Clara 的核心业务是**对话编排**：一次用户请求依次经过「装配上下文 → 调用模型 →（若响应要求调用工具则执行工具并回填）→ 循环直至产出最终答复」。交互式对话与工作区 run / resume 最终都收敛到同一条编排链路（`DefaultConversationOrchestrator.converse`）。
+
+### 流程图
+
+![对话编排流程图](docs/diagrams/conversation-flow.svg)
+
+要点：
+
+- **循环的出口**是「响应不含工具调用」——此时才提取正文并结束本轮。
+- **工具往返**：本地技能优先、外部 MCP 工具兜底；单次工具失败以错误文本回填而不中断整轮，让模型可据错误自行修正。
+- **取消**：请求携带的取消令牌贯穿全链路，令牌置位后模型读取与脚本工具在检查点立即终止，以 CANCELLED 收尾。
+- **失败**：模型调用或工具执行异常被捕获，以 FAILED 收尾并携带结构化错误码与 traceId。
+
+### 时序图
+
+![对话编排时序图](docs/diagrams/conversation-sequence.svg)
+
+一次请求的关键交互：宿主调用编排器 → 编排器写入用户消息 → 循环内装配上下文并调用模型 → 模型返回内容或工具调用 → 命中工具调用时由工具往返协调器执行本地技能 / MCP 工具并回填历史 → 直到不再有工具调用，追加助手回复并返回结果。
 
 ## 构建要求
 
@@ -152,14 +153,13 @@ run.bat
 java -jar clara.jar run --workspace ./business-data --goal 汇总报表并生成结论 --write-mode preview --ui json-detached --output json
 ```
 
-run 会分析工作区目录、识别意图并规划执行；需要用户确认时会挂起并等待 resume 提交答案。
+内置 runner 会把 `--goal` 作为本轮用户输入转发给对话编排器，以 `--run-id` 作为会话标识。`--write-mode` / `--approve-changes` 等选项会被解析与校验，但**内置 runner 当前不执行工作区文件读写**（工作区变更集能力不在本仓库装配范围内，见「工作区文件」）。需要用户确认时由上层返回 `WAITING_INPUT`，再经 resume 提交答案。
 
-## CLI、REST 与 SSE 访问边界
+## CLI 访问边界
 
 - ClaraCli 接收已装配的 WorkspaceBusinessRunner，负责参数解析与执行。
-- WorkspaceRunController 是与 Web 框架无关的控制器骨架，可映射为 HTTP 路由。
-- WorkspaceRunSseAdapter 将执行过程与交互请求转为带序号的事件流。
-- TUI 未实现，选择 tui 会提示并回退到 plain 文本模式。
+- UI 模式：`plain` 纯文本、`json-detached` 一次性 JSON、`json-stream` NDJSON 双向流；TUI 未实现，选择 tui 会提示并回退到 plain 文本模式。
+- 仓库不提供 REST / SSE 适配器；需要 HTTP 边界的宿主可基于 WorkspaceBusinessRunner 自行实现。
 
 ### CLI 命令
 
@@ -205,7 +205,7 @@ run 会分析工作区目录、识别意图并规划执行；需要用户确认�
 | 5 | 权限拒绝 |
 | 6 | 外部模型/MCP 不可用 |
 
-REST 与 CLI 能力面一致；当前 REST 骨架未含认证、授权、限流与租户隔离，宿主接入前应补齐。
+宿主若基于 WorkspaceBusinessRunner 自建 REST / SSE 边界，需自行补齐认证、授权、限流与租户隔离。
 
 ## 模型 Provider 配置
 
@@ -327,6 +327,7 @@ Clara 使用 ClaraException 携带结构化 ClaraError，主要字段：
 
 注意事项：
 
+- 集合名默认按「项目名 + `_conversations`」生成（即按项目隔离）：项目名取「工作目录的目录名」——优先启动脚本注入的 `CLARA_WORK_DIR`，未注入时用进程当前工作目录，即「从哪个目录启动，就以该目录名为项目名」。**Milvus 集合名只允许 ASCII（字母 / 数字 / 下划线）**，故目录名含中文等非 ASCII 字符时会用拼音转写为英文（如 `我的项目 → wodexiangmu`），其余非法字符折叠为下划线；转写后仍为空时退化为 `p + 目录路径哈希前 12 位`。不同项目使用各自独立的集合，避免互相串数据；也可在 `milvus.collection` 显式指定固定集合名。
 - `milvus.dimension` 必须与嵌入模型输出维度一致；默认离线占位嵌入 `HashingEmbeddingClient` 为 1024，换真实嵌入模型时同步修改，并保证入库与检索用同一模型。
 - 不写 `milvus` 节点、或写 `enabled: false` 时保持原样：语义记忆用进程内实现，不写对话记录。
 - Milvus 连不上时启动会提示并回退为进程内实现（本次不写对话记录），不阻断对话。
@@ -403,10 +404,10 @@ clara-skill 将业务能力封装为可注册、可校验、可执行的技能�
 
 ### 工作区文件
 
-- 路径先规范化并校验位于根目录内，拒绝 .. 越界。
+- 路径需规范化并校验位于根目录内，拒绝 .. 越界。
 - 默认忽略 .git、.svn、target、node_modules 等目录。
-- 写入必须走变更集（ChangeSet）流程：预览、校验、授权、应用。
-- 默认写模式 preview，真实写入需 apply 且显式批准。
+- 写模式语义：`read-only` 只读、`preview` 仅生成预览、`apply` 真实写入且需显式批准（`--approve-changes`）。
+- 说明：内置 runner 当前只消费 `goal` 作为对话输入，**尚未接线工作区文件读写**；`--workspace` / `--write-mode` / `--approve-changes` 会被解析与校验，但不会触发实际文件变更。
 
 ### 文档解析
 
@@ -414,7 +415,7 @@ clara-skill 将业务能力封装为可注册、可校验、可执行的技能�
 
 ### 媒体生成
 
-图片/语音/视频生成使用带租户隔离的异步任务接口，通过媒体 Job 完成提交、轮询与结果落盘。媒体资产写入受控存储，不直接暴露临时 URL；回调校验签名、租户与实例状态；单机可用本地存储，多实例需共享存储。
+图片生成（工作流 AGENT 节点声明 `capability: IMAGE`）的产物会落成媒体资产；视频生成由 CLI 的 `image` / `video` 子命令经 `VideoGenerationClient` 完成提交与轮询。媒体资产写入受控存储（单机为工作区下 `.clara/assets`），不直接暴露临时 URL。
 
 ## 作为依赖引入
 
@@ -490,6 +491,7 @@ clara/
 |-- clara-application/         # 应用装配、CLI/REST/SSE、文档解析
 |-- config/                    # 模型 Provider、MCP、技能与工作流配置
 |-- docs/                      # 架构、业务、技术设计与迁移记录
+|   `-- diagrams/              # 架构图与核心业务流程图 / 时序图（SVG）
 |-- deploy/                    # Milvus docker-compose 部署配置
 |-- sample/                    # 示例应用工程（clara-sample，独立 Maven 工程，不纳入根 POM）
 |-- run.bat / run.sh           # 启动脚本

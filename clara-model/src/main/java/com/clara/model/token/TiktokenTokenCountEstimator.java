@@ -22,8 +22,7 @@ import java.util.Optional;
 /**
  * 基于真实 BPE tokenizer（jtokkit / tiktoken 词表）的 token 估算器，实现 {@link ITokenCountEstimator}。
  *
- * <p>是什么、在哪一层：{@code clara-model} 的 token 估算实现（{@code com.clara.model.token}），作为
- * {@link HeuristicTokenCountEstimator} 的精确替代。core 只定义契约，这里落地按模型 / 平台选择编码
+ * <p>token 估算实现（{@code com.clara.model.token}）。core 只定义契约，这里落地按模型 / 平台选择编码
  * （{@code cl100k_base}、{@code o200k_base} 等）的真实分词计数。jtokkit 纯 Java、零依赖、兼容 Java 8，
  * 内置各编码的 BPE 词表资源，无需网络与手写词表。
  *

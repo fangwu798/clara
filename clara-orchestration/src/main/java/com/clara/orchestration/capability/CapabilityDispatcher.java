@@ -1,13 +1,13 @@
 package com.clara.orchestration.capability;
 
 import com.clara.enums.CapabilityKindEnum;
-import com.clara.kernel.api.IStreamModel;
+import com.clara.core.model.IStreamModel;
 import com.clara.core.model.IResponse;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ImageItem;
-import com.clara.kernel.stream.IStreamHandle;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamHandle;
+import com.clara.core.model.IStreamObserver;
 import com.clara.orchestration.OrchestrationErrors;
 
 import java.util.ArrayList;

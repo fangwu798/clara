@@ -1,7 +1,7 @@
 package com.clara.skill.tool.script;
 
 import com.clara.skill.SkillErrors;
-import com.clara.skill.tool.IScriptExecutor;
+import com.clara.api.IScriptExecutor;
 import com.clara.skill.tool.ScriptExecutionSpec;
 
 import java.io.File;

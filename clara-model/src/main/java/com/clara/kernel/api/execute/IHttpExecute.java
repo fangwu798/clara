@@ -5,8 +5,8 @@ import com.clara.core.model.IRequest;
 import com.clara.core.model.IResponse;
 import com.clara.dto.model.RawHttpResponse;
 import com.clara.kernel.http.execute.StreamHandle;
-import com.clara.kernel.stream.IStreamHandle;
-import com.clara.kernel.stream.IStreamObserver;
+import com.clara.core.model.IStreamHandle;
+import com.clara.core.model.IStreamObserver;
 import com.clara.kernel.message.provider.ProviderResponseDecoder;
 
 /**

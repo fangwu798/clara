@@ -71,8 +71,7 @@ public final class SessionCommandHandler {
      * @param session  会话级模型状态，不可为 null
      * @param controls 会话级上下文控制（压缩 / 新建对话）；可为 null（此时这两条指令不生效）
      */
-    public SessionCommandHandler(ConsoleView view, BufferedReader reader, ModelSession session,
-            ConversationControls controls) {
+    public SessionCommandHandler(ConsoleView view, BufferedReader reader, ModelSession session, ConversationControls controls) {
         this.view = view;
         this.reader = reader;
         this.session = session;

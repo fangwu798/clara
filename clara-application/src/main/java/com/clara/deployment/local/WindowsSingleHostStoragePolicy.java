@@ -1,10 +1,8 @@
 package com.clara.deployment.local;
 
 import com.clara.media.filesystem.FileSystemMediaStoreConfig;
-import com.clara.media.job.callback.MediaCallbackSecurityPolicy;
-import com.clara.media.job.local.LocalMediaJobStoreConfig;
 import com.clara.media.validation.MediaValidationPolicy;
-import com.clara.workspace.api.WorkspacePolicy;
+import com.clara.workspace.application.WorkspacePolicy;
 
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -34,8 +32,6 @@ public final class WindowsSingleHostStoragePolicy {
     public static final int WORKSPACE_MAX_FILES = 20000;
     public static final long WORKSPACE_MAX_FILE_BYTES = 32L * MIB;
     public static final long WORKSPACE_MAX_TOTAL_BYTES = 1L * GIB;
-    public static final int MEDIA_JOB_MAX_ENTRIES = 10000;
-    public static final long MEDIA_JOB_MAX_STATE_BYTES = 16L * MIB;
 
     public static final long CONVERSATION_RETENTION_MILLIS = 90L * DAY_MILLIS;
     public static final long TERMINAL_JOB_RETENTION_MILLIS = 90L * DAY_MILLIS;
@@ -68,15 +64,6 @@ public final class WindowsSingleHostStoragePolicy {
 
     public FileSystemMediaStoreConfig mediaStoreConfig() {
         return new FileSystemMediaStoreConfig(workspaceRoot, mediaValidationPolicy);
-    }
-
-    public LocalMediaJobStoreConfig mediaJobStoreConfig() {
-        return new LocalMediaJobStoreConfig(workspaceRoot, workspaceId,
-                MEDIA_JOB_MAX_ENTRIES, MEDIA_JOB_MAX_STATE_BYTES);
-    }
-
-    public MediaCallbackSecurityPolicy mediaCallbackSecurityPolicy() {
-        return new MediaCallbackSecurityPolicy(5L * 60L * 1000L, (int) MIB, 256, 128, 100000);
     }
 
     public WorkspacePolicy workspacePolicy() {
