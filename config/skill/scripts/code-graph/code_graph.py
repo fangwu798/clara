@@ -13,6 +13,10 @@
 - 其余 op（index/status/search/outline/snippet/trace/query）是图谱能力的直通调用，
   给工作流与模型在「需要结构化信息」时使用。
 
+图谱可以装在宿主，也可以跑在容器里（见 deploy/codebase-memory-mcp）：容器部署的注册项是
+`docker exec -i <容器> codebase-memory-mcp`，本脚本识别这种形态后原样带上 docker exec 前缀执行，
+并按 CLARA_CBM_REPO（宿主仓库目录 ↔ 容器内 /work/repo）换算路径、按 CLARA_CBM_PROJECT 定位项目名。
+
 调用方式与其它工具脚本一致：stdin 读 JSON 入参，stdout 打印 JSON 结果；
 图谱二进制与图谱不存在时不会报错退出，而是按「图谱不可用」处理（read 自动回退文件）。
 """
@@ -39,7 +43,7 @@ _TOOL = {
     "id": "code_graph",
     "name": "code_graph",
     "type": "PYTHON",
-    "description": "代码知识图谱工具：读代码时优先使用本工具（图谱里能拿到文件大纲、符号定义、调用关系，token 开销远小于整文件读取）；图谱未覆盖或不可用时 op=read 会自动回退为本地文件读取；.md/.txt 这类散文文件不走图谱、直接返回原文。入参 JSON：op(index|status|search|outline|snippet|trace|query|read)、file_path(仓库相对路径，outline 用)、paths(路径或通配列表，read 用；元素可写 * ? [ ] 与 ** 递归)、pattern(名字 / 文本片段，search 用)、label(节点标签，如 Function / Class)、qualified_name(限定名，snippet 用)、function_name(函数名，trace 用)、direction(inbound|outbound|both，trace 用；inbound 查调用方、outbound 查被调用方)、depth(1-15，trace 用)、query(只读 Cypher，query 用)、project(图谱中的项目名，缺省按当前分析目录匹配)、repo_path(索引目标目录，index 用，缺省为当前分析目录)、max_bytes(单文件回退读取的截断字节，默认 20000)、max_files(展开后读取的文件数上限，默认 200)。返回：{op, source(graph|file|graph+file), files:[{path, source, outline|content}], ...}；其中 source 明确标注每条信息来自图谱还是本地文件。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
+    "description": "代码知识图谱工具：读代码时优先使用本工具（图谱里能拿到文件大纲、符号定义、调用关系，token 开销远小于整文件读取）；图谱未覆盖或不可用时 op=read 会自动回退为本地文件读取；.md/.txt 这类散文文件不走图谱、直接返回原文。入参 JSON：op(index|status|search|outline|snippet|trace|query|read)、file_path(仓库相对路径，outline 用)、paths(路径或通配列表，read 用；元素可写 * ? [ ] 与 ** 递归)、pattern(名字 / 文本片段，search 用)、label(节点标签，如 Function / Class)、qualified_name(限定名，snippet 用)、function_name(函数名，trace 用)、direction(inbound|outbound|both，trace 用；inbound 查调用方、outbound 查被调用方)、depth(1-15，trace 用)、query(只读 Cypher，query 用)、project(图谱中的项目名；缺省按当前分析目录匹配，容器部署时取环境变量 CLARA_CBM_PROJECT)、repo_path(索引目标目录，index 用，缺省为当前分析目录)、max_bytes(单文件回退读取的截断字节，默认 20000)、max_files(展开后读取的文件数上限，默认 200)。返回：{op, source(graph|file|graph+file), files:[{path, source, outline|content}], ...}；其中 source 明确标注每条信息来自图谱还是本地文件。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
     "parameters": {
         "type": "object",
         "properties": {
@@ -79,10 +83,21 @@ WORK_ROOT = os.environ.get("CLARA_WORK_DIR") or REPO_ROOT
 # 仓库根相对前缀：与本仓库其它脚本（file_ops / dir_tree）保持一致，便于按 @repo 读取随应用发布的文件。
 REPO_PREFIX = "@repo"
 
-# 图谱二进制的位置来源：环境变量 → config/mcp 的 MCP 注册项 → PATH。三者都取不到即视为「图谱不可用」。
+# 图谱命令的位置来源：环境变量 → config/mcp 的 MCP 注册项 → PATH。三者都取不到即视为「图谱不可用」。
 BINARY_ENV = "CLARA_CBM_BINARY"
 MCP_CONFIG_DIR = os.path.join(REPO_ROOT, "config", "mcp")
 SERVER_KEY = "codebase-memory-mcp"
+
+# 项目名来源（可选）：容器部署时容器内的项目根固定是挂载点、宿主路径匹配不上，只能靠它把项目钉住。
+PROJECT_ENV = "CLARA_CBM_PROJECT"
+
+# 容器部署的路径映射：容器内的仓库固定挂在 CONTAINER_REPO_MOUNT，宿主侧对应目录写在 REPO_ENV。
+# 有这对映射，才能把宿主路径换算成容器内路径（建索引）与把容器内的项目根换回宿主路径（算相对路径）。
+CONTAINER_REPO_MOUNT = "/work/repo"
+REPO_ENV = "CLARA_CBM_REPO"
+
+# 容器命令的宿主侧入口：注册项形如 `docker exec -i <容器> codebase-memory-mcp` 时整条带上前缀执行。
+DOCKER_COMMANDS = ("docker", "podman")
 
 # trace_path 的 --direction 只认 inbound / outbound / both：同时接受「调用方 / 被调用方」这类通俗说法，
 # 免得工作流或模型按直觉传 callers / callees 时整条命令被 CLI 判成非法入参而白白失败一次。
@@ -128,6 +143,8 @@ def resolve(path, base):
     if path and path.startswith(REPO_PREFIX):
         rest = path[len(REPO_PREFIX):].lstrip("/\\")
         return os.path.join(REPO_ROOT, rest) if rest else REPO_ROOT
+    # 容器内路径（/work/repo/...）按挂载映射换回宿主路径：模型可能把上一轮结果里的容器路径原样传回来。
+    path = host_path(path)
     root = resolve_root(base)
     if not path:
         return root
@@ -166,8 +183,9 @@ def graph_relative(path, root):
     return relative.replace("\\", "/")
 
 
-def config_binary():
-    # 从 config/mcp/*.json 里取本服务端注册的 command[0]：安装脚本会把绝对路径写在这里，脚本据此复用同一份配置。
+def config_command():
+    # 从 config/mcp/*.json 里取本服务端注册的完整命令：安装脚本把二进制绝对路径或容器命令写在这里，
+    # 脚本据此复用同一份配置（宿主安装给路径，容器部署给 docker exec 前缀）。
     if not os.path.isdir(MCP_CONFIG_DIR):
         return None
     for name in sorted(os.listdir(MCP_CONFIG_DIR)):
@@ -186,27 +204,63 @@ def config_binary():
             continue
         command = entry.get("command")
         if isinstance(command, list) and command:
-            candidate = str(command[0]).strip()
+            parts = [str(part).strip() for part in command]
         elif isinstance(command, str) and command.strip():
-            candidate = command.strip()
+            parts = [command.strip()]
         else:
             continue
-        if candidate:
-            return candidate
+        # 注册格式把参数放在 args（与 command 分开）时合并进来，命令行才算完整。
+        extra = entry.get("args")
+        if isinstance(extra, list):
+            parts += [str(part).strip() for part in extra]
+        parts = [part for part in parts if part]
+        if parts:
+            return parts
     return None
 
 
-def resolve_binary():
-    # 返回可执行的图谱二进制路径；找不到返回 None（调用方按「图谱不可用」处理，不报错）。
-    for candidate in (os.environ.get(BINARY_ENV), config_binary(), "codebase-memory-mcp"):
-        if not candidate:
-            continue
-        if os.path.isfile(candidate):
-            return candidate
-        found = shutil.which(candidate)
+def docker_exec_runner(parts):
+    # 识别注册项里的容器形态 `docker exec [-i] <容器> <命令...>`；返回 None 表示这不是一条容器命令。
+    if len(parts) < 4 or os.path.splitext(os.path.basename(parts[0]))[0].lower() not in DOCKER_COMMANDS:
+        return None
+    if parts[1].lower() != "exec":
+        return None
+    index = 2
+    while index < len(parts) and parts[index].startswith("-"):
+        index += 1
+    return parts if index + 1 < len(parts) else None
+
+
+def resolve_runner():
+    """返回执行图谱命令的 argv 前缀，取不到返回 None（调用方按「图谱不可用」处理，不报错）。
+
+    两种形态：本地二进制 `[<路径>]`，与容器部署 `["docker", "exec", "-i", <容器>, "codebase-memory-mcp"]`；
+    后者宿主没有二进制，只能整条命令带着 docker exec 前缀跑（容器内进程由 docker 拉起）。
+    """
+    explicit = (os.environ.get(BINARY_ENV) or "").strip()
+    parts = None
+    if explicit:
+        if os.path.isfile(explicit):
+            return [explicit]
+        found = shutil.which(explicit)
         if found:
-            return found
-    return None
+            return [found]
+        # 也允许把整条命令写进环境变量（容器部署常见：docker exec -i <容器> codebase-memory-mcp）；
+        # 只在整串既不是文件也不是命令时才按空白拆，避免拆坏含空格的路径。
+        if len(explicit.split()) > 1:
+            parts = explicit.split()
+    parts = parts or config_command()
+    if parts:
+        if docker_exec_runner(parts):
+            # 容器命令的宿主侧入口仍是 PATH 里的 docker 客户端。
+            return [shutil.which(parts[0]) or parts[0]] + parts[1:]
+        if os.path.isfile(parts[0]):
+            return parts
+        found = shutil.which(parts[0])
+        if found:
+            return [found] + parts[1:]
+    found = shutil.which("codebase-memory-mcp")
+    return [found] if found else None
 
 
 def clean_text(text):
@@ -216,7 +270,7 @@ def clean_text(text):
     return "\n".join(lines).strip()
 
 
-def run_cli(binary, tool, flags=None, payload=None, timeout=CLI_TIMEOUT_SECONDS, format_json=True):
+def run_cli(runner, tool, flags=None, payload=None, timeout=CLI_TIMEOUT_SECONDS, format_json=True):
     """执行一次 `codebase-memory-mcp cli <tool>`，返回 (ok, 文本)。
 
     参数优先用命令行开关（与官方 README 中的示例一致）；开关调用失败时再用「stdin 传 JSON 入参」重试一次
@@ -237,7 +291,7 @@ def run_cli(binary, tool, flags=None, payload=None, timeout=CLI_TIMEOUT_SECONDS,
     for args, stdin_text in attempts:
         try:
             completed = subprocess.run(
-                [binary] + args,
+                list(runner) + args,
                 input=stdin_text,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -250,8 +304,8 @@ def run_cli(binary, tool, flags=None, payload=None, timeout=CLI_TIMEOUT_SECONDS,
             last_error = str(exception)
             continue
         if completed.returncode == 0:
-            return True, clean_text(completed.stdout)
-        last_error = clean_text(completed.stderr or completed.stdout) or ("exit " + str(completed.returncode))
+            return True, hostify(clean_text(completed.stdout))
+        last_error = hostify(clean_text(completed.stderr or completed.stdout)) or ("exit " + str(completed.returncode))
     return False, last_error
 
 
@@ -272,8 +326,8 @@ def as_json(text):
         return None
 
 
-def list_projects(binary):
-    ok, text = run_cli(binary, "list_projects")
+def list_projects(runner):
+    ok, text = run_cli(runner, "list_projects")
     if not ok:
         return []
     payload = as_json(text)
@@ -291,6 +345,48 @@ def canonical_path(path):
     except (OSError, ValueError):
         resolved = path
     return os.path.normcase(os.path.normpath(resolved))
+
+
+def is_container_runner(runner):
+    # 判断这条命令是不是容器形态：容器里没有宿主的仓库路径，路径换算规则不同。
+    return bool(runner) and os.path.splitext(os.path.basename(runner[0]))[0].lower() in DOCKER_COMMANDS
+
+
+def host_path(path):
+    # 把容器内路径换回宿主路径：容器部署时图谱认的是挂载点（/work/repo），宿主上的同一个文件在
+    # REPO_ENV 声明的目录下。换算成宿主路径有两个用处：把项目根换算成宿主目录才能算出仓库相对路径；
+    # 结果里的路径也必须是宿主路径，否则模型会拿着 /work/repo/... 去读文件，那边根本不存在。
+    host = os.environ.get(REPO_ENV)
+    if not path or not host:
+        return path
+    if path != CONTAINER_REPO_MOUNT and not path.startswith(CONTAINER_REPO_MOUNT + "/"):
+        return path
+    rest = path[len(CONTAINER_REPO_MOUNT):].strip("/")
+    return os.path.join(host, *rest.split("/")) if rest else host
+
+
+def hostify(text):
+    # 结果文本里的容器内路径换回宿主路径（正斜杠写法，避免 JSON 里再转义一层）。
+    host = os.environ.get(REPO_ENV)
+    if not text or not host:
+        return text
+    return text.replace(CONTAINER_REPO_MOUNT + "/", host.replace("\\", "/").rstrip("/") + "/")
+
+
+def container_path(path):
+    # 把宿主路径换算成容器内路径（建索引用）：不在挂载目录内时返回 None，由调用方给出提示。
+    host = os.environ.get(REPO_ENV)
+    if not path or not host:
+        return None
+    try:
+        relative = os.path.relpath(path, host)
+    except ValueError:
+        return None
+    if relative == os.curdir:
+        return CONTAINER_REPO_MOUNT
+    if relative.startswith(os.pardir):
+        return None
+    return CONTAINER_REPO_MOUNT + "/" + relative.replace("\\", "/")
 
 
 def project_root(project):
@@ -311,7 +407,7 @@ def match_project(projects, wanted):
     for project in projects:
         if not isinstance(project, dict):
             continue
-        root = project_root(project)
+        root = host_path(project_root(project))
         if not root:
             continue
         canonical = canonical_path(root)
@@ -324,18 +420,20 @@ def match_project(projects, wanted):
     return fallback
 
 
-def project_of(spec, binary):
+def project_of(spec, runner):
     # 图谱的多数工具都要求 --project：显式给了就用它（此时项目根未知，路径只能按当前分析目录换算），
     # 否则按「索引根 = 当前分析目录」自动匹配；返回 {"name", "root"}，匹配不到返回 None 由调用方回退。
-    if not binary:
+    if not runner:
         return None
-    explicit = spec.get("project")
-    projects = list_projects(binary)
+    explicit = spec.get("project") or os.environ.get(PROJECT_ENV)
+    projects = list_projects(runner)
     if explicit:
+        # 名字在图谱里不存在时直接当「没有图谱可用」：硬用这个名字会让每个文件都白跑一次 CLI
+        # 才发现图谱里没有它，反而比老老实实读文件慢得多。
         for project in projects:
             if isinstance(project, dict) and project.get("name") == explicit:
-                return {"name": explicit, "root": project_root(project)}
-        return {"name": explicit, "root": None}
+                return {"name": explicit, "root": host_path(project_root(project))}
+        return None
     return match_project(projects, canonical_path(WORK_ROOT))
 
 
@@ -396,10 +494,10 @@ def local_read(path, max_bytes):
     return {"content": text}
 
 
-def graph_outline(binary, project_name, rel_path):
+def graph_outline(runner, project_name, rel_path):
     # 取单个文件的声明大纲；该文件不在图谱里（未索引 / 被忽略 / 索引范围外）时返回 None，由调用方回退读文件；图谱认得该文件、却给不出任何声明时同样返回 None。
     flags = ["--project", project_name, "--file-path", rel_path]
-    ok, text = run_cli(binary, "get_file_outline", flags, {"project": project_name, "file_path": rel_path})
+    ok, text = run_cli(runner, "get_file_outline", flags, {"project": project_name, "file_path": rel_path})
     if not ok:
         return None
     payload = as_json(text)
@@ -421,22 +519,41 @@ def graph_outline(binary, project_name, rel_path):
         return stripped
 
 
-def op_index(spec, binary):
+def op_index(spec, runner):
     repo_path = os.path.abspath(resolve(spec.get("repo_path") or "", spec.get("base_dir") or ""))
     if not os.path.isdir(repo_path):
         return {"op": "index", "error": "目录不存在：" + repo_path}
+    # 容器部署时容器里没有宿主路径，只能索引挂在容器内的那一份（映射见 REPO_ENV）。
+    mount = container_path(repo_path)
+    target = mount or repo_path
+    if mount is None and is_container_runner(runner):
+        return {"op": "index", "repo_path": repo_path,
+                "error": ("容器部署只挂了 " + os.environ.get(REPO_ENV, CONTAINER_REPO_MOUNT) + " 这一个目录，"
+                          "这个路径在容器里不存在；改 deploy/codebase-memory-mcp/.env 的 CLARA_CBM_REPO "
+                          "并重跑 docker compose up -d 后再索引。")}
+    # 项目名固定传下去：容器内项目根是挂载点，默认命名会退化成目录名（如 repo），
+    # 与 CLARA_CBM_PROJECT 对不上就查不到图谱。
+    name = spec.get("project") or os.environ.get(PROJECT_ENV)
+    flags = ["--repo-path", target]
+    payload = {"repo_path": target}
+    if name:
+        flags += ["--name", name]
+        payload["name"] = name
     # index_repository 没有 --format 开关，带上会被 CLI 判成未知开关，故关掉自动拼接。
-    ok, text = run_cli(binary, "index_repository", ["--repo-path", repo_path], {"repo_path": repo_path},
+    ok, text = run_cli(runner, "index_repository", flags, payload,
                        timeout=INDEX_TIMEOUT_SECONDS, format_json=False)
-    return {"op": "index", "repo_path": repo_path, "ok": ok, "result": as_json(text) or text}
+    result = {"op": "index", "repo_path": target, "ok": ok, "result": as_json(text) or text}
+    if target != repo_path:
+        result["host_repo_path"] = repo_path
+    return result
 
 
-def simple_op(op, tool, flags, payload, binary, timeout=CLI_TIMEOUT_SECONDS):
-    ok, text = run_cli(binary, tool, flags, payload, timeout=timeout)
+def simple_op(op, tool, flags, payload, runner, timeout=CLI_TIMEOUT_SECONDS):
+    ok, text = run_cli(runner, tool, flags, payload, timeout=timeout)
     return {"op": op, "ok": ok, "result": as_json(text) or text}
 
 
-def op_read(spec, binary):
+def op_read(spec, runner):
     paths = spec.get("paths") or ([spec.get("path")] if spec.get("path") else [])
     if isinstance(paths, str):
         paths = [paths]
@@ -447,7 +564,7 @@ def op_read(spec, binary):
     max_bytes = int(spec.get("max_bytes") or DEFAULT_MAX_BYTES)
     targets = expand_targets(paths, base, max_files)
 
-    project = project_of(spec, binary)
+    project = project_of(spec, runner)
     project_name = project.get("name") if project else None
     project_root = project.get("root") if project else None
     files = []
@@ -458,7 +575,7 @@ def op_read(spec, binary):
         graph_path = graph_relative(absolute, project_root) or rel
         outline = None
         if project_name and not is_prose(absolute):
-            outline = graph_outline(binary, project_name, graph_path)
+            outline = graph_outline(runner, project_name, graph_path)
         if outline is not None:
             files.append({"path": rel, "source": "graph", "outline": outline})
             from_graph += 1
@@ -475,12 +592,13 @@ def op_read(spec, binary):
         note = "以上信息全部来自本地代码知识图谱（op=outline 可看原始声明清单）。"
     elif from_graph == 0:
         source = "file"
-        if binary is None:
+        if runner is None:
             note = ("图谱不可用（未安装 / 未配置 CLARA_CBM_BINARY 或 config/mcp），已全部回退为本地文件读取；"
                     "需要图谱能力请先执行 deploy/codebase-memory-mcp/install.ps1。")
         elif not project_name:
-            note = ("图谱里没有匹配当前分析目录的项目，已全部回退为本地文件读取；"
-                    "可先 op=index 索引当前目录，或用 project 显式指定项目名。")
+            note = ("图谱里没有匹配的项目（当前分析目录未索引，或指定的项目名不存在），"
+                    "已全部回退为本地文件读取；可先 op=index 索引当前目录，"
+                    "或用 project / " + PROJECT_ENV + " 指定 list_projects 返回的项目名。")
         else:
             note = "图谱未覆盖这些文件（多为未索引的新文件），已回退为本地文件读取。"
     else:
@@ -489,7 +607,7 @@ def op_read(spec, binary):
 
     result = {"op": "read", "source": source, "targets": len(targets),
               "graph_files": from_graph, "files": files, "note": note,
-              "project": project_name, "graph_available": bool(binary)}
+              "project": project_name, "graph_available": bool(runner)}
     if len(targets) >= max_files:
         result["truncated"] = True
     return result
@@ -506,21 +624,22 @@ def main():
         return
 
     op = (spec.get("op") or "read").strip()
-    binary = resolve_binary()
+    runner = resolve_runner()
 
     # index 之外的操作都需要图谱可用；不可用时 read 自动回退文件，其余 op 明确回报原因。
-    if binary is None and op != "read":
+    if runner is None and op != "read":
         print(json.dumps({
             "op": op, "ok": False,
-            "error": ("未找到 codebase-memory-mcp 可执行文件：请设置 " + BINARY_ENV +
+            "error": ("未找到 codebase-memory-mcp：请设置 " + BINARY_ENV +
                       "，或在 config/mcp/*.json 中注册该服务端，或把它放进 PATH；"
-                      "安装脚本见 deploy/codebase-memory-mcp/install.ps1。"),
+                      "安装脚本：宿主安装见 deploy/codebase-memory-mcp/install.ps1，"
+                      "容器部署见同目录 install-docker.ps1。"),
         }, ensure_ascii=False))
         return
 
     # 图谱的多数工具都要求 --project：入参没给时按「索引根 = 当前分析目录」自动匹配，匹配不到再退回唯一项目。
     needs_project = op in ("search", "outline", "snippet", "trace", "query")
-    project = project_of(spec, binary) if needs_project else None
+    project = project_of(spec, runner) if needs_project else None
     project_name = project.get("name") if project else None
     if needs_project and not project_name:
         print(json.dumps({
@@ -532,31 +651,31 @@ def main():
 
     try:
         if op == "read":
-            result = op_read(spec, binary)
+            result = op_read(spec, runner)
         elif op == "index":
-            result = op_index(spec, binary)
+            result = op_index(spec, runner)
         elif op == "status":
-            result = simple_op("status", "list_projects", [], None, binary)
+            result = simple_op("status", "list_projects", [], None, runner)
         elif op == "search":
             pattern = spec.get("pattern") or ""
             if spec.get("label"):
                 result = simple_op("search", "search_graph",
                                    ["--project", project_name, "--name-pattern", pattern, "--label", spec.get("label")],
-                                   {"project": project_name, "name_pattern": pattern, "label": spec.get("label")}, binary)
+                                   {"project": project_name, "name_pattern": pattern, "label": spec.get("label")}, runner)
             else:
                 result = simple_op("search", "search_code",
                                    ["--project", project_name, "--pattern", pattern],
-                                   {"project": project_name, "pattern": pattern}, binary)
+                                   {"project": project_name, "pattern": pattern}, runner)
         elif op == "outline":
             file_path = spec.get("file_path") or ""
             result = simple_op("outline", "get_file_outline",
                                ["--project", project_name, "--file-path", file_path],
-                               {"project": project_name, "file_path": file_path}, binary)
+                               {"project": project_name, "file_path": file_path}, runner)
         elif op == "snippet":
             name = spec.get("qualified_name") or ""
             result = simple_op("snippet", "get_code_snippet",
                                ["--project", project_name, "--qualified-name", name],
-                               {"project": project_name, "qualified_name": name}, binary)
+                               {"project": project_name, "qualified_name": name}, runner)
         elif op == "trace":
             function_name = spec.get("function_name") or ""
             direction = normalize_direction(spec.get("direction"))
@@ -565,12 +684,12 @@ def main():
             if spec.get("depth"):
                 flags += ["--depth", str(spec.get("depth"))]
                 payload["depth"] = spec.get("depth")
-            result = simple_op("trace", "trace_path", flags, payload, binary)
+            result = simple_op("trace", "trace_path", flags, payload, runner)
         elif op == "query":
             query = spec.get("query") or ""
             result = simple_op("query", "query_graph",
                                ["--project", project_name, "--query", query],
-                               {"project": project_name, "query": query}, binary)
+                               {"project": project_name, "query": query}, runner)
         else:
             result = {"error": "不支持的 op：" + op}
     except (OSError, subprocess.SubprocessError) as exception:

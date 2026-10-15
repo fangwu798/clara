@@ -10,7 +10,9 @@
   这类结构化查询的 token 开销远低于整文件读取。
 - Clara 侧接的是标准 MCP stdio 协议，不引入新的运行时概念：注册项写在 `config/mcp/mcp.json`。
 
-## 二、部署
+## 二、部署（装到宿主）
+
+不想在本机留安装目录、或想让索引跟着容器走，用下一节的容器部署；两者二选一即可。
 
 ```powershell
 # 在仓库根执行；默认装到 C:\clara-tools\codebase-memory-mcp（不能含空格），
@@ -40,11 +42,66 @@ powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install.ps1
 > 为什么安装目录不能含空格：Clara 的 stdio 注册会把命令行按空白拆分，含空格的路径会被拆坏
 > （见 `clara-mcp` 的 `DefaultMcpClientFactory`）。
 
-## 三、环境变量
+## 三、容器部署（Docker Compose）
+
+不想在本机留安装目录、或想让索引跟着容器走时用这条路径：宿主只保留 Docker，二进制与索引都在容器里。
+与上面的宿主安装**二选一**即可（两者都写 `config/mcp/mcp.json` 的同一个注册项，会互相覆盖）。
+
+```powershell
+# 在仓库根执行：下载 linux 产物 → 构建镜像 → 起容器 → 容器内建索引 → 写 MCP 注册项 → 设用户环境变量
+powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install-docker.ps1
+```
+
+常用开关：
+
+| 开关 | 作用 |
+| --- | --- |
+| `-RepoPath E:\work\demo` | 要索引的仓库（宿主路径），默认仓库根；容器内固定挂到 `/work/repo` |
+| `-Project clara-code-graph` | 图谱里的项目名，默认 `clara-code-graph` |
+| `-SkipIndex` | 只建镜像与容器，不建索引 |
+| `-SkipMcpConfig` | 不改 `config/mcp/mcp.json`（自己维护配置时用） |
+| `-SkipUserEnv` | 不写用户环境变量 |
+| `-ClearHostEnv` | 删掉宿主安装留下的 `CLARA_CBM_BINARY` / `CBM_CACHE_DIR` |
+| `-Version v0.11.0` | 换版本（需同时用 `CBM_ARCHIVE` 换产物名，见 `.env.example`） |
+
+### 为什么是这个形状
+
+- **MCP 服务端只讲 stdio，而 stdio 跨不了容器边界**（二进制里没有 streamable / SSE 相关实现），
+  所以容器只做「常驻 + 挂载」：图谱进程由宿主按需用
+  `docker exec -i clara-codebase-memory-mcp codebase-memory-mcp` 拉起，
+  这条命令同时就是 `config/mcp/mcp.json` 的注册项——Clara 的 stdio 传输按原样执行它，**Clara 侧零改动**。
+- **用 portable 产物**：同版本的普通 linux 产物动态链接 glibc，在 alpine（musl）里会直接以 `not found`
+  失败；portable 那份静态链接。产物由宿主脚本下载并校验 SHA256 后放进构建上下文，构建期不联网。
+- **仓库挂在 `/work/repo` 而不是顶层 `/repo`**：图谱拒绝把卷顶层当项目根
+  （`index_repository` 会报 `path is too broad to index as one root`）。
+- **路径靠 `CLARA_CBM_REPO`、项目名靠 `CLARA_CBM_PROJECT`**：容器里的项目根是 `/work/repo`，
+  与宿主路径天然对不上（按目录名还会被命名成 `repo`），`code_graph` 靠这两个变量换算路径、定位项目。
+
+### 常用命令
+
+```powershell
+# 看容器状态（healthy 才算就绪）
+docker compose -f deploy\codebase-memory-mcp\docker-compose.yml ps
+
+# 代码改动后刷新索引（也可让模型调 code_graph 的 op=index，路径与项目名会自动换算）
+docker exec clara-codebase-memory-mcp codebase-memory-mcp cli index_repository --repo-path /work/repo --name clara-code-graph
+
+# 看已索引的项目
+docker exec clara-codebase-memory-mcp codebase-memory-mcp cli list_projects --format json
+```
+
+改要分析的仓库：改 `deploy\codebase-memory-mcp\.env` 的 `CLARA_CBM_REPO` → `docker compose up -d`
+→ 重跑一次索引（重跑 `install-docker.ps1` 最省事，它会把用户环境变量一起同步）。
+清空全部索引：`docker compose -f deploy\codebase-memory-mcp\docker-compose.yml down -v`（`-v` 删数据卷）。
+拉不到 Docker Hub 时，在 `.env` 里把 `CBM_BASE_IMAGE` 指向镜像站（见 `.env.example`）。
+
+## 四、环境变量
 
 | 变量 | 作用 |
 | --- | --- |
-| `CLARA_CBM_BINARY` | 图谱二进制绝对路径；`config/skill/scripts/code-graph/code_graph.py` 用它定位 CLI |
+| `CLARA_CBM_BINARY` | 图谱二进制绝对路径（也可写整条命令，如 `docker exec -i <容器> codebase-memory-mcp`）；`config/skill/scripts/code-graph/code_graph.py` 用它定位 CLI |
+| `CLARA_CBM_PROJECT` | 图谱里的项目名；容器部署用它钉住 `/work/repo` 上的项目 |
+| `CLARA_CBM_REPO` | 宿主上哪个目录挂在容器内；容器部署由 `install-docker.ps1` 写入，code_graph 用它换算两侧路径 |
 | `CBM_CACHE_DIR` | 可选的图谱数据目录，默认 `%USERPROFILE%\.cache\codebase-memory-mcp`；见下方说明 |
 | `CLARA_MCP_ALLOWED_EXECUTABLES` | 额外允许以 stdio 启动的可执行文件（分号或逗号分隔），一般不用设 |
 | `CBM_ALLOWED_ROOT` | 限制 `index_repository` 只能索引该目录以下的仓库（多租户 / 不可信调用方场景） |
@@ -56,7 +113,7 @@ powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install.ps1
 > `secure CLI coordination could not be created (cache-private)` 失败退出。用默认位置最省事；
 > 确实要自定义，就得先断开该目录的权限继承，只保留 `Administrators` / `SYSTEM`。
 
-## 四、Clara 侧的接入方式
+## 五、Clara 侧的接入方式
 
 - 注册与发现：`config/mcp/mcp.json` 的 `mcpServers` 条目 → `ApplicationBootstrap.loadMcpServers()`
   在启动时注册、发现并登记工具；启动横幅会打印 `mcp : N 个服务端 / M 个外部工具`。
@@ -68,9 +125,11 @@ powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install.ps1
 - 工作流：`analyze_repo_docs`、`design_business_solution` 的读取节点已改为 `code_graph`（图谱优先 + 自动回退）。
 - 会话提示：`config/skill/prompt/code_graph_guide.json` 约定「先查图谱、再回退文件、最后才整文件读取」。
 
-## 五、日常维护
+## 六、日常维护
 
 ```powershell
+# 容器部署时把 `& $env:CLARA_CBM_BINARY` 换成 `docker exec clara-codebase-memory-mcp codebase-memory-mcp`。
+
 # 代码改动后刷新图谱（也可让模型调用 code_graph 的 op=index）
 & $env:CLARA_CBM_BINARY cli index_repository --repo-path E:\workspace_self\xxxx\clara
 
@@ -84,7 +143,7 @@ powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install.ps1
 图谱数据默认在 `%USERPROFILE%\.cache\codebase-memory-mcp`（`<项目名>.db` 与 `_config.db`），
 删掉即清空全部索引；若自定义了 `CBM_CACHE_DIR`，交互式 CLI 与 `code_graph.py` 必须指向同一份。
 
-## 六、其它平台
+## 七、其它平台
 
 macOS / Linux 用官方安装脚本即可（二进制放 `~/.local/bin`）：`curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash`，
 之后把 `~/.local/bin/codebase-memory-mcp` 写进 `config/mcp/mcp.json`。

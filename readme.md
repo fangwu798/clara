@@ -311,7 +311,7 @@ clara-mcp 支持 stdio 与 Streamable HTTP，围绕注册、初始化、能力�
 
 接入 [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) 后，读代码会优先走本机知识图谱：
 
-- 部署：`deploy/codebase-memory-mcp/install.ps1` 下载二进制、写 `config/mcp/mcp.json`、设用户环境变量 `CLARA_CBM_BINARY`，并可顺带建索引；细节见 `deploy/codebase-memory-mcp/readme.md`。
+- 部署（二选一）：`deploy/codebase-memory-mcp/install.ps1` 装到宿主；`deploy/codebase-memory-mcp/install-docker.ps1` 走 Docker Compose —— 容器常驻并把待分析仓库只读挂到 `/work/repo`，宿主按 `docker exec -i <容器> codebase-memory-mcp` 调用，宿主不需要留安装目录。细节见 `deploy/codebase-memory-mcp/readme.md`。
 - 技能脚本 `config/skill/scripts/code-graph/code_graph.py`（工具名 `code_graph`）：`op=read` 对代码文件先取图谱大纲，图谱未覆盖（未索引 / 不在索引范围 / 图谱不可用）时回退本地文件读取，返回里 `source` 标明每条信息来自 `graph` 还是 `file`；`.md` / `.txt` 这类散文文件不查图谱、直接返回原文。
 - 其余 `op` 直通图谱能力：`index`（建 / 重建索引）、`status`、`search`、`outline`、`snippet`、`trace`（`inbound` 查调用方、`outbound` 查被调用方）、`query`（只读 Cypher）。
 - 会话提示 `config/skill/prompt/code_graph_guide.json` 约定「先查图谱 → 没覆盖再读文件 → 最后才整文件读取」；`analyze_repo_docs`、`design_business_solution` 两个工作流的读取节点也已改用 `code_graph`。
@@ -465,6 +465,8 @@ clara/
 |-- deploy/                    # 部署脚本与依赖编排
 |   |-- docker-compose.yml     # Milvus 等本地依赖的 docker-compose 配置
 |   `-- codebase-memory-mcp/   # 代码知识图谱 MCP 的部署脚本与说明
+|       |-- install.ps1        # 装到宿主：下载二进制、注册 MCP、建索引
+|       `-- install-docker.ps1 # 容器部署：docker compose 起容器并在容器内建索引
 |-- sample/                    # 示例应用工程（clara-sample，独立 Maven 工程，不纳入根 POM）
 |-- clara.bat / clara.sh       # 启动脚本
 `-- clara.jar                  # 构建产物

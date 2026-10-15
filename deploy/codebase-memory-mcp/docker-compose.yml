@@ -1,0 +1,44 @@
+# 代码知识图谱 MCP 的容器化部署（宿主 Clara + 容器内图谱）。
+#
+# 为什么是这个形状：codebase-memory-mcp 的 MCP 服务端只讲 stdio（已核实二进制里没有 streamable/SSE
+# 相关实现），而 stdio 没法跨容器边界。所以容器保持常驻，宿主的 Clara 用
+# `docker exec -i clara-codebase-memory-mcp codebase-memory-mcp` 把标准输入输出接到容器内进程上——
+# 这条命令同时也是 `config/mcp/mcp.json` 的注册项，Clara 的 stdio 传输按原样执行它，Clara 侧无需改代码。
+#
+# 启动：deploy\codebase-memory-mcp\install-docker.ps1（推荐，会下载产物、写 .env、建索引、写注册项）
+# 手动：复制 .env.example 为 .env 并改好 CLARA_CBM_REPO，然后 docker compose up -d --build
+#
+# 索引与查询都在 /data 卷里，仓库只读挂载，容器不写宿主仓库。
+name: clara-codebase-memory-mcp
+
+services:
+  codebase-memory-mcp:
+    build:
+      context: .
+      args:
+        BASE_IMAGE: ${CBM_BASE_IMAGE:-alpine:3.20}
+        CBM_ARCHIVE: ${CBM_ARCHIVE:-codebase-memory-mcp-linux-amd64-portable.tar.gz}
+    image: clara/codebase-memory-mcp:${CBM_VERSION:-v0.11.0}
+    container_name: clara-codebase-memory-mcp
+    # 保活：真正的图谱进程由 `docker exec -i` 按需拉起。busybox 的 sleep 认 infinity。
+    command: ["sleep", "infinity"]
+    environment:
+      # 图谱数据目录，对应下面的命名卷；不要改，改了要在 .env 里同步。
+      CBM_CACHE_DIR: /data
+    volumes:
+      # 索引（SQLite）持久化：容器重建不丢图谱，删卷即清空全部索引。
+      - cbm-data:/data
+      # 待分析仓库：容器内固定 /work/repo，只读挂载（建索引只读文件，写的是 /data）。
+      # 挂载点刻意放在普通目录下而不是顶层卷根：图谱拒绝把卷顶层（如 /repo）当项目根。
+      # CLARA_CBM_REPO 由 install-docker.ps1 写进同目录 .env；默认 ./../.. 即 Clara 仓库根。
+      - ${CLARA_CBM_REPO:-../..}:/work/repo:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "codebase-memory-mcp", "--version"]
+      interval: 60s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+
+volumes:
+  cbm-data:

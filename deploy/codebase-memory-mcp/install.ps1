@@ -85,10 +85,14 @@ Invoke-WebRequest -Uri $ZipUrl -OutFile $ZipPath -UseBasicParsing
 $expected = $null
 try {
     $checksumsUrl = ($AssetBase + "/" + $Version + "/checksums.txt")
+    # Invoke-WebRequest 对没有 charset 的响应给的是 byte[]：直接 -split 拆不出行（整段会被拼成一串数字），
+    # 校验和就静默取不到了，必须显式解码。
     $checksums = (Invoke-WebRequest -Uri $checksumsUrl -UseBasicParsing).Content
+    if ($checksums -is [byte[]]) { $checksums = [Text.Encoding]::UTF8.GetString($checksums) }
     foreach ($line in ($checksums -split "`n")) {
-        # 官方格式：<sha256>  <文件名>
-        if ($line -match "^\s*([0-9a-fA-F]{64})\s+" -and $line -match [regex]::Escape($ZipName)) {
+        # 官方格式：<sha256>  <文件名>。校验和与文件名要用同一条正则卡住：分写成两个 -match 时后一个
+        # 匹配会覆盖 $Matches，$Matches[1] 就取不到校验和了。
+        if ($line -match ("^\s*([0-9a-fA-F]{64})\s+\*?.*" + [regex]::Escape($ZipName) + "\s*$")) {
             $expected = $Matches[1].ToLower()
             break
         }
