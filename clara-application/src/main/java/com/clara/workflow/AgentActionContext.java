@@ -1,8 +1,8 @@
 package com.clara.workflow;
 
+import com.clara.config.ModelRegistry;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.orchestration.DefaultConversationOrchestrator;
-import com.clara.session.ModelRegistry;
 
 /**
  * AGENT 动作协作依赖：把创建 {@link AgentWorkflowAction} 所需的四个协作者聚为一个值对象。

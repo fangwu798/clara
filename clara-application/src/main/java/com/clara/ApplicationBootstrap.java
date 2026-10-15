@@ -1,6 +1,7 @@
 package com.clara;
 
 import com.clara.config.ConfigLocator;
+import com.clara.config.ModelRegistry;
 import com.clara.api.IBuiltinTool;
 import com.clara.memory.semantic.milvus.MilvusSettings;
 import com.clara.context.ConvContext;
@@ -64,7 +65,6 @@ import com.clara.orchestration.record.CallRecordPublisher;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
 import com.clara.record.InMemoryCallRecordSink;
-import com.clara.session.ModelRegistry;
 import com.clara.skill.executor.SkillPermissionAuthorizer;
 import com.clara.skill.executor.SkillSchemaValidator;
 import com.clara.skill.prompt.DefaultPromptProvider;
@@ -122,8 +122,8 @@ import java.util.logging.Logger;
  * <p>工作流配置化：工作流定义从 {@code config/workflow} 下的 YAML 加载（见 {@link WorkflowDefinitionRegistry}），
  * AGENT / TOOL 节点动作由 {@code AgentActionFactory} / {@code ToolActionFactory} 生成；内置工具
  * {@code run_workflow} 经 {@link WorkflowRunTool} 暴露给模型，据此以自然语言触发工作流（如读取本地目录代码
- * 并整理技术文档）。AGENT 节点所需的平台配置为会话级，由宿主在加载模型配置后经 {@link #modelRegistry()}
- * 绑定默认模型（节点可再按 {@code role} / {@code model} 指定各自的模型）。
+ * 并整理技术文档）。AGENT 节点所需的平台配置为会话级，由宿主在确定所选模型后经 {@link #modelRegistry()}
+ * 选择当前模型（节点可再按 {@code role} / {@code model} 指定各自的模型）。
  *
  * <p>自定义工作流：模型生成的流程经内置工具 {@code publish_workflow}（{@link PublishWorkflowTool}）用同一套
  * 加载器校验后写入 {@code config/workflow/custom}；运行器在每次调用前按文件签名刷新定义注册表，因此

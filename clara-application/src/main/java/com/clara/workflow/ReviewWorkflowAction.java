@@ -1,5 +1,6 @@
 package com.clara.workflow;
 
+import com.clara.config.ModelRegistry;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.dto.workflow.ExecutionScope;
@@ -9,8 +10,6 @@ import com.clara.orchestration.DefaultConversationOrchestrator;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
-import com.clara.session.ModelBinding;
-import com.clara.session.ModelRegistry;
 import com.clara.workflow.runtime.ReviewNodeOptions;
 import com.clara.workflow.runtime.WorkflowVariableResolver;
 
@@ -94,8 +93,7 @@ public final class ReviewWorkflowAction implements IWorkflowAction {
 
     private String speak(String instanceId, String role, int round, String topic, String discussion,
             boolean isFinal) {
-        ModelBinding binding = modelRegistry.resolve(role, null);
-        ProviderConfiguration configuration = binding.configuration();
+        ProviderConfiguration configuration = modelRegistry.resolve(role, null);
         configuration.getCapability(CapabilityKindEnum.CHAT);
         String model = configuration.toConfig(CapabilityKindEnum.CHAT).getModelId();
 

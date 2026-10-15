@@ -1,11 +1,11 @@
 package com.clara.workflow;
 
+import com.clara.config.ModelRegistry;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.dto.workflow.WorkflowActionSpec;
 import com.clara.orchestration.DefaultConversationOrchestrator;
-import com.clara.session.ModelRegistry;
 import com.clara.workflow.runtime.ReviewNodeOptions;
 
 /**

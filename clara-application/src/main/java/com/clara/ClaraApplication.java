@@ -7,6 +7,7 @@ import com.clara.adapter.console.SessionCommandHandler;
 import com.clara.adapter.console.UsageTrendChart;
 import com.clara.config.ConfigLocator;
 import com.clara.config.ModelAvailabilityManager;
+import com.clara.config.ModelRegistry;
 import com.clara.context.CancellationToken;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraError;
@@ -14,7 +15,6 @@ import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
-import com.clara.session.ModelSession;
 import com.clara.workflow.WorkflowCatalog;
 import com.clara.workflow.runtime.WorkflowProgress;
 
@@ -38,7 +38,7 @@ import java.util.List;
  * <p>职责边界：本类只负责**核心业务流程**——启动参数消费、模型选择决策、引导装配、会话主循环与收尾。
  * 启动参数识别交给 {@link LaunchOptions}，配置定位与读取交给 {@link ConfigLocator}，显示与日志交给
  * {@link ConsoleView}，会话内指令（退出 / 日志 / 颜色 / 切换模型）交给 {@link SessionCommandHandler}，
- * 模型状态交给 {@link ModelSession}。
+ * 模型状态交给 {@link ModelRegistry}（{@code com.clara.config}：别名解析、会话当前模型与配置生命周期）。
  *
  * <p>运行前置：
  * <ol>
@@ -97,16 +97,18 @@ public final class ClaraApplication {
      * @throws IOException 读取标准输入失败时
      */
     private static void runSession(ConsoleView view, BufferedReader reader, List<Path> candidates, ModelChoice choice, CancelKeyMonitor monitor) throws IOException {
-        try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(); ModelSession session = new ModelSession(bootstrap.modelRegistry(), candidates, choice.configPath())) {
-            SessionCommandHandler commands = new SessionCommandHandler(view, reader, session, contextControls(view, bootstrap, session));
+        try (ApplicationBootstrap bootstrap = new ApplicationBootstrap()) {
+            ModelRegistry registry = bootstrap.modelRegistry();
+            registry.select(choice.configPath());
+            SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry, candidates, contextControls(view, bootstrap, registry));
 
-            view.printBanner(bootstrap, session.providerConfig(), choice.configPath(), choice.source());
+            view.printBanner(bootstrap, registry.currentConfiguration(), choice.configPath(), choice.source());
             view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
             view.printHints(WorkflowCatalog.customSummaries());
             if (monitor.isAvailable()) {
                 view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
             }
-            loop(view, reader, bootstrap, session, commands, monitor);
+            loop(view, reader, bootstrap, registry, commands, monitor);
         } catch (RuntimeException startupFailure) {
             view.println("启动失败：" + startupFailure.getClass().getSimpleName() + ": " + startupFailure.getMessage());
             view.println("请确认：1) 所选模型配置存在且合法（当前 " + choice.configPath().toAbsolutePath() + "）；" + "2) 其 credential 声明的环境变量已设置。");
@@ -119,15 +121,15 @@ public final class ClaraApplication {
      *
      * @param view      控制台视图，非 null
      * @param bootstrap 已装配的引导器，非 null
-     * @param session   会话级模型状态（取当前平台与模型），非 null
+     * @param registry  模型注册表（取当前平台与模型），非 null
      * @return 上下文控制实现，非 null
      */
-    private static SessionCommandHandler.ConversationControls contextControls(ConsoleView view, ApplicationBootstrap bootstrap, ModelSession session) {
+    private static SessionCommandHandler.ConversationControls contextControls(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry) {
         return new SessionCommandHandler.ConversationControls() {
             @Override
             public void compressContext() {
                 try {
-                    int count = bootstrap.compressConversation(conversationId, session.providerConfig(), session.providerConfig().toConfig(CapabilityKindEnum.CHAT).getModelId());
+                    int count = bootstrap.compressConversation(conversationId, registry.currentConfiguration(), registry.currentConfiguration().toConfig(CapabilityKindEnum.CHAT).getModelId());
                     if (count <= 0) {
                         view.emit("当前上下文为空，无需压缩。", ConsoleView.ANSI_GRAY);
                     } else {
@@ -148,7 +150,7 @@ public final class ClaraApplication {
             @Override
             public void showUsage() {
                 try {
-                    String report = bootstrap.conversationUsageReport(conversationId, session.providerConfig(), session.providerConfig().toConfig(CapabilityKindEnum.CHAT).getModelId());
+                    String report = bootstrap.conversationUsageReport(conversationId, registry.currentConfiguration(), registry.currentConfiguration().toConfig(CapabilityKindEnum.CHAT).getModelId());
                     view.println(report);
                     view.println("");
                     view.println(usageTrend.render());
@@ -187,12 +189,12 @@ public final class ClaraApplication {
      * @param view      控制台视图，非 null
      * @param reader    标准输入读取器，非 null
      * @param bootstrap 已装配的引导器，非 null
-     * @param session   会话级模型状态，非 null
+     * @param registry  模型注册表（提供当前生效的平台配置），非 null
      * @param commands  会话内指令处理器，非 null
      * @param monitor   ESC 取消监听器，非 null
      * @throws IOException 读取标准输入失败时
      */
-    private static void loop(ConsoleView view, BufferedReader reader, ApplicationBootstrap bootstrap, ModelSession session, SessionCommandHandler commands, CancelKeyMonitor monitor) throws IOException {
+    private static void loop(ConsoleView view, BufferedReader reader, ApplicationBootstrap bootstrap, ModelRegistry registry, SessionCommandHandler commands, CancelKeyMonitor monitor) throws IOException {
         String line;
         while ((line = reader.readLine()) != null) {
             String input = line.trim();
@@ -205,7 +207,7 @@ public final class ClaraApplication {
             }
             if (outcome == SessionCommandHandler.Outcome.INPUT) {
                 view.logUserInput(input);
-                converse(view, bootstrap, session.providerConfig(), input, monitor);
+                converse(view, bootstrap, registry.currentConfiguration(), input, monitor);
             }
         }
     }

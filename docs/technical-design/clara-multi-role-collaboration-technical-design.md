@@ -3,6 +3,8 @@
 > 状态：待审核
 > 前置：`clara-core-contract-technical-design.md`（已审核）、`clara-workflow-service-technical-design.md`（已审核）、`clara-orchestration-service-technical-design.md`（已审核）
 > 本文分析「工作流不固定 + 多角色（同 / 异模型）+ 多角色审核讨论 + 过程中调用图片识别 / 图片生成 / 视频生成」这类业务场景的落地路径，并给出分期技术方案。命名与包结构约束以 `clara-core-contract-technical-design.md` 为准。
+>
+> 修订（2026-10-15）：§4.3 / §4.7 的类分工已收敛——`ModelBinding` 与 `ModelSession` 均并入 `ModelRegistry`（新增「会话当前模型」的选择与读取），`ModelRegistry` 迁至 `com.clara.config`（与 `ConfigLocator` 同层）；下文保留当时的设计记录，实际包名与类型以现结构为准。
 
 ## 1. 目标与场景
 

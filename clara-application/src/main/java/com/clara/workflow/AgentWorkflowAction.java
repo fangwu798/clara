@@ -10,7 +10,6 @@ import com.clara.core.model.IStreamObserver;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
-import com.clara.session.ModelBinding;
 import com.clara.workflow.runtime.AgentNodeOptions;
 import com.clara.workflow.runtime.WorkflowProgress;
 import com.clara.workflow.runtime.WorkflowVariableResolver;
@@ -116,15 +115,11 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         if (scope == null) {
             throw new IllegalArgumentException("scope must not be null");
         }
-        ModelBinding binding = context.modelRegistry().resolve(options.role(), options.modelAlias());
-        ProviderConfiguration configuration = binding.configuration();
+        ProviderConfiguration configuration = context.modelRegistry().resolve(options.role(), options.modelAlias());
         CapabilityKindEnum capability = options.capability();
         // 节点声明的能力在该平台未配置时立即失败（配置问题，不静默降级）
         configuration.getCapability(capability);
-        String model = binding.model();
-        if (blank(model)) {
-            model = configuration.toConfig(capability).getModelId();
-        }
+        String model = configuration.toConfig(capability).getModelId();
         Object instanceValue = scope.get("instanceId");
         String instanceId = instanceValue == null ? nodeId : String.valueOf(instanceValue);
         Map<String, String> resolved = resolveVars(scope);

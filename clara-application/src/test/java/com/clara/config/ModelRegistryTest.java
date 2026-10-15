@@ -1,6 +1,7 @@
-package com.clara.session;
+package com.clara.config;
 
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.kernel.config.ProviderConfiguration;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -16,12 +17,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
- * {@link ModelRegistry} 的单元测试：别名解析优先级、角色表映射、惰性加载与失败语义。
+ * {@link ModelRegistry} 的单元测试：别名解析优先级、角色表映射、会话当前模型的切换与失败语义。
  *
  * <p>夹具用临时目录下的最小平台 YAML（结构对齐仓库既有 provider 配置），不访问网络、不需要凭据。
  */
@@ -30,16 +30,18 @@ public class ModelRegistryTest {
     @Rule
     public final TemporaryFolder folder = new TemporaryFolder();
 
+    private Path alpha;
+    private Path beta;
     private ModelRegistry registry;
 
     @Before
     public void setUp() throws Exception {
-        Path alpha = write("alpha.yml", providerYaml("alpha-model"));
-        Path beta = write("beta.yml", providerYaml("beta-model"));
+        alpha = write("alpha.yml", providerYaml("alpha-model"));
+        beta = write("beta.yml", providerYaml("beta-model"));
         Map<String, String> roles = new LinkedHashMap<String, String>();
         roles.put("reviewer", "beta");
         registry = new ModelRegistry(Arrays.asList(alpha, beta), roles);
-        registry.bindDefault("alpha");
+        registry.select(alpha);
     }
 
     @After
@@ -51,10 +53,7 @@ public class ModelRegistryTest {
 
     @Test
     public void modelAliasOverridesRole() {
-        ModelBinding binding = registry.resolve("reviewer", "alpha");
-
-        assertEquals("alpha-model", modelId(binding));
-        assertNull(binding.model());
+        assertEquals("alpha-model", modelId(registry.resolve("reviewer", "alpha")));
     }
 
     @Test
@@ -68,7 +67,7 @@ public class ModelRegistryTest {
     }
 
     @Test
-    public void fallsBackToDefaultWhenUnspecified() {
+    public void fallsBackToSelectedModelWhenUnspecified() {
         assertEquals("alpha-model", modelId(registry.resolve(null, null)));
     }
 
@@ -78,23 +77,43 @@ public class ModelRegistryTest {
     }
 
     @Test
-    public void missingSelectionWithoutDefaultFails() {
+    public void missingSelectionFails() {
         ModelRegistry empty = new ModelRegistry(Collections.<Path>emptyList(), null);
         try {
             assertThrows(IllegalStateException.class, () -> empty.resolve(null, null));
+            assertThrows(IllegalStateException.class, () -> empty.currentConfiguration());
         } finally {
             empty.close();
         }
     }
 
     @Test
-    public void exposesAliasesAndDefault() {
+    public void exposesAliasesAndCurrentModel() {
         assertTrue(registry.aliases().containsAll(Arrays.asList("alpha", "beta")));
-        assertEquals("alpha", registry.defaultAlias());
+        assertEquals("alpha", registry.currentAlias());
+        assertEquals(alpha, registry.currentConfigPath());
     }
 
-    private static String modelId(ModelBinding binding) {
-        return binding.configuration().toConfig(CapabilityKindEnum.CHAT).getModelId();
+    @Test
+    public void selectingAnotherConfigSwitchesCurrentModel() {
+        registry.select(beta);
+
+        assertEquals("beta", registry.currentAlias());
+        assertEquals(beta, registry.currentConfigPath());
+        assertEquals("beta-model", modelId(registry.currentConfiguration()));
+        // 切换后未指定 role / model 的节点应退回新的当前模型
+        assertEquals("beta-model", modelId(registry.resolve(null, null)));
+    }
+
+    @Test
+    public void selectingUnknownConfigFailsFast() throws Exception {
+        Path stranger = folder.newFile("gamma.yml").toPath();
+
+        assertThrows(IllegalArgumentException.class, () -> registry.select(stranger));
+    }
+
+    private static String modelId(ProviderConfiguration configuration) {
+        return configuration.toConfig(CapabilityKindEnum.CHAT).getModelId();
     }
 
     private Path write(String name, String content) throws Exception {

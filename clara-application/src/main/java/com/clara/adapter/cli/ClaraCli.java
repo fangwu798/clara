@@ -65,8 +65,7 @@ public final class ClaraCli {
     }
 
     private WorkspaceRunResult resume(CliOptions options) throws IOException {
-        Map<String, Object> value = json.readValue(Files.readAllBytes(options.getAnswerFile()), new TypeReference<Map<String, Object>>() {
-        });
+        Map<String, Object> value = json.readValue(Files.readAllBytes(options.getAnswerFile()), new TypeReference<Map<String, Object>>() {});
         return runner.resume(resumeRequest(options, value));
     }
 

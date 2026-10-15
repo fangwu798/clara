@@ -1,9 +1,10 @@
 package com.clara.adapter.console;
 
-import com.clara.session.ModelSession;
+import com.clara.config.ModelRegistry;
 
 import java.io.BufferedReader;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * 会话内指令处理器：识别并执行交互式控制指令（退出、日志模式、颜色、切换模型）。
@@ -60,21 +61,24 @@ public final class SessionCommandHandler {
 
     private final ConsoleView view;
     private final BufferedReader reader;
-    private final ModelSession session;
+    private final ModelRegistry registry;
+    private final List<Path> candidates;
     private final ConversationControls controls;
 
     /**
      * 创建指令处理器。
      *
-     * @param view     控制台视图（用于提示与选择），不可为 null
-     * @param reader   标准输入读取器（用于 {@code /model} 交互选择），不可为 null
-     * @param session  会话级模型状态，不可为 null
-     * @param controls 会话级上下文控制（压缩 / 新建对话）；可为 null（此时这两条指令不生效）
+     * @param view       控制台视图（用于提示与选择），不可为 null
+     * @param reader     标准输入读取器（用于 {@code /model} 交互选择），不可为 null
+     * @param registry   模型注册表（解析别名、切换会话当前模型），不可为 null
+     * @param candidates 可选模型配置清单（已按可用性过滤），可为 null（此时 {@code /model} 不可用）
+     * @param controls   会话级上下文控制（压缩 / 新建对话）；可为 null（此时这两条指令不生效）
      */
-    public SessionCommandHandler(ConsoleView view, BufferedReader reader, ModelSession session, ConversationControls controls) {
+    public SessionCommandHandler(ConsoleView view, BufferedReader reader, ModelRegistry registry, List<Path> candidates, ConversationControls controls) {
         this.view = view;
         this.reader = reader;
-        this.session = session;
+        this.registry = registry;
+        this.candidates = candidates;
         this.controls = controls;
     }
 
@@ -150,13 +154,13 @@ public final class SessionCommandHandler {
     }
 
     private void switchModel() {
-        if (!session.canSwitch()) {
+        if (candidates == null || candidates.isEmpty()) {
             view.println("未发现可选模型列表（启动时以参数指定了配置文件）。");
             return;
         }
-        Path next = view.chooseModel(session.candidates(), reader);
-        session.switchTo(next);
-        view.emit("已切换模型：" + view.describe(session.providerConfig()) + "   [" + session.configPath() + "]");
+        Path next = view.chooseModel(candidates, reader);
+        registry.select(next);
+        view.emit("已切换模型：" + view.describe(registry.currentConfiguration()) + "   [" + registry.currentConfigPath() + "]");
         view.emit("");
     }
 }
