@@ -5,6 +5,7 @@ import com.clara.adapter.console.ConsoleView;
 import com.clara.adapter.console.LaunchOptions;
 import com.clara.adapter.console.SessionCommandHandler;
 import com.clara.adapter.console.UsageTrendChart;
+import com.clara.codegraph.CodeGraphConsole;
 import com.clara.config.ConfigLocator;
 import com.clara.config.ModelAvailabilityManager;
 import com.clara.config.ModelRegistry;
@@ -49,7 +50,8 @@ import java.util.List;
  *
  * <p>使用方法：主（默认）模型由 {@code config/clara.yml} 的 {@code defaultModel} 指定；未配置或未匹配到时，
  * 若存在多个模型配置会列出编号供选择，也可用首个命令行参数直接指定配置文件。进入对话后逐行输入回车发送，
- * {@code /model} 重新选择模型，{@code /log} 切换日志模式，{@code /color} 开关颜色，{@code exit} / {@code quit} 结束；
+ * {@code /model} 重新选择模型，{@code /graph} 查看代码知识图谱状态、{@code /graph import} 把当前工作目录
+ * 导入图谱，{@code /log} 切换日志模式，{@code /color} 开关颜色，{@code exit} / {@code quit} 结束；
  * 一轮执行过程中按 ESC 两次可取消本轮正在进行的模型调用与工具执行（首次 ESC 仅提示，避开误触）。
  *
  * <p>会话标识由工作目录推导，对话历史落盘在工作目录下的 {@code .clara/state/conversations}，因此<b>退出后
@@ -65,6 +67,11 @@ public final class ClaraApplication {
      * 会话级用量趋势：每轮对话后记录累计 token，供 {@code /usage} 渲染趋势图（{@code /new} 时重置）。
      */
     private static final UsageTrendChart usageTrend = new UsageTrendChart();
+
+    /**
+     * 会话内代码知识图谱入口：{@code /graph} 查状态、{@code /graph import} 把工作目录导入图谱。
+     */
+    private static final CodeGraphConsole codeGraphConsole = new CodeGraphConsole();
 
     /**
      * 进程入口：选择模型、装配各模块并进入交互式对话循环。
@@ -104,6 +111,7 @@ public final class ClaraApplication {
 
             view.printBanner(bootstrap, registry.currentConfiguration(), choice.configPath(), choice.source());
             printMcpStatus(view, bootstrap);
+            autoImportCodeGraph(view, bootstrap);
             view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
             view.printHints(WorkflowCatalog.customSummaries());
             if (monitor.isAvailable()) {
@@ -144,6 +152,25 @@ public final class ClaraApplication {
     }
 
     /**
+     * 按 {@code config/clara.yml} 的 {@code codeGraph.autoImport} 在启动时处理图谱：已导入只提示一句，
+     * 没导入则后台发起索引（不阻塞启动，索引在后台跑完后的下一轮就用得上图谱）。
+     *
+     * @param view      控制台视图，不可为 null
+     * @param bootstrap 已装配的引导器，不可为 null
+     */
+    private static void autoImportCodeGraph(ConsoleView view, ApplicationBootstrap bootstrap) {
+        if (!bootstrap.codeGraphSettings().isAutoImportEnabled()) {
+            return;
+        }
+        try {
+            String result = codeGraphConsole.prepare(true);
+            view.emit("  codegraph      : " + result.replace("\n", "；"), ConsoleView.ANSI_GRAY);
+        } catch (RuntimeException failure) {
+            view.emit("  codegraph      : 检查失败：" + failure.getMessage() + "（不影响对话）", ConsoleView.ANSI_GRAY);
+        }
+    }
+
+    /**
      * 构造会话级上下文控制：{@code /compress} 压缩当前上下文、{@code /new} 开始新对话。
      *
      * @param view      控制台视图，非 null
@@ -172,6 +199,20 @@ public final class ClaraApplication {
                 conversationId = newConversationId();
                 usageTrend.reset();
                 view.emit("已开始新对话，会话标识：" + conversationId, ConsoleView.ANSI_GRAY);
+            }
+
+            @Override
+            public void showCodeGraph() {
+                view.emit("正在查询代码知识图谱（工作目录：" + ConfigLocator.workspaceRoot() + "）...", ConsoleView.ANSI_GRAY);
+                view.println(codeGraphConsole.status());
+                view.println("");
+            }
+
+            @Override
+            public void importCodeGraph() {
+                view.emit("正在把当前工作目录导入代码知识图谱（大仓库要几分钟，请等待）...", ConsoleView.ANSI_GRAY);
+                view.println(codeGraphConsole.importWorkdir(false));
+                view.println("");
             }
 
             @Override

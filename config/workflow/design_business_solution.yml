@@ -40,7 +40,18 @@ root:
       promptVars:
         goal: "梳理业务需求，产出「需求 + 技术方案」：整体方案、微服务划分、业务领域隔离、代码结构规划、数据库字段设计、DTO 对象规划"
         listing: "${scan_result}"
-    # 3) 批量读取被挑选的文件内容：优先取代码知识图谱（结构信息省 token），图谱未覆盖的自动回退本地文件。
+    # 3) 把当前工作目录导入代码知识图谱（幂等、秒回）：已导入只回一句「已就绪」，没导入就后台发起索引，
+    #    不让分钟级的索引卡住流程 —— 索引完成后，本工作流的读取与后续各轮都用得上图谱。
+    - id: graph
+      type: TOOL
+      outputKeys: [graph]
+      tool: code_graph
+      arguments:
+        op: prepare
+        base_dir: "."
+        index: true
+        purpose: "把当前工作目录导入代码知识图谱（未索引则后台建索引），供后续读取代码时优先取图谱"
+    # 4) 批量读取被挑选的文件内容：优先取代码知识图谱（结构信息省 token），图谱未覆盖的自动回退本地文件。
     - id: read
       type: TOOL
       outputKeys: [sources]
@@ -51,7 +62,7 @@ root:
         paths: "${plan.files}"
         max_bytes: 7000
         purpose: "读取方案规划挑出的文件：优先取代码知识图谱，图谱未覆盖的再读本地文件"
-    # 4) 按前后端技术规范产出完整的需求与技术方案（Markdown）。
+    # 5) 按前后端技术规范产出完整的需求与技术方案（Markdown）。
     - id: design
       type: AGENT
       outputKeys: [solution]
@@ -61,7 +72,7 @@ root:
         plan: "${plan}"
         sources: "${sources}"
         standards: "${standards}"
-    # 5) 就地落盘到分析目录下的 development-plan/。
+    # 6) 就地落盘到分析目录下的 development-plan/。
     - id: persist
       type: TOOL
       outputKeys: [persisted]

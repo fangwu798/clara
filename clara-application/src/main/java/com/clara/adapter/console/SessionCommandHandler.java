@@ -45,6 +45,12 @@ public final class SessionCommandHandler {
 
         /** 显示 token 用量统计（全部历史记录估算 + 本次进程累计调用）。 */
         void showUsage();
+
+        /** 显示当前工作目录的代码知识图谱状态（是否已导入、怎么导入、可视化地址）。 */
+        void showCodeGraph();
+
+        /** 把当前工作目录导入代码知识图谱（同步等待索引完成，可能几分钟）。 */
+        void importCodeGraph();
     }
 
     private static final String LOG_MODE_COMMAND = "/log";
@@ -58,6 +64,8 @@ public final class SessionCommandHandler {
     private static final String HELP_ALIAS = "/help";
     private static final String USAGE_COMMAND = "/usage";
     private static final String USAGE_ALIAS = "/tokens";
+    private static final String GRAPH_COMMAND = "/graph";
+    private static final String GRAPH_IMPORT_COMMAND = "/graph import";
 
     private final ConsoleView view;
     private final BufferedReader reader;
@@ -131,6 +139,22 @@ public final class SessionCommandHandler {
             }
             return Outcome.HANDLED;
         }
+        if (GRAPH_COMMAND.equals(input)) {
+            if (controls == null) {
+                view.println("当前运行方式不支持查看代码知识图谱。");
+            } else {
+                controls.showCodeGraph();
+            }
+            return Outcome.HANDLED;
+        }
+        if (GRAPH_IMPORT_COMMAND.equals(input)) {
+            if (controls == null) {
+                view.println("当前运行方式不支持导入代码知识图谱。");
+            } else {
+                controls.importCodeGraph();
+            }
+            return Outcome.HANDLED;
+        }
         if (HELP_COMMAND.equals(input) || HELP_ALIAS.equals(input)) {
             printHelp();
             return Outcome.HANDLED;
@@ -148,6 +172,8 @@ public final class SessionCommandHandler {
         view.println("  /compress     压缩当前上下文：把历史归纳为摘要（别名 /compact）");
         view.println("  /new          开始新对话：上下文清空，旧历史保留在磁盘");
         view.println("  /usage        统计 token 用量：全部历史记录估算 + 本次进程累计调用（别名 /tokens）");
+        view.println("  /graph        查看当前工作目录的代码知识图谱状态（是否已导入 / 导入方式 / 可视化地址）");
+        view.println("  /graph import 把当前工作目录导入代码知识图谱（同步等待索引完成，大仓库要几分钟）");
         view.println("  /log          切换精简 / 全量日志（别名 /verbose）");
         view.println("  /color        开关彩色输出");
         view.println("  exit | quit   结束会话（也可用 /exit）");

@@ -15,7 +15,13 @@
 
 图谱可以装在宿主，也可以跑在容器里（见 deploy/codebase-memory-mcp）：容器部署的注册项是
 `docker exec -i <容器> codebase-memory-mcp`，本脚本识别这种形态后原样带上 docker exec 前缀执行，
-并按 CLARA_CBM_REPO（宿主仓库目录 ↔ 容器内 /work/repo）换算路径、按 CLARA_CBM_PROJECT 定位项目名。
+并按 CLARA_CBM_REPO（宿主「挂载根」↔ 容器内 /work/repo）换算两边路径。
+
+挂载根不必等于当前工作目录，也可以是它的祖先目录（工作区根）：挂载根下的任意子目录都能按需索引成
+独立项目，于是一个容器就能覆盖多个工作目录，换目录不必重建容器。项目名优先沿用「该目录已索引时的
+名字」（重复索引不会新建重名项目、也不会丢原有图谱），其次取 CLARA_CBM_PROJECT 或目录名。
+把当前工作目录导入图谱：先用 op=prepare 看是否已导入（秒回），再用 op=index 发起导入，
+或直接运行 deploy/codebase-memory-mcp/index-workdir.ps1。
 
 调用方式与其它工具脚本一致：stdin 读 JSON 入参，stdout 打印 JSON 结果；
 图谱二进制与图谱不存在时不会报错退出，而是按「图谱不可用」处理（read 自动回退文件）。
@@ -27,6 +33,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 
 # 工具脚本按用途分目录存放，共享辅助模块位于 scripts 根目录，故先把 scripts 根加入模块搜索路径。
 SCRIPTS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,13 +50,14 @@ _TOOL = {
     "id": "code_graph",
     "name": "code_graph",
     "type": "PYTHON",
-    "description": "代码知识图谱工具：读代码时优先使用本工具（图谱里能拿到文件大纲、符号定义、调用关系，token 开销远小于整文件读取）；图谱未覆盖或不可用时 op=read 会自动回退为本地文件读取；.md/.txt 这类散文文件不走图谱、直接返回原文。入参 JSON：op(index|status|search|outline|snippet|trace|query|read)、file_path(仓库相对路径，outline 用)、paths(路径或通配列表，read 用；元素可写 * ? [ ] 与 ** 递归)、pattern(名字 / 文本片段，search 用)、label(节点标签，如 Function / Class)、qualified_name(限定名，snippet 用)、function_name(函数名，trace 用)、direction(inbound|outbound|both，trace 用；inbound 查调用方、outbound 查被调用方)、depth(1-15，trace 用)、query(只读 Cypher，query 用)、project(图谱中的项目名；缺省按当前分析目录匹配，容器部署时取环境变量 CLARA_CBM_PROJECT)、repo_path(索引目标目录，index 用，缺省为当前分析目录)、max_bytes(单文件回退读取的截断字节，默认 20000)、max_files(展开后读取的文件数上限，默认 200)。返回：{op, source(graph|file|graph+file), files:[{path, source, outline|content}], ...}；其中 source 明确标注每条信息来自图谱还是本地文件。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
+    "description": "代码知识图谱工具：读代码时优先使用本工具（图谱里能拿到文件大纲、符号定义、调用关系，token 开销远小于整文件读取）；图谱未覆盖或不可用时 op=read 会自动回退为本地文件读取；.md/.txt 这类散文文件不走图谱、直接返回原文。把某个工作目录导入图谱：先用 op=prepare 看是否已导入（秒回），再用 op=index 发起导入（缺省后台执行，不卡住调用）。入参 JSON：op(prepare|index|status|search|outline|snippet|trace|query|read)、file_path(仓库相对路径，outline 用)、paths(路径或通配列表，read 用；元素可写 * ? [ ] 与 ** 递归)、pattern(名字 / 文本片段，search 用)、label(节点标签，如 Function / Class)、qualified_name(限定名，snippet 用)、function_name(函数名，trace 用)、direction(inbound|outbound|both，trace 用；inbound 查调用方、outbound 查被调用方)、depth(1-15，trace 用)、query(只读 Cypher，query 用)、project(图谱中的项目名；缺省按当前分析目录匹配，容器部署时先把该目录导入图谱才能匹配上)、repo_path(索引 / 检查的目标目录，index 与 prepare 用，缺省为当前分析目录)、background(索引是否后台执行，index 用；缺省 true 秒回、稍后用 op=status 看结果，false 则同步等待并返回节点 / 边计数)、index(prepare 时是否顺带后台发起导入，缺省 false)、max_bytes(单文件回退读取的截断字节，默认 20000)、max_files(展开后读取的文件数上限，默认 200)。返回：{op, source(graph|file|graph+file), files:[{path, source, outline|content}], ...}；其中 source 明确标注每条信息来自图谱还是本地文件。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
     "parameters": {
         "type": "object",
         "properties": {
             "purpose": {"type": "string"},
             "op": {"type": "string",
-                   "enum": ["index", "status", "search", "outline", "snippet", "trace", "query", "read"]},
+                   "enum": ["prepare", "index", "status", "search", "outline", "snippet", "trace",
+                            "query", "read"]},
             "file_path": {"type": "string"},
             "paths": {"type": "array", "items": {"type": "string"}},
             "pattern": {"type": "string"},
@@ -63,6 +71,8 @@ _TOOL = {
             "query": {"type": "string"},
             "project": {"type": "string"},
             "repo_path": {"type": "string"},
+            "background": {"type": "boolean"},
+            "index": {"type": "boolean"},
             "base_dir": {"type": "string"},
             "max_bytes": {"type": "integer"},
             "max_files": {"type": "integer"},
@@ -78,7 +88,9 @@ if _toolmeta.describe(_TOOL):
 REPO_ROOT = os.path.normpath(os.path.join(SCRIPTS_ROOT, "..", "..", ".."))
 
 # 工作根：启动脚本把「用户执行命令时所在目录」写入 CLARA_WORK_DIR，即本轮要分析的项目目录。
-WORK_ROOT = os.environ.get("CLARA_WORK_DIR") or REPO_ROOT
+# CLARA_CBM_WORK_DIR 是本工具自己的覆盖项，优先于它（同一进程里换分析目录、或在别处复用本脚本时用）。
+WORK_DIR_ENV = "CLARA_CBM_WORK_DIR"
+WORK_ROOT = os.environ.get(WORK_DIR_ENV) or os.environ.get("CLARA_WORK_DIR") or REPO_ROOT
 
 # 仓库根相对前缀：与本仓库其它脚本（file_ops / dir_tree）保持一致，便于按 @repo 读取随应用发布的文件。
 REPO_PREFIX = "@repo"
@@ -88,13 +100,20 @@ BINARY_ENV = "CLARA_CBM_BINARY"
 MCP_CONFIG_DIR = os.path.join(REPO_ROOT, "config", "mcp")
 SERVER_KEY = "codebase-memory-mcp"
 
-# 项目名来源（可选）：容器部署时容器内的项目根固定是挂载点、宿主路径匹配不上，只能靠它把项目钉住。
+# 项目名来源（可选）：只在「项目根换算不出宿主路径」时才退回它（见 project_of）：一个容器可以覆盖多个
+# 项目，钉死一个项目名去覆盖别的目录只会取到错内容。
 PROJECT_ENV = "CLARA_CBM_PROJECT"
 
-# 容器部署的路径映射：容器内的仓库固定挂在 CONTAINER_REPO_MOUNT，宿主侧对应目录写在 REPO_ENV。
-# 有这对映射，才能把宿主路径换算成容器内路径（建索引）与把容器内的项目根换回宿主路径（算相对路径）。
+# 容器部署的路径映射：容器内的挂载根固定是 CONTAINER_REPO_MOUNT，宿主侧对应的目录写在 REPO_ENV。
+# 有这对映射，才能把宿主路径换算成容器内路径（建索引）、把容器内的路径换回宿主路径（读结果）。
+# 这个挂载根既可以是工作目录本身，也可以是工作目录的祖先（工作区根）——后者让一个容器覆盖多个项目。
 CONTAINER_REPO_MOUNT = "/work/repo"
 REPO_ENV = "CLARA_CBM_REPO"
+
+# 后台索引用的进程创建标记（Windows）：DETACHED_PROCESS 让子进程脱离父进程的终端与控制台，
+# CREATE_NO_WINDOW 避免弹出黑窗；POSIX 一侧用 start_new_session。
+DETACHED_PROCESS = 0x00000008
+CREATE_NO_WINDOW = 0x08000000
 
 # 容器命令的宿主侧入口：注册项形如 `docker exec -i <容器> codebase-memory-mcp` 时整条带上前缀执行。
 DOCKER_COMMANDS = ("docker", "podman")
@@ -420,21 +439,77 @@ def match_project(projects, wanted):
     return fallback
 
 
+def project_by_name(projects, name):
+    # 按项目名取项目；返回 {"name", "root"}，其中 root 已换算成宿主路径（换算不出时为 None）。
+    for project in projects:
+        if isinstance(project, dict) and project.get("name") == name:
+            return {"name": name, "root": host_path(project_root(project))}
+    return None
+
+
+def project_for_dir(projects, directory):
+    # 找出根就是该目录（或与之互相包含）的已索引项目；与 read 的匹配口径一致。
+    return match_project(projects, canonical_path(directory))
+
+
 def project_of(spec, runner):
-    # 图谱的多数工具都要求 --project：显式给了就用它（此时项目根未知，路径只能按当前分析目录换算），
-    # 否则按「索引根 = 当前分析目录」自动匹配；返回 {"name", "root"}，匹配不到返回 None 由调用方回退。
+    """解析本次调用该用图谱里的哪个项目。
+
+    优先级：显式 project 入参 → 按当前分析目录匹配 → CLARA_CBM_PROJECT 钉住的项目（仅在它的项目根
+    换算不出宿主路径、即容器挂载信息缺失时才认）。
+
+    为什么把「按目录匹配」排在环境变量前面：一个容器可以挂载工作区根、索引多个项目，此时钉死的项目名
+    多半指向别的目录；硬用它会让每个文件都白跑一次 CLI，最坏还会把别的项目里同名文件的大纲当成当前
+    目录的代码返回。匹配不到就返回 None，由调用方老实地读本地文件。
+    """
     if not runner:
         return None
-    explicit = spec.get("project") or os.environ.get(PROJECT_ENV)
     projects = list_projects(runner)
+    explicit = spec.get("project")
     if explicit:
-        # 名字在图谱里不存在时直接当「没有图谱可用」：硬用这个名字会让每个文件都白跑一次 CLI
-        # 才发现图谱里没有它，反而比老老实实读文件慢得多。
-        for project in projects:
-            if isinstance(project, dict) and project.get("name") == explicit:
-                return {"name": explicit, "root": host_path(project_root(project))}
-        return None
-    return match_project(projects, canonical_path(WORK_ROOT))
+        return project_by_name(projects, explicit)
+    matched = project_for_dir(projects, WORK_ROOT)
+    if matched:
+        return matched
+    pinned = os.environ.get(PROJECT_ENV)
+    if pinned:
+        found = project_by_name(projects, pinned)
+        if found and not found["root"]:
+            return found
+    return None
+
+
+def project_name_for_index(target, spec, projects):
+    # 建索引时的项目名：显式入参 > 该目录已索引时的项目名（重复索引不新建重名项目、不丢原图谱）>
+    # 环境变量钉住的项目（只在该目录就是挂载根、或根本没配挂载映射时才认，兼容单目录容器部署与宿主安装）>
+    # 目录名；取不到目录名（盘根）时返回 None，交给图谱自己命名。
+    explicit = spec.get("project")
+    if explicit:
+        return explicit
+    existing = project_for_dir(projects, target)
+    if existing and existing.get("name"):
+        return existing.get("name")
+    pinned = os.environ.get(PROJECT_ENV)
+    mount = os.environ.get(REPO_ENV)
+    if pinned and (not mount or canonical_path(target) == canonical_path(mount)):
+        return pinned
+    return os.path.basename(os.path.normpath(target)) or None
+
+
+def as_bool(value, default=False):
+    # 布尔入参宽容解析：模型 / YAML 可能给 true、"true"、"1"、"yes"、"是" 这些写法。
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    text = str(value).strip().lower()
+    if text in ("true", "1", "yes", "y", "on", "是", "开"):
+        return True
+    if text in ("false", "0", "no", "n", "off", "否", "关", "none", ""):
+        return False
+    return default
 
 
 def normalize_direction(value):
@@ -519,32 +594,156 @@ def graph_outline(runner, project_name, rel_path):
         return stripped
 
 
+def mounted_path(target, runner):
+    # 容器部署时把宿主目录换算成容器内目录；宿主安装（或没配映射）时原样返回。
+    if is_container_runner(runner):
+        return container_path(target)
+    return target
+
+
+def out_of_mount(op, target):
+    # 目录在容器的挂载范围之外：不是「图谱不可用」，而是「容器看不到这个目录」，给一条能照做的一步。
+    mount_root = os.environ.get(REPO_ENV) or CONTAINER_REPO_MOUNT
+    return {
+        "op": op, "ok": False, "repo_path": target, "reason": "out_of_mount",
+        "error": ("容器只挂载了 " + mount_root + "（容器内 " + CONTAINER_REPO_MOUNT + "），"
+                  "这个目录不在其中，容器里看不到它，无法索引。"),
+        "hint": ("把挂载根放宽成工作区根（工作目录的公共父目录），一个容器就能覆盖多个项目："
+                 "powershell -ExecutionPolicy Bypass -File deploy\\codebase-memory-mcp\\install-docker.ps1 "
+                 "-RepoPath <仓库目录> -MountRoot <工作区根>；只分析这一个目录的话，"
+                 "把 -RepoPath 直接指向它、省略 -MountRoot 即可。"),
+    }
+
+
+def detached_container_command(runner):
+    # 把 `docker exec -i <容器> <命令...>` 改写成 `docker exec -d <容器> <命令...>`：-i / -t 与 -d 不能同时给。
+    parts = list(runner)
+    if len(parts) < 4 or parts[1].lower() != "exec":
+        return None
+    index = 2
+    while index < len(parts) and parts[index].startswith("-"):
+        index += 1
+    if index + 1 >= len(parts):
+        return None
+    return [parts[0], "exec", "-d"] + parts[index:]
+
+
+def background_index(runner, target, name):
+    """后台发起一次索引，立刻返回 (ok, 说明)。
+
+    为什么不在工具调用里同步等索引：宿主侧单次脚本执行有 30 秒硬超时（clara-skill 的 DefaultToolExecutor），
+    而索引一个中等仓库就要一分钟上下；同步索引会被掐断，还会留下半份图谱。于是容器部署用 `docker exec -d`
+    （命令在容器内跑，客户端立刻返回），宿主安装用脱离终端的子进程（日志落在临时目录）。
+    """
+    args = ["cli", "index_repository", "--repo-path", target]
+    if name:
+        args += ["--name", name]
+    if is_container_runner(runner):
+        command = detached_container_command(runner)
+        if command is None:
+            return False, "无法把注册项改写成后台命令：" + " ".join(runner)
+        subprocess.Popen(command + args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL)
+        return True, ("已在容器内后台发起索引（客户端立刻返回，索引在容器里继续跑）；"
+                      "稍后用 op=status 或 check_index_coverage 查看结果，大仓库要几分钟。")
+    options = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "stdin": subprocess.DEVNULL}
+    if os.name == "nt":
+        options["creationflags"] = DETACHED_PROCESS | CREATE_NO_WINDOW
+    else:
+        options["start_new_session"] = True
+    # 后台进程不再回传输出，日志留一份到临时目录便于排查。
+    log_path = os.path.join(tempfile.gettempdir(), "clara-code-graph-index.log")
+    handle = open(log_path, "ab")
+    try:
+        options["stdout"] = handle
+        options["stderr"] = handle
+        subprocess.Popen(list(runner) + args, **options)
+    finally:
+        handle.close()
+    return True, ("已在后台发起索引（脱离本进程继续跑），日志：" + log_path +
+                  "；稍后用 op=status 查看结果。")
+
+
 def op_index(spec, runner):
-    repo_path = os.path.abspath(resolve(spec.get("repo_path") or "", spec.get("base_dir") or ""))
-    if not os.path.isdir(repo_path):
-        return {"op": "index", "error": "目录不存在：" + repo_path}
-    # 容器部署时容器里没有宿主路径，只能索引挂在容器内的那一份（映射见 REPO_ENV）。
-    mount = container_path(repo_path)
-    target = mount or repo_path
-    if mount is None and is_container_runner(runner):
-        return {"op": "index", "repo_path": repo_path,
-                "error": ("容器部署只挂了 " + os.environ.get(REPO_ENV, CONTAINER_REPO_MOUNT) + " 这一个目录，"
-                          "这个路径在容器里不存在；改 deploy/codebase-memory-mcp/.env 的 CLARA_CBM_REPO "
-                          "并重跑 docker compose up -d 后再索引。")}
-    # 项目名固定传下去：容器内项目根是挂载点，默认命名会退化成目录名（如 repo），
-    # 与 CLARA_CBM_PROJECT 对不上就查不到图谱。
-    name = spec.get("project") or os.environ.get(PROJECT_ENV)
-    flags = ["--repo-path", target]
-    payload = {"repo_path": target}
+    """为某个目录建立 / 重建图谱索引。
+
+    默认后台执行（background 缺省为 true）：秒回一句「已发起」，避免被宿主侧 30 秒的脚本执行超时掐断；
+    需要拿到节点 / 边计数时传 background=false 走同步等待（大仓库可能超时）。
+    """
+    target = os.path.abspath(resolve(spec.get("repo_path") or "", spec.get("base_dir") or ""))
+    if not os.path.isdir(target):
+        return {"op": "index", "error": "目录不存在：" + target}
+    mount = mounted_path(target, runner)
+    if mount is None:
+        return out_of_mount("index", target)
+    name = project_name_for_index(target, spec, list_projects(runner))
+    if as_bool(spec.get("background"), True):
+        ok, note = background_index(runner, mount, name)
+        result = {"op": "index", "ok": ok, "background": True, "repo_path": mount,
+                  "project": name, "note": note}
+        if not ok:
+            result["error"] = note
+        if mount != target:
+            result["host_repo_path"] = target
+        return result
+    flags = ["--repo-path", mount]
+    payload = {"repo_path": mount}
     if name:
         flags += ["--name", name]
         payload["name"] = name
     # index_repository 没有 --format 开关，带上会被 CLI 判成未知开关，故关掉自动拼接。
     ok, text = run_cli(runner, "index_repository", flags, payload,
                        timeout=INDEX_TIMEOUT_SECONDS, format_json=False)
-    result = {"op": "index", "repo_path": target, "ok": ok, "result": as_json(text) or text}
-    if target != repo_path:
-        result["host_repo_path"] = repo_path
+    result = {"op": "index", "ok": ok, "background": False, "repo_path": mount,
+              "project": name, "result": as_json(text) or text}
+    if mount != target:
+        result["host_repo_path"] = target
+    return result
+
+
+def op_prepare(spec, runner):
+    """检查当前分析目录是否已导入图谱，未导入时按需在后台发起导入。
+
+    为什么要这个 op：图谱的多数调用都要求「当前目录已索引」，而建索引要一两分钟——超过宿主侧 30 秒的
+    脚本执行硬超时，没法在工具调用里同步等。prepare 只做一次秒回的探测（list_projects），告诉调用方
+    「已导入 / 需要导入 / 容器看不到这个目录」，需要导入时用后台进程发起（index=true），下一次调用就能
+    用上图谱。入参：repo_path / base_dir 指定目录（缺省为当前分析目录）、index 是否后台发起导入。
+    """
+    target = os.path.abspath(resolve(spec.get("repo_path") or "", spec.get("base_dir") or ""))
+    if not os.path.isdir(target):
+        return {"op": "prepare", "error": "目录不存在：" + target}
+    if runner is None:
+        return {"op": "prepare", "prepared": False, "graph_available": False, "repo_path": target,
+                "error": ("图谱不可用：未找到 codebase-memory-mcp（" + BINARY_ENV +
+                          " 未设置、config/mcp 里没有注册项、PATH 里也没有）。"),
+                "hint": "容器部署：deploy/codebase-memory-mcp/install-docker.ps1；宿主安装：同目录 install.ps1。"}
+    mount = mounted_path(target, runner)
+    if mount is None:
+        result = out_of_mount("prepare", target)
+        result["prepared"] = False
+        return result
+    projects = list_projects(runner)
+    existing = project_for_dir(projects, target)
+    if existing and existing.get("name"):
+        return {"op": "prepare", "prepared": True, "indexed": True, "ok": True, "action": "reuse",
+                "project": existing.get("name"), "repo_path": mount,
+                "note": "当前目录已导入图谱，后续读取会优先取图谱里的文件大纲。"}
+    name = project_name_for_index(target, spec, projects)
+    result = {"op": "prepare", "prepared": False, "indexed": False, "repo_path": mount, "project": name}
+    if mount != target:
+        result["host_repo_path"] = target
+    if as_bool(spec.get("index"), False):
+        ok, note = background_index(runner, mount, name)
+        result["ok"] = ok
+        result["action"] = "indexing" if ok else "index_failed"
+        result["note"] = note
+        if not ok:
+            result["error"] = note
+        return result
+    result["action"] = "needs_index"
+    result["note"] = ("当前目录还没导入图谱（本次调用仍会回退读本地文件）；"
+                      "可传 index=true 让本工具后台发起导入，或直接运行 "
+                      "deploy/codebase-memory-mcp/index-workdir.ps1。")
     return result
 
 
@@ -597,8 +796,9 @@ def op_read(spec, runner):
                     "需要图谱能力请先执行 deploy/codebase-memory-mcp/install.ps1。")
         elif not project_name:
             note = ("图谱里没有匹配的项目（当前分析目录未索引，或指定的项目名不存在），"
-                    "已全部回退为本地文件读取；可先 op=index 索引当前目录，"
-                    "或用 project / " + PROJECT_ENV + " 指定 list_projects 返回的项目名。")
+                    "已全部回退为本地文件读取。把当前目录导入图谱：先 op=prepare 查看，"
+                    "再 op=index 发起导入，或直接运行 deploy/codebase-memory-mcp/index-workdir.ps1；"
+                    "也可以用 project / " + PROJECT_ENV + " 指定 list_projects 返回的项目名。")
         else:
             note = "图谱未覆盖这些文件（多为未索引的新文件），已回退为本地文件读取。"
     else:
@@ -626,8 +826,8 @@ def main():
     op = (spec.get("op") or "read").strip()
     runner = resolve_runner()
 
-    # index 之外的操作都需要图谱可用；不可用时 read 自动回退文件，其余 op 明确回报原因。
-    if runner is None and op != "read":
+    # index / prepare 之外的操作都需要图谱可用；不可用时 read 自动回退文件，index、prepare 自带说明。
+    if runner is None and op not in ("read", "prepare"):
         print(json.dumps({
             "op": op, "ok": False,
             "error": ("未找到 codebase-memory-mcp：请设置 " + BINARY_ENV +
@@ -652,6 +852,8 @@ def main():
     try:
         if op == "read":
             result = op_read(spec, runner)
+        elif op == "prepare":
+            result = op_prepare(spec, runner)
         elif op == "index":
             result = op_index(spec, runner)
         elif op == "status":

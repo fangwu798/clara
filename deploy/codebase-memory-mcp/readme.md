@@ -56,8 +56,9 @@ powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install-dock
 
 | 开关 | 作用 |
 | --- | --- |
-| `-RepoPath E:\work\demo` | 要索引的仓库（宿主路径），默认仓库根；容器内固定挂到 `/work/repo` |
-| `-Project clara-code-graph` | 图谱里的项目名，默认 `clara-code-graph` |
+| `-RepoPath E:\work\demo` | 要索引的仓库（宿主路径），默认仓库根；必须位于 `-MountRoot` 之下 |
+| `-MountRoot E:\workspace_self` | 容器挂载根（宿主路径），默认等于 `-RepoPath`；放宽成工作区根可让一个容器覆盖多个工作目录 |
+| `-Project demo` | 图谱里的项目名；缺省时本仓库用 `clara-code-graph`、别的目录取目录名 |
 | `-SkipIndex` | 只建镜像与容器，不建索引 |
 | `-SkipMcpConfig` | 不改 `config/mcp/mcp.json`（自己维护配置时用） |
 | `-SkipUserEnv` | 不写用户环境变量 |
@@ -74,16 +75,18 @@ powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install-dock
   失败；portable 那份静态链接。产物由宿主脚本下载并校验 SHA256 后放进构建上下文，构建期不联网。
 - **仓库挂在 `/work/repo` 而不是顶层 `/repo`**：图谱拒绝把卷顶层当项目根
   （`index_repository` 会报 `path is too broad to index as one root`）。
-- **路径靠 `CLARA_CBM_REPO`、项目名靠 `CLARA_CBM_PROJECT`**：容器里的项目根是 `/work/repo`，
-  与宿主路径天然对不上（按目录名还会被命名成 `repo`），`code_graph` 靠这两个变量换算路径、定位项目。
+- **挂载根与路径换算**：容器内的挂载根固定是 `/work/repo`，宿主侧对应目录写在 `CLARA_CBM_REPO`，
+  `code_graph` 靠它换算两侧路径。挂载根可以就是被索引的仓库，也可以是它的祖先（工作区根，见
+  「把工作目录导入图谱」）。`CLARA_CBM_PROJECT` 只在「项目根换算不出宿主路径」时才兜底：
+  平时按「项目根 = 当前分析目录」匹配项目，免得拿到别的目录的图谱。
 - **MCP 不占端口**：`docker exec -i` 把宿主进程的 stdin/stdout 直接接到容器内的图谱进程上，
   JSON-RPC 走管道、不走网络，所以不需要发布任何端口；compose 里发布的那个端口只给图谱 UI 用。
 
 ### 常用命令
 
 ```powershell
-# 看容器状态（healthy 才算就绪）
-docker compose -f deploy\codebase-memory-mcp\docker-compose.yml ps
+# 看容器状态（healthy 才算就绪）；图谱服务定义在 deploy\docker-compose.yml，与 Milvus 共用同一个 compose
+docker compose -f deploy\docker-compose.yml ps codebase-memory-mcp
 
 # 代码改动后刷新索引（也可让模型调 code_graph 的 op=index，路径与项目名会自动换算）
 docker exec clara-codebase-memory-mcp codebase-memory-mcp cli index_repository --repo-path /work/repo --name clara-code-graph
@@ -91,6 +94,35 @@ docker exec clara-codebase-memory-mcp codebase-memory-mcp cli index_repository -
 # 看已索引的项目
 docker exec clara-codebase-memory-mcp codebase-memory-mcp cli list_projects --format json
 ```
+
+### 把工作目录导入图谱（挂载根 = 工作区根）
+
+容器只挂得到**一个**宿主目录（挂载根，容器内固定 `/work/repo`），所以「某个工作目录能不能导入图谱」
+等价于「它在不在挂载根里」。挂载根不必等于被索引的那个仓库：放宽成**工作区根**（工作目录的公共父目录）
+之后，它下面的任意子目录都能按需索引成独立项目，换目录不用重建容器。
+
+```powershell
+# 一次放宽（示例：挂载整片 E:\workspace_self，被索引的仓库仍是 Clara 仓库）
+powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install-docker.ps1 `
+    -RepoPath E:\workspace_self\xxxx\clara -MountRoot E:\workspace_self
+
+# 之后随时把任意工作目录导入图谱（不必重建容器；不在挂载根里会告诉你怎么放宽）
+powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\index-workdir.ps1 -WorkDir D:\work\demo
+
+# 只确认「会导入哪个目录、叫什么项目」，不真正建索引
+powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\index-workdir.ps1 -WorkDir D:\work\demo -SkipIndex
+```
+
+- **项目名**：该目录已索引过就沿用原项目名（同一个目录不会出现两份图谱），否则取目录名
+  （`...\demo` → `demo`），也可以用 `-Project` 显式指定。
+- **改挂载根要重做索引**：图谱里的文件路径是相对项目根存的，项目根跟着挂载根变，所以放宽 / 收缩挂载根
+  之后必须重跑一次索引（`install-docker.ps1` 第 5 步会做）；不做的话 `code_graph` 匹配不到项目，
+  会静默回退读本地文件（`op=read` 的 `note` 会说清楚）。
+- **对话里也能导入**：让模型调 `code_graph` 的 `op=prepare`（秒回：当前目录是否已导入、怎么导入）和
+  `op=index`（缺省后台发起、秒回，完成后再用 `op=status` 看结果）。不让工具同步等索引的原因是宿主侧
+  单次技能脚本执行有 30 秒硬超时，而索引一个中等仓库就要一分钟上下，同步发起会被掐断并留下半份图谱。
+- **确认生效**：`index-workdir.ps1 -SkipIndex` 会打印工作目录 / 容器内路径 / 项目名；导入后在那个目录下
+  启动 Clara，`op=prepare` 应返回 `prepared=true`，读代码时的 `source` 才会是 `graph`。
 
 ### 看图谱
 
@@ -132,9 +164,10 @@ docker cp clara-codebase-memory-mcp:/data/clara-code-graph.db .
 
 **④ 直接问 Clara**：图谱已经作为 MCP 工具下发给模型，说一句「用 code_graph 讲一下 X 的调用链」即可。
 
-改要分析的仓库：改 `deploy\codebase-memory-mcp\.env` 的 `CLARA_CBM_REPO` → `docker compose up -d`
-→ 重跑一次索引（重跑 `install-docker.ps1` 最省事，它会把用户环境变量一起同步）。
-清空全部索引：`docker compose -f deploy\codebase-memory-mcp\docker-compose.yml down -v`（`-v` 删数据卷）。
+换到挂载根之外的目录分析：重跑 `install-docker.ps1 -RepoPath <仓库> -MountRoot <工作区根>`（容器重建、
+索引重做、用户环境变量一起同步）。挂载根内的目录不用重建容器，直接 `index-workdir.ps1 -WorkDir <目录>`
+导入即可；改 `deploy\codebase-memory-mcp\.env` 的 `CLARA_CBM_REPO` 后要 `docker compose up -d` 让挂载生效。
+清空全部索引：`docker compose -f deploy\docker-compose.yml down -v`（`-v` 删数据卷，会连带删掉 Milvus 的绑定卷声明，数据仍在 `deploy\volumes`）。
 拉不到 Docker Hub 时，在 `.env` 里把 `CBM_BASE_IMAGE` 指向镜像站（见 `.env.example`）。
 
 ## 四、环境变量
@@ -142,8 +175,9 @@ docker cp clara-codebase-memory-mcp:/data/clara-code-graph.db .
 | 变量 | 作用 |
 | --- | --- |
 | `CLARA_CBM_BINARY` | 图谱二进制绝对路径（也可写整条命令，如 `docker exec -i <容器> codebase-memory-mcp`）；`config/skill/scripts/code-graph/code_graph.py` 用它定位 CLI |
-| `CLARA_CBM_PROJECT` | 图谱里的项目名；容器部署用它钉住 `/work/repo` 上的项目 |
-| `CLARA_CBM_REPO` | 宿主上哪个目录挂在容器内；容器部署由 `install-docker.ps1` 写入，code_graph 用它换算两侧路径 |
+| `CLARA_CBM_PROJECT` | 图谱里的项目名；只在「项目根换算不出宿主路径」时兜底，平时按当前分析目录匹配项目 |
+| `CLARA_CBM_REPO` | 宿主上的容器挂载根（可以是被索引的仓库，也可以是它的祖先）；由 `install-docker.ps1` 写入，code_graph 用它换算两侧路径 |
+| `CLARA_CBM_WORK_DIR` | 可选；覆盖 code_graph 认定的「当前分析目录」（缺省用启动脚本写入的 `CLARA_WORK_DIR`） |
 | `CBM_CACHE_DIR` | 可选的图谱数据目录，默认 `%USERPROFILE%\.cache\codebase-memory-mcp`；见下方说明 |
 | `CLARA_MCP_ALLOWED_EXECUTABLES` | 额外允许以 stdio 启动的可执行文件（分号或逗号分隔），一般不用设 |
 | `CBM_ALLOWED_ROOT` | 限制 `index_repository` 只能索引该目录以下的仓库（多租户 / 不可信调用方场景） |

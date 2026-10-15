@@ -1,5 +1,7 @@
 package com.clara;
 
+import com.clara.codegraph.CodeGraphSupplement;
+import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
 import com.clara.config.ModelRegistry;
 import com.clara.api.IBuiltinTool;
@@ -12,6 +14,7 @@ import com.clara.core.memory.IWindowMemory;
 import com.clara.core.message.IContent;
 import com.clara.core.model.IResponse;
 import com.clara.core.skill.IPromptProvider;
+import com.clara.core.memory.IContextSupplementProvider;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowEngine;
@@ -232,6 +235,7 @@ public final class ApplicationBootstrap implements Closeable {
     private final DefaultConversationOrchestrator orchestrator;
     private final DefaultConversationOrchestrator.WindowMemoryFactory windowMemoryFactory;
     private final WindowCompressionCoordinator windowCompression;
+    private final CodeGraphSettings codeGraphSettings;
     private final InMemoryCallRecordSink callRecordSink;
 
     /**
@@ -316,12 +320,18 @@ public final class ApplicationBootstrap implements Closeable {
 
         // orchestration 协作者
         SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore);
+        // 代码知识图谱：装配提示词前先查一次图谱，命中的知识作为 system 补充信息注入；图谱里没有的，
+        // 模型按 code_graph_guide 的约定改用工具查本地文件。开关在 config/clara.yml 的 codeGraph 节点。
+        this.codeGraphSettings = CodeGraphSettings.load(ConfigLocator.claraConfigFile());
+        IContextSupplementProvider codeGraphSupplement = codeGraphSettings.isSupplementEnabled()
+                ? new CodeGraphSupplement(toolInvoker, codeGraphSettings) : null;
         // 工具描述按请求组装时现扫一遍工作流清单，使运行期新生成的自定义工作流无需重启即可被模型看到
         SkillMatchCoordinator skillMatch = new SkillMatchCoordinator(embeddingClient, semanticMemoryStore, promptProvider,
                 new CompositeToolCatalog(
                         new RegistryToolCatalog(skillRegistry, WorkflowCatalog::decorateToolDescription),
                         new McpToolCatalog(mcpServerRegistry, mcpCapabilityCatalog, DEFAULT_MCP_TENANT)));
-        ContextAssembler contextAssembler = new ContextAssembler(windowCompression, semanticRecall, skillMatch);
+        ContextAssembler contextAssembler = new ContextAssembler(windowCompression, semanticRecall,
+                codeGraphSupplement, skillMatch);
         CapabilityDispatcher capabilityDispatcher = new CapabilityDispatcher(streamModel);
         ToolRoundTripCoordinator toolRoundTrip = new ToolRoundTripCoordinator(toolInvoker);
         // 调用记录接收方：进程内保留最近若干条记录，供上层读取（不打印、不落盘）
@@ -540,6 +550,15 @@ public final class ApplicationBootstrap implements Closeable {
      */
     public WorkflowRunner workflowRunner() {
         return workflowRunner;
+    }
+
+    /**
+     * 返回代码知识图谱开关（{@code config/clara.yml} 的 {@code codeGraph} 节点）。
+     *
+     * @return 开关配置，非 null
+     */
+    public CodeGraphSettings codeGraphSettings() {
+        return codeGraphSettings;
     }
 
     /**

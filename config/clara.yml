@@ -14,6 +14,26 @@ defaultModel: deepseek-response
 #   写法：单行方括号列表（启动脚本按此格式解析）；本行也兼容 YAML 块式序列。
 enabledProviders: [deepseek-response, deepseek-completion]
 
+# 代码知识图谱（可选，需要先按 deploy/codebase-memory-mcp/readme.md 部署：
+#   容器部署 deploy\codebase-memory-mcp\install-docker.ps1；宿主安装 deploy\codebase-memory-mcp\install.ps1）。
+# 开启后：
+#   1) 每轮对话装配提示词前先按提问查一次图谱，命中的符号 / 文件大纲作为补充信息注入（先查图谱、
+#      图谱没有的再由模型用工具查本地文件）；
+#   2) 会话内可用 /graph 查看当前工作目录是否已导入图谱、/graph import 手动导入。
+# 未部署图谱时保持原样即可：查询失败只会「这轮没有补充信息」，不影响对话。
+codeGraph:
+  # 总开关：false 时下面各项一律不生效（等于没接图谱）。
+  enabled: true
+  # 每轮对话先查图谱做补充信息（命中才注入；查询约 2~6 秒，嫌慢可以关掉，改用模型按需调 code_graph）。
+  supplement: true
+  # 启动时把当前工作目录导入图谱（幂等：已导入只提示一句，没导入则后台发起，不阻塞启动）。
+  # 想手动控制导入时机（用 /graph import）时保持 false。
+  autoImport: false
+  # 图谱在 config/mcp 里的注册键（仅用于排查；与实际注册项一致）。
+  mcpServer: codebase-memory-mcp
+  # 单轮补充信息的字符上限，防止一份大纲把上下文撑大。
+  supplementMaxChars: 4000
+
 # 语义记忆（可选）。配了 milvus 且 enabled 不为 false 时：
 #   1) 所有对话记录都会向量化写入 Milvus（来源 CONVERSATION，按会话隔离，用于长程/跨窗口关联）；
 #   2) 每轮按相似度从 Milvus 召回历史上下文，注入到提示词。

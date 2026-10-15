@@ -1,4 +1,8 @@
-# Milvus standalone 本地部署（用于语义记忆联调）
+# Clara 的本地依赖栈：Milvus（语义记忆）+ codebase-memory-mcp（代码知识图谱）。
+#
+# 一次 up 起全套：docker compose up -d
+# 只起图谱：    docker compose up -d codebase-memory-mcp
+# 图谱的部署脚本 deploy\codebase-memory-mcp\install-docker.ps1 用的就是这个文件（只操作图谱那一个服务）。
 #
 # Milvus 采用「计算与存储分离」架构，本体只做向量计算，元数据与数据分别外包给 etcd 与 MinIO，
 # 因此 standalone 模式需要三个容器协同，依赖方向：
@@ -78,6 +82,46 @@ services:
       - etcd    # 元数据存储
       - minio   # 对象存储
 
+  # codebase-memory-mcp：代码知识图谱（读代码时优先查它，见 deploy/codebase-memory-mcp/readme.md）。
+  # 为什么常驻而不是按需 run：该服务端只讲 stdio，而 stdio 跨不了容器边界；于是容器保持常驻，
+  # 宿主按需用 `docker exec -i clara-codebase-memory-mcp codebase-memory-mcp` 把标准输入输出接进去
+  # （这条命令同时就是 config/mcp/mcp.json 的注册项）。图谱 UI 走 HTTP，见下面 ports。
+  codebase-memory-mcp:
+    build:
+      # 构建上下文还是放在 deploy/codebase-memory-mcp（Dockerfile 与 .build 产物都在那边）。
+      context: ./codebase-memory-mcp
+      args:
+        BASE_IMAGE: ${CBM_BASE_IMAGE:-alpine:3.20}
+        CBM_ARCHIVE: ${CBM_ARCHIVE:-codebase-memory-mcp-linux-amd64-portable.tar.gz}
+    image: clara/codebase-memory-mcp:${CBM_VERSION:-v0.11.0}
+    container_name: clara-codebase-memory-mcp
+    # 保活：真正的图谱进程由 `docker exec -i` 按需拉起。busybox 的 sleep 认 infinity。
+    command: ["sleep", "infinity"]
+    environment:
+      # 图谱数据目录，对应下面的命名卷；不要改，改了要在 .env 里同步。
+      CBM_CACHE_DIR: /data
+      # 图谱可视化 UI 的端口（容器内与宿主侧都用它，见 ports 的说明）。
+      CBM_UI_PORT: ${CBM_UI_PORT:-9749}
+    # 只发布到宿主回环：本机浏览器打开 http://127.0.0.1:<端口>/ 看图谱，局域网访问不到。
+    # 端口号必须与容器内一致（UI 会校验 Host 是回环地址，换端口转发会被 403）。
+    ports:
+      - "127.0.0.1:${CBM_UI_PORT:-9749}:${CBM_UI_PORT:-9749}"
+    volumes:
+      # 图谱 SQLite 持久化：容器重建不丢图谱，删卷即清空全部索引。
+      - cbm-data:/data
+      # 待分析仓库 / 工作区：容器内固定 /work/repo，只读挂载（建索引只读文件，写的是 /data）。
+      # 挂载点刻意放在普通目录下而不是顶层卷根：图谱拒绝把卷顶层（如 /repo）当项目根。
+      # CLARA_CBM_REPO 由 install-docker.ps1 写进 deploy\codebase-memory-mcp\.env（--env-file 传入）；
+      # 它可以是某个仓库，也可以是工作区根（工作目录的祖先），后者让一个容器覆盖多个项目。
+      - ${CLARA_CBM_REPO:-..}:/work/repo:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "codebase-memory-mcp", "--version"]
+      interval: 60s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+
   # attu：Milvus 官方 Web 控制台（人工查看集合与实体数据）。
   # 只是 Milvus 的图形客户端，不参与存储；容器内通过 compose 网络直连 standalone 的 gRPC 19530。
   # 9601 为浏览器访问端口（http://localhost:9601）。
@@ -90,3 +134,8 @@ services:
       - "9601:3000"   # Web 控制台：http://localhost:9601
     depends_on:
       - standalone   # 依赖 Milvus 服务本体
+
+# 命名卷：钉住图谱数据卷的名字，让「并入本文件前后」用的是同一个卷（已有图谱不用重新索引）。
+volumes:
+  cbm-data:
+    name: clara-codebase-memory-mcp_cbm-data
