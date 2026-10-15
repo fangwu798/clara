@@ -7,8 +7,9 @@
 #
 #  启动前检查：
 #   1) Python 运行环境（工具脚本依赖）；缺失时引导安装，并把解释器路径写入 PYTHON_PATH；
-#   2) 凭据环境变量：config/clara.yml 声明 enabledProviders 时逐个检查；
-#      未声明时退回主模型（defaultModel）；缺失时引导输入。
+#   2) 凭据环境变量：config/model-providers 下每个配置声明的变量逐个检查，
+#      同名变量只检查一次（deepseek 的两个别名共用一把 Key）；
+#      未找到配置文件时退回主模型（defaultModel）；缺失时引导输入。
 # ============================================================
 
 # 记住用户启动脚本时所在的目录：即要分析的项目目录（Clara 以 CLARA_WORK_DIR 读取）。
@@ -87,7 +88,22 @@ export PYTHON_PATH
 echo "[OK] Python 运行环境：$PYTHON_PATH"
 
 # ---- 2) 凭据环境变量检查 ----
-# config/clara.yml 声明了 enabledProviders 时逐个检查；未声明时退回只检查主模型。
+# config/model-providers 下每个配置都声明一个凭据环境变量，启动时的可用性检查会探测全部配置，
+# 所以这里也全量检查；多个别名可能共用同一个环境变量（deepseek-completion 与 deepseek-response
+# 都用 CLARA_DEEPSEEK_API_KEY），同名变量只检查一次；未找到任何配置文件时退回只检查主模型。
+
+# 记录本轮已检查的凭据环境变量：已检查过返回 0，首次出现返回 1。
+checked_keys=""
+key_checked() {
+    case " $checked_keys " in
+        *" $1 "*)
+            return 0
+            ;;
+    esac
+    checked_keys="$checked_keys $1"
+    return 1
+}
+
 check_key_file() {
     cfg="$1"
     label="$2"
@@ -95,6 +111,12 @@ check_key_file() {
         warn "[WARN] $label 未找到模型配置文件（$cfg），跳过 Key 检查。"
         return
     fi
+    case "$(basename "$cfg")" in
+        *.example.yml|*.example.yaml)
+            # 样例文件不是真实配置，与 Java 侧扫描口径保持一致。
+            return
+            ;;
+    esac
     if grep -qE '^[[:space:]]*apiKey[[:space:]]*:' "$cfg" 2>/dev/null; then
         echo "[INFO] $label 使用内联 apiKey，跳过环境变量检查（请确认该文件未被提交到版本库）。"
         return
@@ -103,6 +125,10 @@ check_key_file() {
         | head -n1 | sed -E 's/^[^:]*:[[:space:]]*//' | tr -d ' \r"')"
     if [ -z "$key_env" ]; then
         echo "[INFO] $label 未声明 environmentVariable，跳过 Key 检查。"
+        return
+    fi
+    if key_checked "$key_env"; then
+        # 该环境变量已被更早的别名检查过，不再重复输出。
         return
     fi
     if [ -n "$(printenv "$key_env" 2>/dev/null)" ]; then
@@ -122,21 +148,18 @@ check_key_file() {
     fi
 }
 
-enabled_providers="$(grep -E '^[[:space:]]*enabledProviders[[:space:]]*:' config/clara.yml 2>/dev/null \
-    | head -n1 | sed -E 's/^[^:]*:[[:space:]]*//' | tr -d '[] \r"')"
+model_config_count=0
+for cfg in config/model-providers/*.yml config/model-providers/*.yaml; do
+    [ -f "$cfg" ] || continue
+    model_config_count=$((model_config_count + 1))
+    provider_alias="$(basename "$cfg")"
+    provider_alias="${provider_alias%.yml}"
+    provider_alias="${provider_alias%.yaml}"
+    check_key_file "$cfg" "$provider_alias"
+done
 
-if [ -n "$enabled_providers" ]; then
-    old_ifs="$IFS"
-    IFS=','
-    for alias in $enabled_providers; do
-        alias="$(echo "$alias" | tr -d ' ')"
-        [ -z "$alias" ] && continue
-        cfg="config/model-providers/$alias.yml"
-        [ -f "$cfg" ] || cfg="config/model-providers/$alias.yaml"
-        check_key_file "$cfg" "$alias"
-    done
-    IFS="$old_ifs"
-else
+if [ "$model_config_count" -eq 0 ]; then
+    # 没有模型配置文件：退回只检查主模型。
     model_config="$1"
     if [ -z "$model_config" ]; then
         default_model="$(grep -E '^[[:space:]]*defaultModel[[:space:]]*:' config/clara.yml 2>/dev/null \

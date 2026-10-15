@@ -208,13 +208,10 @@ def execute(spec, argv, cwd):
     stdin_bytes = None if stdin_text is None else str(stdin_text).encode("utf-8")
 
     started = time.time()
-    process = subprocess.Popen(argv, cwd=cwd, env=build_environment(spec),
-                               stdin=subprocess.PIPE if stdin_bytes is not None else subprocess.DEVNULL,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(argv, cwd=cwd, env=build_environment(spec), stdin=subprocess.PIPE if stdin_bytes is not None else subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out_buffer = StreamBuffer("out", explicit, max_bytes)
     err_buffer = StreamBuffer("err", explicit, max_bytes)
-    pumps = [threading.Thread(target=pump, args=(process.stdout, out_buffer), daemon=True),
-             threading.Thread(target=pump, args=(process.stderr, err_buffer), daemon=True)]
+    pumps = [threading.Thread(target=pump, args=(process.stdout, out_buffer), daemon=True), threading.Thread(target=pump, args=(process.stderr, err_buffer), daemon=True)]
     for thread in pumps:
         thread.start()
     feed_stdin(process, stdin_bytes)
@@ -258,8 +255,7 @@ def main():
         result["cwd"] = cwd
         result.update(execute(spec, argv, cwd))
     except FileNotFoundError as exception:  # noqa: BLE001 - 命令不存在时给出可操作提示
-        result["error"] = ("命令不存在或不可执行：%s；如需 shell 内建命令请改用 command 参数"
-                           % exception)
+        result["error"] = ("命令不存在或不可执行：%s；如需 shell 内建命令请改用 command 参数"  % exception)
     except Exception as exception:  # noqa: BLE001 - 以错误字段回传，保持协议不中断
         result["error"] = str(exception)
     result["duration_ms"] = int((time.time() - started) * 1000)

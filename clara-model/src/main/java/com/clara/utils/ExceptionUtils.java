@@ -10,6 +10,7 @@ import com.clara.enums.ModelProviderEnum;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * 集中创建模型调用链路的领域异常。
@@ -38,6 +39,15 @@ public final class ExceptionUtils {
      * 平台信息缺失时写入消息的占位文案。
      */
     private static final String UNKNOWN = "未知";
+
+    /**
+     * 平台错误提示里的请求标识片段，如 {@code Request id: 021792044653981b...}。
+     *
+     * <p>为什么在写入安全细节前先去掉：这类标识只对厂商侧查单有意义，原始响应体已完整落盘到详细日志；
+     * 留在面向使用者的失败原因里既冗长，又容易被误读成本地信息。展示层只保留平台错误信息与 HTTP 状态码。
+     */
+    private static final Pattern REQUEST_ID = Pattern.compile(
+            "\\s*\\brequest[ _-]?id\\b\\s*[:：]?\\s*[A-Za-z0-9][A-Za-z0-9._-]*", Pattern.CASE_INSENSITIVE);
 
     private ExceptionUtils() {
     }
@@ -177,6 +187,8 @@ public final class ExceptionUtils {
      * 归类与可重试规则不变（401 鉴权、403 授权、429 限流、其余外部服务；429 与 5xx 可重试），状态码仍写入
      * providerCode 与消息模板。
      *
+     * <p>请求标识（如 {@code Request id: ...}）会在写入细节前去掉，只保留错误信息本身。
+     *
      * @param provider        平台，可为 null（表示不归因到具体平台）
      * @param status          平台返回的 HTTP 状态码
      * @param providerMessage 平台返回的错误提示文本，可为 null（不写入细节）
@@ -185,8 +197,9 @@ public final class ExceptionUtils {
     public static ClaraException providerFailure(ModelProviderEnum provider, int status, String providerMessage) {
         ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION : status == 403 ? ErrorCategory.AUTHORIZATION : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
         Map<String, String> details = new LinkedHashMap<String, String>();
-        if (providerMessage != null && !providerMessage.trim().isEmpty()) {
-            details.put("providerMessage", providerMessage.trim());
+        String detail = withoutRequestId(providerMessage);
+        if (detail != null) {
+            details.put("providerMessage", detail);
         }
         return new ClaraException(new ClaraError(ErrorCodes.MODEL_PROVIDER_FAILED, category,
                 message(ErrorCodes.MODEL_PROVIDER_FAILED, provider, String.valueOf(status)),
@@ -216,6 +229,8 @@ public final class ExceptionUtils {
      * 排查；平台返回的提示文本写入 {@code safeDetails} 的 {@code providerMessage} 键，供上层展示具体的失败原因
      * （如限流、并发超限等），不进入面向使用者的默认文案，避免把不可控的平台文本当成本地文案。
      *
+     * <p>请求标识（如 {@code Request id: ...}）会在写入细节前去掉，只保留错误信息本身。
+     *
      * @param provider        平台，可为 null（表示不归因到具体平台）
      * @param providerCode    平台侧原始错误码，可为 null
      * @param providerMessage 平台侧返回的错误提示文本，可为 null
@@ -223,8 +238,9 @@ public final class ExceptionUtils {
      */
     public static ClaraException providerEventFailure(ModelProviderEnum provider, String providerCode, String providerMessage) {
         Map<String, String> details = new LinkedHashMap<String, String>();
-        if (providerMessage != null && !providerMessage.trim().isEmpty()) {
-            details.put("providerMessage", providerMessage);
+        String detail = withoutRequestId(providerMessage);
+        if (detail != null) {
+            details.put("providerMessage", detail);
         }
         return new ClaraException(new ClaraError(
                 ErrorCodes.MODEL_PROVIDER_FAILED,
@@ -288,6 +304,23 @@ public final class ExceptionUtils {
         return new ClaraException(new ClaraError(code, category, message(code, provider, providerCode), retryable,
                 null, provider == null ? null : provider.name(), providerCode, null,
                 Collections.<String, String>emptyMap()));
+    }
+
+    /**
+     * 去掉平台错误提示里的请求标识片段，并去除首尾空白。
+     *
+     * <p>形态如 {@code Request id: 021792044653981b...} 的片段只对厂商侧查单有意义，展示层不使用；
+     * 清理后为空时返回 null，调用方据此不写细节。
+     *
+     * @param providerMessage 平台返回的错误提示文本，可为 null
+     * @return 去掉请求标识后的文本；输入为 null 或清理后为空时返回 null
+     */
+    private static String withoutRequestId(String providerMessage) {
+        if (providerMessage == null) {
+            return null;
+        }
+        String detail = REQUEST_ID.matcher(providerMessage).replaceAll("").trim();
+        return detail.isEmpty() ? null : detail;
     }
 
     /**

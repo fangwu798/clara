@@ -17,7 +17,9 @@ import java.nio.charset.StandardCharsets;
  *       要把「空白」与「未提供」归一为 null 用 {@link #blankToNull(String)}；
  *       要区分「未出现」与「出现但为空」（如流式累积缓冲）用 {@link #emptyToNull(CharSequence)}；</li>
  *   <li>按字节体积限制校验（SSE 单行 / 单事件）用 {@link #utf8Length(String)}；
- *       协议解码用 {@link #decodeUtf8Strict(byte[])}。</li>
+ *       协议解码用 {@link #decodeUtf8Strict(byte[])}；</li>
+ *   <li>控制台多列排版用 {@link #displayWidth(String)} 与 {@link #padRight(String, int)}：
+ *       按「东亚全角占两列」计算宽度，中英混排也能对齐。</li>
  * </ul>
  *
  * <p>线程安全：无状态、无可变字段，可跨线程并发调用。
@@ -105,5 +107,56 @@ public final class StringUtils {
                 .onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
                 .decode(ByteBuffer.wrap(bytes)).toString();
+    }
+
+    /**
+     * 计算字符串在等宽终端中的显示宽度：东亚全角字符占两列，其余字符占一列。
+     *
+     * <p>为什么按显示宽度而不是字符数：中文与英文混排时，按字符数补齐会让后续列错位。
+     *
+     * @param value 待计算的字符串，不可为 null
+     * @return 显示宽度，单位为列
+     */
+    public static int displayWidth(String value) {
+        int width = 0;
+        for (int index = 0; index < value.length(); index++) {
+            width += isFullWidth(value.charAt(index)) ? 2 : 1;
+        }
+        return width;
+    }
+
+    /**
+     * 在右侧补空格，使文本达到指定显示宽度。
+     *
+     * @param value 待补齐的字符串，不可为 null
+     * @param width 目标显示宽度，单位为列
+     * @return 显示宽度不小于目标宽度的文本；已足够宽时原样返回
+     */
+    public static String padRight(String value, int width) {
+        int padding = width - displayWidth(value);
+        if (padding <= 0) {
+            return value;
+        }
+        StringBuilder padded = new StringBuilder(value);
+        for (int index = 0; index < padding; index++) {
+            padded.append(' ');
+        }
+        return padded.toString();
+    }
+
+    /**
+     * 判断字符是否按两列显示：覆盖常用东亚全角区间（汉字、全角标点、假名、谚文）。
+     *
+     * @param value 待判断字符
+     * @return 按两列显示时返回 true
+     */
+    private static boolean isFullWidth(char value) {
+        return (value >= 0x1100 && value <= 0x115F)
+                || (value >= 0x2E80 && value <= 0xA4CF)
+                || (value >= 0xAC00 && value <= 0xD7A3)
+                || (value >= 0xF900 && value <= 0xFAFF)
+                || (value >= 0xFE30 && value <= 0xFE6F)
+                || (value >= 0xFF00 && value <= 0xFF60)
+                || (value >= 0xFFE0 && value <= 0xFFE6);
     }
 }

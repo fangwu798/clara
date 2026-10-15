@@ -1,4 +1,5 @@
 import fnmatch
+import glob
 import json
 import os
 import sys
@@ -18,7 +19,7 @@ _TOOL = {
     "id": "file_ops",
     "name": "file_ops",
     "type": "PYTHON",
-    "description": "对指定目录下的文件执行新增/读取/追加/替换/删除/存在性/列举/递归扫描/批量读取等操作。入参 JSON：op(write|read|append|replace|delete|exists|list|scan|read_many)、path(相对 base_dir 或绝对路径)、base_dir(可选根目录，缺省为当前分析目录 CLARA_WORK_DIR，即执行 run.bat 时所在目录；以 @repo 开头表示按仓库根解析，用于读取随应用发布的固定文件如 config/standards 下的开发规范)、encoding(可选；读取时默认自动识别文件编码，如识别不准再显式指定（gbk、utf-8-sig 等）；写入新文件默认 utf-8)、content、find、replace；scan 额外支持 include/exclude(glob 列表)、max_files(默认 200)、max_depth(默认 6)、with_size；read_many 额外支持 paths(路径列表)、max_bytes(单文件截断字节，默认 20000)。适用于对单个或少量文件做精确读写与目录列举；若要一次性读取整个仓库并整理文档，请改用 run_workflow 工作流。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
+    "description": "对指定目录下的文件执行新增/读取/追加/替换/删除/存在性/列举/递归扫描/批量读取等操作。入参 JSON：op(write|read|append|replace|delete|exists|list|scan|read_many)、path(相对 base_dir 或绝对路径)、base_dir(可选根目录，缺省为当前分析目录 CLARA_WORK_DIR，即执行 run.bat 时所在目录；以 @repo 开头表示按仓库根解析，用于读取随应用发布的固定文件如 config/standards 下的开发规范)、encoding(可选；读取时默认自动识别文件编码，如识别不准再显式指定（gbk、utf-8-sig 等）；写入新文件默认 utf-8)、content、find、replace；scan 额外支持 include/exclude(glob 列表)、max_files(默认 200)、max_depth(默认 6)、with_size；read_many 额外支持 paths(路径列表，元素可写通配模式，如 config/standards/* 一次读取整个目录，支持 * ? [] 与 ** 递归)、max_bytes(单文件截断字节，默认 20000)、max_files(展开后读取的文件数上限，默认 200)。适用于对单个或少量文件做精确读写与目录列举；若要一次性读取整个仓库并整理文档，请改用 run_workflow 工作流。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
     "parameters": {
         "type": "object",
         "properties": {
@@ -65,6 +66,12 @@ DEFAULT_SKIP_DIRS = [
     ".git", ".idea", ".m2", "target", "node_modules", "dist", "build",
     "logs", "volumes", "__pycache__", ".clara",
 ]
+
+# read_many 的路径通配符：路径中出现任一字符即按 glob 展开（* ? [] 均可，** 表示跨目录递归）。
+GLOB_CHARS = "*?["
+
+# read_many 展开通配后的文件数上限（与 scan 的 max_files 默认值一致），防止模式写得过宽读爆上下文。
+DEFAULT_READ_MAX_FILES = 200
 
 
 # 仓库根相对前缀：base_dir / path 以 "@repo" 开头时按仓库根解析，用于读取随应用一起发布的固定文件
@@ -154,17 +161,28 @@ def scan(spec, target):
 
 
 def read_many(spec, base):
-    # 批量读取文件内容，逐文件自动识别编码，单文件按 max_bytes 截断，单个失败不影响其余。
+    # 批量读取文件内容：paths 支持通配模式；逐文件自动识别编码，单文件按 max_bytes 截断，单个失败不影响其余。
     paths = spec.get("paths") or []
     if isinstance(paths, str):
         paths = [paths]
     max_bytes = int(spec.get("max_bytes") or 20000)
+    max_files = int(spec.get("max_files") or DEFAULT_READ_MAX_FILES)
     explicit = read_encoding(spec)
+
+    targets = expand_paths(paths, base)
+    overflow = len(targets) > max_files
+    if overflow:
+        targets = targets[:max_files]
 
     items = []
     total = 0
-    for path in paths:
+    for path in targets:
         item = {"path": path}
+        if any(char in path for char in GLOB_CHARS) and not os.path.exists(resolve(path, base)):
+            # 用通配模式时自己报错：Windows 上直接把 "…/*" 当路径去读会抛出难懂的系统错误。
+            item["error"] = "通配模式未匹配到任何文件，请检查目录与扩展名"
+            items.append(item)
+            continue
         try:
             full = resolve(path, base)
             size = os.path.getsize(full)
@@ -185,7 +203,31 @@ def read_many(spec, base):
         except Exception as exception:  # noqa: BLE001 - 单个文件失败以错误字段回传
             item["error"] = str(exception)
         items.append(item)
-    return {"files": items, "count": len(items), "total_chars": total}
+    return {"files": items, "count": len(items), "total_chars": total, "truncated": overflow}
+
+
+def expand_paths(paths, base):
+    # 展开 read_many 的 paths：不含通配符的原样返回；含通配符的按 base 展开成具体文件。
+    # 展开结果按路径排序并去重（相对 base 根输出，与直接写相对路径的写法保持一致），
+    # 保证同一份配置每次读到的文件与顺序都稳定；某个模式没匹配到文件时保留模式本身，
+    # 由 read_many 逐项回传读取错误，便于调用方发现目录写错或目录为空。
+    root = resolve_root(base)
+    expanded = []
+    seen = set()
+    for path in paths:
+        text = str(path)
+        if not any(char in text for char in GLOB_CHARS):
+            matches = [text]
+        else:
+            matches = [match for match in sorted(glob.glob(resolve(text, base), recursive=True))
+                       if os.path.isfile(match)]
+            matches = [os.path.relpath(match, root).replace(os.sep, "/") for match in matches] or [text]
+        for match in matches:
+            if match in seen:
+                continue
+            seen.add(match)
+            expanded.append(match)
+    return expanded
 
 
 def main():

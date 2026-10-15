@@ -31,6 +31,12 @@ public final class WorkflowDefinitionRegistry {
     private final WorkflowDefinitionLoader loader;
     private volatile Map<String, LoadedWorkflow> workflows = Collections.emptyMap();
 
+    /** 定义文件签名（路径 → 修改时间:大小），用于发现运行期新增 / 修改 / 删除的定义文件。 */
+    private volatile Map<String, String> sourceStamps = Collections.emptyMap();
+
+    /** 最近一次刷新失败的说明（成功时为 null）：既有索引保留可用，失败原因透出给调用方。 */
+    private volatile String lastError;
+
     /**
      * 创建工作流定义注册表。
      *
@@ -52,9 +58,75 @@ public final class WorkflowDefinitionRegistry {
      * @throws IllegalArgumentException 定义非法或标识重复时
      */
     public synchronized void reload() {
+        workflows = loadAll();
+        lastError = null;
+        sourceStamps = scanStamps();
+    }
+
+    /**
+     * 按需刷新：比对定义目录下的文件签名，仅在确有新增 / 修改 / 删除时重新解析。
+     *
+     * <p>用途：让「运行期写入的自定义工作流」（{@code config/workflow/custom}）在后续调用中直接可用，
+     * 无需重启进程；签名一致时只做一次目录遍历与 stat，开销很小。
+     *
+     * <p>失败语义：解析失败时<b>保留既有索引</b>（已加载的工作流照常可运行），把原因记入
+     * {@link #lastError()} 并返回 false；成功替换索引时清空该错误并返回 true。失败时签名不更新，
+     * 因此修好文件后下一次刷新会自动重试。
+     *
+     * @return true 表示索引有效且无解析错误；false 表示本次刷新遇到了非法的定义文件
+     */
+    public synchronized boolean refresh() {
+        if (scanStamps().equals(sourceStamps)) {
+            return lastError == null;
+        }
+        Map<String, LoadedWorkflow> previous = workflows;
+        try {
+            workflows = loadAll();
+        } catch (RuntimeException e) {
+            workflows = previous;
+            lastError = e.getMessage();
+            return false;
+        }
+        lastError = null;
+        sourceStamps = scanStamps();
+        return true;
+    }
+
+    /**
+     * 最近一次刷新 / 重载失败的说明。
+     *
+     * @return 失败原因，无失败时为 null
+     */
+    public String lastError() {
+        return lastError;
+    }
+
+    /**
+     * 解析单个定义文件但不并入索引，供「校验即将发布的自定义工作流」使用。
+     *
+     * @param file 工作流定义文件，不可为 null
+     * @return 解析出的工作流定义，非 null
+     * @throws IllegalArgumentException 文件不可读或配置非法时（消息含文件与节点 id）
+     */
+    public WorkflowDefinition parseDefinition(Path file) {
+        return loader.load(file).getDefinition();
+    }
+
+    /**
+     * 工作流定义目录（自定义工作流写在其 {@code custom} 子目录下）。
+     *
+     * @return 定义目录，可为 null（构造时未指定）
+     */
+    public Path directory() {
+        return directory;
+    }
+
+    /**
+     * 扫描并解析目录下全部定义文件，返回按标识索引的不可变映射（目录不存在时返回空映射）。
+     */
+    private Map<String, LoadedWorkflow> loadAll() {
         if (directory == null || !Files.isDirectory(directory)) {
-            workflows = Collections.emptyMap();
-            return;
+            return Collections.emptyMap();
         }
         List<Path> files = new ArrayList<Path>();
         try (Stream<Path> stream = Files.walk(directory)) {
@@ -75,7 +147,37 @@ public final class WorkflowDefinitionRegistry {
                 throw new IllegalArgumentException("工作流标识重复：" + workflowId + "（" + file + "）");
             }
         }
-        workflows = Collections.unmodifiableMap(loaded);
+        return Collections.unmodifiableMap(loaded);
+    }
+
+    /**
+     * 采集定义目录下全部工作流文件的签名（路径 → 修改时间:大小）。
+     *
+     * @return 签名的有序映射，非 null（目录不存在或不可遍历时为空）
+     */
+    private Map<String, String> scanStamps() {
+        if (directory == null || !Files.isDirectory(directory)) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> stamps = new LinkedHashMap<String, String>();
+        try (Stream<Path> stream = Files.walk(directory)) {
+            stream.filter(Files::isRegularFile).filter(WorkflowDefinitionRegistry::isWorkflowFile)
+                    .sorted().forEach(file -> stamps.put(file.toString(), signature(file)));
+        } catch (IOException e) {
+            return Collections.emptyMap();
+        }
+        return stamps;
+    }
+
+    /**
+     * 单个文件的签名：修改时间与大小，任一变化都视为需要重新解析。
+     */
+    private static String signature(Path file) {
+        try {
+            return Files.getLastModifiedTime(file).toMillis() + ":" + Files.size(file);
+        } catch (IOException e) {
+            return "unknown";
+        }
     }
 
     /**

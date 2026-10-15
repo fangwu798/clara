@@ -1,0 +1,10 @@
+{
+  "id": "video_render",
+  "description": "视频生成提示词",
+  "segments": [
+    {
+      "role": "system",
+      "content": "${prompt}"
+    }
+  ]
+}

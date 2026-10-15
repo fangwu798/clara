@@ -5,7 +5,6 @@ import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -59,7 +58,7 @@ public final class ModelRegistry implements Closeable {
      * @param roleBindings 角色到别名的映射，可为 null（视为无角色表）
      */
     public ModelRegistry(List<Path> configFiles, Map<String, String> roleBindings) {
-        Map<String, Path> index = new LinkedHashMap<String, Path>();
+        Map<String, Path> index = new LinkedHashMap<>();
         if (configFiles != null) {
             for (Path file : configFiles) {
                 String alias = ConfigLocator.aliasOf(file);
@@ -69,7 +68,7 @@ public final class ModelRegistry implements Closeable {
             }
         }
         this.configFiles = index;
-        Map<String, String> roles = new LinkedHashMap<String, String>();
+        Map<String, String> roles = new LinkedHashMap<>();
         if (roleBindings != null) {
             for (Map.Entry<String, String> entry : roleBindings.entrySet()) {
                 if (notBlank(entry.getKey()) && notBlank(entry.getValue())) {
@@ -78,7 +77,7 @@ public final class ModelRegistry implements Closeable {
             }
         }
         this.roleAliases = roles;
-        this.loaded = new LinkedHashMap<String, ProviderConfiguration>();
+        this.loaded = new LinkedHashMap<>();
     }
 
     /**
@@ -109,7 +108,7 @@ public final class ModelRegistry implements Closeable {
      * @return 别名集合，非 null
      */
     public Set<String> aliases() {
-        return Collections.unmodifiableSet(new TreeSet<String>(configFiles.keySet()));
+        return Collections.unmodifiableSet(new TreeSet<>(configFiles.keySet()));
     }
 
     /**

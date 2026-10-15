@@ -1,0 +1,61 @@
+workflowId: author_custom_workflow
+description: 按用户诉求生成自定义工作流并发布到 config/workflow/custom
+version: "1.0.0"
+inputSchema: '{"type":"object","properties":{"requirement":{"type":"string","description":"用户想要的流程，用自然语言描述；含要处理的目录 / 文件、期望产出"},"workflow_hint":{"type":"string","description":"可选：用户指定的工作流标识或改造目标"}},"required":["requirement"]}'
+# 对外只回传发布回执（标识 / 路径 / 调用方式），避免把样例与草稿整体回灌给对话模型。
+outputs: [published]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    # 0) 读取内置流程样例：写法照抄，避免凭空发明节点结构与字段。
+    - id: read_samples
+      type: TOOL
+      outputKeys: [samples]
+      tool: file_ops
+      arguments:
+        op: read_many
+        base_dir: "@repo"
+        paths:
+          - "config/workflow/analyze_repo_docs.yml"
+          - "config/workflow/design_business_solution.yml"
+          - "config/workflow/image_generation.yml"
+        max_bytes: 6000
+        purpose: 读取内置工作流样例作为编写参考
+    # 1) 列出已有自定义工作流：避免标识重复，并支持在既有流程上改造。
+    - id: list_custom
+      type: TOOL
+      outputKeys: [existing]
+      tool: file_ops
+      arguments:
+        op: scan
+        base_dir: "@repo"
+        path: "config/workflow/custom"
+        include: ["*.yml", "*.yaml"]
+        with_size: true
+        purpose: 列出已有自定义工作流，避免标识重复
+    # 2) 起草：把用户诉求转写成一份完整、可直接加载的 YAML 定义。
+    - id: draft
+      type: AGENT
+      outputKeys: [draft]
+      prompt: workflow_author
+      promptVars:
+        requirement: "${requirement}"
+        samples: "${samples}"
+        existing: "${existing}"
+    # 3) 评审：按同一套规范逐项自检草稿，产出可发布的最终版本。
+    - id: review
+      type: AGENT
+      outputKeys: [final]
+      prompt: workflow_author_reviewer
+      promptVars:
+        requirement: "${requirement}"
+        draft: "${draft}"
+    # 4) 发布：用运行期同一套加载器校验后写入 config/workflow/custom，并立即生效（无需重启）。
+    - id: publish
+      type: TOOL
+      outputKeys: [published]
+      tool: publish_workflow
+      arguments:
+        yaml: "${final}"
+        purpose: 校验并发布自定义工作流

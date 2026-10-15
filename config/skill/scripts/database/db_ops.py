@@ -19,7 +19,7 @@ _TOOL = {
     "name": "db_ops",
     "type": "PYTHON",
     "description": (
-        "数据库操作（SQLite / MySQL / PostgreSQL）：查询、执行、批量执行、列表、表结构、版本信息。"
+        "数据库操作（ MySQL / PostgreSQL）：查询、执行、批量执行、列表、表结构、版本信息。"
         "入参 JSON：op(query|execute|script|tables|schema|info)、db_type(sqlite|mysql|postgres，缺省 sqlite)、"
         "path(SQLite 数据库文件，相对 CLARA_WORK_DIR 或 @repo 或绝对路径)、host/port/user/password/database(非 SQLite)、"
         "sql(SQL 文本)、params(SQL 绑定参数数组；占位符 SQLite 用 ?、MySQL/PostgreSQL 用 %s)、"
@@ -34,8 +34,7 @@ _TOOL = {
         "type": "object",
         "properties": {
             "purpose": {"type": "string"},
-            "op": {"type": "string",
-                   "enum": ["query", "execute", "script", "tables", "schema", "info"]},
+            "op": {"type": "string","enum": ["query", "execute", "script", "tables", "schema", "info"]},
             "db_type": {"type": "string", "enum": ["sqlite", "mysql", "postgres"]},
             "path": {"type": "string"},
             "host": {"type": "string"},

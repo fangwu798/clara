@@ -3,6 +3,7 @@ package com.clara.workflow.definition;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowNode;
+import com.clara.core.workflow.IScopeCondition;
 import com.clara.dto.workflow.WorkflowActionSpec;
 import com.clara.dto.workflow.WorkflowDefinition;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
@@ -150,11 +151,36 @@ public final class WorkflowDefinitionLoader {
                 }
                 return WorkflowNodes.human(id, inputKey);
             case CONDITION:
+                return buildConditionNode(node, file, id);
             case LOOP:
                 throw invalid(file, id, "当前配置化工作流暂不支持该节点类型：" + type.name());
             default:
                 throw invalid(file, id, "未知节点类型：" + type.name());
         }
+    }
+
+    private IWorkflowNode buildConditionNode(JsonNode node, Path file, String id) {
+        JsonNode condition = node.get("condition");
+        if (condition == null || !condition.isObject()) {
+            throw invalid(file, id, "CONDITION 节点缺少 condition 对象");
+        }
+        String key = text(condition, "key");
+        if (blank(key)) {
+            throw invalid(file, id, "CONDITION 节点缺少 condition.key");
+        }
+        String operator = text(condition, "operator");
+        String expected = condition.has("value") && !condition.get("value").isNull()
+                ? condition.get("value").asText() : null;
+        JsonNode whenTrue = node.get("whenTrue");
+        if (whenTrue == null || !whenTrue.isObject()) {
+            throw invalid(file, id, "CONDITION 节点缺少 whenTrue 分支");
+        }
+        IWorkflowNode trueNode = buildNode(whenTrue, file);
+        JsonNode whenFalse = node.get("whenFalse");
+        IWorkflowNode falseNode = whenFalse == null || whenFalse.isNull()
+                ? null : buildNode(whenFalse, file);
+        IScopeCondition predicate = new ConfigScopeCondition(key, operator, expected);
+        return WorkflowNodes.condition(id, predicate, trueNode, falseNode);
     }
 
     private IWorkflowNode buildActionNode(JsonNode node, Path file, String id, WorkflowNodeTypeEnum type) {

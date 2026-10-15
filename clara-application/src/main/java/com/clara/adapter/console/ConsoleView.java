@@ -6,8 +6,10 @@ import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.core.model.IStreamObserver;
+import com.clara.model.availability.AvailabilityLine;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.orchestration.api.ConversationResult;
+import com.clara.utils.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.Closeable;
@@ -56,14 +58,56 @@ public final class ConsoleView implements Closeable {
     public static final String ANSI_RED = "\u001B[91m";
 
     /**
+     * ANSI 控制码：黄色（跳过检查等需要留意、但未判定失败的状态）。
+     */
+    public static final String ANSI_YELLOW = "\u001B[93m";
+
+    /**
      * ANSI 控制码：重置。
      */
     public static final String ANSI_RESET = "\u001B[0m";
 
     /**
+     * 取可用性检查行的 ANSI 颜色码：可用为绿色、跳过为黄色、不可用为红色，普通信息不染色。
+     *
+     * @param level 可用性检查行的状态级别，可为 null
+     * @return 颜色码；不染色时返回 null
+     */
+    public static String colorOf(AvailabilityLine.Level level) {
+        if (level == null) {
+            return null;
+        }
+        switch (level) {
+            case OK:
+                return ANSI_GREEN;
+            case WARN:
+                return ANSI_YELLOW;
+            case FAIL:
+                return ANSI_RED;
+            default:
+                return null;
+        }
+    }
+
+    /**
      * 「调用工具」日志中用途短句的最大字符数，超出部分以省略号截断。
      */
     private static final int TOOL_PURPOSE_MAX_CHARS = 80;
+
+    /**
+     * 提示信息中每条目的行首缩进。
+     */
+    private static final String HINT_INDENT = "  ";
+
+    /**
+     * 提示信息中命令列的显示宽度，与 {@code /?} 命令清单的对齐位置一致。
+     */
+    private static final int HINT_COMMAND_WIDTH = 14;
+
+    /**
+     * 提示信息中自然语言用法列的显示宽度，取最长用法「读取本地目录、整理技术文档」的宽度并留出间隔。
+     */
+    private static final int HINT_USAGE_WIDTH = 28;
 
     /**
      * 丢弃输出的流：精简模式下接管框架的标准输出。
@@ -302,18 +346,63 @@ public final class ConsoleView implements Closeable {
     }
 
     /**
-     * 打印交互提示：可用指令（{@code /model}、{@code /log}、{@code /color}、{@code exit}）与自然语言用法示例，
-     * 末尾补一个空行与后续对话分隔。
+     * 打印交互提示：常用命令与自然语言可触发的工作流，末尾补一个空行与后续对话分隔。
+     *
+     * <p>显示约定：命令列与用法列按显示宽度右侧补空格，纵向成列便于扫读；完整命令清单由 {@code /?} 给出，
+     * 此处只列最常用的几条，避免启动时刷屏；ESC 取消能力由调用方按终端是否支持单独提示，这里不重复。
+     *
+     * @param customWorkflows 自定义工作流的「标识（描述）」文本行（{@code config/workflow/custom} 下），
+     *                        非 null，可为空（为空时不打印该段）
      */
-    public void printHints() {
-        println("输入内容回车发送；/? 查看命令提示；/model 切换模型；/compress 压缩当前上下文；/new 开始新对话；"
-                + "/usage 统计 token 用量；/log 切换精简/全量日志；/color 开关颜色；"
-                + "exit 或 quit 结束；执行中按 ESC 两次可取消本轮模型调用与工具执行。"
-                + "需要读取本地目录、整理技术文档、生成需求与技术方案或开发计划、生成/编辑/识别图片时，"
-                + "可直接用自然语言提出（模型会调用 run_workflow 工作流，如 analyze_repo_docs / "
-                + "design_business_solution / plan_development / image_generation / image_edit / "
-                + "image_understanding）。");
+    public void printHints(List<String> customWorkflows) {
+        println("常用命令（/? 查看全部）：");
+        println(hint("/model", "切换模型"));
+        println(hint("/compress", "压缩当前上下文"));
+        println(hint("/new", "开始新对话"));
+        println(hint("/usage", "统计 token 用量"));
+        println(hint("/log", "切换精简 / 全量日志"));
+        println(hint("/color", "开关彩色输出"));
+        println(hint("exit | quit", "结束会话"));
         println();
+        println("自然语言即可触发工作流（模型会自动调用 run_workflow）：");
+        println(workflowHint("读取本地目录、整理技术文档", "analyze_repo_docs"));
+        println(workflowHint("生成需求与技术方案", "design_business_solution"));
+        println(workflowHint("生成开发计划", "plan_development"));
+        println(workflowHint("生成图片", "image_generation"));
+        println(workflowHint("生成视频", "video_generation"));
+        println(workflowHint("编辑图片", "image_edit"));
+        println(workflowHint("识别图片", "image_understanding"));
+        if (customWorkflows != null && !customWorkflows.isEmpty()) {
+            println("自定义工作流（config/workflow/custom，生成后即可按名触发）：");
+            for (String line : customWorkflows) {
+                println(HINT_INDENT + line);
+            }
+        }
+        println();
+        println("直接输入内容回车即发送。");
+        println();
+    }
+
+    /**
+     * 拼一行「命令 + 作用」，命令列按显示宽度对齐。
+     *
+     * @param command     命令，非 null
+     * @param description 作用说明，非 null
+     * @return 已对齐的单行文本
+     */
+    private static String hint(String command, String description) {
+        return HINT_INDENT + StringUtils.padRight(command, HINT_COMMAND_WIDTH) + description;
+    }
+
+    /**
+     * 拼一行「自然语言用法 + 工作流名」，用法列按显示宽度对齐。
+     *
+     * @param usage    自然语言用法，非 null
+     * @param workflow 工作流名，非 null
+     * @return 已对齐的单行文本
+     */
+    private static String workflowHint(String usage, String workflow) {
+        return HINT_INDENT + StringUtils.padRight(usage, HINT_USAGE_WIDTH) + workflow;
     }
 
     /**

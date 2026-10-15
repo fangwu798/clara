@@ -2,7 +2,7 @@
   "id": "run_workflow",
   "name": "run_workflow",
   "type": "BUILTIN",
-  "description": "运行一个已配置的工作流，一次调用即可完成多步骤任务。可用工作流：analyze_repo_docs（读取当前目录源码并整理技术文档）；design_business_solution（扫描当前目录 → 按前后端技术规范产出《需求与技术方案》：整体方案/微服务划分/业务领域隔离/代码结构规划/数据库字段/DTO 规划，并写入 development-plan/01-requirements-and-architecture.md）；plan_development（读取上一步的方案 → 产出《开发计划》：阶段/里程碑/任务拆分/依赖/验收，写入 development-plan/02-development-plan.md）；image_generation（文生图：按主题生成一张图片，入参 inputs.subject 为画面主题，如“夕阳下的海边灯塔”）；image_edit（图生图：以参考图 + 编辑指令生成新图，入参 inputs.reference 为公网图片 URL 或 data:image/<格式>;base64,<编码>、inputs.instruction 为编辑要求）；image_understanding（图片识别：客观描述并提取图片信息，入参 inputs.image 为公网图片 URL 或 data:image/<格式>;base64,<编码>）。调用时机：要求「分析本地目录/读取仓库源码/整理技术文档」时用 analyze_repo_docs；要求「业务拆分/微服务划分/领域隔离/数据库字段/DTO 规划/需求与技术方案」时用 design_business_solution；要求「开发计划/排期/任务拆分」时，若尚未生成方案则先调用 design_business_solution，再调用 plan_development；要求「生成图片/画一张图/文生图/出图」时用 image_generation；要求「改图/图生图/按参考图编辑」时用 image_edit；要求「看图/识别图片/描述图片内容」时用 image_understanding。入参 JSON：workflow(工作流标识)、inputs(对象，可选)。方案的产出会固定遵循随应用发布的前后端开发规范（config/standards/backend-technical-summary.md、config/standards/frontend-ued-summary.md）。",
+  "description": "运行一个已配置的工作流：workflow 填工作流标识，inputs 填该流程的入参对象（标识后的括号里写了描述与必填入参）。本描述的末尾会列出当前可用工作流，包含 config/workflow/custom 下由模型生成的自定义流程——它们写入即生效，无需重启。需要新增或改造流程时，先用 publish_workflow 发布，再用本工具运行。image_generation 与 video_generation 会先优化提示词并等待用户确认再生成，用户批准或提出修改意见后继续；video_generation 可选 inputs.reference（公开图片 URL 或 data URL）。",
   "parameters": "{\"type\":\"object\",\"properties\":{\"workflow\":{\"type\":\"string\"},\"inputs\":{\"type\":\"object\"}},\"required\":[\"workflow\"]}",
   "script": "run_workflow",
   "metadata": { "domain": "workflow", "tags": "workflow,builtin" }

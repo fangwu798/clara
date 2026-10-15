@@ -20,7 +20,8 @@ import java.util.Map;
  * <p>是什么、在哪一层：clara-workflow 的对外入口（包 {@code com.clara.workflow.runtime}），
  * 供宿主的内置工具（如 run_workflow）调用；它组合定义注册表与工作流引擎，屏蔽执行细节。
  *
- * <p>执行流程：按标识取定义 → 生成实例 id → 解析输入（空为 {}）并写入 {@code instanceId} → 启动引擎 →
+ * <p>执行流程：先按需刷新定义注册表（运行期新增的自定义工作流即时可用）→ 按标识取定义 → 生成实例 id →
+ * 解析输入（空为 {}）并写入 {@code instanceId} → 启动引擎 →
  * 汇总状态、等待信息与输出为 JSON 返回。若工作流通过顶层 {@code outputs} 声明了对外输出键，则只回传这些
  * 变量（避免把批量读取的源码等中间产物整体回灌给模型）；输出中超过 20000 字符的字符串会被截断。
  *
@@ -61,7 +62,8 @@ public final class WorkflowRunner {
      * @throws IllegalArgumentException 标识不存在或输入非法时
      */
     public String run(String workflowId, String inputsJson) {
-        WorkflowDefinition definition = registry.require(workflowId);
+        registry.refresh();
+        WorkflowDefinition definition = require(workflowId);
         String instanceId = workflowId + "-" + System.currentTimeMillis();
         LinkedHashMap<String, Object> inputs = parseInputs(inputsJson);
         if (!inputs.containsKey("instanceId")) {
@@ -95,6 +97,23 @@ public final class WorkflowRunner {
             return JSON.writeValueAsString(payload);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("工作流结果序列化失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 按标识取定义；标识不存在而注册表又恰好有解析失败的定义文件时，把失败原因一并抛出，
+     * 让调用方（模型）能直接看到「自定义工作流写错了哪里」而不是只得到一句「工作流不存在」。
+     */
+    private WorkflowDefinition require(String workflowId) {
+        try {
+            return registry.require(workflowId);
+        } catch (IllegalArgumentException e) {
+            String failure = registry.lastError();
+            if (failure == null) {
+                throw e;
+            }
+            throw new IllegalArgumentException(
+                    e.getMessage() + "；另有工作流定义加载失败：" + failure + "（修正该文件后重试即可自动生效）", e);
         }
     }
 

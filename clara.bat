@@ -9,9 +9,10 @@ rem   0) Console code page: switch to UTF-8 (65001) so the UTF-8 output of the
 rem      Java app is not garbled; the original code page is restored on exit.
 rem   1) Python runtime (tool scripts need it); installs it on demand and
 rem      exports the interpreter path via PYTHON_PATH.
-rem   2) Credential env vars: when config/clara.yml declares enabledProviders,
-rem      checks each enabled provider's key env var and prompts for missing
-rem      values; otherwise falls back to the main model (defaultModel).
+rem   2) Credential env vars: every config under config/model-providers declares
+rem      one key env var; each distinct env var is checked once and a missing
+rem      value is prompted for (falls back to the main model when no provider
+rem      config file is found).
 rem ============================================================
 setlocal EnableDelayedExpansion
 
@@ -59,14 +60,20 @@ if not defined PYTHON_PATH (
 )
 echo [OK] Python runtime: !PYTHON_PATH!
 
-rem ---- 2) Credential env vars for enabled providers ----
-rem When config\clara.yml declares enabledProviders, check each one's credential env var.
-call :resolve_enabled_providers
-if defined ENABLED_PROVIDERS (
-    for %%E in (!ENABLED_PROVIDERS!) do call :check_provider_key "%%E"
-    goto :launch
+rem ---- 2) Credential env vars for model providers ----
+rem Every config under config\model-providers declares one credential env var, and the
+rem startup availability check probes all of them, so check them all here too.
+rem Several aliases may share one env var (deepseek-completion and deepseek-response
+rem both use CLARA_DEEPSEEK_API_KEY), so each env var is checked only once.
+set /a MODEL_CONFIG_COUNT=0
+for %%F in ("config\model-providers\*.yml" "config\model-providers\*.yaml") do (
+    if exist "%%~fF" (
+        set /a MODEL_CONFIG_COUNT+=1
+        call :check_provider_key "%%~fF"
+    )
 )
-rem No enabledProviders list: fall back to checking only the main model's key.
+if !MODEL_CONFIG_COUNT! GTR 0 goto :launch
+rem No provider config file found: fall back to checking only the main model's key.
 call :resolve_model_config "%~1"
 if not defined MODEL_CONFIG (
     call :warn "[WARN] Could not locate the main model config; skipping key check."
@@ -196,35 +203,25 @@ powershell -NoProfile -Command "Write-Host $env:CLARA_WARN -ForegroundColor Yell
 if errorlevel 1 echo !CLARA_WARN!
 exit /b
 
-rem Read enabledProviders from config\clara.yml into ENABLED_PROVIDERS (comma separated, brackets stripped).
-:resolve_enabled_providers
-set "ENABLED_PROVIDERS="
-set "ENABLED_RAW="
-for /f "tokens=1,* delims=:" %%A in ('findstr /C:"enabledProviders" "config\clara.yml" 2^>nul') do (
-    set "TMP_NAME=%%A"
-    for /f "tokens=* delims= " %%K in ("!TMP_NAME!") do set "TMP_NAME=%%K"
-    if not defined ENABLED_RAW if "!TMP_NAME!"=="enabledProviders" set "ENABLED_RAW=%%B"
-)
-if not defined ENABLED_RAW exit /b
-set "ENABLED_RAW=!ENABLED_RAW:[=!"
-set "ENABLED_RAW=!ENABLED_RAW:]=!"
-set "ENABLED_RAW=!ENABLED_RAW: =!"
-set "ENABLED_PROVIDERS=!ENABLED_RAW!"
-exit /b
-
-rem Check one enabled provider's credential env var (arg: provider alias); prompt when missing.
+rem Check one model config's credential env var (arg: config file path); an env var
+rem shared by several aliases is checked once; prompt when missing.
 :check_provider_key
-set "PROVIDER_ALIAS=%~1"
-set "PROVIDER_CFG=config\model-providers\!PROVIDER_ALIAS!.yml"
-if not exist "!PROVIDER_CFG!" set "PROVIDER_CFG=config\model-providers\!PROVIDER_ALIAS!.yaml"
-if not exist "!PROVIDER_CFG!" (
-    call :warn "[WARN] Enabled provider !PROVIDER_ALIAS! has no config file under config\model-providers; skipping key check."
-    exit /b
-)
+set "PROVIDER_CFG=%~1"
+set "PROVIDER_ALIAS=%~n1"
+if /i "!PROVIDER_ALIAS:~-8!"==".example" exit /b
 call :resolve_key_env "!PROVIDER_CFG!"
 if not defined KEY_ENV (
     echo [INFO] Provider !PROVIDER_ALIAS!: no environmentVariable ^(or uses inline apiKey^); skipping key check.
     exit /b
 )
+call :key_checked "!KEY_ENV!"
+if not errorlevel 1 exit /b
 call :ensure_key "!KEY_ENV!"
 exit /b
+
+rem Record the credential env vars already checked (arg: env var name); returns
+rem errorlevel 0 when it was checked before in this run, 1 when seen the first time.
+:key_checked
+if defined CHECKED_KEY_%~1 exit /b 0
+set "CHECKED_KEY_%~1=1"
+exit /b 1

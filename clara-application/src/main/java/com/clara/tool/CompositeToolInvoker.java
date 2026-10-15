@@ -47,8 +47,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    private static final TypeReference<Map<String, Object>> ARGUMENTS_TYPE =
-            new TypeReference<Map<String, Object>>() { };
+    private static final TypeReference<Map<String, Object>> ARGUMENTS_TYPE = new TypeReference<Map<String, Object>>() { };
 
     private final SkillRegistry skillRegistry;
     private final IToolInvoker localToolInvoker;
@@ -110,22 +109,17 @@ public final class CompositeToolInvoker implements IToolInvoker {
      */
     private ToolResult invokeExternal(IToolInvocation invocation, ExternalToolBinding binding) {
         if (mcpGateway == null) {
-            throw error(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategory.CAPABILITY,
-                    "外部工具未接入：" + invocation.name() + "（MCP 网关未装配）");
+            throw error(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategory.CAPABILITY, "外部工具未接入：" + invocation.name() + "（MCP 网关未装配）");
         }
         ConvContext conversation = ConvContext.current();
         if (conversation == null) {
-            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION,
-                    "外部工具调用缺少会话上下文：" + invocation.name());
+            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION, "外部工具调用缺少会话上下文：" + invocation.name());
         }
         CallContext call = conversation.currentCall();
         if (call == null) {
-            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION,
-                    "外部工具调用缺少调用上下文：" + invocation.name());
+            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION, "外部工具调用缺少调用上下文：" + invocation.name());
         }
-        McpToolCall mcpCall = new McpToolCall(binding.getTenantId(), binding.getServerKey(),
-                binding.getSnapshotId(), invocation.name(), binding.getSchemaHash(),
-                arguments(invocation), conversation, call);
+        McpToolCall mcpCall = new McpToolCall(binding.getTenantId(), binding.getServerKey(), binding.getSnapshotId(), invocation.name(), binding.getSchemaHash(), arguments(invocation), conversation, call);
         McpToolResult result = mcpGateway.callTool(mcpCall);
         return new ToolResult(invocation.callId(), output(result));
     }
@@ -144,8 +138,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
         try {
             return JSON.readValue(json, ARGUMENTS_TYPE);
         } catch (IOException e) {
-            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION,
-                    "外部工具入参不是合法 JSON：" + invocation.name());
+            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION, "外部工具入参不是合法 JSON：" + invocation.name());
         }
     }
 
@@ -164,7 +157,6 @@ public final class CompositeToolInvoker implements IToolInvoker {
     }
 
     private static ClaraException error(String code, ErrorCategory category, String message) {
-        return new ClaraException(new ClaraError(code, category, message, false, null, null, null, null,
-                Collections.<String, String>emptyMap()));
+        return new ClaraException(new ClaraError(code, category, message, false, null, null, null, null, Collections.emptyMap()));
     }
 }

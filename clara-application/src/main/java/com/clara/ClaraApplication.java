@@ -1,12 +1,12 @@
 package com.clara;
 
-import com.clara.adapter.cli.MediaGenerationCli;
 import com.clara.adapter.console.CancelKeyMonitor;
 import com.clara.adapter.console.ConsoleView;
 import com.clara.adapter.console.LaunchOptions;
 import com.clara.adapter.console.SessionCommandHandler;
 import com.clara.adapter.console.UsageTrendChart;
 import com.clara.config.ConfigLocator;
+import com.clara.config.ModelAvailabilityManager;
 import com.clara.context.CancellationToken;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraError;
@@ -15,6 +15,7 @@ import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.session.ModelSession;
+import com.clara.workflow.WorkflowCatalog;
 import com.clara.workflow.runtime.WorkflowProgress;
 
 import java.io.BufferedReader;
@@ -73,17 +74,13 @@ public final class ClaraApplication {
      * @throws Exception 输出流初始化失败时
      */
     public static void main(String[] args) throws Exception {
-        // 非交互媒体生成子命令（image / video）：供主模型经 run_command 调用 clara.jar 触发，执行完即退出。
-        if (args != null && args.length > 0 && MediaGenerationCli.supports(args[0])) {
-            System.exit(MediaGenerationCli.run(args));
-        }
         // 会话标识由工作目录推导：同一目录再次进入即续接上次的对话历史（历史落盘位置见启动横幅）。
         conversationId = ConfigLocator.cliSessionId();
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         LaunchOptions options = LaunchOptions.parse(args);
 
         try (ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(), options.forcedColor()); CancelKeyMonitor monitor = CancelKeyMonitor.create(view)) {
-            List<Path> candidates = ConfigLocator.modelConfigs();
+            List<Path> candidates = new ModelAvailabilityManager().checkAndPersist(ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(), line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
             ModelChoice choice = selectModelConfig(view, reader, options, candidates);
             runSession(view, reader, candidates, choice, monitor);
         }
@@ -105,7 +102,7 @@ public final class ClaraApplication {
 
             view.printBanner(bootstrap, session.providerConfig(), choice.configPath(), choice.source());
             view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
-            view.printHints();
+            view.printHints(WorkflowCatalog.customSummaries());
             if (monitor.isAvailable()) {
                 view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
             }
@@ -176,9 +173,9 @@ public final class ClaraApplication {
     }
 
     /**
-     * 生成新的会话标识：在「工作目录派生标识」后追加时间戳，保证新对话与既有历史相互隔离。
+     * 生成新会话标识：在「工作目录派生标识」后追加时间戳，保证新对话与既有历史相互隔离。
      *
-     * @return 新的会话标识，非 null
+     * @return 新会话标识，非 null
      */
     private static String newConversationId() {
         return ConfigLocator.cliSessionId() + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
@@ -228,11 +225,12 @@ public final class ClaraApplication {
         }
         String defaultModel = ConfigLocator.defaultModel();
         List<String> enabled = ConfigLocator.enabledProviders();
+        Path configPath = Paths.get("");
         if (defaultModel != null && !enabled.isEmpty() && !containsIgnoreCase(enabled, defaultModel)) {
             view.println("启动失败：config/clara.yml 的 defaultModel=" + defaultModel + " 不在 enabledProviders 启用列表内 " + enabled + "。");
             view.println("请把主模型加入 enabledProviders，或把 defaultModel 改为已启用的模型。");
             System.exit(1);
-            return new ModelChoice(Paths.get(""), "配置错误");
+            return new ModelChoice(configPath, "配置错误");
         }
         Path preferred = defaultModel == null ? null : ConfigLocator.resolveModel(candidates, defaultModel);
         if (preferred != null) {
@@ -244,7 +242,7 @@ public final class ClaraApplication {
         if (candidates.isEmpty()) {
             view.println("未找到模型配置：请确认工作目录为仓库根，且 " + ConfigLocator.modelDirectory().toAbsolutePath() + " 下存在 *.yml / *.yaml（examples 样例会被忽略）。");
             System.exit(1);
-            return new ModelChoice(Paths.get(""), "无可用模型配置");
+            return new ModelChoice(configPath, "无可用模型配置");
         }
         return new ModelChoice(view.chooseModel(candidates, reader), "交互选择");
     }
@@ -304,7 +302,7 @@ public final class ClaraApplication {
         ConsoleView.ConsoleStreamObserver observer = view.newObserver(bootstrap::describeToolInvocation);
         // 轮流式观察者与提示通道注册到线程：工作流节点执行时可复用（文本节点实时显示思考、各节点输出进度）。
         try (CancelKeyMonitor.Session ignored = monitor.watch(cancellationToken);
-                WorkflowProgress.Scope workflowOutput = WorkflowProgress.open(observer, text -> {
+                WorkflowProgress.Scope ignored1 = WorkflowProgress.open(observer, text -> {
                     observer.endStream();
                     view.emit(text, ConsoleView.ANSI_GRAY);
                 })) {
@@ -319,7 +317,7 @@ public final class ClaraApplication {
                     .observer(observer)
                     .cancellationToken(cancellationToken)
                     .build());
-            // 思考与正文已实时流式展示，这里只把完整记录补写进详细日志文件（控制台不重复打印）。
+            // 思考与正文已实时流式展示，这里只把完整记录写进详细日志文件（控制台不重复打印）。
             view.logTurn(result);
             // 记录本轮用量，形成 /usage 的累计趋势。
             recordUsageTrend(result.getUsage());

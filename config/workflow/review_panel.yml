@@ -1,4 +1,5 @@
 workflowId: review_panel
+description: 多角色讨论并汇总评审结论
 version: "1.0.0"
 # 对外只回传最终结论，避免把逐轮讨论稿整体回灌给对话模型。
 outputs: [conclusion]

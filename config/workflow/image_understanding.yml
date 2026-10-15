@@ -1,4 +1,5 @@
 workflowId: image_understanding
+description: 图片理解：提取图片内容并生成客观描述
 version: "1.0.0"
 # 对外只回传图片理解结果。
 outputs: [description]

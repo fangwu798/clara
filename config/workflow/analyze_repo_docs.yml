@@ -1,4 +1,5 @@
 workflowId: analyze_repo_docs
+description: 扫描当前目录并整理技术文档
 version: "1.0.0"
 # 对外只回传最终文档，避免把批量读取的源码内容整体回灌给对话模型。
 outputs: [document]

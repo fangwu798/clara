@@ -1,13 +1,11 @@
 workflowId: image_generation
-version: "1.1.0"
-# 对外只回传图片资产引用（assetId / storageUri 等），避免把 base64 图片数据整体回灌给对话模型。
-outputs: [image]
+description: 文生图，按主题生成图片
+version: "1.2.0"
+outputs: [prompt, image]
 root:
   id: root
   type: SEQUENCE
   children:
-    # 第一步：用文本模型把「主题」精炼成一句可直接生图的画面描述。
-    # 走文本能力，因而能流式显示思考；未指定 model 时使用当前绑定的默认模型。
     - id: refine
       type: AGENT
       outputKeys: [prompt]
@@ -15,13 +13,44 @@ root:
       prompt: image_generator
       promptVars:
         subject: "${subject}"
-    # 第二步：以精炼后的描述出图（字节 doubao-seedream，需已设置 CLARA_VOLCENGINE_API_KEY）。
-    # 图片接口本身不产生思考、也不支持流式；产物落成媒体资产后写回作用域。
-    - id: draw
-      type: AGENT
-      outputKeys: [image]
-      model: volcengine-response
-      capability: IMAGE
-      prompt: image_render
-      promptVars:
-        prompt: "${prompt}"
+    - id: review_prompt
+      type: HUMAN
+      inputKey: promptFeedback
+    - id: confirmation
+      type: CONDITION
+      condition:
+        key: promptFeedback
+        operator: equals
+        value: approve
+      whenTrue:
+        id: draw
+        type: AGENT
+        outputKeys: [image]
+        model: volcengine-response
+        capability: IMAGE
+        prompt: image_render
+        promptVars:
+          prompt: "${prompt}"
+      whenFalse:
+        id: revise_and_review
+        type: SEQUENCE
+        children:
+          - id: revise
+            type: AGENT
+            outputKeys: [prompt]
+            capability: CHAT
+            prompt: image_generator
+            promptVars:
+              subject: "${subject}"
+              feedback: "${promptFeedback}"
+          - id: review_prompt_again
+            type: HUMAN
+            inputKey: promptFeedbackAgain
+          - id: draw_after_feedback
+            type: AGENT
+            outputKeys: [image]
+            model: volcengine-response
+            capability: IMAGE
+            prompt: image_render
+            promptVars:
+              prompt: "${prompt}"

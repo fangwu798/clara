@@ -1,4 +1,5 @@
 workflowId: image_edit
+description: 图生图：根据参考图片和编辑指令生成图片
 version: "1.0.0"
 # 对外只回传图片资产引用。
 outputs: [image]

@@ -1,4 +1,5 @@
 workflowId: design_business_solution
+description: 产出需求与技术方案
 version: "1.0.0"
 # 对外只回传最终方案文本，避免把批量读取的源码整体回灌给对话模型。
 outputs: [solution]
@@ -6,7 +7,8 @@ root:
   id: root
   type: SEQUENCE
   children:
-    # 0) 读取随应用发布的前后端开发规范（固定约束，方案必须遵循，来源为仓库根 config/standards/）。
+    # 0) 读取随应用发布的前后端开发规范（固定约束，方案必须遵循，来源为仓库根 config/standards/ 下的全部文件；
+    #    新增规范文件放进该目录即自动纳入，无需改本流程）。
     - id: read_standards
       type: TOOL
       outputKeys: [standards]
@@ -15,10 +17,9 @@ root:
         op: read_many
         base_dir: "@repo"
         paths:
-          - "config/standards/backend-technical-summary.md"
-          - "config/standards/frontend-ued-summary.md"
+          - "config/standards/*"
         max_bytes: 60000
-    # 1) 扫描当前分析目录（run.bat 执行时所在目录，经 CLARA_WORK_DIR 传入）的目录树。
+    # 1) 扫描当前分析目录（clara.bat 执行时所在目录，经 CLARA_WORK_DIR 传入）的目录树。
     - id: scan
       type: TOOL
       outputKeys: [scan_result]

@@ -1,0 +1,58 @@
+workflowId: video_generation
+description: 文生视频：优化提示词并在用户确认后生成视频，可附参考图片
+version: "1.1.0"
+outputs: [prompt, video]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    - id: refine
+      type: AGENT
+      outputKeys: [prompt]
+      capability: CHAT
+      prompt: video_generator
+      promptVars:
+        subject: "${subject}"
+    - id: review_prompt
+      type: HUMAN
+      inputKey: promptFeedback
+    - id: confirmation
+      type: CONDITION
+      condition:
+        key: promptFeedback
+        operator: equals
+        value: approve
+      whenTrue:
+        id: generate
+        type: AGENT
+        outputKeys: [video]
+        capability: VIDEO
+        prompt: video_render
+        promptVars:
+          prompt: "${prompt}"
+        attachments:
+          - "${reference}"
+      whenFalse:
+        id: revise_and_review
+        type: SEQUENCE
+        children:
+          - id: revise
+            type: AGENT
+            outputKeys: [prompt]
+            capability: CHAT
+            prompt: video_generator
+            promptVars:
+              subject: "${subject}"
+              feedback: "${promptFeedback}"
+          - id: review_prompt_again
+            type: HUMAN
+            inputKey: promptFeedbackAgain
+          - id: generate_after_feedback
+            type: AGENT
+            outputKeys: [video]
+            capability: VIDEO
+            prompt: video_render
+            promptVars:
+              prompt: "${prompt}"
+            attachments:
+              - "${reference}"

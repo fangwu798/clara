@@ -1,0 +1,12 @@
+{
+    "id":  "publish_workflow",
+    "name":  "publish_workflow",
+    "type":  "BUILTIN",
+    "description":  "校验并发布一个自定义工作流定义。入参 JSON：yaml(必填，工作流定义的 YAML 全文)、dryRun(可选布尔，true 表示只校验不落盘)。校验用的是运行期同一套加载器，通过后写入 config/workflow/custom/\u003cworkflowId\u003e.yml 并立即生效（同一会话随后即可用 run_workflow 按标识调用，无需重启）；定义非法时回传加载器的报错（含节点 id），据此修正后重试即可。适用于「把这个流程做成工作流」「改造 / 改名已有自定义工作流」等诉求，也用于交付前自检手写的流程定义。另需填写 purpose(一句话说明本次调用目的，会展示给用户)。",
+    "parameters":  "{\"type\":\"object\",\"properties\":{\"purpose\":{\"type\":\"string\"},\"yaml\":{\"type\":\"string\"},\"dryRun\":{\"type\":\"boolean\"}},\"required\":[\"yaml\"]}",
+    "script":  "publish_workflow",
+    "metadata":  {
+                     "domain":  "workflow",
+                     "tags":  "workflow,builtin,custom"
+                 }
+}

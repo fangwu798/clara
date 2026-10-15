@@ -1,6 +1,7 @@
 package com.clara;
 
 import com.clara.config.ConfigLocator;
+import com.clara.api.IBuiltinTool;
 import com.clara.memory.semantic.milvus.MilvusSettings;
 import com.clara.context.ConvContext;
 import com.clara.core.memory.IEmbeddingClient;
@@ -38,7 +39,6 @@ import com.clara.mcp.registry.config.McpServerConfigLoader;
 import com.clara.mcp.registry.config.McpServerRegistrar;
 import com.clara.mcp.client.McpClientFactory;
 import com.clara.mcp.transport.JacksonMcpJsonCodec;
-import com.clara.media.runtime.MediaRuntime;
 import com.clara.memory.persistence.ConversationStore;
 import com.clara.memory.persistence.InMemoryConversationStore;
 import com.clara.memory.persistence.local.LocalConversationStore;
@@ -79,10 +79,12 @@ import com.clara.tool.CompositeToolInvoker;
 import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.mcp.tool.McpExternalToolRegistrar;
 import com.clara.tool.ToolInvocationPurpose;
-import com.clara.workflow.application.AgentActionFactory;
-import com.clara.workflow.application.ReviewActionFactory;
+import com.clara.workflow.AgentActionFactory;
+import com.clara.workflow.PublishWorkflowTool;
+import com.clara.workflow.ReviewActionFactory;
+import com.clara.workflow.WorkflowCatalog;
 import com.clara.workflow.runtime.ToolActionFactory;
-import com.clara.workflow.application.WorkflowRunTool;
+import com.clara.workflow.WorkflowRunTool;
 import com.clara.workflow.runtime.WorkflowRunner;
 import com.clara.workflow.checkpoint.InMemoryCheckpointStore;
 import com.clara.workflow.definition.WorkflowDefinitionLoader;
@@ -123,8 +125,13 @@ import java.util.logging.Logger;
  * 并整理技术文档）。AGENT 节点所需的平台配置为会话级，由宿主在加载模型配置后经 {@link #modelRegistry()}
  * 绑定默认模型（节点可再按 {@code role} / {@code model} 指定各自的模型）。
  *
- * <p>媒体能力：{@link MediaRuntime} 惰性提供媒体存储（图片产物落成可引用资产）与异步媒体任务调度器，
- * 未使用时不产生任何文件或锁；AGENT 节点声明 {@code capability: IMAGE} 时会把生成的图片落成资产。
+ * <p>自定义工作流：模型生成的流程经内置工具 {@code publish_workflow}（{@link PublishWorkflowTool}）用同一套
+ * 加载器校验后写入 {@code config/workflow/custom}；运行器在每次调用前按文件签名刷新定义注册表，因此
+ * 「会话中生成、立即可用，且无需重启」。可用清单另由 {@link WorkflowCatalog} 拼进 {@code run_workflow} 的
+ * 工具描述下发，模型据此在用户提到某个流程时按名调用。
+ *
+ * <p>媒体能力通过配置化工作流提供：AGENT 节点可声明 {@code IMAGE} / {@code VIDEO} 能力，生成结果以
+ * 供应商返回的引用写入工作流作用域，不在 application 层维护独立媒体存储。
  *
  * <p>对话历史：窗口记忆由工作目录下的本地文件存储承载（{@code <工作目录>/.clara/state/conversations}，见
  * {@link LocalConversationStore}），因此「同一目录再次进入」能续接上次的上下文；存储同样惰性创建，且目录被
@@ -209,7 +216,6 @@ public final class ApplicationBootstrap implements Closeable {
     private final ExternalToolCatalog externalToolCatalog;
     private final IWorkflowEngine workflowEngine;
     private final ModelRegistry modelRegistry;
-    private final MediaRuntime mediaRuntime;
     private final WorkflowDefinitionRegistry workflowDefinitionRegistry;
     private final WorkflowRunner workflowRunner;
     private final DefaultConversationOrchestrator orchestrator;
@@ -300,7 +306,9 @@ public final class ApplicationBootstrap implements Closeable {
 
         // orchestration 协作者
         SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore);
-        SkillMatchCoordinator skillMatch = new SkillMatchCoordinator(embeddingClient, semanticMemoryStore, promptProvider, new RegistryToolCatalog(skillRegistry));
+        // 工具描述按请求组装时现扫一遍工作流清单，使运行期新生成的自定义工作流无需重启即可被模型看到
+        SkillMatchCoordinator skillMatch = new SkillMatchCoordinator(embeddingClient, semanticMemoryStore, promptProvider,
+                new RegistryToolCatalog(skillRegistry, WorkflowCatalog::decorateToolDescription));
         ContextAssembler contextAssembler = new ContextAssembler(windowCompression, semanticRecall, skillMatch);
         CapabilityDispatcher capabilityDispatcher = new CapabilityDispatcher(streamModel);
         ToolRoundTripCoordinator toolRoundTrip = new ToolRoundTripCoordinator(toolInvoker);
@@ -328,19 +336,20 @@ public final class ApplicationBootstrap implements Closeable {
         // clara-workflow：默认内存检查点工作流引擎；IWorkflowDefinitionResolver 本阶段未接入
         this.workflowEngine = new DefaultWorkflowEngine(new InMemoryCheckpointStore(), 4);
 
-        // 工作流配置化装配：模型绑定注册表 + 媒体运行时 + 动作工厂 → 定义目录加载 → 定义注册表 → 运行器 → 内置工具
+        // 工作流配置化装配：模型绑定注册表 + 动作工厂 → 定义目录加载 → 定义注册表 → 运行器 → 内置工具
         this.modelRegistry = new ModelRegistry(ConfigLocator.modelConfigs(), ConfigLocator.roleBindings());
-        this.mediaRuntime = new MediaRuntime(ConfigLocator.workspaceRoot(), WORKSPACE_ID);
         List<IWorkflowActionFactory> actionFactories = Arrays.asList(
-                new AgentActionFactory(orchestrator, promptProvider, modelRegistry, mediaRuntime),
+                new AgentActionFactory(orchestrator, promptProvider, modelRegistry),
                 new ReviewActionFactory(orchestrator, promptProvider, modelRegistry),
                 new ToolActionFactory(toolInvoker));
         this.workflowDefinitionRegistry = new WorkflowDefinitionRegistry(DEFAULT_WORKFLOW_DIRECTORY, new WorkflowDefinitionLoader(actionFactories));
         // 目录不存在时不加载、不报错
         this.workflowDefinitionRegistry.reload();
         this.workflowRunner = new WorkflowRunner(workflowEngine, workflowDefinitionRegistry);
-        // 内置工具与本地工具调用共享同一脚本执行器注册表，故可在运行器就绪后再注册内置执行器
-        scriptExecutors.register(new BuiltinToolExecutor(Collections.singletonList(new WorkflowRunTool(workflowRunner))));
+        // 内置工具与本地工具调用共享同一脚本执行器注册表，故可在运行器就绪后再注册内置执行器：
+        // run_workflow 负责按标识运行；publish_workflow 负责校验并发布模型生成的自定义工作流
+        scriptExecutors.register(new BuiltinToolExecutor(Arrays.<IBuiltinTool>asList(
+                new WorkflowRunTool(workflowRunner), new PublishWorkflowTool(workflowDefinitionRegistry))));
     }
 
     /**
@@ -543,15 +552,6 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     /**
-     * 返回媒体运行时，宿主据此获取媒体存储（图片产物资产化）与异步媒体任务调度器。
-     *
-     * @return 媒体运行时，非 null
-     */
-    public MediaRuntime mediaRuntime() {
-        return mediaRuntime;
-    }
-
-    /**
      * 返回装配好的 embedding 客户端。
      *
      * @return embedding 客户端，非 null
@@ -745,7 +745,6 @@ public final class ApplicationBootstrap implements Closeable {
 
     @Override
     public void close() {
-        closeQuietly(mediaRuntime);
         closeQuietly(modelRegistry);
         closeQuietly(workflowEngine);
         closeQuietly(semanticMemoryStore);

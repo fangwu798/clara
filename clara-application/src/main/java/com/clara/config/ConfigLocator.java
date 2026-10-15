@@ -108,9 +108,12 @@ public final class ConfigLocator {
      * @return 排序后的配置路径列表，非 null
      */
     public static List<Path> modelConfigs() {
-        List<Path> all = scanModelConfigs();
-        List<String> enabled = enabledProviders();
-        if (enabled.isEmpty()) {
+        return filterModelConfigs(allModelConfigs(), claraConfigFile());
+    }
+
+    static List<Path> filterModelConfigs(List<Path> all, Path configFile) {
+        List<String> enabled = enabledProviders(configFile);
+        if (!hasEnabledProvidersSetting(configFile)) {
             return all;
         }
         List<Path> filtered = new ArrayList<>();
@@ -124,16 +127,40 @@ public final class ConfigLocator {
     }
 
     /**
+     * 扫描全部模型配置，不应用 {@code enabledProviders} 过滤。
+     *
+     * @return 排序后的配置文件列表
+     */
+    public static List<Path> allModelConfigs() {
+        return scanModelConfigs();
+    }
+
+    private static boolean hasEnabledProvidersSetting(Path configFile) {
+        if (!Files.isRegularFile(configFile)) {
+            return false;
+        }
+        try {
+            JsonNode root = YAML.readTree(Files.readAllBytes(configFile));
+            return root != null && root.has(ENABLED_PROVIDERS_KEY);
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+
+    /**
      * 读取 {@code config/clara.yml} 的启用供应商列表 {@code enabledProviders}。
      *
      * <p>格式：YAML 序列（{@code [a, b]} 单行流式或 {@code - a} 块式均可）或逗号分隔字符串；元素为模型别名
-     * （{@code config/model-providers} 下文件名去掉扩展名）。文件缺失、未配置该键或读取失败时返回空列表
-     * （表示不限制，加载全部模型配置）。
+     * （{@code config/model-providers} 下文件名去掉扩展名）。文件缺失、未配置该键、显式配置空列表或读取失败时
+     * 均返回空列表；应用筛选时会额外区分“未配置”与“显式空列表”。
      *
      * @return 启用别名列表，非 null（可为空）
      */
     public static List<String> enabledProviders() {
-        Path configFile = claraConfigFile();
+        return enabledProviders(claraConfigFile());
+    }
+
+    private static List<String> enabledProviders(Path configFile) {
         if (!Files.isRegularFile(configFile)) {
             return Collections.emptyList();
         }
