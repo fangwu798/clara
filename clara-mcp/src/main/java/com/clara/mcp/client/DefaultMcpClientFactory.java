@@ -14,6 +14,7 @@ import com.clara.mcp.transport.stdio.ProcessFactory;
 import com.clara.mcp.transport.stdio.StdioMcpTransport;
 import java.net.URI;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -88,6 +89,7 @@ public final class DefaultMcpClientFactory implements McpClientFactory {
     private StdioMcpTransport stdio(McpServerRegistration registration) {
         List<String> command = registration.getCommand().isEmpty()
                 ? split(registration.getAddress()) : registration.getCommand();
+        command = absolutize(command);
         StdioMcpTransport.Builder builder = StdioMcpTransport.builder()
                 .command(command)
                 .allowedExecutables(allowedExecutables)
@@ -96,6 +98,34 @@ public final class DefaultMcpClientFactory implements McpClientFactory {
         if (!registration.getEnv().isEmpty()) { builder.environment(registration.getEnv()); }
         if (processFactory != null) { builder.processFactory(processFactory); }
         return builder.build();
+    }
+
+    /**
+     * 把命令首项绝对化：MCP 生态的配置惯例是写 {@code npx} / {@code node} 这类裸命令名，而 stdio 传输只接受
+     * 绝对路径，直接用原始配置会在建连前就因「executable must be absolute」失败。
+     *
+     * <p>解析办法是在允许清单里按文件名匹配（清单由宿主按 PATH / PATHEXT 展开）：既不要求在配置里写死绝对
+     * 路径，也不放宽「必须命中允许清单」这条安全前提——匹配不上就原样返回，由传输层照旧报「必须是绝对路径」。
+     *
+     * @param command 原始命令，不可为空
+     * @return 首项已绝对化的命令列表；无需或无法绝对化时返回原列表
+     */
+    private List<String> absolutize(List<String> command) {
+        if (command.isEmpty() || Paths.get(command.get(0)).isAbsolute()) {
+            return command;
+        }
+        String head = command.get(0);
+        for (Path candidate : allowedExecutables) {
+            String fileName = candidate.getFileName().toString();
+            int dot = fileName.lastIndexOf('.');
+            String stem = dot > 0 ? fileName.substring(0, dot) : fileName;
+            if (fileName.equalsIgnoreCase(head) || stem.equalsIgnoreCase(head)) {
+                List<String> resolved = new ArrayList<String>(command);
+                resolved.set(0, candidate.toString());
+                return resolved;
+            }
+        }
+        return command;
     }
 
     private StreamableHttpMcpTransport http(McpServerRegistration registration) {

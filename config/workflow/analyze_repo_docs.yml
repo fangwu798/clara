@@ -25,15 +25,20 @@ root:
       promptVars:
         goal: "梳理并输出本项目（Clara 智能体平台）的技术文档"
         listing: "${scan_result}"
+    # 读取计划挑出的文件：code_graph 逐文件先取知识图谱的文件大纲，图谱未覆盖（未索引 / 不在索引范围 /
+    # 图谱不可用）的才回退为本地文件读取，返回里每条信息都带 source(graph|file)，便于核对信息来源。
+    # 想让图谱覆盖全量代码时，先运行 `codebase-memory-mcp cli index_repository --repo-path <目录>`（见
+    # deploy/codebase-memory-mcp/readme.md），或让模型调用 code_graph 的 op=index。
     - id: read
       type: TOOL
       outputKeys: [sources]
-      tool: file_ops
+      tool: code_graph
       arguments:
-        op: read_many
+        op: read
         base_dir: "."
         paths: "${plan.files}"
         max_bytes: 6000
+        purpose: "读取计划挑出的源码与文档：优先取代码知识图谱，图谱未覆盖的再读本地文件"
     - id: draft
       type: AGENT
       outputKeys: [document]

@@ -40,16 +40,17 @@ root:
       promptVars:
         goal: "梳理业务需求，产出「需求 + 技术方案」：整体方案、微服务划分、业务领域隔离、代码结构规划、数据库字段设计、DTO 对象规划"
         listing: "${scan_result}"
-    # 3) 批量读取被挑选的文件内容。
+    # 3) 批量读取被挑选的文件内容：优先取代码知识图谱（结构信息省 token），图谱未覆盖的自动回退本地文件。
     - id: read
       type: TOOL
       outputKeys: [sources]
-      tool: file_ops
+      tool: code_graph
       arguments:
-        op: read_many
+        op: read
         base_dir: "."
         paths: "${plan.files}"
         max_bytes: 7000
+        purpose: "读取方案规划挑出的文件：优先取代码知识图谱，图谱未覆盖的再读本地文件"
     # 4) 按前后端技术规范产出完整的需求与技术方案（Markdown）。
     - id: design
       type: AGENT

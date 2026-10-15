@@ -5,6 +5,7 @@
 >
 > 修订（2026-10-15）：CLI 运行模式已删除——`com.clara.adapter.cli` 下的 ClaraCli / CliArgumentsParser / CliOptions / CliExitCodes / NdjsonProtocolWriter 及其契约测试一并移除。原因：`clara.jar` 的入口始终是交互式对话 `ClaraApplication`（shade 插件的 mainClass），CLI 没有任何生产调用方，任务改由工作流（`run_workflow` / `publish_workflow`）承担。下文 §4.3、§5.3 等章节保留为当时的设计记录。
 > 修订（2026-10-15）：工作区运行入口已删除——`com.clara.workspace`（WorkspaceBusinessRunner / DefaultWorkspaceBusinessRunner / WorkspaceRunRequest / WorkspaceResumeRequest / WorkspaceRunResult / WorkspacePolicy）与 core 的 `com.clara.enums.cli`、`com.clara.enums.workspace` 一并移除，`ApplicationBootstrap` 不再装配该入口、也不再有 `workspaceRunner()` 访问器。原因：CLI 删除后无任何调用方。下文 §4 / §5 中相关章节保留为当时的设计记录。
+> 修订（2026-10-15）：MCP 工具下发补齐——新增 `com.clara.tool.McpToolCatalog`（把已发现的 MCP 工具声明成可下发给模型的工具）与 `com.clara.tool.CompositeToolCatalog`（本地技能工具与外部 MCP 工具合并，同名本地优先），`SkillMatchCoordinator` 改用合并目录，使「发现 → 声明 → 调用」三环闭合；同时启动时由 `loadMcpServers` 完成「注册 → 发现 → 登记」，并把结果写进启动横幅。
 
 ## 1. 目标
 
@@ -39,10 +40,12 @@ clara-application/src/main/java/com/clara/
 │   │   ├── WorkspaceRunSseAdapter.java    # SSE 事件流适配（后续阶段）
 │   │   ├── SseEvent.java / RestResponse.java / RestErrors.java  # 协议载体（保留）
 │   └── document/                          # 文档解析适配（保留）
-├── tool/                                  # 外部工具接入（新增）
+├── tool/                                  # 工具接入与下发（新增）
 │   ├── ExternalToolBinding.java           # 外部工具路由绑定值对象（新增）
 │   ├── ExternalToolCatalog.java           # 工具名 → 外部工具路由登记表（新增）
-│   └── CompositeToolInvoker.java          # 本地 skill 优先、外部 mcp 兜底的组合工具调用器（新增）
+│   ├── CompositeToolInvoker.java          # 本地 skill 优先、外部 mcp 兜底的组合工具调用器（新增）
+│   ├── McpToolCatalog.java                # 把已发现的 MCP 工具声明为可下发的工具声明（新增）
+│   └── CompositeToolCatalog.java          # 本地技能工具 + 外部 MCP 工具合并（同名本地优先，新增）
 ├── workspace/                             # 应用层组合能力（保留）
 │   ├── application/WorkspaceBusinessRunner.java  # 核心业务入口（run / resume / cancel）
 │   └── ...
@@ -145,6 +148,20 @@ clara-application/src/main/java/com/clara/
 - 业务细节：`register(tenantId, snapshot, catalog)` 遍历快照工具，对每个工具登记 `ExternalToolBinding(tenantId, snapshot.getServerKey(), snapshot.getSnapshotId(), tool.getSchemaHash())`（同名工具按目录约定以最后一次为准），返回登记的工具个数。
 - 技术细节：无状态、可跨线程共享；`tenantId` 空白、`snapshot` / `catalog` 为 null 时抛 `IllegalArgumentException`；不持有 MCP 客户端、不发起调用。
 
+**`McpToolCatalog`（`com.clara.tool`，新增）**
+- 作用：core 契约 `IToolCatalog` 的实现，把「已发现并已登记」的 MCP 工具声明成可下发给模型的工具。
+- 使用范围：由 `ApplicationBootstrap` 装配进 `CompositeToolCatalog`，供编排层组装请求体时取「本轮可下发工具」。
+- 为什么需要：调用侧路由早已能按工具名转给 MCP 网关，但下发侧原先只声明技能注册表里的本地工具，模型永远不知道该调用哪个外部工具；补上本目录后「发现 → 声明 → 调用」才闭合。
+- 业务细节：只列注册状态可用的服务端（`McpServerRegistry.listEnabled(tenantId)`）的最新快照，把工具名 / 描述 / 入参 Schema 转成 `ToolContext(ToolSpecification)`；入参 Schema 直接沿用 MCP 声明的 JSON Schema，不额外包装。
+- 技术细节：`McpServerRegistry` 与 `McpCapabilityCatalog` 都可被后续发现流程更新，故每次调用都重新读取快照、不缓存；实例无状态可跨线程共享；构造要求 `tenantId` 非空白。
+
+**`CompositeToolCatalog`（`com.clara.tool`，新增）**
+- 作用：把本地技能工具与外部 MCP 工具合成一份下发声明，同名时本地优先。
+- 使用范围：装配在编排层取「本轮可下发工具」的位置上（`SkillMatchCoordinator`）。
+- 为什么需要：调用侧 `CompositeToolInvoker` 的路由顺序就是「技能注册表命中即走本地，否则查外部目录」；若下发声明里同名工具以外部为准，模型会以为在调 MCP 工具、实际却由本地技能执行，两边 Schema 一旦不同就会出现难查的参数错误。
+- 业务细节：按「先主后次」收集并去重（先收集者优先）；目录为 null、`availableTools()` 返回 null、条目为 null、缺函数签名的声明一律跳过，不抛异常。
+- 技术细节：返回不可修改列表；用 `LinkedHashMap` 保持稳定顺序。
+
 ## 5. 关键实现细节
 
 ### 5.1 装配（`ApplicationBootstrap`）
@@ -152,8 +169,9 @@ clara-application/src/main/java/com/clara/
 - 读取运行配置；按「供应商 + 模型」隔离的窗口记忆由工厂按需创建（默认实现 `DefaultWindowMemory(conversationId, provider, model, conversationStore)`）；
 - model 装配：`CompatibleStream(Jdk8HttpTransport)` 提供统一模型调用入口，`TiktokenTokenCountEstimator` 提供 token 估算；
 - memory 装配：`LocalSemanticMemoryStore(dimension)`（本地语义记忆）、`InMemoryConversationStore`（会话存储）、`DefaultSummarizeCoordinator(streamModel, promptProvider)`（压缩编排）；
-- skill 装配：`SkillRegistry`（内置 `resource/config` + 运行期 `config/skill`，`reload()` 扫描并写入技能描述向量）、`DefaultPromptProvider`、`DefaultToolInvoker(DefaultToolExecutor)`；
+- skill 装配：`SkillRegistry`（内置 `resource/config` + 运行期 `config/skill`，`reload()` 扫描并写入技能描述向量）、`DefaultPromptProvider`、`DefaultToolInvoker(DefaultToolExecutor)`；下发给模型的工具声明取合并目录 `CompositeToolCatalog(RegistryToolCatalog(技能注册表), McpToolCatalog(mcpServerRegistry, mcpCapabilityCatalog, DEFAULT_MCP_TENANT))`；
 - mcp 装配：`InMemoryMcpServerRegistry` + `InMemoryMcpCapabilityCatalog` + `DefaultMcpClientFactory` → `DefaultMcpGateway`，并创建 `ExternalToolCatalog`（空，供宿主 / 发现流程登记）；工具往返以 `CompositeToolInvoker(技能注册表, DefaultToolInvoker, mcpGateway, externalToolCatalog)` 在本地技能与外部工具间分派；
+- mcp 接入：`loadMcpServers(ApplicationBootstrap.DEFAULT_MCP_TENANT)` 在启动时读 `config/mcp` 完成「注册 → 握手发现 → 登记外部工具」，横幅打印 `mcp : N 个服务端 / M 个外部工具`；单个服务端发现失败只跳过该服务端，不阻断启动与对话。stdio 允许清单由 `allowedStdioExecutables()` 现扫配置（叠加环境变量 `CLARA_MCP_ALLOWED_EXECUTABLES` 与 `node` 兜底）并按 PATH / PATHEXT 解析成绝对路径，避免每接一个 stdio 服务端都要改代码；
 - workflow 装配：`DefaultWorkflowEngine(InMemoryCheckpointStore, 并行度)`；
 - orchestration 装配：`ContextAssembler(压缩, 找回, 技能)`、`CapabilityDispatcher(streamModel)`、`ToolRoundTripCoordinator(compositeToolInvoker)`、`CallRecordPublisher(null)`、`WindowMemoryFactory`，最终组装 `DefaultConversationOrchestrator`；
 - 可选实现（`ICallRecordSink` / `IWorkflowDefinitionResolver`）以 null 注入，编排层自行降级；

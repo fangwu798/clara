@@ -362,7 +362,10 @@ public final class StdioMcpTransport implements McpTransport {
                 Map<String, String> environment) throws IOException {
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.directory(workingDirectory.toFile());
-            builder.environment().clear(); builder.environment().putAll(environment);
+            // 在继承来的父进程环境之上叠加配置项，而不是清空后重建：子进程要靠 PATH、SystemRoot、
+            // USERPROFILE、TEMP 这类变量才能定位可执行文件与自身缓存 / 配置目录。清空环境时 stdio 服务端
+            // 会在启动后立刻退出，发现阶段只会看到 stdout 直接 EOF（表现为「MCP 传输失败：读写异常」）。
+            builder.environment().putAll(environment);
             return builder.start();
         }
     }

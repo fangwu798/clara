@@ -34,6 +34,7 @@ import com.clara.mcp.registry.McpDiscoveryService;
 import com.clara.mcp.registry.McpServerRegistration;
 import com.clara.mcp.registry.McpServerRegistry;
 import com.clara.mcp.registry.McpServerSnapshot;
+import com.clara.mcp.registry.McpTransportProfile;
 import com.clara.mcp.registry.config.McpServerConfig;
 import com.clara.mcp.registry.config.McpServerConfigDirectoryLoader;
 import com.clara.mcp.registry.config.McpServerConfigLoader;
@@ -75,7 +76,9 @@ import com.clara.skill.tool.DefaultToolExecutor;
 import com.clara.skill.tool.DefaultToolInvoker;
 import com.clara.skill.tool.ScriptExecutorRegistry;
 import com.clara.skill.tool.builtin.BuiltinToolExecutor;
+import com.clara.tool.CompositeToolCatalog;
 import com.clara.tool.CompositeToolInvoker;
+import com.clara.tool.McpToolCatalog;
 import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.mcp.tool.McpExternalToolRegistrar;
 import com.clara.tool.ToolInvocationPurpose;
@@ -92,12 +95,17 @@ import com.clara.workflow.definition.WorkflowDefinitionRegistry;
 import com.clara.workflow.engine.DefaultWorkflowEngine;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -183,6 +191,11 @@ public final class ApplicationBootstrap implements Closeable {
      * MCP 服务端配置的默认加载目录（相对运行目录）。
      */
     private static final Path DEFAULT_MCP_CONFIG_DIRECTORY = Paths.get("config", "mcp");
+
+    /**
+     * 本机默认 MCP 租户标识：注册、发现、下发与调用必须用同一个租户，否则工具目录取不到快照。
+     */
+    public static final String DEFAULT_MCP_TENANT = "local";
 
     /**
      * 工作流定义（YAML）的默认加载目录（相对运行目录）。
@@ -305,7 +318,9 @@ public final class ApplicationBootstrap implements Closeable {
         SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore);
         // 工具描述按请求组装时现扫一遍工作流清单，使运行期新生成的自定义工作流无需重启即可被模型看到
         SkillMatchCoordinator skillMatch = new SkillMatchCoordinator(embeddingClient, semanticMemoryStore, promptProvider,
-                new RegistryToolCatalog(skillRegistry, WorkflowCatalog::decorateToolDescription));
+                new CompositeToolCatalog(
+                        new RegistryToolCatalog(skillRegistry, WorkflowCatalog::decorateToolDescription),
+                        new McpToolCatalog(mcpServerRegistry, mcpCapabilityCatalog, DEFAULT_MCP_TENANT)));
         ContextAssembler contextAssembler = new ContextAssembler(windowCompression, semanticRecall, skillMatch);
         CapabilityDispatcher capabilityDispatcher = new CapabilityDispatcher(streamModel);
         ToolRoundTripCoordinator toolRoundTrip = new ToolRoundTripCoordinator(toolInvoker);
@@ -598,7 +613,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @throws IllegalArgumentException 租户标识非法或配置加载失败时
      */
     public int loadMcpServers(String tenantId) {
-        return loadMcpServers(tenantId, DEFAULT_MCP_CONFIG_DIRECTORY);
+        return loadMcpServers(tenantId, ConfigLocator.locate(DEFAULT_MCP_CONFIG_DIRECTORY));
     }
 
     /**
@@ -652,15 +667,133 @@ public final class ApplicationBootstrap implements Closeable {
     /**
      * 创建 MCP 客户端工厂：按服务端注册项的传输方式创建客户端。
      *
-     * <p>装配期尚无服务端登记，允许执行的命令与工作目录在此给出默认占位值；宿主登记 stdio 服务端时应按
-     * 实际可执行文件绝对路径调整。
+     * <p>允许执行的命令由 {@link #allowedStdioExecutables()} 现扫配置得出，不再写死单个命令：stdio 传输会校验
+     * 「首个命令是否为允许清单中真实存在的绝对路径」，写死一个命令意味着每接入一个 stdio 服务端都要改代码。
+     *
+     * <p>工作目录取进程当前目录：MCP 服务端多为「按相对路径读取配置 / 缓存」的实现，与操作台同根最直观。
      *
      * @return MCP 客户端工厂，非 null
      */
     private static McpClientFactory defaultMcpClientFactory() {
         return new DefaultMcpClientFactory(new JacksonMcpJsonCodec(), null,
-                Collections.singletonList(Paths.get("node").toAbsolutePath()),
-                Paths.get("").toAbsolutePath(), null, MCP_REQUEST_TIMEOUT_MILLIS);
+                allowedStdioExecutables(), Paths.get("").toAbsolutePath(), null,
+                MCP_REQUEST_TIMEOUT_MILLIS);
+    }
+
+    /**
+     * 解析允许以 stdio 方式启动的可执行文件清单。
+     *
+     * <p>来源三处：{@code config/mcp} 下各 stdio 服务端配置声明的首个命令、环境变量
+     * {@code CLARA_MCP_ALLOWED_EXECUTABLES}（分号或逗号分隔）、历史默认值 {@code node}。候选一律解析为
+     * 真实存在的绝对路径后才纳入清单——{@code StdioMcpTransport} 会对清单逐项取真实路径，清单里混入不存在的
+     * 项会让所有 stdio 服务端一起失败。
+     *
+     * <p>为什么保留 {@code node} 兜底：清单为空时工厂构造即抛错。解析不到任何可执行文件时退回「当前目录下的
+     * node」占位，使装配得以完成、只在真正调用 stdio 服务端时按「不在允许清单」报错。
+     *
+     * @return 允许清单，非 null、非空
+     */
+    private static List<Path> allowedStdioExecutables() {
+        Set<Path> allowed = new LinkedHashSet<Path>();
+        Set<String> seen = new LinkedHashSet<String>();
+        try {
+            List<McpServerConfig> configs = new McpServerConfigDirectoryLoader(
+                    new McpServerConfigLoader(), ConfigLocator.locate(DEFAULT_MCP_CONFIG_DIRECTORY)).load();
+            for (McpServerConfig config : configs) {
+                if (config.getTransportProfile() != McpTransportProfile.STDIO || config.getCommand().isEmpty()) {
+                    continue;
+                }
+                addExecutable(allowed, seen, config.getCommand().get(0));
+            }
+        } catch (RuntimeException ignored) {
+            // 配置目录不存在或配置非法不阻断装配：MCP 服务端本就允许「一个都不接」
+        }
+        String extra = System.getenv("CLARA_MCP_ALLOWED_EXECUTABLES");
+        if (extra != null) {
+            for (String part : extra.split("[;,]")) {
+                addExecutable(allowed, seen, part);
+            }
+        }
+        addExecutable(allowed, seen, "node");
+        if (allowed.isEmpty()) {
+            allowed.add(Paths.get("node").toAbsolutePath());
+        }
+        return Collections.unmodifiableList(new ArrayList<Path>(allowed));
+    }
+
+    /**
+     * 解析单个候选命令并纳入允许清单（同一命令只解析一次）。
+     *
+     * @param allowed 允许清单累积集合，不可为 null
+     * @param seen    已解析过的原始命令名，不可为 null
+     * @param token   候选命令名或路径，可为 null / 空白（此时忽略）
+     */
+    private static void addExecutable(Set<Path> allowed, Set<String> seen, String token) {
+        if (token == null || token.trim().isEmpty() || !seen.add(token.trim())) {
+            return;
+        }
+        Path resolved = resolveExecutable(token.trim());
+        if (resolved != null) {
+            allowed.add(resolved);
+        }
+    }
+
+    /**
+     * 把命令名解析为绝对真实路径：绝对路径直接校验；否则按 PATH 逐目录查找，命令名不含扩展名时按 PATHEXT 补全
+     * （Windows 下 {@code node} 实际是 {@code node.exe}）。
+     *
+     * @param token 命令名或路径，不可为空白
+     * @return 绝对真实路径；未找到或不是普通文件时返回 null
+     */
+    private static Path resolveExecutable(String token) {
+        Path direct = Paths.get(token);
+        if (direct.isAbsolute()) {
+            return realFile(direct);
+        }
+        // Windows 上先按 PATHEXT 补全、裸名字放最后：nodejs 目录里同时存在无扩展名的 npx（Unix shell 脚本）
+        // 与可执行的 npx.cmd，先试裸名字会选中那个脚本，最终以「不是有效的 Win32 应用程序」启动失败。
+        List<String> names = new ArrayList<String>();
+        if (token.indexOf('.') < 0) {
+            String pathExt = System.getenv("PATHEXT");
+            if (pathExt != null) {
+                for (String ext : pathExt.split(";")) {
+                    if (!ext.trim().isEmpty()) {
+                        names.add(token + ext.trim());
+                    }
+                }
+            }
+        }
+        names.add(token);
+        String pathValue = System.getenv("PATH");
+        if (pathValue == null) {
+            return null;
+        }
+        for (String directory : pathValue.split(File.pathSeparator)) {
+            if (directory.trim().isEmpty()) {
+                continue;
+            }
+            for (String name : names) {
+                Path found = realFile(Paths.get(directory.trim(), name));
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 校验候选是否为普通文件，是则返回其真实路径。
+     *
+     * @param candidate 候选路径，不可为 null
+     * @return 真实路径；不存在或不可解析时返回 null
+     */
+    private static Path realFile(Path candidate) {
+        try {
+            return Files.isRegularFile(candidate) ? candidate.toRealPath() : null;
+        } catch (IOException notFound) {
+            return null;
+        }
     }
 
     /**

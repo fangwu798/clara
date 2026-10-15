@@ -103,6 +103,7 @@ public final class ClaraApplication {
             SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry, candidates, contextControls(view, bootstrap, registry));
 
             view.printBanner(bootstrap, registry.currentConfiguration(), choice.configPath(), choice.source());
+            printMcpStatus(view, bootstrap);
             view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
             view.printHints(WorkflowCatalog.customSummaries());
             if (monitor.isAvailable()) {
@@ -113,6 +114,32 @@ public final class ClaraApplication {
             view.println("启动失败：" + startupFailure.getClass().getSimpleName() + ": " + startupFailure.getMessage());
             view.println("请确认：1) 所选模型配置存在且合法（当前 " + choice.configPath().toAbsolutePath() + "）；" + "2) 其 credential 声明的环境变量已设置。");
             System.exit(1);
+        }
+    }
+
+    /**
+     * 接入外部 MCP 服务端，并把接入结果写进启动横幅。
+     *
+     * <p>为什么在启动阶段做：发现（握手 + 列工具）要起子进程 / 连网络，结果应提前告诉用户；但失败不许阻断
+     * 对话，故整体兜底为一行提示。接入成功后模型能在工具清单里看到这些外部工具（本地技能与外部工具由
+     * {@code CompositeToolCatalog} 合并下发），调用则经 {@code CompositeToolInvoker} 路由到 MCP 网关。
+     *
+     * @param view      控制台视图，不可为 null
+     * @param bootstrap 已装配的引导器，不可为 null
+     */
+    private static void printMcpStatus(ConsoleView view, ApplicationBootstrap bootstrap) {
+        try {
+            // 发现要起子进程并做一次 MCP 握手，stdio 服务端可能要好几秒；先打一行提示，避免横幅之后长时间静置。
+            view.emit("  mcp            : 正在接入外部 MCP 服务端（config/mcp）...", ConsoleView.ANSI_GRAY);
+            int servers = bootstrap.loadMcpServers(ApplicationBootstrap.DEFAULT_MCP_TENANT);
+            if (servers <= 0) {
+                view.emit("  mcp            : 未接入外部 MCP 服务端（config/mcp 无配置或发现失败）", ConsoleView.ANSI_GRAY);
+                return;
+            }
+            int tools = bootstrap.externalToolCatalog().snapshot().size();
+            view.emit("  mcp            : " + servers + " 个服务端 / " + tools + " 个外部工具（config/mcp）", ConsoleView.ANSI_GRAY);
+        } catch (RuntimeException failure) {
+            view.emit("  mcp            : 接入失败：" + failure.getMessage() + "（不影响对话）", ConsoleView.ANSI_GRAY);
         }
     }
 

@@ -125,10 +125,10 @@ java -jar clara.jar
 
 ```powershell
 # Windows
-run.bat
+clara.bat
 
 # Linux / macOS
-./run.sh
+./clara.sh
 ```
 
 对话内可用命令：
@@ -299,6 +299,23 @@ clara-mcp 支持 stdio 与 Streamable HTTP，围绕注册、初始化、能力�
 
 注意：stdio 会启动受控子进程，应限制可执行文件路径与工作目录；Streamable HTTP 应使用 HTTPS；发现结果可能过期；InMemoryMcpServerRegistry 适合单实例。
 
+接入外部 MCP 服务端（启动时自动完成）：
+
+- 注册项写在 `config/mcp/*.json` 的 `mcpServers` 映射下，每项给 `command` + `args` + `env`（stdio）或 `url`（Streamable HTTP）。
+- 启动时由 `ApplicationBootstrap.loadMcpServers()` 注册 → 握手发现 → 登记工具，横幅打印 `mcp : N 个服务端 / M 个外部工具`。
+- 下发给模型的工具声明由 `CompositeToolCatalog` 合并「本地技能工具 + 外部 MCP 工具」，**同名时本地优先**，与 `CompositeToolInvoker` 的调用路由顺序一致。
+- stdio 的首项命令必须命中允许清单：清单取自 `config/mcp` 里声明的命令、环境变量 `CLARA_MCP_ALLOWED_EXECUTABLES`（分号或逗号分隔）与 `node` 兜底，逐项按 PATH / PATHEXT 解析成绝对路径；配置里可以写 `npx` 这类裸命令名，工厂会在清单内按文件名解析成绝对路径。
+- 子进程在继承父进程环境的基础上叠加配置里的 `env`，因此服务端能取到 `PATH`、`USERPROFILE` 等变量。
+
+### 代码知识图谱（可选）
+
+接入 [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) 后，读代码会优先走本机知识图谱：
+
+- 部署：`deploy/codebase-memory-mcp/install.ps1` 下载二进制、写 `config/mcp/mcp.json`、设用户环境变量 `CLARA_CBM_BINARY`，并可顺带建索引；细节见 `deploy/codebase-memory-mcp/readme.md`。
+- 技能脚本 `config/skill/scripts/code-graph/code_graph.py`（工具名 `code_graph`）：`op=read` 对代码文件先取图谱大纲，图谱未覆盖（未索引 / 不在索引范围 / 图谱不可用）时回退本地文件读取，返回里 `source` 标明每条信息来自 `graph` 还是 `file`；`.md` / `.txt` 这类散文文件不查图谱、直接返回原文。
+- 其余 `op` 直通图谱能力：`index`（建 / 重建索引）、`status`、`search`、`outline`、`snippet`、`trace`（`inbound` 查调用方、`outbound` 查被调用方）、`query`（只读 Cypher）。
+- 会话提示 `config/skill/prompt/code_graph_guide.json` 约定「先查图谱 → 没覆盖再读文件 → 最后才整文件读取」；`analyze_repo_docs`、`design_business_solution` 两个工作流的读取节点也已改用 `code_graph`。
+
 ## 工作流与人工交互
 
 clara-workflow 提供工作流定义、DAG 执行、预算控制、检查点与人工交互恢复。
@@ -445,9 +462,11 @@ clara/
 |-- config/                    # 模型 Provider、MCP、技能与工作流配置
 |-- docs/                      # 架构、业务、技术设计与迁移记录
 |   `-- diagrams/              # 架构图与核心业务流程图 / 时序图（SVG）
-|-- deploy/                    # Milvus docker-compose 部署配置
+|-- deploy/                    # 部署脚本与依赖编排
+|   |-- docker-compose.yml     # Milvus 等本地依赖的 docker-compose 配置
+|   `-- codebase-memory-mcp/   # 代码知识图谱 MCP 的部署脚本与说明
 |-- sample/                    # 示例应用工程（clara-sample，独立 Maven 工程，不纳入根 POM）
-|-- run.bat / run.sh           # 启动脚本
+|-- clara.bat / clara.sh       # 启动脚本
 `-- clara.jar                  # 构建产物
 ```
 

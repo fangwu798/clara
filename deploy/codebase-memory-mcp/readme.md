@@ -1,0 +1,90 @@
+# codebase-memory-mcp 本地部署
+
+把 [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)（本地代码知识图谱 MCP 服务端）装到本机，
+并接入 Clara：Clara 启动时自动发现它的工具、把工具声明下发给模型，模型读代码时优先查图谱、图谱没覆盖的再读本地文件。
+
+## 一、为什么用它
+
+- 纯 C 静态二进制、无运行期依赖、无需联网即可查询；索引与查询都在本机完成，图谱落成 SQLite。
+- 把函数 / 类 / 导入 / HTTP 路由及其关系索引成图，`get_file_outline`、`search_graph`、`trace_path`
+  这类结构化查询的 token 开销远低于整文件读取。
+- Clara 侧接的是标准 MCP stdio 协议，不引入新的运行时概念：注册项写在 `config/mcp/mcp.json`。
+
+## 二、部署
+
+```powershell
+# 在仓库根执行；默认装到 C:\clara-tools\codebase-memory-mcp（不能含空格），
+# 并索引当前目录、把注册项写进 config/mcp/mcp.json
+powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install.ps1
+```
+
+常用开关：
+
+| 开关 | 作用 |
+| --- | --- |
+| `-InstallDir D:\tools\cbm` | 换安装目录（同样不能含空格） |
+| `-IndexRoot E:\workspace\demo` | 指定要索引的仓库，默认当前目录 |
+| `-SkipIndex` | 只装二进制并注册 MCP，不建索引 |
+| `-SkipMcpConfig` | 不改 `config/mcp/mcp.json`（自己维护配置时用） |
+| `-SkipUserEnv` | 不写用户环境变量 |
+| `-Version latest` | 用 GitHub API 取最新版本标签 |
+| `-RequireChecksum` | 取不到官方校验和时直接失败（默认只警告） |
+
+脚本做的事：下载官方 release 压缩包 → 用 `checksums.txt` 校验 SHA256（取不到时警告）→ 解压出
+`codebase-memory-mcp.exe` → 写 `config/mcp/mcp.json` 的注册项 → 设置用户环境变量
+`CLARA_CBM_BINARY` → 可选执行一次索引。图谱数据默认落在 `%USERPROFILE%\.cache\codebase-memory-mcp`。
+
+> 为什么不直接跑官方的 `install.ps1`：它会改写各 AI 客户端的配置文件，而 Clara 只认 `config/mcp/mcp.json`，
+> 两处配置会互相覆盖。本脚本只取官方二进制。
+>
+> 为什么安装目录不能含空格：Clara 的 stdio 注册会把命令行按空白拆分，含空格的路径会被拆坏
+> （见 `clara-mcp` 的 `DefaultMcpClientFactory`）。
+
+## 三、环境变量
+
+| 变量 | 作用 |
+| --- | --- |
+| `CLARA_CBM_BINARY` | 图谱二进制绝对路径；`config/skill/scripts/code-graph/code_graph.py` 用它定位 CLI |
+| `CBM_CACHE_DIR` | 可选的图谱数据目录，默认 `%USERPROFILE%\.cache\codebase-memory-mcp`；见下方说明 |
+| `CLARA_MCP_ALLOWED_EXECUTABLES` | 额外允许以 stdio 启动的可执行文件（分号或逗号分隔），一般不用设 |
+| `CBM_ALLOWED_ROOT` | 限制 `index_repository` 只能索引该目录以下的仓库（多租户 / 不可信调用方场景） |
+
+`setx` 写入的用户环境变量要**新开终端**才生效。
+
+> 为什么默认不设 `CBM_CACHE_DIR`：图谱启动时会校验缓存目录及其父目录的 DACL，只要路径链上存在
+> 「非受信主体可写」的目录（`C:\` 下新建的目录会继承 `Authenticated Users: 修改`），CLI 会直接以
+> `secure CLI coordination could not be created (cache-private)` 失败退出。用默认位置最省事；
+> 确实要自定义，就得先断开该目录的权限继承，只保留 `Administrators` / `SYSTEM`。
+
+## 四、Clara 侧的接入方式
+
+- 注册与发现：`config/mcp/mcp.json` 的 `mcpServers` 条目 → `ApplicationBootstrap.loadMcpServers()`
+  在启动时注册、发现并登记工具；启动横幅会打印 `mcp : N 个服务端 / M 个外部工具`。
+- 下发给模型：`CompositeToolCatalog` 把「本地技能工具 + 外部 MCP 工具」合并成一份工具声明（同名时本地优先，
+  与 `CompositeToolInvoker` 的路由顺序保持一致）。
+- 读写代码：技能脚本 `config/skill/scripts/code-graph/code_graph.py`（工具名 `code_graph`）——`op=read`
+  逐文件先取图谱大纲，图谱未覆盖时回退本地文件读取，返回的 `source` 字段标明每条信息来自图谱还是文件；
+  其余 `op`（`index`/`status`/`search`/`outline`/`snippet`/`trace`/`query`）是图谱能力的直通调用。
+- 工作流：`analyze_repo_docs`、`design_business_solution` 的读取节点已改为 `code_graph`（图谱优先 + 自动回退）。
+- 会话提示：`config/skill/prompt/code_graph_guide.json` 约定「先查图谱、再回退文件、最后才整文件读取」。
+
+## 五、日常维护
+
+```powershell
+# 代码改动后刷新图谱（也可让模型调用 code_graph 的 op=index）
+& $env:CLARA_CBM_BINARY cli index_repository --repo-path E:\workspace_self\xxxx\clara
+
+# 看已索引的项目与规模
+& $env:CLARA_CBM_BINARY cli list_projects --format json
+
+# 单个工具的入参开关（由工具的 JSON Schema 生成）
+& $env:CLARA_CBM_BINARY cli get_file_outline --help
+```
+
+图谱数据默认在 `%USERPROFILE%\.cache\codebase-memory-mcp`（`<项目名>.db` 与 `_config.db`），
+删掉即清空全部索引；若自定义了 `CBM_CACHE_DIR`，交互式 CLI 与 `code_graph.py` 必须指向同一份。
+
+## 六、其它平台
+
+macOS / Linux 用官方安装脚本即可（二进制放 `~/.local/bin`）：`curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash`，
+之后把 `~/.local/bin/codebase-memory-mcp` 写进 `config/mcp/mcp.json`。

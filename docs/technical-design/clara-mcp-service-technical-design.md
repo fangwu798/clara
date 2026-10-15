@@ -201,7 +201,7 @@ clara-mcp/src/main/java/com/clara/mcp/
 - 使用范围：stdio 传输的服务端。
 - 为什么需要：支持本地 MCP 服务端。
 - 业务细节：按注册项地址启动子进程，按行读写 JSON-RPC 消息。
-- 技术细节：经 `ProcessFactory` 启动进程，标准输入输出按行编解码；关闭时销毁进程与流；后台线程排空 stderr 防阻塞。
+- 技术细节：经 `ProcessFactory` 启动进程，标准输入输出按行编解码；关闭时销毁进程与流；后台线程排空 stderr 防阻塞。首项命令必须是绝对路径且命中允许清单；子进程环境在**继承父进程环境**的基础上叠加配置里的 `env`——清空环境会让服务端拿不到 `PATH`、`USERPROFILE` 这类变量，启动即退出，而发现阶段只能观察到 stdout 直接 EOF。
 
 **`StreamableHttpMcpTransport` / `McpHeadersProvider` / `SseEventParser`（`com.clara.mcp.transport.http`）**
 - 作用：以 streamable http 方式与远端服务端通信。
@@ -230,7 +230,7 @@ clara-mcp/src/main/java/com/clara/mcp/
 ### 5.2 传输抽象（stdio / streamable http）
 
 - 统一 `McpTransport` 接口：`start` 启动并注册监听，`sendRequest` 异步返回响应，`sendNotification` 单向通知，`cancel` 按请求 id 取消，`checkHealth` 健康检查；
-- stdio：经 `ProcessFactory` 启动子进程，按行读写 JSON-RPC，后台排空 stderr，关闭时销毁进程；
+- stdio：经 `ProcessFactory` 启动子进程（继承父进程环境再叠加配置 `env`），按行读写 JSON-RPC，后台排空 stderr，关闭时销毁进程；
 - http：经 streamable http POST 发送、SSE 解析响应，关闭释放连接；
 - 新增传输只需新增 `McpTransport` 实现 + 在 `DefaultMcpClientFactory` 注册分派。
 
@@ -328,7 +328,7 @@ http 形态（有 `url`，可选 `headers`）：
 
 **env 插值**：`env` 与 `headers` 的值支持 `${VAR}` 占位，从系统环境变量解析；**变量未定义时抛错并在消息中指明变量名**（不静默保留原文），避免把未解析的占位符当真实密钥外发。
 
-**注册流程**：宿主读取配置 →（可选）`McpServerConfigDirectoryLoader.load()` 合并 → `McpServerRegistrar.registerAll(tenantId, configs)` 逐条转换为 `McpServerRegistration`（状态 `ACTIVE`）并 `McpServerRegistry.register` → 交由 `DefaultMcpDiscoveryService` 发现。`DefaultMcpClientFactory` 优先使用注册项的结构化字段：stdio 用 `command` + `env` 启动子进程，http 用 `url` + per-server `headers` 作为请求头。
+**注册流程**：宿主读取配置 →（可选）`McpServerConfigDirectoryLoader.load()` 合并 → `McpServerRegistrar.registerAll(tenantId, configs)` 逐条转换为 `McpServerRegistration`（状态 `ACTIVE`）并 `McpServerRegistry.register` → 交由 `DefaultMcpDiscoveryService` 发现。`DefaultMcpClientFactory` 优先使用注册项的结构化字段：stdio 用 `command` + `env` 启动子进程，http 用 `url` + per-server `headers` 作为请求头。stdio 首项命令若是裸命令名（如 `npx` / `node`），工厂先在允许清单里按文件名（含去掉扩展名的名字）解析成绝对路径——MCP 配置惯例写裸命令名，而传输层只接受绝对路径；清单里匹配不到则原样下传，由传输层照旧拒绝。
 
 ## 6. 业务场景与功能映射
 
