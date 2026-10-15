@@ -25,6 +25,13 @@ services:
     environment:
       # 图谱数据目录，对应下面的命名卷；不要改，改了要在 .env 里同步。
       CBM_CACHE_DIR: /data
+      # 图谱可视化 UI 的端口（容器内与宿主侧都用它，见下面 ports 的说明）。
+      CBM_UI_PORT: ${CBM_UI_PORT:-9749}
+    # 图谱 UI 只发布到宿主回环：本机浏览器打开 http://127.0.0.1:<端口>/ 即可看图谱，局域网访问不到。
+    # 端口号必须与容器内一致（UI 会校验 Host 是回环地址，换端口转发会被 403），容器内由
+    # entrypoint.sh 用同一个 CBM_UI_PORT 做转发，所以改 .env 里的 CBM_UI_PORT 就能整体换端口。
+    ports:
+      - "127.0.0.1:${CBM_UI_PORT:-9749}:${CBM_UI_PORT:-9749}"
     volumes:
       # 索引（SQLite）持久化：容器重建不丢图谱，删卷即清空全部索引。
       - cbm-data:/data

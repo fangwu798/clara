@@ -76,6 +76,8 @@ powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install-dock
   （`index_repository` 会报 `path is too broad to index as one root`）。
 - **路径靠 `CLARA_CBM_REPO`、项目名靠 `CLARA_CBM_PROJECT`**：容器里的项目根是 `/work/repo`，
   与宿主路径天然对不上（按目录名还会被命名成 `repo`），`code_graph` 靠这两个变量换算路径、定位项目。
+- **MCP 不占端口**：`docker exec -i` 把宿主进程的 stdin/stdout 直接接到容器内的图谱进程上，
+  JSON-RPC 走管道、不走网络，所以不需要发布任何端口；compose 里发布的那个端口只给图谱 UI 用。
 
 ### 常用命令
 
@@ -89,6 +91,46 @@ docker exec clara-codebase-memory-mcp codebase-memory-mcp cli index_repository -
 # 看已索引的项目
 docker exec clara-codebase-memory-mcp codebase-memory-mcp cli list_projects --format json
 ```
+
+### 看图谱
+
+**① 浏览器（推荐）**
+
+容器里的图谱 UI 由常驻 daemon 提供。它只监听容器回环，所以 `entrypoint.sh` 把它转发到容器网卡
+（端口号保持不变——UI 会校验 Host 是回环地址，换端口转发会被它 403 掉），compose 再把它发布到
+**宿主回环**，因此只有本机能访问：
+
+```
+http://127.0.0.1:9749/     # 换端口：改 .env 的 CBM_UI_PORT 后 docker compose up -d
+```
+
+页面里能搜节点、按标签（`Class` / `Method` / `File` …）过滤、看调用关系与文件树。
+
+**② 命令行（可脚本化）**
+
+```powershell
+# 架构总览（语言 / 包 / 入口点）
+docker exec clara-codebase-memory-mcp codebase-memory-mcp cli get_architecture --project clara-code-graph --aspects overview --format tree
+
+# 找符号 / 看文件里的声明 / 查调用方
+docker exec clara-codebase-memory-mcp codebase-memory-mcp cli search_graph --project clara-code-graph --name-pattern ApplicationBootstrap --label Class
+docker exec clara-codebase-memory-mcp codebase-memory-mcp cli get_file_outline --project clara-code-graph --file-path clara-application/src/main/java/com/clara/ApplicationBootstrap.java
+docker exec clara-codebase-memory-mcp codebase-memory-mcp cli trace_path --project clara-code-graph --function-name resolve_runner --direction inbound
+
+# 只读 Cypher
+docker exec clara-codebase-memory-mcp codebase-memory-mcp cli query_graph --project clara-code-graph --query "MATCH (n) RETURN labels(n) AS kind, count(n) AS c ORDER BY c DESC LIMIT 5"
+```
+
+**③ 直接查 SQLite（图谱本身就是个库）**
+
+```powershell
+docker cp clara-codebase-memory-mcp:/data/clara-code-graph.db .
+# nodes(id, project, label, name, qualified_name, file_path, start_line, end_line, properties)
+# edges(id, project, source_id, target_id, type, properties)
+# 拿来用任意 SQLite 客户端看：DB Browser for SQLite / sqlite3 CLI / Python 的 sqlite3
+```
+
+**④ 直接问 Clara**：图谱已经作为 MCP 工具下发给模型，说一句「用 code_graph 讲一下 X 的调用链」即可。
 
 改要分析的仓库：改 `deploy\codebase-memory-mcp\.env` 的 `CLARA_CBM_REPO` → `docker compose up -d`
 → 重跑一次索引（重跑 `install-docker.ps1` 最省事，它会把用户环境变量一起同步）。
@@ -142,6 +184,9 @@ docker exec clara-codebase-memory-mcp codebase-memory-mcp cli list_projects --fo
 
 图谱数据默认在 `%USERPROFILE%\.cache\codebase-memory-mcp`（`<项目名>.db` 与 `_config.db`），
 删掉即清空全部索引；若自定义了 `CBM_CACHE_DIR`，交互式 CLI 与 `code_graph.py` 必须指向同一份。
+
+宿主安装也能看图谱：`& $env:CLARA_CBM_BINARY daemon start` 之后浏览器打开 `http://127.0.0.1:9749/`
+（UI 直接跑在本机）。注意 UI 固定用 9749，容器部署也占用宿主 9749，两条路径别同时开。
 
 ## 七、其它平台
 

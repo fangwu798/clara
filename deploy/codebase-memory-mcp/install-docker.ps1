@@ -32,6 +32,10 @@
 .PARAMETER Version
   版本号，默认 v0.11.0。
 
+.PARAMETER UiPort
+  图谱可视化 UI 的端口，默认 9749，只发布到宿主回环（http://127.0.0.1:<端口>/）。容器内用同一个端口，
+  所以换端口只要改这里即可。
+
 .PARAMETER SkipIndex
   只建镜像与容器，不建索引。
 
@@ -61,6 +65,7 @@ param(
     [string]$RepoPath = "",
     [string]$Project = "clara-code-graph",
     [string]$Version = "v0.11.0",
+    [int]$UiPort = 9749,
     [switch]$SkipIndex,
     [switch]$SkipMcpConfig,
     [switch]$SkipUserEnv,
@@ -167,7 +172,8 @@ $envLines = @(
     "# 由 install-docker.ps1 生成：Compose 会自动读取本目录下的 .env。改动后重跑 docker compose up -d。",
     $RepoLine,
     ("CBM_VERSION={0}" -f $Version),
-    ("CBM_ARCHIVE={0}" -f $TarballName)
+    ("CBM_ARCHIVE={0}" -f $TarballName),
+    ("CBM_UI_PORT={0}" -f $UiPort)
 )
 [IO.File]::WriteAllLines($EnvFile, $envLines, (New-Object Text.UTF8Encoding($false)))
 
@@ -199,6 +205,28 @@ while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 3
 }
 Write-Info ("容器已就绪：" + $ContainerName + "（镜像 " + $ImageName + ":" + $Version + "）")
+
+# 图谱 UI 是附加能力：容器内 daemon 提供页面，entrypoint 再把它从回环转发出来。起不来只提示，
+# MCP 与 CLI 都不受影响（它们走 docker exec 的 stdio，不依赖端口）。
+$uiReady = $false
+$uiDeadline = (Get-Date).AddSeconds(30)
+while ((Get-Date) -lt $uiDeadline) {
+    $probe = New-Object Net.Sockets.TcpClient
+    try {
+        $probe.Connect("127.0.0.1", $UiPort)
+        $uiReady = $true
+    } catch {
+        Start-Sleep -Seconds 2
+    } finally {
+        $probe.Close()
+    }
+    if ($uiReady) { break }
+}
+if ($uiReady) {
+    Write-Info ("图谱 UI 已就绪，浏览器打开：http://127.0.0.1:" + $UiPort + "/")
+} else {
+    Write-Warning ("图谱 UI 端口 " + $UiPort + " 暂未就绪（可直接访问试试）；MCP 与 CLI 不受影响")
+}
 
 # 5) 建索引（在容器内对 /work/repo 执行） -----------------------------------------
 if (-not $SkipIndex) {
@@ -256,4 +284,6 @@ Write-Info ("  2) 看一眼已经索引的项目：docker exec -i " + $Container
 Write-Info "  3) 代码改动后重跑索引（也可让模型调 code_graph 的 op=index，项目名会自动沿用）："
 Write-Info ("     docker exec " + $ContainerName + " codebase-memory-mcp cli index_repository --repo-path " + $ContainerRepo + " --name " + $Project)
 Write-Info "  4) 换分析的仓库：改同目录 .env 的 CLARA_CBM_REPO 后 docker compose up -d，重跑本脚本让用户环境变量同步，再重跑第 3 步；"
-Write-Info "  5) 清空全部索引：docker compose down -v（-v 会删掉 cbm-data 卷）。"
+Write-Info "  5) 看图谱（可视化）：浏览器打开 http://127.0.0.1:" + $UiPort + "/ （只监听宿主回环，不对外）；"
+Write-Info "     纯文本查看用容器内的 CLI：docker exec " + $ContainerName + " codebase-memory-mcp cli get_architecture --project " + $Project;
+Write-Info "  6) 清空全部索引：docker compose down -v（-v 会删掉 cbm-data 卷）。"
