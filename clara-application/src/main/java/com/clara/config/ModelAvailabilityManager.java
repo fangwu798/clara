@@ -27,6 +27,10 @@ import java.util.function.Function;
  *
  * <p>本类只负责 application 层的启动编排。实际的模型请求由 {@link IModelProbe} 完成，供应商 YAML 的解析由
  * {@link ProviderYamlConfigurationLoader} 完成。检查结果按首字符响应时间升序排列，最快的模型会成为默认模型。
+ *
+ * <p>输出时机：每个模型的结论在它自己的检查结束后立刻发送给输出接收器，跳过、配置不可用等无需请求的项也
+ * 随即输出，**不等整批检查结束**——单条探测最长要等一次网络往返，全部攒到最后会让启动长时间没有任何反馈。
+ * 为保证先输出的行与后输出的行对齐，列宽由一次本地预扫描提前确定（见 {@link AvailabilityLine#widths}）。
  */
 public final class ModelAvailabilityManager {
 
@@ -74,8 +78,10 @@ public final class ModelAvailabilityManager {
      * 依次检查全部模型配置，并把检查结果持久化到 {@code clara.yml}。
      *
      * <p>配置引用的环境变量不存在或为空时直接跳过，不会发起模型请求。成功产生正文字符的模型视为可用，
-     * 可用结果按首字符响应时间排序，并以最快模型作为 {@code defaultModel}。全部模型检查完后，各行的状态、
-     * 别名、平台与模型、结论四列按本批次最大显示宽度对齐后发送给输出接收器，并带上状态级别：
+     * 可用结果按首字符响应时间排序，并以最快模型作为 {@code defaultModel}。
+     *
+     * <p>输出时机：每个模型的结论在该模型检查结束后**立即**发送给输出接收器（为 null 时静默执行），
+     * 不等其余模型检查完；各行的状态、别名、平台与模型、结论四列仍按预扫描确定的列宽对齐，并带上状态级别：
      * 可用为 {@code OK}、跳过为 {@code WARN}、不可用为 {@code FAIL}，供调用方着色。
      *
      * @param configFiles 待检查的供应商配置文件列表
@@ -87,37 +93,24 @@ public final class ModelAvailabilityManager {
     public List<Path> checkAndPersist(List<Path> configFiles, Path claraConfig, Consumer<AvailabilityLine> output) {
         Consumer<AvailabilityLine> sink = output == null ? value -> {} : output;
         sink.accept(AvailabilityLine.info("正在检查模型可用性..."));
+        // 先本地预扫描（只解析配置、读环境变量，不发请求）以确定列宽，再逐条检查、逐条输出：
+        // 这样每条结论在它自己的检查结束时就可见，同时各列仍然对齐。
+        List<PendingCheck> pending = prescan(configFiles);
+        AvailabilityLine.ColumnWidths widths = AvailabilityLine.widths(aliasesOf(pending), identitiesOf(pending));
         List<ModelCheckResult> results = new ArrayList<>();
-        ProviderYamlConfigurationLoader loader = new ProviderYamlConfigurationLoader();
-        for (Path path : configFiles) {
-            String alias = ConfigLocator.aliasOf(path);
-            ProviderConfiguration configuration = null;
-            try {
-                configuration = loader.load(path);
-                if (!configuration.getCapabilities().containsKey(CapabilityKindEnum.CHAT)) {
-                    results.add(ModelCheckResult.skipped(path, alias, "未配置 CHAT 能力"));
-                    continue;
-                }
-                String variable = configuration.getCredential().getEnvironmentVariable();
-                if (variable != null && isBlank(environment.apply(variable))) {
-                    results.add(ModelCheckResult.missingCredential(path, alias, variable));
-                    continue;
-                }
-                ModelConfig chat = configuration.toConfig(CapabilityKindEnum.CHAT);
-                results.add(probe.probe(path, alias, configuration, chat, timeoutMillis));
-            } catch (RuntimeException failure) {
-                results.add(ModelCheckResult.unavailable(path, alias, null, null, concise(failure)));
-            } finally {
-                if (configuration != null) {
-                    configuration.close();
-                }
+        try {
+            for (PendingCheck check : pending) {
+                ModelCheckResult result = check.check(probe, timeoutMillis);
+                results.add(result);
+                sink.accept(AvailabilityLine.line(result, widths));
+            }
+        } finally {
+            for (PendingCheck check : pending) {
+                check.close();
             }
         }
 
         List<ModelCheckResult> available = new ArrayList<>();
-        for (AvailabilityLine line : AvailabilityLine.render(results)) {
-            sink.accept(line);
-        }
         for (ModelCheckResult result : results) {
             if (result.isAvailable()) {
                 available.add(result);
@@ -140,6 +133,78 @@ public final class ModelAvailabilityManager {
             paths.add(result.getPath());
         }
         return paths;
+    }
+
+    /**
+     * 本地预扫描：解析每份配置、判定能否发起请求，全程不发网络请求。
+     *
+     * <p>为什么要先扫一遍：输出要「检查完一个就出一个」，但列宽必须先定下来，而列宽依赖别名与
+     * 「平台与模型」文本——后者只能由本地解析取得。预扫描只读 YAML 与查环境变量，耗时可忽略，
+     * 换来逐条输出时各列对齐。
+     *
+     * @param configFiles 待检查的供应商配置文件列表
+     * @return 与输入顺序一致的待检查项，非 null
+     */
+    private List<PendingCheck> prescan(List<Path> configFiles) {
+        List<PendingCheck> pending = new ArrayList<>();
+        ProviderYamlConfigurationLoader loader = new ProviderYamlConfigurationLoader();
+        for (Path path : configFiles) {
+            String alias = ConfigLocator.aliasOf(path);
+            ProviderConfiguration configuration = null;
+            try {
+                configuration = loader.load(path);
+                if (!configuration.getCapabilities().containsKey(CapabilityKindEnum.CHAT)) {
+                    pending.add(PendingCheck.decided(ModelCheckResult.skipped(path, alias, "未配置 CHAT 能力")));
+                    continue;
+                }
+                String variable = configuration.getCredential().getEnvironmentVariable();
+                if (variable != null && isBlank(environment.apply(variable))) {
+                    pending.add(PendingCheck.decided(ModelCheckResult.missingCredential(path, alias, variable)));
+                    continue;
+                }
+                ModelConfig chat = configuration.toConfig(CapabilityKindEnum.CHAT);
+                pending.add(PendingCheck.ready(path, alias, configuration, chat));
+                // 平台配置的所有权移交给待检查项，由它在检查结束后关闭；置空以免这里重复关闭。
+                configuration = null;
+            } catch (RuntimeException failure) {
+                pending.add(PendingCheck.decided(ModelCheckResult.unavailable(path, alias, null, null, concise(failure))));
+            } finally {
+                if (configuration != null) {
+                    configuration.close();
+                }
+            }
+        }
+        return pending;
+    }
+
+    /**
+     * 取全部待检查项的别名，供预计算列宽使用。
+     *
+     * @param pending 待检查项，非 null
+     * @return 与输入顺序一致的别名列表，非 null
+     */
+    private static List<String> aliasesOf(List<PendingCheck> pending) {
+        List<String> aliases = new ArrayList<>();
+        for (PendingCheck check : pending) {
+            aliases.add(check.alias());
+        }
+        return aliases;
+    }
+
+    /**
+     * 取全部待检查项在「平台与模型」列的文本，供预计算列宽使用。
+     *
+     * <p>预扫描已判定为跳过 / 不可用的项不展示该列（与实际渲染口径一致），只有即将发起请求的项才有内容。
+     *
+     * @param pending 待检查项，非 null
+     * @return 与输入顺序一致的列文本列表，非 null
+     */
+    private static List<String> identitiesOf(List<PendingCheck> pending) {
+        List<String> identities = new ArrayList<>();
+        for (PendingCheck check : pending) {
+            identities.add(check.identity());
+        }
+        return identities;
     }
 
     /**
@@ -256,6 +321,129 @@ public final class ModelAvailabilityManager {
     private static String concise(Throwable failure) {
         String message = failure.getMessage();
         return failure.getClass().getSimpleName() + (isBlank(message) ? "" : ": " + message);
+    }
+
+    /**
+     * 单个模型的待检查项：预扫描已完成「不需要网络即可判定」的部分（配置解析、CHAT 能力、凭据），
+     * 需要真实请求的部分留到 {@link #check} 执行。
+     *
+     * <p>为什么拆成两项而不是一个结果对象：预扫描阶段必须知道「这一行会不会有平台与模型可展示」，
+     * 才能把列宽算准；而结果要等请求结束才产生。
+     */
+    private static final class PendingCheck {
+
+        /**
+         * 预扫描即可判定的终态结果（跳过 / 配置不可用）；需要发起请求时为 null。
+         */
+        private final ModelCheckResult terminal;
+
+        /**
+         * 供应商配置文件路径；已判定项为 null。
+         */
+        private final Path path;
+
+        /**
+         * 模型别名，始终非 null，用于输出与列宽计算。
+         */
+        private final String alias;
+
+        /**
+         * 待探测的平台配置；已判定项为 null，且其生命周期归本对象。
+         */
+        private final ProviderConfiguration configuration;
+
+        /**
+         * 待探测的对话能力配置；已判定项为 null。
+         */
+        private final ModelConfig chat;
+
+        /**
+         * 是否已释放平台配置，避免重复关闭。
+         */
+        private boolean closed;
+
+        private PendingCheck(ModelCheckResult terminal, Path path, String alias,
+                ProviderConfiguration configuration, ModelConfig chat) {
+            this.terminal = terminal;
+            this.path = path;
+            this.alias = alias;
+            this.configuration = configuration;
+            this.chat = chat;
+        }
+
+        /**
+         * 创建无需网络请求即可判定的待检查项。
+         *
+         * @param result 预扫描得到的结果，非 null
+         * @return 待检查项，非 null
+         */
+        private static PendingCheck decided(ModelCheckResult result) {
+            return new PendingCheck(result, null, result.getAlias(), null, null);
+        }
+
+        /**
+         * 创建需要真实请求的待检查项，平台配置所有权随之移交。
+         *
+         * @param path          配置文件路径
+         * @param alias         模型别名
+         * @param configuration 平台配置，不可为 null
+         * @param chat          对话能力配置，不可为 null
+         * @return 待检查项，非 null
+         */
+        private static PendingCheck ready(Path path, String alias, ProviderConfiguration configuration,
+                ModelConfig chat) {
+            return new PendingCheck(null, path, alias, configuration, chat);
+        }
+
+        /**
+         * 模型别名。
+         *
+         * @return 别名，非 null
+         */
+        private String alias() {
+            return alias;
+        }
+
+        /**
+         * 「平台与模型」列的文本：需要请求时按配置预拼，与探测结果渲染出的文本一致；已判定项为空串。
+         *
+         * @return 列文本，非 null，可为空串
+         */
+        private String identity() {
+            return terminal != null
+                    ? ""
+                    : AvailabilityLine.identity(configuration.getProvider().name(), chat.getModelId());
+        }
+
+        /**
+         * 执行本项检查：已判定项直接返回既有结果，否则发起一次真实探测。
+         *
+         * <p>探测抛错按「不可用」处理并保留原因，不中断其余模型的检查。
+         *
+         * @param probe         模型探测器，非 null
+         * @param timeoutMillis 探测超时，单位为毫秒
+         * @return 检查结果，非 null
+         */
+        private ModelCheckResult check(IModelProbe probe, long timeoutMillis) {
+            if (terminal != null) {
+                return terminal;
+            }
+            try {
+                return probe.probe(path, alias, configuration, chat, timeoutMillis);
+            } catch (RuntimeException failure) {
+                return ModelCheckResult.unavailable(path, alias, null, null, concise(failure));
+            }
+        }
+
+        /**
+         * 关闭本项持有的平台配置；已判定项无配置可关，重复调用无副作用。
+         */
+        private void close() {
+            if (configuration != null && !closed) {
+                closed = true;
+                configuration.close();
+            }
+        }
     }
 
 }

@@ -16,15 +16,11 @@
   <rect x="40" y="62" width="860" height="112" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
   <text x="56" y="86" font-size="13" font-weight="700" fill="#2B6CB0">访问边界 / 宿主</text>
 
-  <rect x="190" y="102" width="260" height="50" rx="8" fill="#FFFFFF" stroke="#5B9BD5"/>
-  <text x="320" y="123" font-size="13" font-weight="700" fill="#24425E" text-anchor="middle">交互式控制台</text>
-  <text x="320" y="140" font-size="10.5" fill="#5A6B7B" text-anchor="middle">ClaraApplication · ConsoleView</text>
+  <rect x="190" y="102" width="560" height="50" rx="8" fill="#FFFFFF" stroke="#5B9BD5"/>
+  <text x="470" y="123" font-size="13" font-weight="700" fill="#24425E" text-anchor="middle">交互式对话控制台（唯一运行模式）</text>
+  <text x="470" y="140" font-size="10.5" fill="#5A6B7B" text-anchor="middle">ClaraApplication · ConsoleView · 任务由 run_workflow / publish_workflow 工作流承担</text>
 
-  <rect x="490" y="102" width="260" height="50" rx="8" fill="#FFFFFF" stroke="#5B9BD5"/>
-  <text x="620" y="123" font-size="13" font-weight="700" fill="#24425E" text-anchor="middle">CLI：run / resume</text>
-  <text x="620" y="140" font-size="10.5" fill="#5A6B7B" text-anchor="middle">ClaraCli · CliArgumentsParser</text>
-
-  <text x="190" y="168" font-size="10.5" fill="#7A8A99">REST / SSE 等 HTTP 边界不由本仓库提供，由宿主基于 WorkspaceBusinessRunner 按需自建。</text>
+  <text x="190" y="168" font-size="10.5" fill="#7A8A99">CLI（run / resume）运行模式已移除；REST / SSE 等 HTTP 边界不由本仓库提供，由宿主按需自建。</text>
 
   <line x1="470" y1="174" x2="470" y2="196" stroke="#4C566A" stroke-width="1.6" marker-end="url(#ar)"/>
 
@@ -35,8 +31,8 @@
   <text x="470" y="262" font-size="13" font-weight="700" fill="#7A4A00" text-anchor="middle">ApplicationBootstrap —— 唯一装配点：把 core 契约绑定到各模块实现</text>
 
   <rect x="60" y="288" width="196" height="44" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
-  <text x="158" y="307" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">ModelRegistry / ModelSession</text>
-  <text x="158" y="323" font-size="10.5" fill="#8A6A3A" text-anchor="middle">模型与平台绑定</text>
+  <text x="158" y="307" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">ModelRegistry</text>
+  <text x="158" y="323" font-size="10.5" fill="#8A6A3A" text-anchor="middle">模型选择 / 平台配置 / 可用性探测</text>
 
   <rect x="268" y="288" width="196" height="44" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
   <text x="366" y="307" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">WorkspaceBusinessRunner</text>

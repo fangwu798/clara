@@ -147,65 +147,19 @@ run.bat
 
 对话历史按工作目录持久化：会话标识由工作目录推导（启动横幅的 `sessionId`），历史写入 `<工作目录>/.clara/state/conversations`，因此**退出后再次进入同一目录会续接上次的上下文**（换目录即换上下文）。删除该目录即清空历史；同一目录下同时只允许一个 Clara 实例（历史目录有排他锁），第二个实例会提示并降级为进程内历史（本次退出即丢失）。
 
-### 4. CLI 执行工作区任务
+### 4. 自然语言提交任务
+
+clara.jar 只有交互式对话一个入口（com.clara.ClaraApplication），任务用自然语言描述，由模型选择工具或工作流执行：
 
 ```powershell
-java -jar clara.jar run --workspace ./business-data --goal 汇总报表并生成结论 --write-mode preview --ui json-detached --output json
+java -jar clara.jar
 ```
 
-内置 runner 会把 `--goal` 作为本轮用户输入转发给对话编排器，以 `--run-id` 作为会话标识。`--write-mode` / `--approve-changes` 等选项会被解析与校验，但**内置 runner 当前不执行工作区文件读写**（工作区变更集能力不在本仓库装配范围内，见「工作区文件」）。需要用户确认时由上层返回 `WAITING_INPUT`，再经 resume 提交答案。
+- 读取本地目录、整理技术文档、生成需求与技术方案、生成开发计划、生成 / 编辑 / 识别图片等，直接说明诉求即可（模型会调用 run_workflow 工作流）。
+- 需要固定流程时，可让模型生成自定义工作流（内置工具 publish_workflow），或直接写入 config/workflow/custom，随后在对话里按名调用。
+- 交互指令、取消、日志与目录结构见「3. 交互式对话」。
 
-## CLI 访问边界
-
-- ClaraCli 接收已装配的 WorkspaceBusinessRunner，负责参数解析与执行。
-- UI 模式：`plain` 纯文本、`json-detached` 一次性 JSON、`json-stream` NDJSON 双向流；TUI 未实现，选择 tui 会提示并回退到 plain 文本模式。
-- 仓库不提供 REST / SSE 适配器；需要 HTTP 边界的宿主可基于 WorkspaceBusinessRunner 自行实现。
-
-### CLI 命令
-
-| 命令 | 说明 |
-| --- | --- |
-| run | 执行一次工作区业务任务 |
-| resume | 使用答案文件恢复等待中的运行 |
-
-### CLI 选项
-
-| 选项 | 说明 |
-| --- | --- |
-| --workspace | 目标工作区路径，必须是可访问目录 |
-| --goal | 业务目标描述 |
-| --skill | 可选，指定技能 ID |
-| --write-mode read-only | 只读，禁止写入 |
-| --write-mode preview | 生成预览但不应用（默认） |
-| --write-mode apply | 真实写入，需配合 --approve-changes |
-| --approve-changes | 批准真实写入，仅 apply 模式有效 |
-| --ui auto | 自动选择（默认，等价 plain 文本） |
-| --ui tui | TUI（未实现，回退 plain） |
-| --ui plain | 纯文本输出 |
-| --ui json-detached | 一次性 JSON 输出，等待输入时退出码 3 |
-| --ui json-stream | NDJSON 双向流式协议 |
-| --output json | JSON 格式输出 |
-| --config | 可选配置文件路径 |
-| --user | 用户标识，默认 console |
-| --run-id | 运行标识，run 未提供时自动生成 |
-| --interaction-id | resume 时指定交互标识 |
-| --answer-file | resume 时的答案 JSON 文件 |
-| --provider | 指定模型平台枚举 |
-| --model | 指定模型 ID |
-| --no-color | 关闭终端彩色输出 |
-
-### CLI 退出码
-
-| 退出码 | 含义 |
-| --- | --- |
-| 0 | 成功 |
-| 2 | 参数/配置/IO 错误 |
-| 3 | 已挂起等待输入 |
-| 4 | 业务执行失败 |
-| 5 | 权限拒绝 |
-| 6 | 外部模型/MCP 不可用 |
-
-宿主若基于 WorkspaceBusinessRunner 自建 REST / SSE 边界，需自行补齐认证、授权、限流与租户隔离。
+> 历史说明：早期版本另有 `run` / `resume` 子命令与 `--ui plain|json-detached|json-stream` 等 CLI 选项（clara-application 的 adapter/cli 适配层）。该适配层已删除——它没有生产调用方（jar 入口一直是 ClaraApplication），相应能力改由工作流承担。
 
 ## 模型 Provider 配置
 
@@ -259,7 +213,7 @@ try (ProviderConfiguration provider = loader.load(
 
 配置加载默认拒绝超过 1 MiB 的文件、未知字段、非 HTTPS URI、非法扩展名与越界扫描，且只加载明确指定的单个文件。
 
-CLI 已内置 --config 路径解析，但 Clara 无独立装配入口：ClaraCli 接收已装配的 WorkspaceBusinessRunner。宿主应在创建 CLI 前完成模型注册。
+模型配置由 `ConfigLocator` 定位（`config/model-providers/**`，按 `config/clara.yml` 的 `enabledProviders` 过滤启用项），加载、缓存与生命周期由 `ModelRegistry` 统一负责。
 
 ## 会话上下文
 
@@ -406,8 +360,7 @@ clara-skill 将业务能力封装为可注册、可校验、可执行的技能�
 
 - 路径需规范化并校验位于根目录内，拒绝 .. 越界。
 - 默认忽略 .git、.svn、target、node_modules 等目录。
-- 写模式语义：`read-only` 只读、`preview` 仅生成预览、`apply` 真实写入且需显式批准（`--approve-changes`）。
-- 说明：内置 runner 当前只消费 `goal` 作为对话输入，**尚未接线工作区文件读写**；`--workspace` / `--write-mode` / `--approve-changes` 会被解析与校验，但不会触发实际文件变更。
+- 读取与写入由工作流的工具节点承担（`file_ops` 等脚本工具）：路径先规范化并校验位于工作目录内，越界（`..`）与忽略目录由工具侧统一拦截。
 
 ### 文档解析
 

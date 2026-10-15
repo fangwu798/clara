@@ -165,6 +165,41 @@ public class ModelAvailabilityManagerTest {
     }
 
     /**
+     * 每条结论在该模型检查结束后立即输出：探测第二个模型时，第一个模型的结果必须已经发出，
+     * 不能等整批检查结束再一起输出。
+     */
+    @Test
+    public void emitsEachResultBeforeProbingNextModel() throws Exception {
+        Path clara = temporary.newFile("streaming.yml").toPath();
+        List<Path> configs = Arrays.asList(config("deepseek-completion.yml"),
+                config("deepseek-response.yml"), config("kimi-completion.yml"));
+        List<AvailabilityLine> output = new ArrayList<AvailabilityLine>();
+        List<String> emittedBeforeSecondProbe = new ArrayList<String>();
+        AtomicInteger probes = new AtomicInteger();
+        IModelProbe probe = (path, alias, provider, chat, timeout) -> {
+            if (probes.incrementAndGet() == 2) {
+                emittedBeforeSecondProbe.addAll(texts(output));
+            }
+            return ModelCheckResult.available(path, alias, provider.getProvider().name(), chat.getModelId(), 8L);
+        };
+
+        new ModelAvailabilityManager(name -> "test-key", probe, 1000L)
+                .checkAndPersist(configs, clara, output::add);
+
+        assertEquals(3, probes.get());
+        assertTrue("探测第二个模型前应已输出第一个模型的结果，实际输出：" + emittedBeforeSecondProbe,
+                emittedBeforeSecondProbe.stream().anyMatch(line -> line.contains("deepseek-completion")));
+        // 结果行（带「平台与模型」列）恰好 3 条，顺序与配置顺序一致；末尾的「默认模型」汇总行不计入
+        List<String> rows = texts(output).stream()
+                .filter(line -> line.contains("provider="))
+                .collect(Collectors.toList());
+        assertEquals(3, rows.size());
+        assertTrue(rows.get(0).contains("deepseek-completion"));
+        assertTrue(rows.get(1).contains("deepseek-response"));
+        assertTrue(rows.get(2).contains("kimi-completion"));
+    }
+
+    /**
      * 取出输出行的纯文本，便于按文案断言。
      *
      * @param lines 输出行

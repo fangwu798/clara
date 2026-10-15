@@ -3,6 +3,7 @@ package com.clara.model.availability;
 import org.junit.Test;
 
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -56,6 +57,32 @@ public class AvailabilityLineTest {
                 ModelCheckResult.available(Paths.get("a.yml"), "a", "DEEPSEEK", "ds", 21L, "推理模型仅返回思维链"))));
 
         assertTrue(lines.get(0).contains("首字符响应=21ms  推理模型仅返回思维链"));
+    }
+
+    /**
+     * 逐条渲染与整批渲染得到同样的文本：这是「检查完一个就输出一个」的前提，先输出的行不能比后输出的行窄。
+     */
+    @Test
+    public void singleLineRenderingMatchesBatchRendering() {
+        List<ModelCheckResult> results = Arrays.asList(
+                ModelCheckResult.available(Paths.get("a.yml"), "a", "OPENAI", "gpt", 12L),
+                ModelCheckResult.unavailable(Paths.get("bb.yml"), "bb", "DEEPSEEK", "ds-v4-pro", "denied"),
+                ModelCheckResult.missingCredential(Paths.get("ccc.yml"), "ccc", "CLARA_KIMI_API_KEY"));
+        List<String> aliases = new ArrayList<String>();
+        List<String> identities = new ArrayList<String>();
+        for (ModelCheckResult result : results) {
+            aliases.add(result.getAlias());
+            identities.add(AvailabilityLine.identity(result.getProvider(), result.getModel()));
+        }
+        AvailabilityLine.ColumnWidths widths = AvailabilityLine.widths(aliases, identities);
+
+        List<String> batch = texts(AvailabilityLine.render(results));
+        for (int index = 0; index < results.size(); index++) {
+            AvailabilityLine single = AvailabilityLine.line(results.get(index), widths);
+            assertEquals(batch.get(index), single.getText());
+        }
+        assertEquals(AvailabilityLine.Level.OK, AvailabilityLine.line(results.get(0), widths).getLevel());
+        assertEquals(AvailabilityLine.Level.WARN, AvailabilityLine.line(results.get(2), widths).getLevel());
     }
 
     /**
