@@ -90,8 +90,6 @@ import com.clara.workflow.checkpoint.InMemoryCheckpointStore;
 import com.clara.workflow.definition.WorkflowDefinitionLoader;
 import com.clara.workflow.definition.WorkflowDefinitionRegistry;
 import com.clara.workflow.engine.DefaultWorkflowEngine;
-import com.clara.workspace.application.DefaultWorkspaceBusinessRunner;
-import com.clara.workspace.api.WorkspaceBusinessRunner;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -221,7 +219,6 @@ public final class ApplicationBootstrap implements Closeable {
     private final DefaultConversationOrchestrator orchestrator;
     private final DefaultConversationOrchestrator.WindowMemoryFactory windowMemoryFactory;
     private final WindowCompressionCoordinator windowCompression;
-    private final WorkspaceBusinessRunner workspaceRunner;
     private final InMemoryCallRecordSink callRecordSink;
 
     /**
@@ -329,9 +326,6 @@ public final class ApplicationBootstrap implements Closeable {
                 };
 
         this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler, capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator);
-
-        // 核心业务入口：把工作区 run / resume / cancel 落到上面的对话编排能力，供 CLI 使用
-        this.workspaceRunner = new DefaultWorkspaceBusinessRunner(orchestrator);
 
         // clara-workflow：默认内存检查点工作流引擎；IWorkflowDefinitionResolver 本阶段未接入
         this.workflowEngine = new DefaultWorkflowEngine(new InMemoryCheckpointStore(), 4);
@@ -451,15 +445,6 @@ public final class ApplicationBootstrap implements Closeable {
                 .append("（输入 ").append(input).append(" / 输出 ").append(output)
                 .append(" / 合计 ").append(total).append(" tokens）");
         return report.toString();
-    }
-
-    /**
-     * 返回装配好的工作区核心业务入口。
-     *
-     * @return 工作区业务运行器，非 null
-     */
-    public WorkspaceBusinessRunner workspaceRunner() {
-        return workspaceRunner;
     }
 
     /**

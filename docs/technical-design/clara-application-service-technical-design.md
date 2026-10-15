@@ -4,6 +4,7 @@
 > 前置：`clara-application-service-business-design.md`（已审核）、`clara-orchestration-service-technical-design.md`（已审核）、`clara-core-contract-technical-design.md`（已审核）
 >
 > 修订（2026-10-15）：CLI 运行模式已删除——`com.clara.adapter.cli` 下的 ClaraCli / CliArgumentsParser / CliOptions / CliExitCodes / NdjsonProtocolWriter 及其契约测试一并移除。原因：`clara.jar` 的入口始终是交互式对话 `ClaraApplication`（shade 插件的 mainClass），CLI 没有任何生产调用方，任务改由工作流（`run_workflow` / `publish_workflow`）承担。下文 §4.3、§5.3 等章节保留为当时的设计记录。
+> 修订（2026-10-15）：工作区运行入口已删除——`com.clara.workspace`（WorkspaceBusinessRunner / DefaultWorkspaceBusinessRunner / WorkspaceRunRequest / WorkspaceResumeRequest / WorkspaceRunResult / WorkspacePolicy）与 core 的 `com.clara.enums.cli`、`com.clara.enums.workspace` 一并移除，`ApplicationBootstrap` 不再装配该入口、也不再有 `workspaceRunner()` 访问器。原因：CLI 删除后无任何调用方。下文 §4 / §5 中相关章节保留为当时的设计记录。
 
 ## 1. 目标
 

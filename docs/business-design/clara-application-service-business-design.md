@@ -2,6 +2,8 @@
 
 > 状态：已审核
 > 关联文档：`clara-orchestration-service-business-design.md`、`clara-workflow-service-business-design.md`
+>
+> 修订（2026-10-15）：运行模式与核心业务入口收敛——CLI 运行模式与 `WorkspaceBusinessRunner`（run / resume / cancel）均已移除（CLI 删除后无任何调用方），任务改由交互式控制台 + 工作流（`run_workflow` / `publish_workflow`）承担；下文提及它们的章节保留为当时的设计记录。
 
 ## 1. 背景与目标
 

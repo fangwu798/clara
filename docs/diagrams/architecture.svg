@@ -35,8 +35,8 @@
   <text x="158" y="323" font-size="10.5" fill="#8A6A3A" text-anchor="middle">模型选择 / 平台配置 / 可用性探测</text>
 
   <rect x="268" y="288" width="196" height="44" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
-  <text x="366" y="307" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">WorkspaceBusinessRunner</text>
-  <text x="366" y="323" font-size="10.5" fill="#8A6A3A" text-anchor="middle">工作区 run / resume 入口</text>
+  <text x="366" y="307" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">WorkflowCatalog</text>
+  <text x="366" y="323" font-size="10.5" fill="#8A6A3A" text-anchor="middle">工作流清单 / 自定义流程热加载</text>
 
   <rect x="476" y="288" width="196" height="44" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
   <text x="574" y="307" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">WorkflowRunner</text>

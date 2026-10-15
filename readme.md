@@ -2,7 +2,7 @@
 
 Clara 是一套面向 Java 8 的 AI 应用运行时库。它提供模型调用、会话记忆、MCP 客户端、工作流编排、任务规划、技能注册与执行、工作区文档读写与媒体生成等能力，并拆分为可独立复用的 Maven 模块，便于嵌入 Java 系统。
 
-> Clara 当前是「库 + 控制台」形态，不是开箱即用的独立服务。仓库没有 Spring Boot 或 Web 容器；clara-application 提供 CLI 与控制台访问边界，REST / SSE 等边界由宿主应用按需自建。宿主负责装配、配置、鉴权、持久化与交互 UI。
+> Clara 当前是「库 + 控制台」形态，不是开箱即用的独立服务。仓库没有 Spring Boot 或 Web 容器；clara-application 提供交互式控制台与装配入口，REST / SSE 等边界由宿主应用按需自建。宿主负责装配、配置、鉴权、持久化与交互 UI。
 
 ## 项目目标
 
@@ -21,14 +21,14 @@ Clara 是一套面向 Java 8 的 AI 应用运行时库。它提供模型调用�
 | 模块 | 职责 | 主要使用场景 |
 | --- | --- | --- |
 | clara-bom | 统一管理各模块版本 | 外部项目通过 dependencyManagement 导入 |
-| clara-core | 能力/角色/协议及各领域枚举（含 workspace / document / cli）、结构化错误模型与跨模块契约（含媒体契约与值对象） | 所有模块的公共基础 |
+| clara-core | 能力/角色/协议及各领域枚举（document / interaction / memory / planner / skill / workflow）、结构化错误模型与跨模块契约（含媒体契约与值对象） | 所有模块的公共基础 |
 | clara-model | 调用上下文、Provider 配置、HTTP/SSE 传输、模型调用实现（协议编解码、Token 估算、嵌入） | 同步/流式对话、Embedding、Token 估算与 OpenAI/DeepSeek/火山方舟/阿里云/Kimi/Anthropic 协议适配 |
 | clara-memory | 窗口记忆、会话持久化、语义记忆 | 消息/Token 窗口裁剪、本地/JDBC 会话存储、Milvus 召回 |
 | clara-mcp | MCP 客户端、服务注册表、能力目录与传输、外部工具路由 | stdio 或 Streamable HTTP 接入外部 MCP 工具、资源与提示词 |
 | clara-workflow | 工作流定义、DAG 执行、任务规划、预算台账、人工交互网关、内置动作与运行支撑 | 多步骤任务、并行/条件/循环节点、失败恢复与 WAITING_INPUT 挂起 |
 | clara-orchestration | 对话编排、上下文组装、工具往返、技能匹配 | 组合模型、记忆、技能、工具与工作流 |
 | clara-skill | 技能注册表、执行器、Schema 校验与工具执行 | 业务能力封装为可版本化、可授权的技能 |
-| clara-application | 应用装配、CLI 与控制台入口、文档解析、会话/工具/媒体装配 | 构建可执行 clara.jar |
+| clara-application | 应用装配、交互式控制台入口、文档解析、会话/工具/媒体装配 | 构建可执行 clara.jar |
 
 ### 模块依赖
 
@@ -368,7 +368,7 @@ clara-skill 将业务能力封装为可注册、可校验、可执行的技能�
 
 ### 媒体生成
 
-图片生成（工作流 AGENT 节点声明 `capability: IMAGE`）的产物会落成媒体资产；视频生成由 CLI 的 `image` / `video` 子命令经 `VideoGenerationClient` 完成提交与轮询。媒体资产写入受控存储（单机为工作区下 `.clara/assets`），不直接暴露临时 URL。
+图片生成（工作流 AGENT 节点声明 `capability: IMAGE`）的产物会落成媒体资产；视频生成由工作流 `video_generation` 的 AGENT 节点（`capability: VIDEO`）完成提交与轮询。媒体资产写入受控存储（单机为工作区下 `.clara/assets`），不直接暴露临时 URL。
 
 ## 作为依赖引入
 
@@ -441,7 +441,7 @@ clara/
 |-- clara-workflow/            # 工作流引擎、任务规划、人工交互
 |-- clara-orchestration/       # 对话编排与能力组合
 |-- clara-skill/               # 技能注册、执行与工具
-|-- clara-application/         # 应用装配、CLI/REST/SSE、文档解析
+|-- clara-application/         # 应用装配、交互式控制台、工作流自举、文档解析
 |-- config/                    # 模型 Provider、MCP、技能与工作流配置
 |-- docs/                      # 架构、业务、技术设计与迁移记录
 |   `-- diagrams/              # 架构图与核心业务流程图 / 时序图（SVG）
