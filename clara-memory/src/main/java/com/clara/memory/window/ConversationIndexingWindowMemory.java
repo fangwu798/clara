@@ -1,5 +1,6 @@
 package com.clara.memory.window;
 
+import com.clara.core.memory.ConversationMemoryText;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.memory.ITokenCountEstimator;
@@ -14,7 +15,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 对话索引窗口记忆：在既有窗口记忆之上，把每条追加的对话记录向量化后写入语义记忆存储。
@@ -32,11 +32,6 @@ import java.util.Map;
  * <p>失败语义：写入语义库失败（如向量库不可用）只提示到标准错误并继续——向量化是附加能力，不该让本轮对话失败。
  */
 public final class ConversationIndexingWindowMemory implements IWindowMemory {
-
-    /**
-     * 单条记录写入向量库的最大字符数：工具输出可能很大，整段入库既浪费额度也会在召回时挤占上下文。
-     */
-    private static final int MAX_CONTENT_CHARS = 2000;
 
     private final IWindowMemory delegate;
     private final IEmbeddingClient embeddingClient;
@@ -105,7 +100,7 @@ public final class ConversationIndexingWindowMemory implements IWindowMemory {
         long now = System.currentTimeMillis();
         for (int position = 0; position < messages.size(); position++) {
             IContent message = messages.get(position);
-            String content = message == null ? null : indexableText(message);
+            String content = ConversationMemoryText.of(message);
             if (content == null) {
                 continue;
             }
@@ -125,60 +120,6 @@ public final class ConversationIndexingWindowMemory implements IWindowMemory {
 
     private String entryId(int position) {
         return MemorySourceTypeEnum.CONVERSATION.name() + ":" + conversationId() + ":" + position;
-    }
-
-    /**
-     * 取一条消息可入库的文本：{@code role: 正文}；多模态消息取其文本部分，工具调用消息退回工具调用摘要。
-     *
-     * @return 可入库文本；无可用文本（如空正文）时返回 null
-     */
-    private static String indexableText(IContent message) {
-        Map<String, Object> rendered = message.toCompletionMessage();
-        String body = body(rendered);
-        if (body.isEmpty()) {
-            return null;
-        }
-        Object role = rendered.get("role");
-        String text = (role instanceof String ? (String) role : "message") + ": " + body;
-        return text.length() <= MAX_CONTENT_CHARS
-                ? text
-                : text.substring(0, MAX_CONTENT_CHARS);
-    }
-
-    /**
-     * 从线格式消息里取正文：字符串正文直接用；多模态（数组）取其中的文本片段；否则退回工具调用摘要。
-     */
-    private static String body(Map<String, Object> rendered) {
-        Object content = rendered.get("content");
-        if (content instanceof String) {
-            return ((String) content).trim();
-        }
-        if (content instanceof List) {
-            return textParts((List<?>) content);
-        }
-        Object toolCalls = rendered.get("tool_calls");
-        return toolCalls instanceof List && !((List<?>) toolCalls).isEmpty()
-                ? toolCalls.toString().trim() : "";
-    }
-
-    /**
-     * 取多模态内容里的文本片段（{@code {"type":"text","text":"..."}}）。
-     */
-    private static String textParts(List<?> parts) {
-        StringBuilder text = new StringBuilder();
-        for (Object part : parts) {
-            if (!(part instanceof Map)) {
-                continue;
-            }
-            Object value = ((Map<?, ?>) part).get("text");
-            if (value instanceof String && !((String) value).trim().isEmpty()) {
-                if (text.length() > 0) {
-                    text.append(' ');
-                }
-                text.append(((String) value).trim());
-            }
-        }
-        return text.toString();
     }
 
     private static String sha256(String content) {

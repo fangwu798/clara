@@ -135,8 +135,10 @@ public final class ContextAssembler {
         // 模型自然走工具查本地文件那条路（补充提供者自身兜底，失败不阻断本轮）。
         List<String> supplement = supplementProvider == null
                 ? Collections.<String>emptyList() : supplementProvider.supplement(userInput);
+        // 召回被窗口淘汰的历史知识：把本轮真正要下发的消息一并传进去，命中的内容若模型本来就看得到（本轮提问、
+        // 刚返回的工具结果）会被丢弃，不重复塞进 system 指令。
         List<String> recall = semanticRecallCoordinator.recall(windowMemory.conversationId(), userInput,
-                effective);
+                effective, prepared);
 
         String systemText = systemText(systemParts, basePrompts, matched.getPrompts(), supplement, recall);
         List<IContent> messages = new ArrayList<IContent>();

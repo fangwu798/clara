@@ -1,6 +1,7 @@
 package com.clara.orchestration.context;
 
 import com.clara.core.memory.IContextTraceSink;
+import com.clara.core.message.IContent;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.dto.memory.ContextControlConfig;
@@ -8,6 +9,7 @@ import com.clara.dto.memory.MemoryEntry;
 import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
 import com.clara.enums.memory.MemorySourceTypeEnum;
+import com.clara.kernel.message.delta.UserContent;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -126,6 +128,47 @@ public class SemanticRecallCoordinatorTest {
         assertTrue(coordinator.recall("c1", "query text", control(3, 0.5)).isEmpty());
 
         assertEquals(Collections.singletonList(0), trace.hits);
+    }
+
+    @Test
+    public void recallDropsHitsThatCurrentTurnAlreadyCarries() {
+        RecordingTrace trace = new RecordingTrace();
+        // 条目的入库文本与「本轮要下发的消息」一字不差：模型本来就看得到，不该再当补充信息塞一遍
+        MemoryMatch duplicated = new MemoryMatch(entry(MemorySourceTypeEnum.CONVERSATION, "e1",
+                "user: 请帮我分析一下 PackageRuleDescriptionService"), 0.97);
+        SemanticRecallCoordinator coordinator = new SemanticRecallCoordinator(text -> new float[] {1f, 0f},
+                new RecordingStore(Collections.singletonList(duplicated)), trace);
+
+        List<String> knowledge = coordinator.recall("c1", "请帮我分析一下 PackageRuleDescriptionService",
+                control(3, 0.5), Collections.<IContent>singletonList(
+                        new UserContent("请帮我分析一下 PackageRuleDescriptionService")));
+
+        assertTrue(knowledge.isEmpty());
+        assertEquals(Collections.singletonList(0), trace.hits);
+        // 上报要写明是「已在本轮上下文」丢的，而不是「分数不够」——两者的排查方向完全相反
+        assertTrue(trace.details.get(0).get(0).contains("全部已在本轮上下文，已丢弃"));
+        assertTrue(trace.details.get(0).get(1).contains("丢弃 score=0.970"));
+    }
+
+    @Test
+    public void recallDropsOnlyTheHitsVisibleInCurrentTurn() {
+        RecordingTrace trace = new RecordingTrace();
+        List<MemoryMatch> matches = Arrays.asList(
+                new MemoryMatch(entry(MemorySourceTypeEnum.CONVERSATION, "e1", "user: 另一个问题"), 0.95),
+                new MemoryMatch(entry(MemorySourceTypeEnum.CONVERSATION, "e2", "tool: 旧的工具结果"), 0.91));
+        SemanticRecallCoordinator coordinator = new SemanticRecallCoordinator(text -> new float[] {1f, 0f},
+                new RecordingStore(matches), trace);
+
+        List<String> knowledge = coordinator.recall("c1", "另一个问题", control(3, 0.5),
+                Collections.<IContent>singletonList(new UserContent("另一个问题")));
+
+        assertEquals(Arrays.asList("tool: 旧的工具结果"), knowledge);
+        List<String> details = trace.details.get(0);
+        assertEquals(3, details.size());
+        assertTrue(details.get(0).contains("召回 2 条"));
+        assertTrue(details.get(0).contains("丢弃 1 条（已在本轮上下文）"));
+        assertTrue(details.get(0).contains("过阈值 1 条"));
+        assertTrue(details.get(1).contains("score=0.910"));
     }
 
     // ---- helpers -----------------------------------------------------------
