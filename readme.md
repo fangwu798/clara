@@ -319,7 +319,7 @@ clara-mcp 支持 stdio 与 Streamable HTTP，围绕注册、初始化、能力�
 
 - 部署（二选一）：`deploy/codebase-memory-mcp/install.ps1` 装到宿主；`deploy/codebase-memory-mcp/install-docker.ps1` 走 Docker Compose —— 容器常驻并把待分析仓库只读挂到 `/work/repo`，宿主按 `docker exec -i <容器> codebase-memory-mcp` 调用，宿主不需要留安装目录。细节见 `deploy/codebase-memory-mcp/readme.md`。图谱可视化：容器部署会把 UI 发布到宿主回环，浏览器打开 `http://127.0.0.1:9749/`；宿主安装用 `codebase-memory-mcp daemon start` 后访问同一地址。
 - 技能脚本 `config/skill/scripts/code-graph/code_graph.py`（工具名 `code_graph`）：`op=read` 对代码文件先取图谱大纲，图谱未覆盖（未索引 / 不在索引范围 / 图谱不可用）时回退本地文件读取，返回里 `source` 标明每条信息来自 `graph` 还是 `file`；`.md` / `.txt` 这类散文文件不查图谱、直接返回原文。
-- 其余 `op` 直通图谱能力：`index`（建 / 重建索引）、`status`、`search`、`outline`、`snippet`、`trace`（`inbound` 查调用方、`outbound` 查被调用方；只跟 `CALLS` 边、会漏掉 `USAGE`，不能当完整引用清单）、`query`（只读 Cypher）。完整问「谁引用了 X」用 `query`，例如 `MATCH (c:Class)-[:DEFINES_METHOD]->(m)-[r]->(n) WHERE n.name='X' RETURN DISTINCT c.qualified_name`。
+- 其余 `op` 直通图谱能力：`index`（建 / 重建索引）、`status`、`search`、`outline`、`snippet`、`trace`（`inbound` 查调用方、`outbound` 查被调用方；只跟 `CALLS` 边、会漏掉 `USAGE`，不能当完整引用清单）、`query`（只读 Cypher）。完整问「谁引用了 X」用 `query`，例如 `MATCH (c:Class)-[:DEFINES_METHOD]->(m)-[r]->(n) WHERE n.name='X' RETURN DISTINCT c.qualified_name`。图谱的 Cypher 只支持子集：标签写成 `n:Class` 或 `(c:Class {name:'X'})`，**不支持列表下标**（如 `labels(n)[0]`，写它整条语句会报 `not fully parsed`）。
 - 会话提示 `config/skill/prompt/code_graph_guide.json` 约定「先查图谱 → 没覆盖再读文件 → 最后才整文件读取」；它由 `config/clara.yml` 的 `context.alwaysPrompts`（默认 `[code_graph_guide]`）常驻注入每轮 system 指令——按输入相似度检索那套指望不上（有阈值与条数上限），故单列一条不参与检索的通道；图谱关闭时该条自动跳过。
 - `analyze_repo_docs`、`design_business_solution` 两个工作流的读取节点也已改用 `code_graph`。
 - 每轮预取图谱补充信息（`codeGraph.supplement`）默认关，交给模型按需调 `code_graph`：这笔查询压在每轮模型开始之前，实测大仓库（lippo-life，约 2 万个符号）单次要 20 秒以上（换项目、换关键词都稳定 20 秒左右，不是冷启动；同库按符号名的 `search_graph` 只要 3 秒），会把首字响应从 1~2 秒拖到 20 秒+。小仓库想恢复「先查再答」把它设回 `true` 即可。
@@ -334,9 +334,9 @@ clara-mcp 支持 stdio 与 Streamable HTTP，围绕注册、初始化、能力�
               score=0.812  ...
   ```
 
-  `[图谱]` = 代码知识图谱补充（仅 `codeGraph.supplement: true` 时有这一行）、`[提示词]` = 提示词向量匹配、`[向量]` = 语义记忆（Milvus）召回；命中为绿色，未命中与明细为灰色（`/color` 可关色）。明细行先汇总「召回了几条 / 其中几条过阈值 / 最高分」，再逐条给出 score 与片段预览（无召回时直接写「语义库里没有本会话可检索的记录」，好区分「库里没数据」和「分数不够」），同一份文本同时写入详细日志。缺了这几行，就分不清「模型没用图谱」是没命中、没接线，还是被阈值刷掉了。
+  `[图谱]` = 代码知识图谱补充（仅 `codeGraph.supplement: true` 时有这一行）、`[提示词]` = 提示词向量匹配、`[向量]` = 语义记忆（Milvus）召回（仅启用外部向量库时有这一行：`milvus.enabled: false` 时对话记录不进语义库、召回必然为空，这行也不再打印）；命中为绿色，未命中与明细为灰色（`/color` 可关色）。明细行先汇总「召回了几条 / 其中几条因已在本轮上下文被丢弃 / 几条过阈值 / 最高分」，再逐条给出 score 与片段预览（无召回时直接写「语义库里没有本会话可检索的记录」，好区分「库里没数据」和「分数不够」），同一份文本同时写入详细日志。命中内容若本轮请求里已经带着（本轮提问本身、刚返回的工具结果）会被丢弃并单列一行「丢弃 …」、不再重复注入 system 指令：判重只比文本，且与写入端共用同一套「入库文本」折算，所以被压缩或截断过的历史照常召回。缺了这几行，就分不清「模型没用图谱」是没命中、没接线，还是被阈值刷掉了。
 - 自动查图谱只认提问里「像代码标识符」的词（类名 / 方法名 / 字段名：驼峰、下划线、字母数字混排），汉字与自然语言词只当分隔符。纯中文整句没有可查的标识符时本轮跳过查询（图谱按符号名与代码内容匹配，整句命中不了，白等一次查询），由模型按 `code_graph_guide` 自己带模式查；图谱自身报错（未索引当前目录、项目登记的根路径已失效）会单独打印原因，不与「零命中」混成一句。
-- 启动时会打印图谱初始化日志：总开关状态、`挂载检查`（容器能否看到当前工作目录，带耗时）、`导入检查`（当前项目是否已导入；没导入且开了 `autoImport` 时会在后台发起索引），开关关掉或某步跳过时同样打一行说明原因，免得「图谱怎么没命中」只能靠猜：
+- 启用图谱时会在启动阶段打印初始化日志：`挂载检查`（容器能否看到当前工作目录，带耗时）、`导入检查`（当前项目是否已导入；没导入且开了 `autoImport` 时会在后台发起索引），开了但某步跳过（`autoMount: false` / `autoImport: false`）时会打一行说明原因，免得「图谱怎么没命中」只能靠猜；总开关 `enabled: false` 时整块不打印，关闭的功能不出现在日志里：
 
   ```
     codegraph      : 初始化：工作目录 E:\workspace_rongshu\lippo-life，autoMount=true autoImport=true
@@ -399,6 +399,20 @@ clara-skill 将业务能力封装为可注册、可校验、可执行的技能�
 典型用法：实现技能接口并声明输入/输出与权限，注册到技能注册表，校验与授权后调用；恢复时按版本号确定执行体。
 
 注意：技能接收外部输入先做结构化校验；文件、网络、进程与高风险业务分别授权；执行需携带上下文、租户、截止时间与取消信号；技能注册表（SkillRegistry）为内存实现，仅进程内有效。
+
+## 浏览器自动化（UI 测试）
+
+技能脚本 `config/skill/scripts/browser/browser.py`（工具名 `browser`）用 Playwright 驱动浏览器，让模型直接操作本机 / 内网页面做自动测试：打开页面、读取可交互元素、点击 / 输入 / 选择 / 勾选、断言、截图留证。
+
+- 会话常驻：真正的浏览器跑在后台进程 `_browser_host.py` 里（由工具脚本按需拉起、无窗口运行），同一工作目录的多次调用是同一个浏览器——登录态与页面进度跨调用保留，不必每步重新登录；`op=close` 结束会话，空闲 30 分钟自动退出。状态、截图与后台日志都在工作目录的 `.clara/browser/` 下（`session.json` / `shots/` / `host.log`）。
+- 快照驱动定位：`op=open` 与 `op=snapshot` 返回「可交互元素清单」（每个元素带 `ref`、角色、名称、当前值、禁用状态、下拉选项），模型用 `target="ref=e3"` 或 `css=` / `text=` / `role=button[name=提交]` / `label=` / `placeholder=` / `testid=` / `xpath=` 定位；匹配到多个时取第一个可见元素并说明，可用 `index` 指定。页面跳转或重渲染后 `ref` 失效会提示重新快照。
+- 断言与证据：`op=expect` 支持 visible / hidden / attached / detached / enabled / disabled / text_contains / value_equals / count / url_contains / title_contains / no_console_errors，返回 `pass` 与实际值；`op=run` 用 `steps=[{op:...},...]` 一次跑多步、失败即停，换页面的步骤会自动带回新快照（`ref` 按新快照重新编号）；失败自动截图并把页面快照一并回传，便于模型自我修正。控制台报错与失败请求按「当前文档」统计，跳转后自动重置。
+- 用例可回放：把一次测试写成 JSON 用例文件（内容就是 `steps` 数组，或 `{"name":"..","vars":{..},"steps":[..]}`），用 `op=run` 的 `case=<路径>` 回放；`steps` 里的字符串可用 `{{变量名}}` 引用 `vars`，同一份用例换环境（如基地址）不必改文件。路径按当前工作目录解析，适合随项目版本化（例如放 `ui-tests/login-smoke.json`）。
+- 单次调用受框架 30 秒硬超时约束，因此工具内部预算默认 20 秒（`budget_ms` 可调小），超时返回「接着做」的提示——长流程拆成多次调用即可，不用一口气走完。
+- 首次使用先自检：`op=doctor` 显示 Python、Playwright、可用浏览器（内置 chromium / 系统 Chrome / 系统 Edge）与会话状态。缺内置浏览器时执行 `python -m playwright install chromium`，或调用时传 `channel="chrome"` / `channel="msedge"` 直接走系统浏览器。
+- 默认无头运行；需要盯着执行过程时在 `open` 里传 `headless=false`（或设环境变量 `CLARA_BROWSER_HEADLESS=0`）。技能脚本按目录自动发现，新增 / 修改后重启进程即生效（见「技能」）。
+
+对话里直接说诉求即可，例如：「打开 http://localhost:5174，用 admin/123456 登录，看首页有没有待办列表」「把注册表单填一遍提交，检查有没有报错」。典型调用序列：`open` → `snapshot` → `fill` / `click` → `expect` → `screenshot` → `close`。
 
 ## 文档解析与媒体处理
 
