@@ -18,7 +18,8 @@ import java.nio.file.Path;
  * <pre>
  * codeGraph:
  *   enabled: true          # 总开关：false 时其余开关一律不生效（等于没接图谱）
- *   supplement: true       # 每轮对话前先向图谱查一次，命中的知识作为补充信息注入提示词
+ *   supplement: false      # 每轮对话前先向图谱查一次，命中的知识作为补充信息注入提示词（默认关，见下）
+ *   autoMount: true        # 启动时确保图谱容器能看到当前工作目录（不在挂载里就补一条只读挂载）
  *   autoImport: false      # 启动时把当前工作目录导入图谱（未索引则后台发起，不阻塞启动）
  *   mcpServer: codebase-memory-mcp   # 图谱在 config/mcp 里的注册键（仅用于日志与排查）
  *   supplementMaxChars: 4000         # 单轮补充信息的字符上限
@@ -47,14 +48,16 @@ public final class CodeGraphSettings {
 
     private final boolean enabled;
     private final boolean supplement;
+    private final boolean autoMount;
     private final boolean autoImport;
     private final String mcpServer;
     private final int supplementMaxChars;
 
-    private CodeGraphSettings(boolean enabled, boolean supplement, boolean autoImport, String mcpServer,
-            int supplementMaxChars) {
+    private CodeGraphSettings(boolean enabled, boolean supplement, boolean autoMount, boolean autoImport,
+            String mcpServer, int supplementMaxChars) {
         this.enabled = enabled;
         this.supplement = supplement;
+        this.autoMount = autoMount;
         this.autoImport = autoImport;
         this.mcpServer = mcpServer;
         this.supplementMaxChars = supplementMaxChars;
@@ -82,17 +85,18 @@ public final class CodeGraphSettings {
         boolean enabled = bool(node, "enabled", true);
         String server = text(node, "mcpServer", DEFAULT_MCP_SERVER);
         int maxChars = integer(node, "supplementMaxChars", DEFAULT_SUPPLEMENT_MAX_CHARS);
-        return new CodeGraphSettings(enabled, bool(node, "supplement", true) && enabled,
-                bool(node, "autoImport", false) && enabled, server, maxChars);
+        return new CodeGraphSettings(enabled, bool(node, "supplement", false) && enabled,
+                bool(node, "autoMount", true) && enabled, bool(node, "autoImport", false) && enabled, server,
+                maxChars);
     }
 
     /**
-     * 默认配置：开启图谱、开启每轮补充信息、不自动导入。
+     * 默认配置：开启图谱、关闭每轮补充信息、启动时按需挂载、不自动导入。
      *
      * @return 默认配置，非 null
      */
     public static CodeGraphSettings defaults() {
-        return new CodeGraphSettings(true, true, false, DEFAULT_MCP_SERVER, DEFAULT_SUPPLEMENT_MAX_CHARS);
+        return new CodeGraphSettings(true, false, true, false, DEFAULT_MCP_SERVER, DEFAULT_SUPPLEMENT_MAX_CHARS);
     }
 
     /**
@@ -107,10 +111,24 @@ public final class CodeGraphSettings {
     /**
      * 是否在每轮对话前查询图谱并把命中结果作为补充信息注入提示词。
      *
+     * <p>默认关：这笔查询压在每轮模型开始之前，实测大仓库（lippo-life，约 2 万个符号）单次要 20 秒以上
+     * （换项目、换关键词都稳定 20 秒左右，不是冷启动；同库按符号名的 {@code search_graph} 只要 3 秒），
+     * 会把首字响应从 1~2 秒拖到 20 秒+。模型本来就会按需调 {@code code_graph}
+     * （常驻提示词 {@code code_graph_guide} 保证它知道要查），所以默认交给模型按需查询。
+     *
      * @return true 表示启用补充信息
      */
     public boolean isSupplementEnabled() {
         return supplement;
+    }
+
+    /**
+     * 是否在启动时确保图谱容器能看到当前工作目录（不在挂载里就补一条只读挂载）。
+     *
+     * @return true 表示启用启动挂载
+     */
+    public boolean isAutoMountEnabled() {
+        return autoMount;
     }
 
     /**

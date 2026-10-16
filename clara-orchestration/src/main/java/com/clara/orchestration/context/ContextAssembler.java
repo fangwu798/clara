@@ -24,7 +24,11 @@ import java.util.Set;
  * <p>装配顺序：先按窗口策略裁剪历史；窗口发生淘汰且启用压缩时，把被淘汰的消息组压缩为摘要；随后压缩历史
  * 工具结果（只压当前提问之前的历史部分，控制请求体膨胀）；再完成技能匹配（提示词 + 工具声明）、外部知识
  * 补充（代码知识图谱：先查图谱、图谱里没有再让模型自己查本地文件）与对话知识找回；最后把 system 指令
- * （技能提示词 + 图谱补充信息 + 压缩摘要 + 检索知识）归一化到消息首位。
+ * （常驻提示词 + 技能提示词 + 图谱补充信息 + 压缩摘要 + 检索知识）归一化到消息首位。
+ *
+ * <p>提示词分两类：{@code basePrompts} 是常驻的，每轮原样注入，承载「读代码先查图谱」这类与输入无关的
+ * 固定约定；技能提示词是按输入相似度检索出来的，承载随输入变化的用法说明。前者靠检索注入会因阈值与
+ * 条数上限时有时无，故单独走一条通道。
  */
 public final class ContextAssembler {
 
@@ -32,6 +36,11 @@ public final class ContextAssembler {
     private final SemanticRecallCoordinator semanticRecallCoordinator;
     private final IContextSupplementProvider supplementProvider;
     private final SkillMatchCoordinator skillMatchCoordinator;
+
+    /**
+     * 常驻提示词：每轮原样拼进 system 指令，不参与按输入的相似度检索；不可变，可能为空。
+     */
+    private final List<String> basePrompts;
 
     /**
      * 创建上下文装配器（不注入外部知识补充）。
@@ -43,7 +52,7 @@ public final class ContextAssembler {
     public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
             SemanticRecallCoordinator semanticRecallCoordinator,
             SkillMatchCoordinator skillMatchCoordinator) {
-        this(windowCompressionCoordinator, semanticRecallCoordinator, null, skillMatchCoordinator);
+        this(windowCompressionCoordinator, semanticRecallCoordinator, null, skillMatchCoordinator, null);
     }
 
     /**
@@ -58,6 +67,24 @@ public final class ContextAssembler {
             SemanticRecallCoordinator semanticRecallCoordinator,
             IContextSupplementProvider supplementProvider,
             SkillMatchCoordinator skillMatchCoordinator) {
+        this(windowCompressionCoordinator, semanticRecallCoordinator, supplementProvider, skillMatchCoordinator,
+                null);
+    }
+
+    /**
+     * 创建上下文装配器并指定常驻提示词。
+     *
+     * @param windowCompressionCoordinator 窗口压缩协调器，不可为 null
+     * @param semanticRecallCoordinator    知识找回协调器，不可为 null
+     * @param supplementProvider           外部知识补充提供者（如代码知识图谱）；可为 null（不补充）
+     * @param skillMatchCoordinator        技能匹配协调器，不可为 null
+     * @param basePrompts                  常驻提示词（每轮原样注入，不参与检索）；可为 null（视为无）
+     */
+    public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
+            SemanticRecallCoordinator semanticRecallCoordinator,
+            IContextSupplementProvider supplementProvider,
+            SkillMatchCoordinator skillMatchCoordinator,
+            List<String> basePrompts) {
         if (windowCompressionCoordinator == null || semanticRecallCoordinator == null
                 || skillMatchCoordinator == null) {
             throw new IllegalArgumentException("context assembler dependencies are invalid");
@@ -66,6 +93,9 @@ public final class ContextAssembler {
         this.semanticRecallCoordinator = semanticRecallCoordinator;
         this.supplementProvider = supplementProvider;
         this.skillMatchCoordinator = skillMatchCoordinator;
+        this.basePrompts = basePrompts == null
+                ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(new ArrayList<String>(basePrompts));
     }
 
     /**
@@ -108,7 +138,7 @@ public final class ContextAssembler {
         List<String> recall = semanticRecallCoordinator.recall(windowMemory.conversationId(), userInput,
                 effective);
 
-        String systemText = systemText(systemParts, matched.getPrompts(), supplement, recall);
+        String systemText = systemText(systemParts, basePrompts, matched.getPrompts(), supplement, recall);
         List<IContent> messages = new ArrayList<IContent>();
         if (!systemText.isEmpty()) {
             messages.add(new SystemContent(systemText));
@@ -147,11 +177,14 @@ public final class ContextAssembler {
     }
 
     /**
-     * 归一化 system 指令文本：技能提示词、图谱补充信息、压缩摘要、检索知识按序拼接。
+     * 归一化 system 指令文本：常驻提示词、技能提示词、图谱补充信息、压缩摘要、检索知识按序拼接。
      */
-    private static String systemText(List<IContent> systemParts, List<String> prompts,
+    private static String systemText(List<IContent> systemParts, List<String> basePrompts, List<String> prompts,
             List<String> supplement, List<String> recall) {
         StringBuilder text = new StringBuilder();
+        for (String prompt : basePrompts) {
+            append(text, prompt);
+        }
         for (String prompt : prompts) {
             append(text, prompt);
         }

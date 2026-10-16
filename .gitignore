@@ -36,3 +36,9 @@ hs_err_pid*.log
 
 # Python 字节码缓存（手工执行 config/skill/scripts 下的脚本时会生成，框架执行时已禁用）。
 __pycache__/
+
+# 按需挂载生成的 compose 覆盖文件（ensure-mount.ps1 写，内容随本机挂了哪些工作目录变化）。
+/deploy/docker-compose.mounts.yml
+
+# 本地调试产物（临时日志、探针脚本、截图等），不入库。
+/.local/

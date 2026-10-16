@@ -19,7 +19,7 @@ _TOOL = {
     "id": "text_search",
     "name": "text_search",
     "type": "PYTHON",
-    "description": "在指定目录（或单个文件）内按关键词/正则搜索文件内容，返回命中文件、行号与命中行，可按需附带上下文行。用于快速定位符号、配置项、引用关系，替代「先 scan 再逐个 read」的低效做法。入参 JSON：pattern(必填，关键词或正则)、path(可选，相对 base_dir 的文件或目录，缺省为当前分析目录)、base_dir(可选根目录，缺省为 CLARA_WORK_DIR；以 @repo 开头按仓库根解析)、regex(可选，默认 false，true 时按正则匹配)、ignore_case(可选，默认 true)、include/exclude(glob 列表，如 [\"*.java\"]、[\"*.md\"] 取反)、max_results(默认 100)、context(默认 0，命中行前后附加的行数)、max_depth(默认 8)、encoding(可选，默认自动识别文件编码，需要时可显式指定 gbk、utf-8-sig 等)、max_file_bytes(默认 2000000，超过则跳过)、max_files(默认 5000)。返回：{root, pattern, matches:[{path, line, text, context?}], count, files_scanned, truncated}。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
+    "description": "在指定目录（或单个文件）内按关键词/正则搜索文件内容，返回命中文件、行号与命中行，可按需附带上下文行。用于图谱查不到时兜底定位文本：符号、配置项、字面串（目录未导入图谱、文件不在索引范围、非代码文本）。代码符号与引用关系优先用 code_graph（图谱已覆盖时更准、token 更省），本工具只作回退。入参 JSON：pattern(必填，关键词或正则)、path(可选，相对 base_dir 的文件或目录，缺省为当前分析目录)、base_dir(可选根目录，缺省为 CLARA_WORK_DIR；以 @repo 开头按仓库根解析)、regex(可选，默认 false，true 时按正则匹配)、ignore_case(可选，默认 true)、include/exclude(glob 列表，如 [\"*.java\"]、[\"*.md\"] 取反)、max_results(默认 100)、context(默认 0，命中行前后附加的行数)、max_depth(默认 8)、encoding(可选，默认自动识别文件编码，需要时可显式指定 gbk、utf-8-sig 等)、max_file_bytes(默认 2000000，超过则跳过)、max_files(默认 5000)。返回：{root, pattern, matches:[{path, line, text, context?}], count, files_scanned, truncated}。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
     "parameters": {
         "type": "object",
         "properties": {

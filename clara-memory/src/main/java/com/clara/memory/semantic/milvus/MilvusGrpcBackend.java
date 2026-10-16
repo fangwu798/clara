@@ -20,6 +20,7 @@ import io.milvus.param.R;
 import io.milvus.param.RpcStatus;
 import io.milvus.param.collection.CreateCollectionParam;
 import io.milvus.param.collection.DescribeCollectionParam;
+import io.milvus.param.collection.DropCollectionParam;
 import io.milvus.param.collection.FieldType;
 import io.milvus.param.collection.HasCollectionParam;
 import io.milvus.param.collection.LoadCollectionParam;
@@ -217,6 +218,17 @@ public final class MilvusGrpcBackend implements MilvusBackend {
                 .withExpr(expr)
                 .build());
         checkStatus(result, "deleteByConversation");
+    }
+
+    @Override
+    public void dropCollection(String collection) {
+        if (collection == null) {
+            throw new IllegalArgumentException("collection must not be null");
+        }
+        R<RpcStatus> result = client.dropCollection(DropCollectionParam.newBuilder()
+                .withCollectionName(collection)
+                .build());
+        checkStatus(result, "dropCollection");
     }
 
     @Override

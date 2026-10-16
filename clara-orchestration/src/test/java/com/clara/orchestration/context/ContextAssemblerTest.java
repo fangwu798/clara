@@ -139,6 +139,51 @@ public class ContextAssemblerTest {
                 () -> assembler.assemble(null, control(false), null));
     }
 
+    @Test
+    public void assembleInjectsBasePromptsEvenWhenNoPromptMatched() {
+        UserContent user = new UserContent("hi");
+        FakeWindowMemory window = new FakeWindowMemory("c1", Collections.<IContent>singletonList(user));
+
+        ContextAssembler assembler = new ContextAssembler(
+                new WindowCompressionCoordinator(null),
+                new SemanticRecallCoordinator(null, null),
+                null,
+                new SkillMatchCoordinator(null, null, null),
+                Collections.singletonList("BASE-PROMPT"));
+
+        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(false), null);
+
+        List<IContent> messages = assembled.getMessages();
+        assertEquals(2, messages.size());
+        assertTrue(messages.get(0) instanceof SystemContent);
+        assertEquals("BASE-PROMPT", ((SystemContent) messages.get(0)).instructionText());
+        assertSame(user, messages.get(1));
+    }
+
+    @Test
+    public void assemblePlacesBasePromptsBeforeMatchedPrompts() {
+        UserContent user = new UserContent("hi");
+        FakeWindowMemory window = new FakeWindowMemory("c1", Collections.<IContent>singletonList(user));
+
+        SkillMatchCoordinator skill = new SkillMatchCoordinator(
+                text -> new float[] {1f, 0f},
+                new RoutingStore(Collections.singletonList(
+                        new MemoryMatch(entry(MemorySourceTypeEnum.PROMPT, "p1"), 0.9)),
+                        Collections.<MemoryMatch>emptyList()),
+                constantPromptProvider("SYS-PROMPT"));
+        ContextAssembler assembler = new ContextAssembler(
+                new WindowCompressionCoordinator(null),
+                new SemanticRecallCoordinator(null, null),
+                null,
+                skill,
+                Collections.singletonList("BASE-PROMPT"));
+
+        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(false), null);
+
+        assertEquals("BASE-PROMPT\nSYS-PROMPT",
+                ((SystemContent) assembled.getMessages().get(0)).instructionText());
+    }
+
     // ---- helpers -----------------------------------------------------------
 
     private static ContextControlConfig control(boolean compressEnabled) {

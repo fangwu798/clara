@@ -12,7 +12,7 @@ defaultModel: deepseek-response
 #   启动脚本（clara.bat / clara.sh）会逐个检查这些供应商凭据声明的环境变量
 #   （config/model-providers/<别名>.yml 的 credential.environmentVariable），缺失时提示输入。
 #   写法：单行方括号列表（启动脚本按此格式解析）；本行也兼容 YAML 块式序列。
-enabledProviders: [deepseek-response, deepseek-completion]
+enabledProviders: [deepseek-response, deepseek-completion, kimi-response, kimi-completion, openai]
 
 # 代码知识图谱（可选，需要先按 deploy/codebase-memory-mcp/readme.md 部署：
 #   容器部署 deploy\codebase-memory-mcp\install-docker.ps1；宿主安装 deploy\codebase-memory-mcp\install.ps1）。
@@ -24,8 +24,16 @@ enabledProviders: [deepseek-response, deepseek-completion]
 codeGraph:
   # 总开关：false 时下面各项一律不生效（等于没接图谱）。
   enabled: true
-  # 每轮对话先查图谱做补充信息（命中才注入；查询约 2~6 秒，嫌慢可以关掉，改用模型按需调 code_graph）。
-  supplement: true
+  # 每轮对话先查图谱、命中才注入，默认关（交给模型按需调 code_graph）。
+  # 为什么默认关：这笔查询压在每轮模型开始之前，实测大仓库（lippo-life）单次要 20 秒以上
+  # （换项目、换关键词都稳定 20 秒左右，不是冷启动），首字响应会被从 1~2 秒拖到 20 秒+；
+  # 而模型本来就按需调 code_graph（常驻提示词 code_graph_guide 保证它知道要查）。
+  # 小仓库想恢复「先查再答」就改成 true；控制台的 [图谱] 观测行只在开启时才出现。
+  supplement: false
+  # 启动时确保图谱容器能看到当前工作目录：不在容器的挂载里就补一条只读挂载（必要时重建容器，几秒）。
+  # 容器不会因为换了工作目录就自动看到新目录，缺挂载时图谱对该目录一律回「容器里看不到它」。
+  # 已挂上时只跑一次 docker inspect（秒回）；宿主机安装图谱（没有容器）时自动跳过。
+  autoMount: true
   # 启动时把当前工作目录导入图谱（幂等：已导入只提示一句，没导入则后台发起，不阻塞启动）。
   # 想手动控制导入时机（用 /graph import）时保持 false。
   autoImport: false
@@ -34,21 +42,49 @@ codeGraph:
   # 单轮补充信息的字符上限，防止一份大纲把上下文撑大。
   supplementMaxChars: 4000
 
+# 常驻提示词（可选）：列表里的提示词每轮原样拼进 system 指令，不参与「按输入相似度检索」。
+#   为什么单列一条通道：技能提示词是按用户输入的向量相似度检索注入的（有相似度阈值
+#   与条数上限），像「读代码先查知识图谱」这种与具体输入无关的固定约定，靠检索会出现有时注入、
+#   有时不注入，模型行为随之漂移。固定约定放这里；随输入变化的技能提示词仍走检索。
+#   取值是 config/skill/prompt 下的提示词标识；节点缺省时默认 [code_graph_guide]，写 [] 表示不常驻。
+#   图谱关闭（codeGraph.enabled: false）时 code_graph_guide 会自动跳过——图谱不可用时留着它
+#   只会把模型引向一个会报错的工具。
+context:
+  alwaysPrompts: [code_graph_guide]
+
 # 语义记忆（可选）。配了 milvus 且 enabled 不为 false 时：
-#   1) 所有对话记录都会向量化写入 Milvus（来源 CONVERSATION，按会话隔离，用于长程/跨窗口关联）；
-#   2) 每轮按相似度从 Milvus 召回历史上下文，注入到提示词。
+#   1) 所有对话记录都会写入 Milvus（来源 CONVERSATION，按会话隔离，用于长程/跨窗口关联）；
+#   2) 每轮按输入从 Milvus 召回历史上下文，注入到提示词。
 # 未配置该节点、或 enabled: false 时保持原样：语义记忆用进程内实现，不写对话记录。
 # 服务端可用 deploy/docker-compose.yml 起（etcd + MinIO + milvus standalone，gRPC 端口 19530）。
 milvus:
   enabled: true
   host: 127.0.0.1
   port: 19530
+  # mode：检索模式，二选一。
+  #   bm25   —— Milvus 内置 BM25 全文检索，中文按 analyzer 分词；不依赖任何嵌入服务，推荐。
+  #   vector —— 嵌入向量相似度检索；需要可用的嵌入服务（本机实测 DeepSeek / Kimi / 火山方舟
+  #             都没有可用的 embeddings 端点），离线兜底用的占位嵌入又没有语义，分数根本过不了阈值。
+  # 为什么默认 bm25：占位嵌入（HashingEmbeddingClient）算出的余弦分最高只有 0.08 左右，远低于
+  # 召回阈值 0.70，结果就是「历史写进去了但永远召不回来」（控制台 [向量] 长期显示召回 0 条）。
+  # BM25 直接按词命中打分，不需要嵌入；分数会单调压到 (0, 1)：score / (score + 1)，
+  # 所以阈值 0.70 约等于 BM25 原始分 2.33，实测相关文档能到 4~7 分，不相关的大多 1.3 分以下。
+  # 注意：BM25 的正文走 SDK 的 String.getBytes()（平台默认字符集），要求 JVM 默认字符集为 UTF-8
+  # （clara.bat / clara.sh 已带 -Dfile.encoding=UTF-8）。默认 GBK 时正文会以 GBK 字节发出，
+  # Milvus 分词器读到非法 UTF-8 会 panic 并把服务端整个 abort；手工 java -jar 时务必自己加该参数。
+  mode: bm25
+  # analyzer：BM25 的分词器（仅 bm25 模式使用）。chinese 是 Milvus 内置的 jieba 中文分词。
+  analyzer: chinese
+  # 集合结构与当前模式不一致时（例如 vector 切 bm25，或改过 analyzer / dimension），
+  # 启动期自动删除旧集合并按新结构重建。两种模式的集合结构不同，不存在就地升级。
+  # 注意：重建会清空该集合里的历史记录（旧记录不再可召回）；想保留请先手动迁移。
+  recreateOnSchemaMismatch: true
   # collection 可选：不写时按「当前目录名 + _conversations」自动命名（即项目名），
   # 让不同项目 / 目录使用各自独立的集合、互不串数据。
   # collection: my_conversations
-  # 向量维度必须与嵌入模型一致；当前默认的离线占位嵌入（HashingEmbeddingClient）为 1024。
-  # 换成真实嵌入模型时，这里要改成该模型的输出维度，并让入库与检索保持同一模型。
-  dimension: 1024
+  # 向量维度（仅 vector 模式使用），必须与嵌入模型一致；
+  # 当前默认的离线占位嵌入（HashingEmbeddingClient）为 1024。
+  # dimension: 1024
   # Milvus 开启鉴权时填写，否则留空。
   # username: root
   # password: Milvus

@@ -114,6 +114,8 @@ services:
       # CLARA_CBM_REPO 由 install-docker.ps1 写进 deploy\codebase-memory-mcp\.env（--env-file 传入）；
       # 它可以是某个仓库，也可以是工作区根（工作目录的祖先），后者让一个容器覆盖多个项目。
       - ${CLARA_CBM_REPO:-..}:/work/repo:ro
+      # 其余按需挂载的工作目录写在 deploy\docker-compose.mounts.yml（ensure-mount.ps1 生成，叠加在本文件
+      # 之上：docker compose -f docker-compose.yml -f docker-compose.mounts.yml up -d codebase-memory-mcp）。
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "codebase-memory-mcp", "--version"]
@@ -135,7 +137,8 @@ services:
     depends_on:
       - standalone   # 依赖 Milvus 服务本体
 
-# 命名卷：钉住图谱数据卷的名字，让「并入本文件前后」用的是同一个卷（已有图谱不用重新索引）。
+# 命名卷：图谱索引数据（容器内 /data），与容器生命周期分离，重建容器不丢图谱。
+# 卷名由 Compose 项目名（本文件所在目录名 deploy）加卷键组合而成，即 deploy_cbm-data；
+# 想让多个 compose 文件共用同一份图谱数据时，在此加 name: 钉死卷名即可（换名等于换一份图谱）。
 volumes:
   cbm-data:
-    name: clara-codebase-memory-mcp_cbm-data

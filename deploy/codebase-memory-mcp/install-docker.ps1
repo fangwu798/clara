@@ -27,6 +27,8 @@
   - 部署时就放宽：-RepoPath <仓库目录> -MountRoot <工作区根>；
   - 之后导入别的工作目录：deploy\codebase-memory-mcp\index-workdir.ps1 -WorkDir <目录>，
     或在对话里让模型调 code_graph 的 op=prepare / op=index。
+  - 挂载之外的目录也不必重建容器：ensure-mount.ps1 只给它补一条挂载（容器内路径 /work/roots/<slug>），
+    index-workdir.ps1 与程序启动时的 codeGraph.autoMount 都会按需调用它。
 
 .PARAMETER RepoPath
   要索引的仓库目录（宿主路径），默认仓库根；必须位于 -MountRoot 之下。
@@ -107,6 +109,10 @@ $ImageName = "clara/codebase-memory-mcp"
 $ContainerRepo = "/work/repo"
 # 路径分隔符集合：TrimStart 要的是 char[]，用数组字面量会被 PowerShell 挑错重载。
 $PathSeparators = [char[]]@("\", "/")
+# 共用小工具（项目名规则、宿主 <-> 容器路径换算、挂载表读取、管道输出编码）都在 graph-common.ps1：
+# 同一个目录在两处必须得到同一个名字，否则图谱里会出现同目录的两份索引。
+. (Join-Path $ScriptDir "graph-common.ps1")
+Enable-Utf8PipelineOutput
 
 function Write-Info([string]$Message) { Write-Host ("[cbm-docker] " + $Message) }
 
@@ -130,27 +136,28 @@ $RepoPath = (Resolve-Path -LiteralPath $RepoPath).Path
 if (-not $MountRoot) { $MountRoot = $RepoPath }
 if (-not (Test-Path -LiteralPath $MountRoot)) { throw ("挂载根目录不存在：" + $MountRoot) }
 $MountRoot = (Resolve-Path -LiteralPath $MountRoot).Path
+# 祖先判断与相对路径都用「去掉末尾分隔符」的形式：盘根（E:\）经 Resolve-Path 会带着末尾分隔符，
+# 直接拿它做前缀比较就把那个分隔符算进了长度，「E:\ 是 E:\...\clara 的父目录」这种成立的判断会永远失败。
+$mountKey = $MountRoot.TrimEnd($PathSeparators)
+$repoKey = $RepoPath.TrimEnd($PathSeparators)
 # 挂载根必须是仓库目录的祖先（或就是它）：容器只挂得到挂载根这一份，仓库不在里面的索引无从谈起。
-if (-not $RepoPath.Equals($MountRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    if (-not $RepoPath.StartsWith($MountRoot, [StringComparison]::OrdinalIgnoreCase)) {
+if (-not $repoKey.Equals($mountKey, [StringComparison]::OrdinalIgnoreCase)) {
+    if (-not $repoKey.StartsWith($mountKey, [StringComparison]::OrdinalIgnoreCase)) {
         throw ("仓库目录不在挂载根里：RepoPath=" + $RepoPath + "，MountRoot=" + $MountRoot)
     }
-    $boundary = $RepoPath.Substring($MountRoot.Length, 1)
+    $boundary = $repoKey.Substring($mountKey.Length, 1)
     if ($boundary -ne "\" -and $boundary -ne "/") {
         throw ("挂载根不是仓库目录的父目录（只是路径前缀相同）：RepoPath=" + $RepoPath + "，MountRoot=" + $MountRoot)
     }
 }
 # 仓库目录在容器内的路径：挂载根固定挂在 /work/repo，仓库是它下面的一层（容器里的项目根就是这个路径）。
 $RepoInContainer = $ContainerRepo
-if (-not $RepoPath.Equals($MountRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    $tail = $RepoPath.Substring($MountRoot.Length).TrimStart($PathSeparators)
+if (-not $repoKey.Equals($mountKey, [StringComparison]::OrdinalIgnoreCase)) {
+    $tail = $repoKey.Substring($mountKey.Length).TrimStart($PathSeparators)
     $RepoInContainer = ($ContainerRepo + "/" + $tail).Replace("\", "/")
 }
-# 项目名缺省：本仓库沿用既有图谱的名字，别的目录取目录名（与 code_graph 的 op=index 命名规则一致）。
-if (-not $Project) {
-    if ($RepoPath.Equals($RepoRoot, [StringComparison]::OrdinalIgnoreCase)) { $Project = "clara-code-graph" }
-    else { $Project = Split-Path -Leaf $RepoPath }
-}
+# 项目名缺省：本仓库沿用既有图谱的名字（clara-code-graph），别的目录取目录名。
+if (-not $Project) { $Project = Get-DefaultGraphProjectName -TargetDir $RepoPath -ScriptDir $ScriptDir }
 
 # 2) 下载 linux portable 产物并校验 ------------------------------------------
 # 用 portable 那份：普通 linux 产物动态链接 glibc，在 alpine（musl）里会以「not found」直接失败。
@@ -334,7 +341,9 @@ Write-Info ("     docker exec " + $ContainerName + " codebase-memory-mcp cli ind
 Write-Info "  4) 把别的工作目录导入图谱（挂载根取工作区根时随时可用，不必重建容器）："
 Write-Info "     powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\index-workdir.ps1 -WorkDir <目录>"
 Write-Info "     （也可以在对话里让模型跑 code_graph 的 op=prepare / op=index）"
-Write-Info "  5) 换到挂载根之外的分析目录：重跑本脚本并加 -MountRoot <工作区根>，容器会重建、索引会重做；"
+Write-Info "  5) 换到挂载之外的分析目录：不用重跑本脚本 —— index-workdir.ps1 与程序启动时会按需补一条挂载"
+Write-Info "     （ensure-mount.ps1：只新增、不挪动已有目录，已建好的图谱不用重做索引）；也可以重跑本脚本"
+Write-Info "     并加 -MountRoot <工作区根>，那会重建容器并重做索引；"
 Write-Info "  6) 看图谱（可视化）：浏览器打开 http://127.0.0.1:" + $UiPort + "/ （只监听宿主回环，不对外）；"
 Write-Info "     纯文本查看用容器内的 CLI：docker exec " + $ContainerName + " codebase-memory-mcp cli get_architecture --project " + $Project;
 Write-Info "  7) 清空全部索引：docker compose down -v（-v 会删掉 cbm-data 卷）。"

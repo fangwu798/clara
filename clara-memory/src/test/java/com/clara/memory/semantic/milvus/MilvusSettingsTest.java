@@ -10,9 +10,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * {@link MilvusSettings} 的单元测试：「配了就开、不配保持原样」的开关语义、按项目（当前目录名）隔离的
@@ -119,6 +121,53 @@ public class MilvusSettingsTest {
     @Test(expected = IllegalArgumentException.class)
     public void missingDimensionWithInvalidDefaultRejected() throws Exception {
         MilvusSettings.load(write("milvus:\n  host: 127.0.0.1\n"), 0, "demo");
+    }
+
+    @Test
+    public void defaultsToVectorMode() throws Exception {
+        MilvusSettings settings = MilvusSettings.load(write("milvus:\n  enabled: true\n"), 128, "demo");
+        assertNotNull(settings);
+        assertEquals(MilvusSettings.MODE_VECTOR, settings.getMode());
+        assertFalse(settings.isBm25Mode());
+        assertEquals(MilvusSettings.DEFAULT_ANALYZER, settings.getAnalyzer());
+        assertFalse(settings.isRecreateOnSchemaMismatch());
+    }
+
+    @Test
+    public void bm25ModeAndFlagsAreRead() throws Exception {
+        MilvusSettings settings = MilvusSettings.load(write("milvus:\n"
+                + "  mode: bm25\n"
+                + "  analyzer: chinese\n"
+                + "  recreateOnSchemaMismatch: true\n"), 128, "demo");
+        assertNotNull(settings);
+        assertEquals(MilvusSettings.MODE_BM25, settings.getMode());
+        assertTrue(settings.isBm25Mode());
+        assertEquals("chinese", settings.getAnalyzer());
+        assertTrue(settings.isRecreateOnSchemaMismatch());
+    }
+
+    @Test
+    public void bm25ModeFallsBackToChineseAnalyzer() throws Exception {
+        MilvusSettings settings = MilvusSettings.load(write("milvus:\n  mode: bm25\n"), 128, "demo");
+        assertNotNull(settings);
+        assertEquals(MilvusSettings.DEFAULT_ANALYZER, settings.getAnalyzer());
+    }
+
+    @Test
+    public void modeIsCaseInsensitiveAndTrimmed() throws Exception {
+        MilvusSettings settings = MilvusSettings.load(write("milvus:\n  mode: BM25\n"), 128, "demo");
+        assertNotNull(settings);
+        assertTrue(settings.isBm25Mode());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void unknownModeRejected() throws Exception {
+        MilvusSettings.load(write("milvus:\n  mode: hybrid\n"), 128, "demo");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void nonBooleanRecreateFlagRejected() throws Exception {
+        MilvusSettings.load(write("milvus:\n  recreateOnSchemaMismatch: sometimes\n"), 128, "demo");
     }
 
     private Path write(String yaml) throws Exception {

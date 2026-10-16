@@ -18,6 +18,9 @@ import java.util.Set;
  * 维度校验与结果排序。
  *
  * <p>向量检索（含过滤与相似度计算）由后端完成；本类负责构造期集合校验与检索后的最终排序 / topK 裁剪。
+ *
+ * <p>BM25 模式（{@link MilvusCollectionSpec#isBm25()}）下集合里没有密集向量，维度校验一律跳过，
+ * 改要求查询带上原始文本（{@link SemanticMemoryQuery#getQueryText()}）。
  * {@code deleteByConversation} 仅删除 {@code CONVERSATION} 来源条目，由后端保证该过滤语义。
  */
 public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
@@ -59,7 +62,8 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
             if (entry == null) {
                 throw new IllegalArgumentException("entries must not contain null");
             }
-            if (entry.getDimension() != spec.getDimension()) {
+            // BM25 模式不存向量，维度对不上也无所谓；向量模式则必须严格一致，否则检索结果毫无意义
+            if (!spec.isBm25() && entry.getDimension() != spec.getDimension()) {
                 throw SemanticMemoryErrors.configMismatch();
             }
             if (!ids.add(entry.getId())) {
@@ -79,7 +83,12 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
         if (query == null) {
             throw new IllegalArgumentException("query must not be null");
         }
-        if (query.getVector().length != spec.getDimension()) {
+        if (spec.isBm25()) {
+            // BM25 用原文检索：缺原文说明调用方漏传，早报错好过静默返回空结果
+            if (query.getQueryText() == null) {
+                throw new IllegalArgumentException("bm25 search requires the raw query text");
+            }
+        } else if (query.getVector().length != spec.getDimension()) {
             throw SemanticMemoryErrors.configMismatch();
         }
         List<MemoryMatch> matches;

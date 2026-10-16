@@ -7,6 +7,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 /**
  * Milvus 语义记忆配置：读取 {@code config/clara.yml} 的 {@code milvus} 节点。
@@ -19,10 +20,16 @@ import java.nio.file.Path;
  * {@code enabled: false}，都视为<b>未启用</b>，此时语义记忆维持进程内实现、不把对话记录写入向量库；
  * 只要存在该节点且未显式关闭，即视为启用——所有对话记录写入 Milvus，并在每轮按相似度召回上下文。
  *
+ * <p>检索模式（{@code mode}）：{@code vector} 用嵌入向量做相似度检索（默认）；
+ * {@code bm25} 用 Milvus 内置 BM25 全文检索（中文按 {@code analyzer} 分词，默认 chinese）。
+ * BM25 模式不需要任何嵌入服务，集合里也不存向量；两种模式的集合结构不同，
+ * 切换模式必须重建集合（可用 {@code recreateOnSchemaMismatch} 让启动期自动重建）。
+ *
  * <p>字段缺省：{@code host} 缺省 {@code 127.0.0.1}、{@code port} 缺省 {@code 19530}、
  * {@code collection} 缺省为「项目名_conversations」（项目名由宿主按当前目录名传入，不同目录使用不同集合，
- * 避免多个项目共用同一集合互相串数据）、{@code dimension} 缺省取嵌入客户端维度、
- * {@code username} / {@code password} 缺省无鉴权。
+ * 避免多个项目共用同一集合互相串数据）、{@code dimension} 缺省取嵌入客户端维度（仅 vector 模式使用）、
+ * {@code username} / {@code password} 缺省无鉴权、{@code analyzer} 缺省 {@code chinese}、
+ * {@code recreateOnSchemaMismatch} 缺省 {@code false}。
  *
  * <p>失败语义：文件读取失败、{@code port} / {@code dimension} 非正、{@code collection} 为空白时抛
  * {@link IllegalArgumentException}（配置错误应在启动期暴露，而不是等第一次写入才失败）。
@@ -50,6 +57,21 @@ public final class MilvusSettings {
     public static final String FALLBACK_PROJECT = "clara";
 
     /**
+     * 检索模式：向量相似度检索（默认）。
+     */
+    public static final String MODE_VECTOR = "vector";
+
+    /**
+     * 检索模式：Milvus 内置 BM25 全文检索（中文分词后按词频 / 逆文档频率打分）。
+     */
+    public static final String MODE_BM25 = "bm25";
+
+    /**
+     * BM25 模式的默认分词器：Milvus 内置的 chinese（jieba），适合中文对话记录。
+     */
+    public static final String DEFAULT_ANALYZER = "chinese";
+
+    /**
      * 项目名参与集合名的最大长度（Milvus 集合名上限 255，这里留出后缀空间）。
      */
     private static final int MAX_PROJECT_CHARS = 200;
@@ -62,15 +84,21 @@ public final class MilvusSettings {
     private final int dimension;
     private final String username;
     private final String password;
+    private final String mode;
+    private final String analyzer;
+    private final boolean recreateOnSchemaMismatch;
 
     private MilvusSettings(String host, int port, String collection, int dimension, String username,
-            String password) {
+            String password, String mode, String analyzer, boolean recreateOnSchemaMismatch) {
         this.host = host;
         this.port = port;
         this.collection = collection;
         this.dimension = dimension;
         this.username = username;
         this.password = password;
+        this.mode = mode;
+        this.analyzer = analyzer;
+        this.recreateOnSchemaMismatch = recreateOnSchemaMismatch;
     }
 
     /**
@@ -105,12 +133,20 @@ public final class MilvusSettings {
         if (collection.trim().isEmpty()) {
             throw new IllegalArgumentException("clara.yml 的 milvus.collection 不能为空白");
         }
+        String mode = text(milvus, "mode", MODE_VECTOR).toLowerCase(Locale.ROOT);
+        if (!MODE_VECTOR.equals(mode) && !MODE_BM25.equals(mode)) {
+            throw new IllegalArgumentException("clara.yml 的 milvus.mode 只能是 " + MODE_VECTOR
+                    + " 或 " + MODE_BM25 + "，实际：" + mode);
+        }
         return new MilvusSettings(text(milvus, "host", DEFAULT_HOST),
                 positive(milvus, "port", DEFAULT_PORT),
                 collection.trim(),
                 positive(milvus, "dimension", defaultDimension),
                 text(milvus, "username", null),
-                text(milvus, "password", null));
+                text(milvus, "password", null),
+                mode,
+                text(milvus, "analyzer", DEFAULT_ANALYZER),
+                bool(milvus, "recreateOnSchemaMismatch", false));
     }
 
     public String getHost() {
@@ -135,6 +171,42 @@ public final class MilvusSettings {
 
     public String getPassword() {
         return password;
+    }
+
+    /**
+     * 取检索模式：{@link #MODE_VECTOR} 或 {@link #MODE_BM25}。
+     *
+     * @return 检索模式，非 null
+     */
+    public String getMode() {
+        return mode;
+    }
+
+    /**
+     * 是否为 BM25 全文检索模式。
+     *
+     * @return 模式为 {@code bm25} 时返回 true
+     */
+    public boolean isBm25Mode() {
+        return MODE_BM25.equals(mode);
+    }
+
+    /**
+     * 取 BM25 模式的分词器名（仅 BM25 模式使用）。
+     *
+     * @return 分词器名，非 null
+     */
+    public String getAnalyzer() {
+        return analyzer;
+    }
+
+    /**
+     * 集合结构与配置不匹配时是否自动删除旧集合并按新结构重建。
+     *
+     * @return 需要自动重建时返回 true
+     */
+    public boolean isRecreateOnSchemaMismatch() {
+        return recreateOnSchemaMismatch;
     }
 
     /**
@@ -187,6 +259,26 @@ public final class MilvusSettings {
         }
         String text = value.asText();
         return text == null || text.trim().isEmpty() ? fallback : text.trim();
+    }
+
+    /**
+     * 读取布尔字段：缺失时返回兜底值，声明了非布尔时抛配置错误。
+     *
+     * @param node     集合节点，非 null
+     * @param field    字段名
+     * @param fallback 缺失时的兜底值
+     * @return 字段值
+     * @throws IllegalArgumentException 字段存在但不是布尔时
+     */
+    private static boolean bool(JsonNode node, String field, boolean fallback) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            return fallback;
+        }
+        if (!value.isBoolean()) {
+            throw new IllegalArgumentException("clara.yml 的 milvus." + field + " 必须是布尔值，实际：" + value);
+        }
+        return value.booleanValue();
     }
 
     /**

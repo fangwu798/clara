@@ -1,5 +1,6 @@
 package com.clara.orchestration.skill;
 
+import com.clara.core.memory.IContextTraceSink;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.skill.IPromptProvider;
@@ -12,6 +13,7 @@ import com.clara.dto.tool.ToolContext;
 import com.clara.dto.tool.ToolSpecification;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -22,7 +24,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * {@link SkillMatchCoordinator} 单元测试：依赖缺失返回空、按来源检索、按 sourceId 去重、工具名规整。
+ * {@link SkillMatchCoordinator} 单元测试：依赖缺失返回空、按来源过滤与 sourceId 去重、工具声明全量下发。
+ *
+ * <p>另外盯住「上报给观测口的内容」：命中条数、阈值与候选数、每条命中的分数与 id，
+ * 这些正是控制台观察本轮提示词检索时要看的东西，且不影响对话结果。
  */
 public class SkillMatchCoordinatorTest {
 
@@ -61,7 +66,7 @@ public class SkillMatchCoordinatorTest {
         SkillMatchCoordinator coordinator = new SkillMatchCoordinator(text -> new float[] {1f, 0f},
                 store(prompts, empty()), promptProvider("PROMPT-"));
 
-        SkillMatchCoordinator.MatchedSkill matched = coordinator.match("查询天气", control(3, 0.5));
+        SkillMatchCoordinator.MatchedSkill matched = coordinator.match("查询引用", control(3, 0.5));
 
         assertEquals(Collections.singletonList("PROMPT-p1"), matched.getPrompts());
         assertTrue(matched.getTools().isEmpty());
@@ -80,6 +85,52 @@ public class SkillMatchCoordinatorTest {
         assertEquals(2, matched.getTools().size());
         assertEquals("get_weather", matched.getTools().get(0).getFunction().getName());
         assertEquals("file_ops", matched.getTools().get(1).getFunction().getName());
+    }
+
+    @Test
+    public void matchReportsHitsWithThresholdAndScores() {
+        RecordingTrace trace = new RecordingTrace();
+        SkillMatchCoordinator coordinator = new SkillMatchCoordinator(text -> new float[] {1f, 0f},
+                store(Arrays.asList(
+                        new MemoryMatch(entry(MemorySourceTypeEnum.PROMPT, "p1"), 0.9),
+                        new MemoryMatch(entry(MemorySourceTypeEnum.PROMPT, "p1"), 0.8),
+                        new MemoryMatch(entry(MemorySourceTypeEnum.PROMPT, "p2"), 0.1)),
+                        empty()),
+                promptProvider("PROMPT-"), null, trace);
+
+        coordinator.match("查询引用", control(3, 0.5));
+
+        assertEquals(Collections.singletonList("prompt_match"), trace.sources);
+        assertEquals(Collections.singletonList(1), trace.hits);
+        // 明细先报「召回几条 / 过阈值几条」：未命中时才能分清是库里没数据还是分数不够
+        List<String> details = trace.details.get(0);
+        assertEquals(2, details.size());
+        assertTrue(details.get(0).contains("召回 3 条"));
+        assertTrue(details.get(0).contains("过阈值 2 条"));
+        assertTrue(details.get(0).contains("阈值 0.50"));
+        assertTrue(details.get(0).contains("最高分 0.900"));
+        assertTrue(details.get(1).contains("score=0.900"));
+        assertTrue(details.get(1).contains("p1"));
+    }
+
+    @Test
+    public void matchReportsMissAndDisabledRetrieval() {
+        RecordingTrace missTrace = new RecordingTrace();
+        SkillMatchCoordinator missing = new SkillMatchCoordinator(text -> new float[] {1f},
+                store(Collections.singletonList(
+                        new MemoryMatch(entry(MemorySourceTypeEnum.PROMPT, "p1"), 0.1)), empty()),
+                promptProvider("x"), null, missTrace);
+
+        assertTrue(missing.match("hello", control(3, 0.5)).getPrompts().isEmpty());
+        assertEquals(Collections.singletonList(0), missTrace.hits);
+
+        RecordingTrace disabledTrace = new RecordingTrace();
+        SkillMatchCoordinator disabled = new SkillMatchCoordinator(text -> new float[] {1f},
+                store(empty(), empty()), promptProvider("x"), null, disabledTrace);
+
+        assertTrue(disabled.match("hello", control(0, 0.5)).getPrompts().isEmpty());
+        assertEquals(Collections.singletonList(0), disabledTrace.hits);
+        assertTrue(disabledTrace.details.get(0).get(0).contains("未开启提示词检索"));
     }
 
     // ---- helpers -----------------------------------------------------------
@@ -146,5 +197,20 @@ public class SkillMatchCoordinatorTest {
             public void close() {
             }
         };
+    }
+
+    /** 记录上报内容的观测口：看「上报了哪些点、分别是什么」。 */
+    private static final class RecordingTrace implements IContextTraceSink {
+
+        private final List<String> sources = new ArrayList<String>();
+        private final List<Integer> hits = new ArrayList<Integer>();
+        private final List<List<String>> details = new ArrayList<List<String>>();
+
+        @Override
+        public void onTrace(String source, int hitCount, long elapsedMillis, List<String> rendered) {
+            sources.add(source);
+            hits.add(hitCount);
+            details.add(new ArrayList<String>(rendered));
+        }
     }
 }

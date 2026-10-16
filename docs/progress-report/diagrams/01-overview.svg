@@ -1,0 +1,148 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800" font-family="'Segoe UI','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3B82C4"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5AA45D"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="800" fill="#FFFFFF"/>
+
+  <!-- 1. 定位条：Clara 是什么 -->
+  <rect x="32" y="20" width="1216" height="96" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <line x1="38" y1="38" x2="38" y2="98" stroke="#3B82C4" stroke-width="4" stroke-linecap="round"/>
+  <text x="58" y="60" font-size="20" font-weight="700" fill="#2E3440">Clara · Java 8 AI 应用运行时库</text>
+  <text x="58" y="88" font-size="11.5" fill="#6B7280">把大模型能力、MCP 工具与多步工作流沉淀为可嵌入 Java 系统的稳定运行时。</text>
+
+  <!-- 2. 谁在用 -->
+  <rect x="32" y="128" width="1216" height="104" rx="12" fill="#F4FBF4" stroke="#CFE6CF"/>
+  <text x="48" y="151" font-size="13.5" font-weight="700" fill="#3F7A42">谁在用</text>
+
+  <rect x="48" y="162" width="384" height="56" rx="8" fill="#FFFFFF" stroke="#5AA45D" stroke-width="1.2"/>
+  <rect x="62" y="174" width="32" height="32" rx="6" fill="#EAF6EA" stroke="#5AA45D" stroke-width="1"/>
+  <line x1="62" y1="184" x2="94" y2="184" stroke="#5AA45D" stroke-width="1"/>
+  <rect x="68" y="189" width="7" height="11" fill="#8CC48E"/>
+  <rect x="79" y="194" width="7" height="6" fill="#5AA45D"/>
+  <circle cx="88" cy="191" r="3" fill="#5AA45D"/>
+  <text x="104" y="185" font-size="12.5" font-weight="700" fill="#2F6B33">宿主 Java 应用</text>
+  <text x="104" y="203" font-size="10.5" fill="#6B7280">Spring Boot 工程、批处理服务、内部平台</text>
+
+  <rect x="448" y="162" width="384" height="56" rx="8" fill="#FFFFFF" stroke="#5AA45D" stroke-width="1.2"/>
+  <circle cx="478" cy="181" r="7" fill="none" stroke="#5AA45D" stroke-width="1.4"/>
+  <path d="M466,200 a12,11 0 0 1 24,0" fill="none" stroke="#5AA45D" stroke-width="1.4"/>
+  <text x="504" y="185" font-size="12.5" font-weight="700" fill="#2F6B33">业务研发团队</text>
+  <text x="504" y="203" font-size="10.5" fill="#6B7280">无需自建模型网关与工具链路</text>
+
+  <rect x="848" y="162" width="384" height="56" rx="8" fill="#FFFFFF" stroke="#5AA45D" stroke-width="1.2"/>
+  <circle cx="878" cy="190" r="8" fill="none" stroke="#5AA45D" stroke-width="1.4"/>
+  <line x1="878" y1="180" x2="878" y2="176" stroke="#5AA45D" stroke-width="1.4"/>
+  <line x1="878" y1="200" x2="878" y2="204" stroke="#5AA45D" stroke-width="1.4"/>
+  <line x1="870" y1="190" x2="866" y2="190" stroke="#5AA45D" stroke-width="1.4"/>
+  <line x1="886" y1="190" x2="890" y2="190" stroke="#5AA45D" stroke-width="1.4"/>
+  <text x="904" y="185" font-size="12.5" font-weight="700" fill="#2F6B33">智能化改造项目</text>
+  <text x="904" y="203" font-size="10.5" fill="#6B7280">存量系统快速接入大模型能力</text>
+  <!-- 3. 解决什么问题 -->
+  <rect x="32" y="244" width="1216" height="140" rx="12" fill="#FFF8EE" stroke="#F0D2A8"/>
+  <text x="48" y="266" font-size="13.5" font-weight="700" fill="#B26A00">解决什么问题</text>
+
+  <circle cx="60" cy="288" r="9.5" fill="#C0504D"/>
+  <text x="60" y="292" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+  <text x="80" y="292" font-size="11" fill="#2E3440">供应商协议与 SDK 差异被隔离，业务代码不感知平台</text>
+
+  <circle cx="60" cy="314" r="9.5" fill="#C0504D"/>
+  <text x="60" y="318" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+  <text x="80" y="318" font-size="11" fill="#2E3440">一次调用 = 模型 + 工具 + 工作流 + 记忆的统一编排</text>
+
+  <circle cx="60" cy="340" r="9.5" fill="#C0504D"/>
+  <text x="60" y="344" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+  <text x="80" y="344" font-size="11" fill="#2E3440">超时 / 取消 / 错误码 / traceId 贯穿每次外部调用</text>
+
+  <circle cx="60" cy="366" r="9.5" fill="#C0504D"/>
+  <text x="60" y="370" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+  <text x="80" y="370" font-size="11" fill="#2E3440">网络、凭据、文件与工具访问有明确安全边界</text>
+
+  <!-- 4. 六大能力 -->
+  <rect x="32" y="396" width="1216" height="308" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <text x="48" y="420" font-size="13.5" font-weight="700" fill="#2B6CB0">六大能力</text>
+  <text x="1232" y="420" font-size="11" fill="#6B7280" text-anchor="end">每个模块可单独引入，也可组合装配</text>
+
+  <rect x="48" y="432" width="384" height="120" rx="8" fill="#FFFFFF" stroke="#3B82C4" stroke-width="1.2"/>
+  <rect x="62" y="446" width="38" height="38" rx="8" fill="#EAF3FC" stroke="#3B82C4" stroke-width="0.9"/>
+  <rect x="70" y="454" width="22" height="22" rx="4" fill="none" stroke="#3B82C4" stroke-width="1.4"/>
+  <rect x="77" y="461" width="8" height="8" fill="#3B82C4"/>
+  <line x1="81" y1="454" x2="81" y2="449" stroke="#3B82C4" stroke-width="1.2"/>
+  <line x1="81" y1="476" x2="81" y2="481" stroke="#3B82C4" stroke-width="1.2"/>
+  <line x1="70" y1="465" x2="65" y2="465" stroke="#3B82C4" stroke-width="1.2"/>
+  <line x1="92" y1="465" x2="97" y2="465" stroke="#3B82C4" stroke-width="1.2"/>
+  <text x="110" y="462" font-size="12.5" font-weight="700" fill="#2B6CB0">模型调用</text>
+  <text x="110" y="478" font-size="10.5" fill="#6B7280">6 大平台协议适配</text>
+  <text x="62" y="506" font-size="10.5" fill="#5A6B7B">OpenAI · DeepSeek · 火山方舟</text>
+  <text x="62" y="522" font-size="10.5" fill="#5A6B7B">阿里云 · Kimi · Anthropic</text>
+
+  <rect x="448" y="432" width="384" height="120" rx="8" fill="#FFFFFF" stroke="#5AA45D" stroke-width="1.2"/>
+  <rect x="462" y="446" width="38" height="38" rx="8" fill="#EAF6EA" stroke="#5AA45D" stroke-width="0.9"/>
+  <line x1="470" y1="455" x2="490" y2="455" stroke="#5AA45D" stroke-width="1.2"/>
+  <line x1="469" y1="457" x2="477" y2="474" stroke="#5AA45D" stroke-width="1.2"/>
+  <line x1="491" y1="457" x2="483" y2="474" stroke="#5AA45D" stroke-width="1.2"/>
+  <circle cx="466" cy="455" r="3.5" fill="#5AA45D"/>
+  <circle cx="494" cy="455" r="3.5" fill="#5AA45D"/>
+  <circle cx="480" cy="478" r="4.5" fill="#5AA45D"/>
+  <text x="510" y="462" font-size="12.5" font-weight="700" fill="#3F7A42">会话记忆</text>
+  <text x="510" y="478" font-size="10.5" fill="#6B7280">窗口 + 持久化 + 语义召回</text>
+  <text x="462" y="506" font-size="10.5" fill="#5A6B7B">窗口记忆 + 本地持久化</text>
+  <text x="462" y="522" font-size="10.5" fill="#5A6B7B">Milvus 语义召回</text>
+
+  <rect x="848" y="432" width="384" height="120" rx="8" fill="#FFFFFF" stroke="#E0A94C" stroke-width="1.2"/>
+  <rect x="862" y="446" width="38" height="38" rx="8" fill="#FDF3E3" stroke="#E0A94C" stroke-width="0.9"/>
+  <line x1="872" y1="465" x2="874" y2="465" stroke="#E0A94C" stroke-width="1.4"/>
+  <line x1="888" y1="465" x2="890" y2="465" stroke="#E0A94C" stroke-width="1.4"/>
+  <rect x="864" y="460" width="8" height="10" rx="2" fill="#E0A94C"/>
+  <rect x="890" y="460" width="8" height="10" rx="2" fill="#E0A94C"/>
+  <circle cx="881" cy="465" r="7" fill="none" stroke="#E0A94C" stroke-width="1.4"/>
+  <text x="910" y="462" font-size="12.5" font-weight="700" fill="#B26A00">MCP 客户端</text>
+  <text x="910" y="478" font-size="10.5" fill="#6B7280">MCP 工具接入标准</text>
+  <text x="862" y="506" font-size="10.5" fill="#5A6B7B">stdio / Streamable HTTP</text>
+  <text x="862" y="522" font-size="10.5" fill="#5A6B7B">本地技能优先，外部工具兜底</text>
+  <rect x="48" y="568" width="384" height="120" rx="8" fill="#FFFFFF" stroke="#3B82C4" stroke-width="1.2"/>
+  <rect x="62" y="582" width="38" height="38" rx="8" fill="#EAF3FC" stroke="#3B82C4" stroke-width="0.9"/>
+  <line x1="79" y1="596" x2="72" y2="605" stroke="#3B82C4" stroke-width="1.3" marker-end="url(#arw)"/>
+  <line x1="83" y1="596" x2="90" y2="605" stroke="#3B82C4" stroke-width="1.3" marker-end="url(#arw)"/>
+  <circle cx="81" cy="592" r="5" fill="#3B82C4"/>
+  <circle cx="70" cy="610" r="5" fill="none" stroke="#3B82C4" stroke-width="1.3"/>
+  <circle cx="92" cy="610" r="5" fill="none" stroke="#3B82C4" stroke-width="1.3"/>
+  <text x="110" y="598" font-size="12.5" font-weight="700" fill="#2B6CB0">工作流编排</text>
+  <text x="110" y="614" font-size="10.5" fill="#6B7280">DAG · 多角色 · 可恢复</text>
+  <text x="62" y="642" font-size="10.5" fill="#5A6B7B">人工确认 + 检查点恢复</text>
+  <text x="62" y="658" font-size="10.5" fill="#5A6B7B">多角色分阶段协作</text>
+
+  <rect x="448" y="568" width="384" height="120" rx="8" fill="#FFFFFF" stroke="#5AA45D" stroke-width="1.2"/>
+  <rect x="462" y="582" width="38" height="38" rx="8" fill="#EAF6EA" stroke="#5AA45D" stroke-width="0.9"/>
+  <rect x="466" y="586" width="14" height="14" rx="3" fill="#5AA45D"/>
+  <rect x="484" y="586" width="14" height="14" rx="3" fill="none" stroke="#5AA45D" stroke-width="1.3"/>
+  <rect x="466" y="604" width="14" height="14" rx="3" fill="none" stroke="#5AA45D" stroke-width="1.3"/>
+  <rect x="484" y="604" width="14" height="14" rx="3" fill="#8CC48E"/>
+  <text x="510" y="598" font-size="12.5" font-weight="700" fill="#3F7A42">技能体系</text>
+  <text x="510" y="614" font-size="10.5" fill="#6B7280">16 个技能提示词 · 15 个脚本工具</text>
+  <text x="462" y="642" font-size="10.5" fill="#5A6B7B">文档解析 · 文件操作 · 代码图谱</text>
+  <text x="462" y="658" font-size="10.5" fill="#5A6B7B">图像 / 视频生成 · 可注册扩展</text>
+
+  <rect x="848" y="568" width="384" height="120" rx="8" fill="#FFFFFF" stroke="#E0A94C" stroke-width="1.2"/>
+  <rect x="862" y="582" width="38" height="38" rx="8" fill="#FDF3E3" stroke="#E0A94C" stroke-width="0.9"/>
+  <rect x="866" y="588" width="28" height="24" rx="4" fill="none" stroke="#E0A94C" stroke-width="1.4"/>
+  <line x1="866" y1="596" x2="894" y2="596" stroke="#E0A94C" stroke-width="1"/>
+  <polyline points="872,602 878,606 872,610" fill="none" stroke="#E0A94C" stroke-width="1.3"/>
+  <line x1="882" y1="610" x2="890" y2="610" stroke="#E0A94C" stroke-width="1.3"/>
+  <text x="910" y="598" font-size="12.5" font-weight="700" fill="#B26A00">应用装配</text>
+  <text x="910" y="614" font-size="10.5" fill="#6B7280">交互式控制台 clara.jar</text>
+  <text x="862" y="642" font-size="10.5" fill="#5A6B7B">一个入口跑通全链路</text>
+  <text x="862" y="658" font-size="10.5" fill="#5A6B7B">库形态可嵌入宿主系统</text>
+
+  <!-- 5. 交付形态 -->
+  <rect x="32" y="716" width="1216" height="60" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <rect x="48" y="737" width="18" height="18" rx="5" fill="#3B82C4"/>
+  <path d="M52,746 l4,-4 4,4 4,-7" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="78" y="751" font-size="13" font-weight="700" fill="#2B6CB0">交付形态</text>
+  <text x="146" y="751" font-size="11.5" fill="#2E3440">交付物 = 9 个 Maven 模块 + 可执行 clara.jar + 配置化能力（模型 / 工作流 / 技能 / 提示词）+ 部署脚本</text>
+</svg>

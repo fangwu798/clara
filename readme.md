@@ -272,17 +272,23 @@ Clara 使用 ClaraException 携带结构化 ClaraError，主要字段：
 
 ### 语义记忆与 Milvus（可选）
 
-语义记忆用于长程/跨窗口关联：把对话记录向量化沉淀，并每轮按相似度召回注入上下文。默认关闭，开启方式：
+语义记忆用于长程/跨窗口关联：把对话记录沉淀到 Milvus，并每轮按输入召回相关历史注入上下文。默认关闭，开启方式：
 
 1. 起服务：`docker compose -f deploy/docker-compose.yml up -d`（etcd + MinIO + milvus standalone，gRPC 端口 19530）。
 2. 在 `config/clara.yml` 增加 `milvus` 节点（字段与注释见该文件），确保可连上；启动横幅的 `semantic` 一行会显示最终用的是 `local` 还是 `milvus`，据此确认是否生效。
 
-开启后：所有对话记录（按会话隔离，来源 CONVERSATION）写入 Milvus；每轮按相似度召回历史上下文注入提示词（默认召回 3 条、阈值 0.7，见 `ContextControlConfig`）。
+开启后：所有对话记录（按会话隔离，来源 CONVERSATION）写入 Milvus；每轮按输入召回历史上下文注入提示词（默认召回 3 条、阈值 0.7，见 `ContextControlConfig`）。召回方式由 `milvus.mode` 决定：全文检索（BM25）或向量相似度。
 
 注意事项：
 
 - 集合名默认按「项目名 + `_conversations`」生成（即按项目隔离）：项目名取「工作目录的目录名」——优先启动脚本注入的 `CLARA_WORK_DIR`，未注入时用进程当前工作目录，即「从哪个目录启动，就以该目录名为项目名」。**Milvus 集合名只允许 ASCII（字母 / 数字 / 下划线）**，故目录名含中文等非 ASCII 字符时会用拼音转写为英文（如 `我的项目 → wodexiangmu`），其余非法字符折叠为下划线；转写后仍为空时退化为 `p + 目录路径哈希前 12 位`。不同项目使用各自独立的集合，避免互相串数据；也可在 `milvus.collection` 显式指定固定集合名。
-- `milvus.dimension` 必须与嵌入模型输出维度一致；默认离线占位嵌入 `HashingEmbeddingClient` 为 1024，换真实嵌入模型时同步修改，并保证入库与检索用同一模型。
+- 检索模式（`milvus.mode`）：
+  - `bm25`（默认，推荐）：用 Milvus 内置 BM25 全文检索，中文按 `milvus.analyzer`（默认 `chinese`，jieba）分词；不依赖任何嵌入服务，集合里也不存向量。
+  - `vector`：把输入向量化后按余弦相似度检索，需要有可用的嵌入服务。离线占位嵌入 `HashingEmbeddingClient` 没有语义（实测同一问题与历史记录的最高余弦分只有 0.08 左右），永远过不了 0.70 的召回阈值，表现为 `[向量]` 一直「召回 0 条」；没有可用 embeddings 端点时不要用这个模式。
+  - 两种模式的集合结构不同，**切换模式（或改 `analyzer` / `dimension`）必须重建集合**：把 `milvus.recreateOnSchemaMismatch` 设为 `true`，启动时检测到结构不匹配就自动删除旧集合并按新结构重建。注意重建会清空该集合里的历史记录。
+  - 分数口径：BM25 原始分没有上界，回给上层前按 `score / (score + 1)` 单调压到 (0, 1)，所以阈值 0.70 约等于原始分 2.33（实测相关文档 4~7 分、无关文档 1 分上下）。
+- **JVM 默认字符集必须是 UTF-8**（`clara.bat` / `clara.sh` 已带 `-Dfile.encoding=UTF-8`）：milvus-sdk-java 拼全文检索占位符时用的是 `String.getBytes()`（平台默认字符集）而不是 UTF-8。中文 Windows 默认 GBK，中文正文会以 GBK 字节发出，Milvus 的 jieba 分词器读到非法 UTF-8 会 panic，并把**整个 Milvus 服务端 abort**（不是这一次检索失败，而是整个记忆库掉线）。手工 `java -jar` 启动时务必自己加该参数；启动期检测到默认字符集不是 UTF-8 且模式为 BM25 时会打印警告。
+- `milvus.dimension` 仅向量模式使用，必须与嵌入模型输出维度一致；默认离线占位嵌入 `HashingEmbeddingClient` 为 1024。
 - 不写 `milvus` 节点、或写 `enabled: false` 时保持原样：语义记忆用进程内实现，不写对话记录。
 - Milvus 连不上时启动会提示并回退为进程内实现（本次不写对话记录），不阻断对话。
 
@@ -313,8 +319,31 @@ clara-mcp 支持 stdio 与 Streamable HTTP，围绕注册、初始化、能力�
 
 - 部署（二选一）：`deploy/codebase-memory-mcp/install.ps1` 装到宿主；`deploy/codebase-memory-mcp/install-docker.ps1` 走 Docker Compose —— 容器常驻并把待分析仓库只读挂到 `/work/repo`，宿主按 `docker exec -i <容器> codebase-memory-mcp` 调用，宿主不需要留安装目录。细节见 `deploy/codebase-memory-mcp/readme.md`。图谱可视化：容器部署会把 UI 发布到宿主回环，浏览器打开 `http://127.0.0.1:9749/`；宿主安装用 `codebase-memory-mcp daemon start` 后访问同一地址。
 - 技能脚本 `config/skill/scripts/code-graph/code_graph.py`（工具名 `code_graph`）：`op=read` 对代码文件先取图谱大纲，图谱未覆盖（未索引 / 不在索引范围 / 图谱不可用）时回退本地文件读取，返回里 `source` 标明每条信息来自 `graph` 还是 `file`；`.md` / `.txt` 这类散文文件不查图谱、直接返回原文。
-- 其余 `op` 直通图谱能力：`index`（建 / 重建索引）、`status`、`search`、`outline`、`snippet`、`trace`（`inbound` 查调用方、`outbound` 查被调用方）、`query`（只读 Cypher）。
-- 会话提示 `config/skill/prompt/code_graph_guide.json` 约定「先查图谱 → 没覆盖再读文件 → 最后才整文件读取」；`analyze_repo_docs`、`design_business_solution` 两个工作流的读取节点也已改用 `code_graph`。
+- 其余 `op` 直通图谱能力：`index`（建 / 重建索引）、`status`、`search`、`outline`、`snippet`、`trace`（`inbound` 查调用方、`outbound` 查被调用方；只跟 `CALLS` 边、会漏掉 `USAGE`，不能当完整引用清单）、`query`（只读 Cypher）。完整问「谁引用了 X」用 `query`，例如 `MATCH (c:Class)-[:DEFINES_METHOD]->(m)-[r]->(n) WHERE n.name='X' RETURN DISTINCT c.qualified_name`。
+- 会话提示 `config/skill/prompt/code_graph_guide.json` 约定「先查图谱 → 没覆盖再读文件 → 最后才整文件读取」；它由 `config/clara.yml` 的 `context.alwaysPrompts`（默认 `[code_graph_guide]`）常驻注入每轮 system 指令——按输入相似度检索那套指望不上（有阈值与条数上限），故单列一条不参与检索的通道；图谱关闭时该条自动跳过。
+- `analyze_repo_docs`、`design_business_solution` 两个工作流的读取节点也已改用 `code_graph`。
+- 每轮预取图谱补充信息（`codeGraph.supplement`）默认关，交给模型按需调 `code_graph`：这笔查询压在每轮模型开始之前，实测大仓库（lippo-life，约 2 万个符号）单次要 20 秒以上（换项目、换关键词都稳定 20 秒左右，不是冷启动；同库按符号名的 `search_graph` 只要 3 秒），会把首字响应从 1~2 秒拖到 20 秒+。小仓库想恢复「先查再答」把它设回 `true` 即可。
+- 每轮对话还会在控制台打印知识源命中情况，便于直接观察执行：
+
+  ```
+    [图谱]    命中 1 条（320ms）
+              pattern=ContextAssembler
+    [提示词]  未命中（33ms）
+              阈值 0.70，候选 16 条
+    [向量]    命中 2 条（1014ms）
+              score=0.812  ...
+  ```
+
+  `[图谱]` = 代码知识图谱补充（仅 `codeGraph.supplement: true` 时有这一行）、`[提示词]` = 提示词向量匹配、`[向量]` = 语义记忆（Milvus）召回；命中为绿色，未命中与明细为灰色（`/color` 可关色）。明细行先汇总「召回了几条 / 其中几条过阈值 / 最高分」，再逐条给出 score 与片段预览（无召回时直接写「语义库里没有本会话可检索的记录」，好区分「库里没数据」和「分数不够」），同一份文本同时写入详细日志。缺了这几行，就分不清「模型没用图谱」是没命中、没接线，还是被阈值刷掉了。
+- 自动查图谱只认提问里「像代码标识符」的词（类名 / 方法名 / 字段名：驼峰、下划线、字母数字混排），汉字与自然语言词只当分隔符。纯中文整句没有可查的标识符时本轮跳过查询（图谱按符号名与代码内容匹配，整句命中不了，白等一次查询），由模型按 `code_graph_guide` 自己带模式查；图谱自身报错（未索引当前目录、项目登记的根路径已失效）会单独打印原因，不与「零命中」混成一句。
+- 启动时会打印图谱初始化日志：总开关状态、`挂载检查`（容器能否看到当前工作目录，带耗时）、`导入检查`（当前项目是否已导入；没导入且开了 `autoImport` 时会在后台发起索引），开关关掉或某步跳过时同样打一行说明原因，免得「图谱怎么没命中」只能靠猜：
+
+  ```
+    codegraph      : 初始化：工作目录 E:\workspace_rongshu\lippo-life，autoMount=true autoImport=true
+    codegraph      : 挂载检查 830ms：已可见，无需挂载：E:\workspace_rongshu\lippo-life
+    codegraph      : 导入检查 3120ms：未导入，已在后台发起导入（大仓库要几分钟，完成后用 /graph 查看）
+                     项目：lippo-life
+  ```
 
 ## 工作流与人工交互
 

@@ -1,11 +1,13 @@
 package com.clara;
 
 import com.clara.adapter.console.CancelKeyMonitor;
+import com.clara.adapter.console.ConsoleContextTrace;
 import com.clara.adapter.console.ConsoleView;
 import com.clara.adapter.console.LaunchOptions;
 import com.clara.adapter.console.SessionCommandHandler;
 import com.clara.adapter.console.UsageTrendChart;
 import com.clara.codegraph.CodeGraphConsole;
+import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
 import com.clara.config.ModelAvailabilityManager;
 import com.clara.config.ModelRegistry;
@@ -71,6 +73,15 @@ public final class ClaraApplication {
     /**
      * 会话内代码知识图谱入口：{@code /graph} 查状态、{@code /graph import} 把工作目录导入图谱。
      */
+    /** 图谱初始化日志的标签列：与启动横幅其它行同宽。 */
+    private static final String CODEGRAPH_PREFIX = "  codegraph      : ";
+
+    /** 图谱初始化日志的续行缩进：宽度等于 CODEGRAPH_PREFIX，续行文字与首行文字对齐。 */
+    private static final String CODEGRAPH_DETAIL = "                   ";
+
+    /** 图谱技能脚本结果的首行前缀：步骤名已经说明是「结果」，打印时去掉这个重复前缀。 */
+    private static final String RESULT_PREFIX = "结果：";
+
     private static final CodeGraphConsole codeGraphConsole = new CodeGraphConsole();
 
     /**
@@ -104,14 +115,15 @@ public final class ClaraApplication {
      * @throws IOException 读取标准输入失败时
      */
     private static void runSession(ConsoleView view, BufferedReader reader, List<Path> candidates, ModelChoice choice, CancelKeyMonitor monitor) throws IOException {
-        try (ApplicationBootstrap bootstrap = new ApplicationBootstrap()) {
+        // 控制台观测：每轮把图谱补充与向量召回的命中情况打在控制台（同时落详细日志）。
+        try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(new ConsoleContextTrace(view))) {
             ModelRegistry registry = bootstrap.modelRegistry();
             registry.select(choice.configPath());
             SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry, candidates, contextControls(view, bootstrap, registry));
 
             view.printBanner(bootstrap, registry.currentConfiguration(), choice.configPath(), choice.source());
             printMcpStatus(view, bootstrap);
-            autoImportCodeGraph(view, bootstrap);
+            prepareCodeGraph(view, bootstrap);
             view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
             view.printHints(WorkflowCatalog.customSummaries());
             if (monitor.isAvailable()) {
@@ -152,22 +164,105 @@ public final class ClaraApplication {
     }
 
     /**
-     * 按 {@code config/clara.yml} 的 {@code codeGraph.autoImport} 在启动时处理图谱：已导入只提示一句，
-     * 没导入则后台发起索引（不阻塞启动，索引在后台跑完后的下一轮就用得上图谱）。
+     * 按 {@code config/clara.yml} 的 {@code codeGraph} 开关在启动时处理图谱：{@code autoMount} 先确保图谱
+     * 容器能看到当前工作目录（容器看不到就补一条只读挂载），{@code autoImport} 再幂等地处理导入
+     * （已导入只提示一句，没导入则后台发起，不阻塞启动）。
+     *
+     * <p>为什么挂载排在导入前面：容器是按「一条目录一条挂载」带上工作目录的，缺挂载时图谱对该目录一律
+     * 回「容器里看不到它」，导入会直接失败。
+     *
+     * <p>为什么每一步都要打日志：这两步各自要起一次子进程（挂载检查查 docker、导入检查查图谱项目，
+     * 合起来可能好几秒），静默期只会让人以为程序卡住；而且「图谱怎么没命中」的原因基本都写在这里
+     * （开关关了 / 目录没挂上 / 没导入），不打印就只能靠猜。
      *
      * @param view      控制台视图，不可为 null
      * @param bootstrap 已装配的引导器，不可为 null
      */
-    private static void autoImportCodeGraph(ConsoleView view, ApplicationBootstrap bootstrap) {
-        if (!bootstrap.codeGraphSettings().isAutoImportEnabled()) {
+    private static void prepareCodeGraph(ConsoleView view, ApplicationBootstrap bootstrap) {
+        CodeGraphSettings settings = bootstrap.codeGraphSettings();
+        if (!settings.isEnabled()) {
+            emitCodeGraph(view, "未启用（config/clara.yml 里 codeGraph.enabled=false），跳过初始化");
             return;
         }
-        try {
-            String result = codeGraphConsole.prepare(true);
-            view.emit("  codegraph      : " + result.replace("\n", "；"), ConsoleView.ANSI_GRAY);
-        } catch (RuntimeException failure) {
-            view.emit("  codegraph      : 检查失败：" + failure.getMessage() + "（不影响对话）", ConsoleView.ANSI_GRAY);
+        emitCodeGraph(view, "初始化：工作目录 " + ConfigLocator.workspaceRoot() + "，supplement="
+                + settings.isSupplementEnabled() + " autoMount=" + settings.isAutoMountEnabled()
+                + " autoImport=" + settings.isAutoImportEnabled());
+        if (settings.isAutoMountEnabled()) {
+            emitCodeGraphStep(view, "挂载检查", new CodeGraphStep() {
+                @Override
+                public String run() {
+                    return codeGraphConsole.ensureMount();
+                }
+            });
+        } else {
+            emitCodeGraph(view, "挂载检查：跳过（autoMount=false）——容器看不到本目录时读代码会退回本地文件；"
+                    + "需要补挂见 deploy\\codebase-memory-mcp\\install-docker.ps1");
         }
+        if (settings.isAutoImportEnabled()) {
+            emitCodeGraphStep(view, "导入检查", new CodeGraphStep() {
+                @Override
+                public String run() {
+                    return codeGraphConsole.prepare(true);
+                }
+            });
+        } else {
+            emitCodeGraph(view, "导入检查：跳过（autoImport=false）——图谱里没有本项目时不会被自动导入"
+                    + "（用 /graph 查看、/graph import 导入）");
+        }
+    }
+
+    /**
+     * 跑一步图谱初始化，把结果与耗时打成「  codegraph      : 步骤 123ms：首行」。
+     *
+     * <p>其余结果行按续行缩进对齐：脚本回的结果里常有项目 / 目录 / 说明好几种，压成一行看不清。
+     *
+     * @param view  控制台视图，不可为 null
+     * @param label 步骤名（挂载检查 / 导入检查），非 null
+     * @param step  要执行的一步，非 null
+     */
+    private static void emitCodeGraphStep(ConsoleView view, String label, CodeGraphStep step) {
+        long started = System.nanoTime();
+        String result;
+        try {
+            result = step.run();
+        } catch (RuntimeException failure) {
+            result = "失败：" + failure.getMessage() + "（不影响对话）";
+        }
+        long elapsedMillis = (System.nanoTime() - started) / 1000000L;
+        String[] lines = (result == null ? "" : result.trim()).split("\r?\n");
+        String headline = lines[0].trim();
+        if (headline.startsWith(RESULT_PREFIX)) {
+            headline = headline.substring(RESULT_PREFIX.length()).trim();
+        }
+        emitCodeGraph(view, label + " " + elapsedMillis + "ms："
+                + (headline.isEmpty() ? "（脚本没有输出，可能没装 Python）" : headline));
+        for (int index = 1; index < lines.length; index++) {
+            String detail = lines[index].trim();
+            if (!detail.isEmpty()) {
+                view.emit(CODEGRAPH_DETAIL + detail, ConsoleView.ANSI_GRAY);
+            }
+        }
+    }
+
+    /**
+     * 打一行图谱初始化日志（标签列与横幅其它行对齐）。
+     *
+     * @param view    控制台视图，不可为 null
+     * @param message 内容，非 null
+     */
+    private static void emitCodeGraph(ConsoleView view, String message) {
+        view.emit(CODEGRAPH_PREFIX + message, ConsoleView.ANSI_GRAY);
+    }
+
+    /**
+     * 图谱初始化的一步：跑一次脚本调用并回可打印的中文结果。
+     */
+    private interface CodeGraphStep {
+
+        /**
+         * @return 可打印的中文结果，非 null
+         */
+        String run();
     }
 
     /**

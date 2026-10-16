@@ -176,4 +176,7 @@ if [ "$model_config_count" -eq 0 ]; then
 fi
 
 echo ""
-exec java -jar clara.jar "$@"
+# -Dfile.encoding=UTF-8 不是可选项：Milvus Java SDK 用 String.getBytes()（平台默认字符集）
+# 编码全文检索（BM25）的正文，默认字符集不是 UTF-8 时正文会变成非法字节，
+# Milvus 的 jieba 分词器会 panic 并让服务端整个 abort（历史召回随之不可用）。
+exec java -Dfile.encoding=UTF-8 -jar clara.jar "$@"

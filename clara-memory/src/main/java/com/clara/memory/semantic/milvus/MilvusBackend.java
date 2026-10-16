@@ -53,6 +53,16 @@ public interface MilvusBackend extends Closeable {
     void deleteByConversation(String collection, String conversationId);
 
     /**
+     * 删除整个集合。
+     *
+     * <p>用于检索模式（vector ↔ bm25）或向量维度变更后按新结构重建：两种集合结构不同，
+     * 无法在原集合上直接切换。
+     *
+     * @param collection 集合名称，不可为 null
+     */
+    void dropCollection(String collection);
+
+    /**
      * 关闭后端并释放资源。
      */
     @Override

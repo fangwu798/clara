@@ -1,6 +1,7 @@
 package com.clara;
 
 import com.clara.codegraph.CodeGraphSupplement;
+import com.clara.config.AlwaysPromptSettings;
 import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
 import com.clara.config.ModelRegistry;
@@ -15,6 +16,7 @@ import com.clara.core.message.IContent;
 import com.clara.core.model.IResponse;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.memory.IContextSupplementProvider;
+import com.clara.core.memory.IContextTraceSink;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowEngine;
@@ -100,6 +102,8 @@ import com.clara.workflow.engine.DefaultWorkflowEngine;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -247,6 +251,16 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     /**
+     * 使用默认装配，并接入上下文来源观测口（供控制台观察图谱 / 召回的执行情况）。
+     *
+     * @param contextTrace 上下文来源观测口；可为 null（不上报）
+     */
+    public ApplicationBootstrap(IContextTraceSink contextTrace) {
+        this(new HashingEmbeddingClient(EMBEDDING_DIMENSION), EMBEDDING_DIMENSION, defaultMcpClientFactory(),
+                contextTrace);
+    }
+
+    /**
      * 指定嵌入客户端与向量维度装配，便于接入真实凭据（如 {@code HttpEmbeddingClient}）。
      *
      * @param embeddingClient  嵌入客户端，不可为 null
@@ -254,7 +268,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @throws IllegalArgumentException 参数非法时
      */
     public ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension) {
-        this(embeddingClient, embeddingDimension, defaultMcpClientFactory());
+        this(embeddingClient, embeddingDimension, defaultMcpClientFactory(), null);
     }
 
     /**
@@ -270,6 +284,22 @@ public final class ApplicationBootstrap implements Closeable {
      */
     ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension,
             McpClientFactory mcpClientFactory) {
+        this(embeddingClient, embeddingDimension, mcpClientFactory, null);
+    }
+
+    /**
+     * 指定嵌入客户端、向量维度、MCP 客户端工厂与上下文来源观测口装配。
+     *
+     * <p>包内可见：测试可注入 fake 工厂与自定义观测口，在不连网络的前提下验证 MCP 接入与上报链路。
+     *
+     * @param embeddingClient    嵌入客户端，不可为 null
+     * @param embeddingDimension 向量维度，须与嵌入客户端输出一致，必须为正
+     * @param mcpClientFactory   MCP 客户端工厂，不可为 null
+     * @param contextTrace       上下文来源观测口；可为 null（不上报）
+     * @throws IllegalArgumentException 参数非法时
+     */
+    ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension,
+            McpClientFactory mcpClientFactory, IContextTraceSink contextTrace) {
         if (embeddingClient == null) {
             throw new IllegalArgumentException("embeddingClient must not be null");
         }
@@ -288,7 +318,10 @@ public final class ApplicationBootstrap implements Closeable {
         MilvusSemanticMemoryStore milvusStore = milvus == null ? null : connectMilvus(milvus);
         this.semanticMemoryStore = milvusStore == null ? new LocalSemanticMemoryStore(embeddingDimension) : milvusStore;
         this.conversationIndexing = milvusStore != null;
-        this.semanticMemoryDescription = milvusStore == null ? "进程内 local（不写对话记录）" : "milvus " + milvus.getHost() + ":" + milvus.getPort() + "/" + milvus.getCollection() + "（对话记录写入并召回）";
+        this.semanticMemoryDescription = milvusStore == null
+                ? "进程内 local（不写对话记录）"
+                : "milvus " + milvus.getHost() + ":" + milvus.getPort() + "/" + milvus.getCollection()
+                        + "（" + semanticModeOf(milvus) + "，对话记录写入并召回）";
 
         this.tokenCountEstimator = new TiktokenTokenCountEstimator(TiktokenTokenCountEstimator.DEFAULT_ENCODING);
 
@@ -319,19 +352,25 @@ public final class ApplicationBootstrap implements Closeable {
         this.windowCompression = new WindowCompressionCoordinator(new DefaultSummarizeCoordinator(streamModel, promptProvider));
 
         // orchestration 协作者
-        SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore);
+        SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore,
+                contextTrace);
         // 代码知识图谱：装配提示词前先查一次图谱，命中的知识作为 system 补充信息注入；图谱里没有的，
         // 模型按 code_graph_guide 的约定改用工具查本地文件。开关在 config/clara.yml 的 codeGraph 节点。
         this.codeGraphSettings = CodeGraphSettings.load(ConfigLocator.claraConfigFile());
         IContextSupplementProvider codeGraphSupplement = codeGraphSettings.isSupplementEnabled()
-                ? new CodeGraphSupplement(toolInvoker, codeGraphSettings) : null;
+                ? new CodeGraphSupplement(toolInvoker, codeGraphSettings, contextTrace) : null;
         // 工具描述按请求组装时现扫一遍工作流清单，使运行期新生成的自定义工作流无需重启即可被模型看到
         SkillMatchCoordinator skillMatch = new SkillMatchCoordinator(embeddingClient, semanticMemoryStore, promptProvider,
                 new CompositeToolCatalog(
                         new RegistryToolCatalog(skillRegistry, WorkflowCatalog::decorateToolDescription),
-                        new McpToolCatalog(mcpServerRegistry, mcpCapabilityCatalog, DEFAULT_MCP_TENANT)));
+                        new McpToolCatalog(mcpServerRegistry, mcpCapabilityCatalog, DEFAULT_MCP_TENANT)),
+                contextTrace);
+        // 常驻提示词：不走向量检索、每轮原样进 system（如「读代码先查知识图谱」这类固定约定）。
+        // 为什么要单独一条通道见 {@link AlwaysPromptSettings} 的类注释。
+        List<String> basePrompts = alwaysPrompts(AlwaysPromptSettings.load(ConfigLocator.claraConfigFile()),
+                promptProvider, codeGraphSettings.isEnabled());
         ContextAssembler contextAssembler = new ContextAssembler(windowCompression, semanticRecall,
-                codeGraphSupplement, skillMatch);
+                codeGraphSupplement, skillMatch, basePrompts);
         CapabilityDispatcher capabilityDispatcher = new CapabilityDispatcher(streamModel);
         ToolRoundTripCoordinator toolRoundTrip = new ToolRoundTripCoordinator(toolInvoker);
         // 调用记录接收方：进程内保留最近若干条记录，供上层读取（不打印、不落盘）
@@ -559,6 +598,36 @@ public final class ApplicationBootstrap implements Closeable {
      */
     public CodeGraphSettings codeGraphSettings() {
         return codeGraphSettings;
+    }
+
+    /**
+     * 解析常驻提示词：把配置里的标识取成提示词文本，取不到的跳过——配错了不该挡住对话。
+     *
+     * <p>图谱关闭时跳过图谱使用约定：那条约定通篇在讲怎么用图谱，图谱不可用时留着它只会把模型
+     * 引向一个会报错的工具。
+     *
+     * @param settings         常驻提示词开关，不可为 null
+     * @param promptProvider   提示词提供器，不可为 null
+     * @param codeGraphEnabled 代码知识图谱总开关是否打开
+     * @return 提示词文本列表，可能为空，非 null
+     */
+    private static List<String> alwaysPrompts(AlwaysPromptSettings settings, IPromptProvider promptProvider,
+            boolean codeGraphEnabled) {
+        List<String> prompts = new ArrayList<String>();
+        for (String id : settings.getIds()) {
+            if (AlwaysPromptSettings.CODE_GRAPH_GUIDE.equals(id) && !codeGraphEnabled) {
+                continue;
+            }
+            try {
+                String prompt = promptProvider.prompt(id);
+                if (prompt != null && !prompt.trim().isEmpty()) {
+                    prompts.add(prompt);
+                }
+            } catch (RuntimeException unavailable) {
+                // 标识写错或提示词文件缺失：跳过这一条，其余常驻提示词照常生效。
+            }
+        }
+        return prompts;
     }
 
     /**
@@ -856,17 +925,74 @@ public final class ApplicationBootstrap implements Closeable {
      */
     private static MilvusSemanticMemoryStore connectMilvus(MilvusSettings settings) {
         quietMilvusLogging();
+        warnOnBm25NonUtf8Charset(settings);
         try {
+            MilvusCollectionSpec spec = collectionSpec(settings);
             MilvusBackend backend = MilvusBackendFactory.create(new MilvusBackendConfig(
                     settings.getHost(), settings.getPort(), settings.getUsername(), settings.getPassword(),
                     MilvusBackendConfig.DEFAULT_DATABASE,
                     MilvusBackendConfig.DEFAULT_CONNECT_TIMEOUT_MILLIS,
-                    MilvusBackendConfig.DEFAULT_IDLE_TIMEOUT_MILLIS));
-            return new MilvusSemanticMemoryStore(new MilvusCollectionSpec(settings.getCollection(), settings.getDimension()), backend);
+                    MilvusBackendConfig.DEFAULT_IDLE_TIMEOUT_MILLIS), spec);
+            try {
+                return new MilvusSemanticMemoryStore(spec, backend);
+            } catch (RuntimeException mismatch) {
+                if (!settings.isRecreateOnSchemaMismatch()) {
+                    throw mismatch;
+                }
+                // 旧集合结构与当前配置不一致（切了检索模式 / 换了嵌入维度）：旧向量与新查询不可比，重建是唯一选项。
+                // 只在配置里显式开了重建才动手（删集合会丢旧记录）；重建失败会被外层兜回进程内实现。
+                System.err.println("[memory] Milvus 集合结构与配置不匹配，按配置重建：" + mismatch.getMessage());
+                backend.dropCollection(spec.getCollection());
+                return new MilvusSemanticMemoryStore(spec, backend);
+            }
         } catch (RuntimeException unavailable) {
             System.err.println("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）：" + unavailable.getMessage());
             return null;
         }
+    }
+
+    /**
+     * BM25 模式下检查 JVM 默认字符集：不是 UTF-8 时打印明确警告。
+     *
+     * <p>为什么必须提醒：milvus-sdk-java 拼 VarChar 全文检索占位符时用的是 {@code String.getBytes()}（平台
+     * 默认字符集），不是 UTF-8。中文 Windows 上未加 {@code -Dfile.encoding=UTF-8} 时默认字符集是 GBK，
+     * 中文正文会以 GBK 字节发出，Milvus 的分词器收到非法 UTF-8 会 panic 并让服务端整个 abort——代价不是
+     * 这一次检索失败，而是整个记忆库掉线。启动脚本 clara.bat / clara.sh 已带该参数，只有手工 java -jar 才会踩到。
+     *
+     * @param settings Milvus 配置，非 null
+     */
+    private static void warnOnBm25NonUtf8Charset(MilvusSettings settings) {
+        if (!settings.isBm25Mode()) {
+            return;
+        }
+        Charset charset = Charset.defaultCharset();
+        if (!StandardCharsets.UTF_8.equals(charset)) {
+            System.err.println("[memory] 警告：JVM 默认字符集是 " + charset.name()
+                    + "，Milvus 全文检索的正文会按它编码，可能让 Milvus 服务端 abort；"
+                    + "请用 clara.bat / clara.sh 启动（已带 -Dfile.encoding=UTF-8）。");
+        }
+    }
+
+    /**
+     * 按配置构造集合规格：BM25 模式用分词器定义集合身份（不存向量），向量模式用维度。
+     *
+     * @param settings Milvus 配置，非 null
+     * @return 集合规格，非 null
+     */
+    private static MilvusCollectionSpec collectionSpec(MilvusSettings settings) {
+        return settings.isBm25Mode()
+                ? new MilvusCollectionSpec(settings.getCollection(), settings.getAnalyzer())
+                : new MilvusCollectionSpec(settings.getCollection(), settings.getDimension());
+    }
+
+    /**
+     * 取语义记忆的检索模式描述，供启动横幅展示。
+     *
+     * @param settings Milvus 配置，非 null
+     * @return 模式描述，非 null
+     */
+    private static String semanticModeOf(MilvusSettings settings) {
+        return settings.isBm25Mode() ? "bm25 全文检索" : "向量检索";
     }
 
     /**

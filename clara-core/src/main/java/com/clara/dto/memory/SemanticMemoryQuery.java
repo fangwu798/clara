@@ -11,6 +11,10 @@ import java.util.Map;
  *
  * <p>检索对话记录时按 {@link #conversationId()} 限定当前会话；检索技能描述时通过 {@link #sourceType()}
  * 限定来源类型。无租户：不含 {@code tenantId}。
+ *
+ * <p>{@link #getQueryText()} 携带本次检索的原始文本，供全文检索实现（Milvus BM25）使用；
+ * 向量检索并不需要它，为 null 即可。两种检索方式共用同一个查询对象，调用方就不用关心
+ * 底层用的是哪一种。
  */
 public final class SemanticMemoryQuery {
 
@@ -21,6 +25,7 @@ public final class SemanticMemoryQuery {
     private final double minScore;
     private final long nowEpochMillis;
     private final Map<String, String> filters;
+    private final String queryText;
 
     /**
      * 创建查询条件。
@@ -36,6 +41,24 @@ public final class SemanticMemoryQuery {
      */
     public SemanticMemoryQuery(MemorySourceTypeEnum sourceType, String conversationId, float[] vector,
             int topK, double minScore, long nowEpochMillis, Map<String, String> filters) {
+        this(sourceType, conversationId, vector, topK, minScore, nowEpochMillis, filters, null);
+    }
+
+    /**
+     * 创建查询条件，并携带原始查询文本。
+     *
+     * @param sourceType      来源类型过滤，可为 null（不限来源）
+     * @param conversationId  会话标识过滤，可为 null（不限会话，如检索技能描述）
+     * @param vector          查询向量，不可为 null、空、含 NaN/Inf 或零范数
+     * @param topK            召回条数，必须为正
+     * @param minScore        最小相似度，须在 {@code [-1, 1]} 区间
+     * @param nowEpochMillis  当前时间（Unix epoch 毫秒），用于过期判断，不可为负
+     * @param filters         元数据过滤条件，可为 null
+     * @param queryText       原始查询文本（供全文检索使用），可为 null / 空白
+     * @throws IllegalArgumentException 任一字段不合法时
+     */
+    public SemanticMemoryQuery(MemorySourceTypeEnum sourceType, String conversationId, float[] vector,
+            int topK, double minScore, long nowEpochMillis, Map<String, String> filters, String queryText) {
         if (vector == null || vector.length == 0 || topK <= 0 || Double.isNaN(minScore)
                 || minScore < -1 || minScore > 1 || nowEpochMillis < 0) {
             throw new IllegalArgumentException("semantic query is invalid");
@@ -56,6 +79,7 @@ public final class SemanticMemoryQuery {
         this.topK = topK;
         this.minScore = minScore;
         this.nowEpochMillis = nowEpochMillis;
+        this.queryText = queryText == null || queryText.trim().isEmpty() ? null : queryText;
         LinkedHashMap<String, String> copied = new LinkedHashMap<String, String>();
         if (filters != null) {
             for (Map.Entry<String, String> value : filters.entrySet()) {
@@ -94,5 +118,14 @@ public final class SemanticMemoryQuery {
 
     public Map<String, String> getMetadataFilters() {
         return filters;
+    }
+
+    /**
+     * 取原始查询文本。
+     *
+     * @return 原始查询文本；未提供或为空白时返回 null
+     */
+    public String getQueryText() {
+        return queryText;
     }
 }

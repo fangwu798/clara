@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 1400 950" width="1400" height="950" font-family="&apos;Segoe UI&apos;,&apos;Microsoft YaHei&apos;,Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5B7FCB"/>
+  </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="950" fill="#FFFFFF"/>
+  <text x="48" y="46" font-size="20" font-weight="700" fill="#1E4E77">Clara 项目进展汇报（2026-09-03 → 2026-10-15）</text>
+  <text x="48" y="70" font-size="11.5" fill="#6B7280">面向 Java 8 的 AI 应用运行时库 · 43 天迭代：一个多月做了什么、现在什么状态</text>
+  <text x="48" y="104" font-size="13" font-weight="700" fill="#1E4E77">A · 关键指标</text>
+  <rect x="48" y="118" width="311" height="132" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <text x="68" y="174" font-size="26" font-weight="700" fill="#1E4E77">43</text>
+  <text x="118" y="174" font-size="15" font-weight="700" fill="#1E4E77">天</text>
+  <text x="68" y="208" font-size="10.5" fill="#6B7280">迭代周期</text>
+  <text x="68" y="230" font-size="10.5" fill="#6B7280">2026-09-03 → 2026-10-15</text>
+  <rect x="379" y="118" width="311" height="132" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <text x="399" y="174" font-size="26" font-weight="700" fill="#1E4E77">37</text>
+  <text x="449" y="174" font-size="15" font-weight="700" fill="#1E4E77">次</text>
+  <text x="399" y="208" font-size="10.5" fill="#6B7280">Git 提交次数</text>
+  <text x="399" y="230" font-size="10.5" fill="#6B7280">全部落在 09-03 → 10-15 区间内</text>
+  <rect x="710" y="118" width="311" height="132" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <text x="730" y="174" font-size="26" font-weight="700" fill="#1E4E77">9 / 370</text>
+  <text x="730" y="208" font-size="10.5" fill="#6B7280">Maven 模块 / Java 主源文件</text>
+  <text x="730" y="230" font-size="10.5" fill="#6B7280">9 个模块统一构建，370 个主源文件</text>
+  <rect x="1041" y="118" width="311" height="132" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <text x="1061" y="174" font-size="26" font-weight="700" fill="#1E4E77">425 / 0</text>
+  <text x="1061" y="208" font-size="10.5" fill="#6B7280">离线全量验证：测试通过 / 失败</text>
+  <text x="1061" y="230" font-size="10.5" fill="#6B7280">排除需真实供应商凭据的 19 个在线用例</text>
+  <line x1="48" y1="266" x2="1352" y2="266" stroke="#EDF1F6" stroke-width="1"/>
+  <text x="48" y="300" font-size="13" font-weight="700" fill="#1E4E77">B · 迭代时间线（2026-09 上旬 → 2026-10 中旬）</text>
+  <text x="1352" y="300" font-size="10" fill="#9AA3AE" text-anchor="end">站点按里程碑顺序等距排布，标注为该里程碑实际区间</text>
+  <line x1="90" y1="480" x2="1330" y2="480" stroke="#5B7FCB" stroke-width="3" marker-end="url(#tl-arrow)"/>
+  <text x="90" y="504" font-size="10" fill="#9AA3AE">2026-09 上旬</text>
+  <text x="1330" y="504" font-size="10" fill="#9AA3AE" text-anchor="end">2026-10 中旬</text>
+  <line x1="150" y1="418" x2="150" y2="471" stroke="#C6DDF2" stroke-width="1.6"/>
+  <text x="150" y="330" font-size="11" font-weight="700" fill="#3B82C4" text-anchor="middle">09-03 ~ 09-07</text>
+  <text x="150" y="348" font-size="12" font-weight="700" fill="#1E4E77" text-anchor="middle">立项与基线</text>
+  <text x="150" y="366" font-size="10.5" fill="#6B7280" text-anchor="middle">Java 8 基线冻结，模块与包名定型</text>
+  <text x="150" y="380" font-size="10.5" fill="#6B7280" text-anchor="middle">依赖与许可矩阵梳理</text>
+  <text x="150" y="394" font-size="10.5" fill="#6B7280" text-anchor="middle">离线验收通过（当时 64 套件 /</text>
+  <text x="150" y="408" font-size="10.5" fill="#6B7280" text-anchor="middle">234 用例）</text>
+  <circle cx="150" cy="480" r="7" fill="#3B82C4" stroke="#FFFFFF" stroke-width="2"/>
+  <line x1="366" y1="489" x2="366" y2="538" stroke="#C6DDF2" stroke-width="1.6"/>
+  <text x="366" y="545" font-size="11" font-weight="700" fill="#3B82C4" text-anchor="middle">09-17 ~ 09-23</text>
+  <text x="366" y="563" font-size="12" font-weight="700" fill="#1E4E77" text-anchor="middle">模型内核</text>
+  <text x="366" y="581" font-size="10.5" fill="#6B7280" text-anchor="middle">多平台接入（OpenAI / DeepSeek /</text>
+  <text x="366" y="595" font-size="10.5" fill="#6B7280" text-anchor="middle">火山方舟 / 阿里云 / Kimi）</text>
+  <text x="366" y="609" font-size="10.5" fill="#6B7280" text-anchor="middle">Responses 协议 + 按协议抽象编解码器</text>
+  <text x="366" y="623" font-size="10.5" fill="#6B7280" text-anchor="middle">统一 provider 往返骨架、流式生图</text>
+  <circle cx="366" cy="480" r="7" fill="#3B82C4" stroke="#FFFFFF" stroke-width="2"/>
+  <line x1="582" y1="418" x2="582" y2="471" stroke="#C6DDF2" stroke-width="1.6"/>
+  <text x="582" y="330" font-size="11" font-weight="700" fill="#3B82C4" text-anchor="middle">10-08 ~ 10-09</text>
+  <text x="582" y="348" font-size="12" font-weight="700" fill="#1E4E77" text-anchor="middle">服务化重构</text>
+  <text x="582" y="366" font-size="10.5" fill="#6B7280" text-anchor="middle">各模块服务化落地</text>
+  <text x="582" y="380" font-size="10.5" fill="#6B7280" text-anchor="middle">核心契约与包边界收敛</text>
+  <text x="582" y="394" font-size="10.5" fill="#6B7280" text-anchor="middle">业务 / 技术设计文档成体系</text>
+  <circle cx="582" cy="480" r="7" fill="#3B82C4" stroke="#FFFFFF" stroke-width="2"/>
+  <line x1="798" y1="489" x2="798" y2="538" stroke="#C6DDF2" stroke-width="1.6"/>
+  <text x="798" y="545" font-size="11" font-weight="700" fill="#3B82C4" text-anchor="middle">10-10 ~ 10-12</text>
+  <text x="798" y="563" font-size="12" font-weight="700" fill="#1E4E77" text-anchor="middle">可用形态</text>
+  <text x="798" y="581" font-size="10.5" fill="#6B7280" text-anchor="middle">可执行 clara.jar + 启动脚本</text>
+  <text x="798" y="595" font-size="10.5" fill="#6B7280" text-anchor="middle">交互式控制台分层重构</text>
+  <text x="798" y="609" font-size="10.5" fill="#6B7280" text-anchor="middle">工作流编排与多角色多模态</text>
+  <text x="798" y="623" font-size="10.5" fill="#6B7280" text-anchor="middle">技能工具链配置化、会话持久化</text>
+  <circle cx="798" cy="480" r="7" fill="#3B82C4" stroke="#FFFFFF" stroke-width="2"/>
+  <line x1="1014" y1="418" x2="1014" y2="471" stroke="#C6DDF2" stroke-width="1.6"/>
+  <text x="1014" y="330" font-size="11" font-weight="700" fill="#3B82C4" text-anchor="middle">10-13</text>
+  <text x="1014" y="348" font-size="12" font-weight="700" fill="#1E4E77" text-anchor="middle">记忆与媒体</text>
+  <text x="1014" y="366" font-size="10.5" fill="#6B7280" text-anchor="middle">语义记忆接入 Milvus</text>
+  <text x="1014" y="380" font-size="10.5" fill="#6B7280" text-anchor="middle">（etcd + MinIO + standalone + Attu）</text>
+  <text x="1014" y="394" font-size="10.5" fill="#6B7280" text-anchor="middle">生图 / 生视频通道打通</text>
+  <text x="1014" y="408" font-size="10.5" fill="#6B7280" text-anchor="middle">工作流过程可见性与会话历史压缩</text>
+  <circle cx="1014" cy="480" r="7" fill="#3B82C4" stroke="#FFFFFF" stroke-width="2"/>
+  <line x1="1230" y1="489" x2="1230" y2="538" stroke="#C6DDF2" stroke-width="1.6"/>
+  <text x="1230" y="545" font-size="11" font-weight="700" fill="#3B82C4" text-anchor="middle">10-14 ~ 10-15</text>
+  <text x="1230" y="563" font-size="12" font-weight="700" fill="#1E4E77" text-anchor="middle">边界收敛与外部工具</text>
+  <text x="1230" y="581" font-size="10.5" fill="#6B7280" text-anchor="middle">模块边界收敛、删除无调用方能力</text>
+  <text x="1230" y="595" font-size="10.5" fill="#6B7280" text-anchor="middle">自定义工作流生成与热加载</text>
+  <text x="1230" y="609" font-size="10.5" fill="#6B7280" text-anchor="middle">接入代码知识图谱 MCP</text>
+  <text x="1230" y="623" font-size="10.5" fill="#6B7280" text-anchor="middle">（含容器部署与图谱可视化 UI）</text>
+  <circle cx="1230" cy="480" r="7" fill="#3B82C4" stroke="#FFFFFF" stroke-width="2"/>
+  <line x1="48" y1="664" x2="1352" y2="664" stroke="#EDF1F6" stroke-width="1"/>
+  <text x="48" y="692" font-size="13" font-weight="700" fill="#1E4E77">C · 当前状态</text>
+  <circle cx="170" cy="688" r="5" fill="#2F7D32"/>
+  <text x="181" y="692" font-size="10" fill="#6B7280">已完成</text>
+  <circle cx="228" cy="688" r="5" fill="#B26A00"/>
+  <text x="239" y="692" font-size="10" fill="#6B7280">进行中</text>
+  <circle cx="286" cy="688" r="5" fill="#5C7A99"/>
+  <text x="297" y="692" font-size="10" fill="#6B7280">待补充</text>
+  <rect x="48" y="706" width="311" height="196" rx="10" fill="#F4FBF4" stroke="#CFE6CF"/>
+  <circle cx="68" cy="732" r="6" fill="#2F7D32"/>
+  <text x="82" y="737" font-size="12.5" font-weight="700" fill="#2F7D32">已完成</text>
+  <line x1="64" y1="748" x2="343" y2="748" stroke="#CFE6CF" stroke-width="1.4"/>
+  <circle cx="72" cy="778" r="2.5" fill="#2F7D32"/>
+  <text x="84" y="782" font-size="10.5" fill="#4B5563">9 模块统一构建通过</text>
+  <circle cx="72" cy="796" r="2.5" fill="#2F7D32"/>
+  <text x="84" y="800" font-size="10.5" fill="#4B5563">Java 8 字节码（major version 52）</text>
+  <circle cx="72" cy="814" r="2.5" fill="#2F7D32"/>
+  <text x="84" y="818" font-size="10.5" fill="#4B5563">425 个离线测试全绿</text>
+  <circle cx="72" cy="832" r="2.5" fill="#2F7D32"/>
+  <text x="84" y="836" font-size="10.5" fill="#4B5563">本地真实环境已跑通</text>
+  <text x="84" y="854" font-size="10.5" fill="#4B5563">对话 / 工作流 / 图片生成 / 语义记忆</text>
+  <rect x="379" y="706" width="311" height="196" rx="10" fill="#FFF8EE" stroke="#F0D2A8"/>
+  <circle cx="399" cy="732" r="6" fill="#B26A00"/>
+  <text x="413" y="737" font-size="12.5" font-weight="700" fill="#B26A00">进行中</text>
+  <line x1="395" y1="748" x2="674" y2="748" stroke="#F0D2A8" stroke-width="1.4"/>
+  <circle cx="403" cy="778" r="2.5" fill="#B26A00"/>
+  <text x="415" y="782" font-size="10.5" fill="#4B5563">供应商在线兼容用例</text>
+  <text x="415" y="800" font-size="10.5" fill="#4B5563">（部分账号余额 / 授权待修复）</text>
+  <circle cx="403" cy="814" r="2.5" fill="#B26A00"/>
+  <text x="415" y="818" font-size="10.5" fill="#4B5563">视频生成端到端接线</text>
+  <rect x="710" y="706" width="311" height="196" rx="10" fill="#F2F5F9" stroke="#5C7A99"/>
+  <circle cx="730" cy="732" r="6" fill="#5C7A99"/>
+  <text x="744" y="737" font-size="12.5" font-weight="700" fill="#243B53">待补充</text>
+  <line x1="726" y1="748" x2="1005" y2="748" stroke="#5C7A99" stroke-width="1.4"/>
+  <circle cx="734" cy="778" r="2.5" fill="#5C7A99"/>
+  <text x="746" y="782" font-size="10.5" fill="#243B53">产品化文档与演示材料</text>
+  <circle cx="734" cy="796" r="2.5" fill="#5C7A99"/>
+  <text x="746" y="800" font-size="10.5" fill="#243B53">多实例共享存储</text>
+  <circle cx="734" cy="814" r="2.5" fill="#5C7A99"/>
+  <text x="746" y="818" font-size="10.5" fill="#243B53">生产级可观测性</text>
+  <rect x="1041" y="706" width="311" height="196" rx="10" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <circle cx="1061" cy="732" r="6" fill="#5B7FCB"/>
+  <text x="1075" y="737" font-size="12.5" font-weight="700" fill="#1E4E77">说明 · 一句话结论</text>
+  <line x1="1057" y1="748" x2="1336" y2="748" stroke="#C6DDF2" stroke-width="1.4"/>
+  <circle cx="1065" cy="778" r="2.5" fill="#5B7FCB"/>
+  <text x="1077" y="782" font-size="10.5" fill="#4B5563">从 0 到 1 的运行时底座已成型，</text>
+  <circle cx="1065" cy="796" r="2.5" fill="#5B7FCB"/>
+  <text x="1077" y="800" font-size="10.5" fill="#4B5563">具备可演示、可嵌入的完整闭环。</text>
+  <circle cx="1065" cy="814" r="2.5" fill="#5B7FCB"/>
+  <text x="1077" y="818" font-size="10.5" fill="#4B5563">本阶段目标已达成，可进入下一阶段。</text>
+</svg>

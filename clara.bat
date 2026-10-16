@@ -88,7 +88,11 @@ call :ensure_key "!KEY_ENV!"
 
 :launch
 echo.
-java -jar "clara.jar" %*
+rem -Dfile.encoding=UTF-8 is required here, not cosmetic: the Milvus Java SDK
+rem encodes full-text search (BM25) text with String.getBytes(), i.e. the platform
+rem default charset. Under a Chinese locale that is GBK, so the query goes out as
+rem invalid UTF-8 and the Milvus server aborts while tokenizing it.
+java -Dfile.encoding=UTF-8 -jar "clara.jar" %*
 set "EXITCODE=%ERRORLEVEL%"
 
 :finish
