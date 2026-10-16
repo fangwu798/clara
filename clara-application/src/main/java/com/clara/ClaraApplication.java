@@ -10,6 +10,7 @@ import com.clara.codegraph.CodeGraphConsole;
 import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
 import com.clara.config.ModelAvailabilityManager;
+import com.clara.config.ModelFailover;
 import com.clara.config.ModelRegistry;
 import com.clara.context.CancellationToken;
 import com.clara.enums.CapabilityKindEnum;
@@ -18,6 +19,7 @@ import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
+import com.clara.orchestration.api.OrchestrationStatusEnum;
 import com.clara.workflow.WorkflowCatalog;
 import com.clara.workflow.runtime.WorkflowProgress;
 
@@ -29,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -129,7 +132,7 @@ public final class ClaraApplication {
             if (monitor.isAvailable()) {
                 view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
             }
-            loop(view, reader, bootstrap, registry, commands, monitor);
+            loop(view, reader, bootstrap, registry, candidates, commands, monitor);
         } catch (RuntimeException startupFailure) {
             view.println("启动失败：" + startupFailure.getClass().getSimpleName() + ": " + startupFailure.getMessage());
             view.println("请确认：1) 所选模型配置存在且合法（当前 " + choice.configPath().toAbsolutePath() + "）；" + "2) 其 credential 声明的环境变量已设置。");
@@ -358,7 +361,7 @@ public final class ClaraApplication {
      * @param monitor   ESC 取消监听器，非 null
      * @throws IOException 读取标准输入失败时
      */
-    private static void loop(ConsoleView view, BufferedReader reader, ApplicationBootstrap bootstrap, ModelRegistry registry, SessionCommandHandler commands, CancelKeyMonitor monitor) throws IOException {
+    private static void loop(ConsoleView view, BufferedReader reader, ApplicationBootstrap bootstrap, ModelRegistry registry, List<Path> candidates, SessionCommandHandler commands, CancelKeyMonitor monitor) throws IOException {
         String line;
         while ((line = reader.readLine()) != null) {
             String input = line.trim();
@@ -371,7 +374,7 @@ public final class ClaraApplication {
             }
             if (outcome == SessionCommandHandler.Outcome.INPUT) {
                 view.logUserInput(input);
-                converse(view, bootstrap, registry.currentConfiguration(), input, monitor);
+                converse(view, bootstrap, registry, candidates, input, monitor);
             }
         }
     }
@@ -452,23 +455,83 @@ public final class ClaraApplication {
     }
 
     /**
-     * 执行一轮对话并打印回复与用量。
+     * 执行一轮对话：当前模型不可用时，按启动期响应时间顺序自动切到下一个可用模型重试。
      *
-     * @param view           控制台视图，非 null
-     * @param bootstrap      已装配的引导器，非 null
-     * @param providerConfig 当前模型配置，非 null
-     * @param input          用户输入，非空白
-     * @param monitor        ESC 取消监听器，非 null
+     * <p>为什么在这层做故障转移：换模型只影响「这一轮对话用哪个平台」，属于宿主（会话）的决策，
+     * 与编排层无关——工作流 AGENT 节点有各自的 role / model 绑定，不该被这里的切换影响。
+     *
+     * <p>尝试顺序取自 {@link ModelFailover#attemptOrder}（当前模型 + 启动期按响应时间升序的其余可用模型）。
+     * 只有在「失败属于模型不可用」且「本轮还没执行过工具调用」时才继续往下换：工具可能有副作用
+     * （写文件、发请求），换个模型把同一轮重放一遍等于把这些副作用重做一次。
+     *
+     * <p>切过去的模型会写入 {@link ModelRegistry}（即会话当前模型），后续轮次默认用它；同时会打印一行
+     * {@code [failover]} 说明，不做静默切换。注意会话历史按「会话 + 平台 + 模型」隔离，
+     * 所以新模型看到的是它自己那份历史（切回原模型即恢复原上下文）。
+     *
+     * @param view       控制台视图，非 null
+     * @param bootstrap  已装配的引导器，非 null
+     * @param registry   模型注册表（读当前模型、写切换结果），非 null
+     * @param candidates 启动期按首字符响应时间升序的可用模型配置，非 null
+     * @param input      用户输入，非空白
+     * @param monitor    ESC 取消监听器，非 null
      */
-    private static void converse(ConsoleView view, ApplicationBootstrap bootstrap, ProviderConfiguration providerConfig, String input, CancelKeyMonitor monitor) {
-        long started = System.currentTimeMillis();
+    private static void converse(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry,
+            List<Path> candidates, String input, CancelKeyMonitor monitor) {
         // 本轮取消令牌：交给监听器置位，随请求下发给编排层，进而让模型调用与脚本工具在检查点终止。
+        // 一次对话可能换模型重试，令牌跨尝试共用——用户按 ESC 取消的是整轮，不是某一次尝试。
         CancellationToken cancellationToken = new CancellationToken();
+        List<Path> plan = ModelFailover.attemptOrder(candidates, registry.currentConfigPath());
+        if (plan.isEmpty()) {
+            // 极端情况：候选清单为空且当前模型没解析出别名——仍然要跑一轮，别把用户输入吞掉（此时不换模型）。
+            plan = Collections.singletonList(registry.currentConfigPath());
+        }
+        try (CancelKeyMonitor.Session ignored = monitor.watch(cancellationToken)) {
+            for (int index = 0; index < plan.size(); index++) {
+                Path configPath = plan.get(index);
+                if (index > 0) {
+                    registry.select(configPath);
+                    view.emit("  [failover] 上一个模型不可用，已切到 " + ConfigLocator.aliasOf(configPath)
+                            + " 重试（会话历史按模型隔离，切回原模型即恢复原上下文）", ConsoleView.ANSI_YELLOW);
+                }
+                ConversationResult result = converseOnce(view, bootstrap, registry.currentConfiguration(), input,
+                        cancellationToken);
+                if (result == null
+                        || result.getStatus() != OrchestrationStatusEnum.FAILED
+                        || !ModelFailover.isUnavailable(result.getError())) {
+                    // 成功、异常已就地报告，或失败原因与「模型不可用」无关（入参、内容安全等）：如实报告，不换模型。
+                    return;
+                }
+                if (result.getToolRoundTrips() > 0) {
+                    view.emit("  [failover] 本轮已经执行过工具调用（可能有副作用），不再换模型重试", ConsoleView.ANSI_YELLOW);
+                    return;
+                }
+                if (index == plan.size() - 1) {
+                    // 只有一个候补都没有时别报「试完 N 个」，那种说法会让用户以为换过了别的模型。
+                    view.emit(plan.size() > 1
+                            ? "  [failover] 已按响应时间顺序试完 " + plan.size() + " 个可用模型，均不可用；可用 /model 手动指定，或检查网络与凭据"
+                            : "  [failover] 没有其它可用模型可切换；可用 /model 手动指定，或检查网络与凭据", ConsoleView.ANSI_RED);
+                }
+            }
+        }
+    }
+
+    /**
+     * 用指定模型跑一轮对话，并把回复、用量与错误打印到控制台。
+     *
+     * @param view              控制台视图，非 null
+     * @param bootstrap         已装配的引导器，非 null
+     * @param providerConfig    本次尝试使用的模型配置，非 null
+     * @param input             用户输入，非空白
+     * @param cancellationToken 本轮取消令牌，非 null
+     * @return 编排结果；非预期异常已就地报告时返回 null（调用方据此停止本轮，不再换模型）
+     */
+    private static ConversationResult converseOnce(ConsoleView view, ApplicationBootstrap bootstrap,
+            ProviderConfiguration providerConfig, String input, CancellationToken cancellationToken) {
+        long started = System.currentTimeMillis();
         // 传入工具用途解析器：调用工具时在日志里附一句「这次调用是为了什么」（结合本次入参推导）。
         ConsoleView.ConsoleStreamObserver observer = view.newObserver(bootstrap::describeToolInvocation);
         // 轮流式观察者与提示通道注册到线程：工作流节点执行时可复用（文本节点实时显示思考、各节点输出进度）。
-        try (CancelKeyMonitor.Session ignored = monitor.watch(cancellationToken);
-                WorkflowProgress.Scope ignored1 = WorkflowProgress.open(observer, text -> {
+        try (WorkflowProgress.Scope ignored1 = WorkflowProgress.open(observer, text -> {
                     observer.endStream();
                     view.emit(text, ConsoleView.ANSI_GRAY);
                 })) {
@@ -500,9 +563,12 @@ public final class ClaraApplication {
                 String details = failure.getSafeDetails().isEmpty() ? "" : " details=" + failure.getSafeDetails();
                 view.emit("  error: [" + failure.getCode() + "/" + failure.getCategory() + "] " + failure.getSafeMessage() + details, ConsoleView.ANSI_RED);
             }
+            return result;
         } catch (RuntimeException turnFailure) {
             view.emit("[error] " + turnFailure.getClass().getSimpleName() + ": " + turnFailure.getMessage(), ConsoleView.ANSI_RED);
+            return null;
+        } finally {
+            view.println();
         }
-        view.println();
     }
 }

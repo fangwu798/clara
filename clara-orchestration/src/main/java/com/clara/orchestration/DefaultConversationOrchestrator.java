@@ -7,6 +7,7 @@ import com.clara.dto.memory.ContextControlConfig;
 import com.clara.dto.tool.ToolCall;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
+import com.clara.enums.RoleEnum;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCategory;
@@ -104,7 +105,11 @@ public final class DefaultConversationOrchestrator {
         // 内层退出时必须还原外层绑定，故不能用 bind + finally clear（那会把外层会话一并清空）。
         StringBuilder reasoning = new StringBuilder();
         try (ConvContext.Scope ignored = ConvContext.open(context)) {
-            windowMemory.append(Collections.singletonList(userContent(request, capabilityKind)));
+            // 故障转移会把同一轮换个模型重发，追加前先判重：末尾已经是同一条用户消息就不再追加。
+            IContent userTurn = userContent(request, capabilityKind);
+            if (shouldAppendUserTurn(windowMemory, userTurn)) {
+                windowMemory.append(Collections.singletonList(userTurn));
+            }
             int toolRoundTrips = 0;
             while (true) {
                 context.throwIfCancelled();
@@ -179,6 +184,26 @@ public final class DefaultConversationOrchestrator {
             return new UserContent(request.getUserInput());
         }
         return new UserVisionContent(request.getUserInput(), attachments);
+    }
+
+    /**
+     * 判断本轮用户消息要不要追加进窗口记忆：末尾已经是同一条用户消息时跳过。
+     *
+     * <p>为什么判重：同一份历史里连着两条一模一样的用户消息，只可能来自「上一轮没留下助手回复」——
+     * 即模型不可用时的故障转移把同一轮换个模型重发（或上一轮以取消 / 失败收尾）。那种悬空重复会让重试的
+     * 提示词里出现两遍同一个问题，也会在历史里越攒越多；正常的连续两轮之间必有助手回复，不会判成重复。
+     *
+     * @param windowMemory 当前模型对应的窗口记忆，非 null
+     * @param userTurn     本轮用户消息，非 null
+     * @return 需要追加时返回 true
+     */
+    static boolean shouldAppendUserTurn(IWindowMemory windowMemory, IContent userTurn) {
+        List<IContent> history = windowMemory.messages();
+        if (history.isEmpty()) {
+            return true;
+        }
+        IContent last = history.get(history.size() - 1);
+        return last.getRoleType() != RoleEnum.USER || !last.equals(userTurn);
     }
 
     /**
