@@ -223,7 +223,7 @@ docker cp clara-codebase-memory-mcp:/data/clara-code-graph.db .
 - 读写代码：技能脚本 `config/skill/scripts/code-graph/code_graph.py`（工具名 `code_graph`）——`op=read`
   逐文件先取图谱大纲，图谱未覆盖时回退本地文件读取，返回的 `source` 字段标明每条信息来自图谱还是文件；
   其余 `op`（`index`/`status`/`search`/`outline`/`snippet`/`trace`/`query`）是图谱能力的直通调用；`trace` 的 `inbound`
-  只跟 `CALLS` 边、会漏掉 `USAGE`，要完整的「谁引用了 X」清单用 `query`（只读 Cypher）。
+  只跟 `CALLS` 边、会漏掉 `USAGE`，要完整的「谁引用了 X」清单用 `query`（只读 Cypher；图谱只支持 Cypher 子集，标签写 `n:Class`，不支持 `labels(n)[0]` 这类列表下标）。
 - 工作流：`analyze_repo_docs`、`design_business_solution` 的读取节点已改为 `code_graph`（图谱优先 + 自动回退）。
 - 启动挂载 / 导入：`config/clara.yml` 的 `codeGraph.autoMount`（默认开）在启动时调 `ensure-mount.ps1`，确保
   容器能看到当前工作目录；`codeGraph.autoImport`（默认关）再幂等地按需导入。两者各在启动横幅打一行结果。

@@ -4,7 +4,7 @@
   "segments": [
     {
       "role": "system",
-      "content": "阅读或检索代码时按以下顺序取信息，避免一上来就把整仓库文件读进上下文：\n1) 先用 code_graph 工具查本地代码知识图谱：列某文件有哪些声明用 op=outline；按名字/正则找符号用 op=search（带上 label=Function/Class 更准）；查「X 被谁引用 / 谁调用了 X / X 的调用方」用 op=query（只读 Cypher，如 MATCH (c:Class)-[:DEFINES_METHOD]->(m)-[r]->(n) WHERE n.name='X' RETURN DISTINCT c.qualified_name），只看调用链层级用 op=trace direction=inbound（只跟 CALLS 边、会漏掉 USAGE，别当完整引用清单）；查「X 调用了谁」用 op=trace direction=outbound；取某个函数的源码用 op=snippet；要精确统计或筛选用 op=query（只读 Cypher）；一次了解多个文件的结构用 op=read。\n2) code_graph 的 op=read 逐文件取信息：代码文件先取图谱大纲，图谱没有该文件（未索引、不在索引范围、图谱不可用）时自动回退读本地文件；.md/.txt 这类散文文件不走图谱、直接返回原文（图谱对它们只给章节标题，不足以替代正文）。返回里的 source 字段标明每条信息来自 graph 还是 file，回答时可据此说明依据。\n3) 只有图谱与回退都拿不到所需信息时，才用 file_ops / text_search 直接读文件；需要整体重建图谱时用 code_graph 的 op=index。"
+      "content": "阅读或检索代码时按以下顺序取信息，避免一上来就把整仓库文件读进上下文：\n1) 先用 code_graph 工具查本地代码知识图谱：列某文件有哪些声明用 op=outline；按名字/正则找符号用 op=search（带上 label=Function/Class 更准）；查「X 被谁引用 / 谁调用了 X / X 的调用方」用 op=query（只读 Cypher，如 MATCH (c:Class)-[:DEFINES_METHOD]->(m)-[r]->(n) WHERE n.name='X' RETURN DISTINCT c.qualified_name；图谱只支持 Cypher 子集，标签写 n:Class，不支持 labels(n)[0] 这种列表下标），只看调用链层级用 op=trace direction=inbound（只跟 CALLS 边、会漏掉 USAGE，别当完整引用清单）；查「X 调用了谁」用 op=trace direction=outbound；取某个函数的源码用 op=snippet；要精确统计或筛选用 op=query（只读 Cypher）；一次了解多个文件的结构用 op=read。\n2) code_graph 的 op=read 逐文件取信息：代码文件先取图谱大纲，图谱没有该文件（未索引、不在索引范围、图谱不可用）时自动回退读本地文件；.md/.txt 这类散文文件不走图谱、直接返回原文（图谱对它们只给章节标题，不足以替代正文）。返回里的 source 字段标明每条信息来自 graph 还是 file，回答时可据此说明依据。\n3) 只有图谱与回退都拿不到所需信息时，才用 file_ops / text_search 直接读文件；需要整体重建图谱时用 code_graph 的 op=index。"
     }
   ]
 }

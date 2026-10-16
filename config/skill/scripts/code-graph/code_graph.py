@@ -51,7 +51,7 @@ _TOOL = {
     "id": "code_graph",
     "name": "code_graph",
     "type": "PYTHON",
-    "description": "代码知识图谱工具：图谱覆盖当前工作目录时，读代码 / 查符号 / 查引用一律先用本工具，查不到再回退 text_search / file_ops 看本地文件。常用问题与 op 的对应：查「X 被谁引用 / 谁调用了 X / X 的调用方」→ op=query（只读 Cypher），例如 MATCH (c:Class)-[:DEFINES_METHOD]->(m)-[r]->(n) WHERE n.name='X' RETURN DISTINCT c.qualified_name（引用方是节点 m 及其外层类 c；关系类型有 USAGE / CALLS / DEFINES / TESTS）；只想看调用链层级就用 op=trace direction=inbound，但它只跟 CALLS 边、会漏掉 USAGE，别当完整引用清单。查「X 调用了谁」→ op=trace direction=outbound；查某文件的符号清单 → op=outline；按名字或正则找符号 → op=search（带 label=Function / Class 更准）；取某函数源码 → op=snippet；精确统计或筛选 → op=query；一次读多个文件的结构 → op=read（图谱未覆盖或不可用时自动回退为本地文件读取；.md/.txt 这类散文文件不走图谱、直接返回原文）。把某个工作目录导入图谱：先用 op=prepare 看是否已导入（秒回），再用 op=index 发起导入（缺省后台执行，不卡住调用）。入参 JSON：op(prepare|index|status|search|outline|snippet|trace|query|read)、file_path(仓库相对路径，outline 用)、paths(路径或通配列表，read 用；元素可写 * ? [ ] 与 ** 递归)、pattern(名字 / 文本片段，search 用)、regex(布尔，search 用；默认 false，为 true 时 pattern 按正则匹配，多关键词检索写 foo|bar 就要带上它，否则 | 只当字面量、命中恒为 0)、label(节点标签，如 Function / Class)、qualified_name(限定名，snippet 用)、function_name(函数名，trace 用)、direction(inbound|outbound|both，trace 用；inbound 查调用方、outbound 查被调用方)、depth(1-15，trace 用)、query(只读 Cypher，query 用)、project(图谱中的项目名；缺省按当前分析目录匹配，容器部署时先把该目录导入图谱才能匹配上)、repo_path(索引 / 检查的目标目录，index 与 prepare 用，缺省为当前分析目录)、background(索引是否后台执行，index 用；缺省 true 秒回、稍后用 op=status 看结果，false 则同步等待并返回节点 / 边计数)、index(prepare 时是否顺带后台发起导入，缺省 false)、max_bytes(单文件回退读取的截断字节，默认 20000)、max_files(展开后读取的文件数上限，默认 200)。返回：{op, source(graph|file|graph+file), files:[{path, source, outline|content}], ...}；其中 source 明确标注每条信息来自图谱还是本地文件。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
+    "description": "代码知识图谱工具：图谱覆盖当前工作目录时，读代码 / 查符号 / 查引用一律先用本工具，查不到再回退 text_search / file_ops 看本地文件。常用问题与 op 的对应：查「X 被谁引用 / 谁调用了 X / X 的调用方」→ op=query（只读 Cypher），例如 MATCH (c:Class)-[:DEFINES_METHOD]->(m)-[r]->(n) WHERE n.name='X' RETURN DISTINCT c.qualified_name（引用方是节点 m 及其外层类 c；关系类型有 USAGE / CALLS / DEFINES / TESTS；Cypher 只支持子集：标签写成 n:Class，或在 MATCH 里写 (c:Class {name:'X'})，但不支持列表下标 labels(n)[0]，写它整条语句会报 not fully parsed）；只想看调用链层级就用 op=trace direction=inbound，但它只跟 CALLS 边、会漏掉 USAGE，别当完整引用清单。查「X 调用了谁」→ op=trace direction=outbound；查某文件的符号清单 → op=outline；按名字或正则找符号 → op=search（带 label=Function / Class 更准）；取某函数源码 → op=snippet；精确统计或筛选 → op=query；一次读多个文件的结构 → op=read（图谱未覆盖或不可用时自动回退为本地文件读取；.md/.txt 这类散文文件不走图谱、直接返回原文）。把某个工作目录导入图谱：先用 op=prepare 看是否已导入（秒回），再用 op=index 发起导入（缺省后台执行，不卡住调用）。入参 JSON：op(prepare|index|status|search|outline|snippet|trace|query|read)、file_path(仓库相对路径，outline 用)、paths(路径或通配列表，read 用；元素可写 * ? [ ] 与 ** 递归)、pattern(名字 / 文本片段，search 用)、regex(布尔，search 用；默认 false，为 true 时 pattern 按正则匹配，多关键词检索写 foo|bar 就要带上它，否则 | 只当字面量、命中恒为 0)、label(节点标签，如 Function / Class)、qualified_name(限定名，snippet 用)、function_name(函数名，trace 用)、direction(inbound|outbound|both，trace 用；inbound 查调用方、outbound 查被调用方)、depth(1-15，trace 用)、query(只读 Cypher，query 用)、project(图谱中的项目名；缺省按当前分析目录匹配，容器部署时先把该目录导入图谱才能匹配上)、repo_path(索引 / 检查的目标目录，index 与 prepare 用，缺省为当前分析目录)、background(索引是否后台执行，index 用；缺省 true 秒回、稍后用 op=status 看结果，false 则同步等待并返回节点 / 边计数)、index(prepare 时是否顺带后台发起导入，缺省 false)、max_bytes(单文件回退读取的截断字节，默认 20000)、max_files(展开后读取的文件数上限，默认 200)。返回：{op, source(graph|file|graph+file), files:[{path, source, outline|content}], ...}；其中 source 明确标注每条信息来自图谱还是本地文件。另需填写 purpose(请务必填写：一句话简短说明本次调用该工具的目的，会展示给用户)。",
     "parameters": {
         "type": "object",
         "properties": {
@@ -319,22 +319,27 @@ def clean_text(text):
 def run_cli(runner, tool, flags=None, payload=None, timeout=CLI_TIMEOUT_SECONDS, format_json=True):
     """执行一次 `codebase-memory-mcp cli <tool>`，返回 (ok, 文本)。
 
-    参数优先用命令行开关（与官方 README 中的示例一致）；开关调用失败时再用「stdin 传 JSON 入参」重试一次
-    （官方对个别工具的开关名未在文档中给出，但两条通道都会生成同一份工具入参），两条都失败才返回失败。
-    format_json=False 用于本身没有 --format 开关的工具（官方目前只有 index_repository 如此），
-    此时两条通道都不带该开关。
+    两条通道按顺序试：先按官方 README 的写法走命令行开关（能拿到结构化的 --format json 输出），
+    开关名不对时才退回「stdin 传 JSON 入参」。
+
+    stdin 通道的开关与开关通道不同：这条通道 **不能** 带 --format json。实测（0.11.0）带上它之后
+    CLI 会忽略管道里的入参、转而报必填参数缺失（如 query is required），把「Cypher 语法不通过」这类
+    真实原因盖掉，模型就会照着假错误去改参数、白绕一圈。
+    format_json=False 用于本身没有 --format 开关的工具（官方目前只有 index_repository 如此）。
+
+    两条通道都失败时，报的是「更可信的那条」：开关通道若不是在抱怨开关名，就以它的错误为准。
     """
-    tail = ["--format", "json"] if format_json else []
+    flag_tail = ["--format", "json"] if format_json else []
     attempts = []
     if flags is not None:
-        attempts.append((["cli", tool] + list(flags) + tail, None))
+        attempts.append(("flags", ["cli", tool] + list(flags) + flag_tail, None))
     if payload is not None:
-        attempts.append((["cli", tool] + tail, json.dumps(payload, ensure_ascii=False)))
+        attempts.append(("stdin", ["cli", tool], json.dumps(payload, ensure_ascii=False)))
     if not attempts:
-        attempts.append((["cli", tool] + tail, None))
+        attempts.append(("flags", ["cli", tool] + flag_tail, None))
 
-    last_error = ""
-    for args, stdin_text in attempts:
+    errors = []
+    for channel, args, stdin_text in attempts:
         try:
             completed = subprocess.run(
                 list(runner) + args,
@@ -347,12 +352,33 @@ def run_cli(runner, tool, flags=None, payload=None, timeout=CLI_TIMEOUT_SECONDS,
                 errors="replace",
             )
         except (OSError, subprocess.SubprocessError) as exception:  # noqa: PERF203 - 逐个通道尝试
-            last_error = str(exception)
+            errors.append((channel, str(exception)))
             continue
         if completed.returncode == 0:
             return True, hostify(clean_text(completed.stdout))
-        last_error = hostify(clean_text(completed.stderr or completed.stdout)) or ("exit " + str(completed.returncode))
-    return False, last_error
+        errors.append((channel, hostify(clean_text(completed.stderr or completed.stdout))
+                       or ("exit " + str(completed.returncode))))
+    return False, best_error(errors)
+
+
+def best_error(errors):
+    """两条通道都失败时挑一条报出去：只有开关通道在抱怨开关名时，才改用 stdin 通道的错误。
+
+    反过来（Cypher 语法不通过、图谱里没有该项目等）必须保留开关通道的错误——那才是真实原因；
+    stdin 通道的「缺少必填参数」只是这条通道自己的失效表现。
+    """
+    flag_error = next((text for channel, text in errors if channel == "flags"), "")
+    stdin_error = next((text for channel, text in errors if channel == "stdin"), "")
+    if stdin_error and (not flag_error or flag_name_problem(flag_error)):
+        return stdin_error
+    return flag_error or stdin_error
+
+
+def flag_name_problem(text):
+    """判断错误文本是不是「这个开关名不认识」（只有这种情况才值得改用另一条通道的错误）。"""
+    lowered = (text or "").lower()
+    return any(marker in lowered for marker in (
+        "unknown flag", "unknown option", "unrecognized", "for the supported flags"))
 
 
 def as_json(text):
@@ -950,6 +976,20 @@ def op_prepare(spec, runner):
     return result
 
 
+def missing_required(spec, op, key, hint):
+    """op 的必填参数缺失时给出明确错误（参数齐备则返回 None）。
+
+    为什么自己判：CLI 对缺参只回一行 "query is required" 这类含糊文本，模型看不出是参数没传到，
+    容易往「工具坏了 / 参数名不对」的方向排查；这里把缺的参数名与本次收到的参数键一并告诉它。
+    """
+    value = spec.get(key)
+    if isinstance(value, str) and value.strip():
+        return None
+    return {"op": op, "ok": False,
+            "error": ("op=%s 缺少必填参数 %s（%s）；本次收到的参数键：%s"
+                      % (op, key, hint, ", ".join(sorted(spec)) or "（无）"))}
+
+
 def simple_op(op, tool, flags, payload, runner, timeout=CLI_TIMEOUT_SECONDS):
     ok, text = run_cli(runner, tool, flags, payload, timeout=timeout)
     return {"op": op, "ok": ok, "result": as_json(text) or text}
@@ -1016,6 +1056,27 @@ def op_read(spec, runner):
     return result
 
 
+def cypher_hint(result):
+    """Cypher 没通过解析时补一句支持范围。
+
+    图谱只认 Cypher 的一个子集：模型按标准 Cypher 写（如 labels(n)[0]）会撞上「not fully parsed」，
+    不补说明它就只会把同样的语句再写一遍，所以这里直接把能用的写法接在错误后面。
+    """
+    if result.get("ok") is False and "not fully parsed" in str(result.get("result")):
+        result["hint"] = ("图谱只支持 Cypher 子集：标签写 n:Class，或在 MATCH 里写 (c:Class {name:'X'})；"
+                          "不支持列表下标（labels(n)[0]）——要标签就直接写 n:Class，或写成 labels(n) 取整个标签列表。")
+    return result
+
+
+REQUIRED_ARGS = {
+    "search": ("pattern", "要查找的符号名或文本片段"),
+    "outline": ("file_path", "仓库相对路径"),
+    "snippet": ("qualified_name", "符号限定名"),
+    "trace": ("function_name", "函数名"),
+    "query": ("query", "只读 Cypher 语句"),
+}
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -1040,7 +1101,16 @@ def main():
         }, ensure_ascii=False))
         return
 
+    # 必填参数先于项目解析：缺参数就没必要去解析项目（解析要跑 docker inspect，很慢）。
+    required = REQUIRED_ARGS.get(op)
+    if required is not None:
+        missing = missing_required(spec, op, required[0], required[1])
+        if missing is not None:
+            print(json.dumps(missing, ensure_ascii=False))
+            return
+
     # 图谱的多数工具都要求 --project：入参没给时按「索引根 = 当前分析目录」自动匹配，匹配不到再退回唯一项目。
+
     needs_project = op in ("search", "outline", "snippet", "trace", "query")
     project = project_of(spec, runner) if needs_project else None
     project_name = project.get("name") if project else None
@@ -1101,6 +1171,7 @@ def main():
             result = simple_op("query", "query_graph",
                                ["--project", project_name, "--query", query],
                                {"project": project_name, "query": query}, runner)
+            result = cypher_hint(result)
         else:
             result = {"error": "不支持的 op：" + op}
     except (OSError, subprocess.SubprocessError) as exception:
