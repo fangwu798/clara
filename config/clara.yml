@@ -12,7 +12,7 @@ defaultModel: deepseek-response
 #   启动脚本（clara.bat / clara.sh）会逐个检查这些供应商凭据声明的环境变量
 #   （config/model-providers/<别名>.yml 的 credential.environmentVariable），缺失时提示输入。
 #   写法：单行方括号列表（启动脚本按此格式解析）；本行也兼容 YAML 块式序列。
-enabledProviders: [deepseek-response, deepseek-completion, kimi-response, kimi-completion, openai]
+enabledProviders: [deepseek-response, deepseek-completion]
 
 # 代码知识图谱（可选，需要先按 deploy/codebase-memory-mcp/readme.md 部署：
 #   容器部署 deploy\codebase-memory-mcp\install-docker.ps1；宿主安装 deploy\codebase-memory-mcp\install.ps1）。
@@ -22,8 +22,9 @@ enabledProviders: [deepseek-response, deepseek-completion, kimi-response, kimi-c
 #   2) 会话内可用 /graph 查看当前工作目录是否已导入图谱、/graph import 手动导入。
 # 未部署图谱时保持原样即可：查询失败只会「这轮没有补充信息」，不影响对话。
 codeGraph:
-  # 总开关：false 时下面各项一律不生效（等于没接图谱）。
-  enabled: true
+  # 总开关：false 时下面各项一律不生效（等于没接图谱）：不再做启动挂载 / 导入检查，不再每轮预取图谱补充，
+  # 常驻提示词 code_graph_guide 也自动跳过。要重新启用改回 true 即可。
+  enabled: false
   # 每轮对话先查图谱、命中才注入，默认关（交给模型按需调 code_graph）。
   # 为什么默认关：这笔查询压在每轮模型开始之前，实测大仓库（lippo-life）单次要 20 秒以上
   # （换项目、换关键词都稳定 20 秒左右，不是冷启动），首字响应会被从 1~2 秒拖到 20 秒+；
@@ -58,7 +59,8 @@ context:
 # 未配置该节点、或 enabled: false 时保持原样：语义记忆用进程内实现，不写对话记录。
 # 服务端可用 deploy/docker-compose.yml 起（etcd + MinIO + milvus standalone，gRPC 端口 19530）。
 milvus:
-  enabled: true
+  # 当前关闭：语义记忆退回进程内实现，不写 Milvus、也不做召回。要用改回 true（并确认 Milvus 已起）。
+  enabled: false
   host: 127.0.0.1
   port: 19530
   # mode：检索模式，二选一。

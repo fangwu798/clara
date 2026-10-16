@@ -173,7 +173,9 @@ public final class ClaraApplication {
      *
      * <p>为什么每一步都要打日志：这两步各自要起一次子进程（挂载检查查 docker、导入检查查图谱项目，
      * 合起来可能好几秒），静默期只会让人以为程序卡住；而且「图谱怎么没命中」的原因基本都写在这里
-     * （开关关了 / 目录没挂上 / 没导入），不打印就只能靠猜。
+     * （目录没挂上 / 没导入），不打印就只能靠猜。
+     *
+     * <p>总开关关掉时整块不打：功能既然关了，日志里就不该再出现它（要确认开关看 config/clara.yml）。
      *
      * @param view      控制台视图，不可为 null
      * @param bootstrap 已装配的引导器，不可为 null
@@ -181,7 +183,6 @@ public final class ClaraApplication {
     private static void prepareCodeGraph(ConsoleView view, ApplicationBootstrap bootstrap) {
         CodeGraphSettings settings = bootstrap.codeGraphSettings();
         if (!settings.isEnabled()) {
-            emitCodeGraph(view, "未启用（config/clara.yml 里 codeGraph.enabled=false），跳过初始化");
             return;
         }
         emitCodeGraph(view, "初始化：工作目录 " + ConfigLocator.workspaceRoot() + "，supplement="

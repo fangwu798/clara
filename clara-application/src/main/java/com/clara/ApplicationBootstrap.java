@@ -352,8 +352,12 @@ public final class ApplicationBootstrap implements Closeable {
         this.windowCompression = new WindowCompressionCoordinator(new DefaultSummarizeCoordinator(streamModel, promptProvider));
 
         // orchestration 协作者
-        SemanticRecallCoordinator semanticRecall = new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore,
-                contextTrace);
+        // 语义记忆召回只在启用外部向量库（Milvus）时接线：关闭时对话记录根本不进语义库
+        // （见下方 windowMemoryFactory 的 conversationIndexing），召回必然是空的——再跑一次空检索
+        // 只会多打一行 [向量] 观测行，把「关闭的功能」留在日志里。
+        SemanticRecallCoordinator semanticRecall = conversationIndexing
+                ? new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore, contextTrace)
+                : new SemanticRecallCoordinator(null, null);
         // 代码知识图谱：装配提示词前先查一次图谱，命中的知识作为 system 补充信息注入；图谱里没有的，
         // 模型按 code_graph_guide 的约定改用工具查本地文件。开关在 config/clara.yml 的 codeGraph 节点。
         this.codeGraphSettings = CodeGraphSettings.load(ConfigLocator.claraConfigFile());
