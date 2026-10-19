@@ -64,7 +64,7 @@ public final class RegistryToolCatalog implements IToolCatalog {
 
     @Override
     public List<ToolContext> availableTools() {
-        List<ToolContext> tools = new ArrayList<ToolContext>();
+        List<ToolContext> tools = new ArrayList<>();
         for (ToolMethod method : registry.allTools()) {
             tools.add(new ToolContext(new ToolSpecification(
                     toolName(method.getName()), description(method), toolParameters(method.getParameters()))));
@@ -99,9 +99,9 @@ public final class RegistryToolCatalog implements IToolCatalog {
     }
 
     private static Map<String, Object> emptySchema() {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
-        schema.put("properties", new LinkedHashMap<String, Object>());
+        schema.put("properties", new LinkedHashMap<>());
         return schema;
     }
 

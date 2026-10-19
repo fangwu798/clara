@@ -14,7 +14,7 @@ public final class McpPage<T> {
     public McpPage(List<T> items, String nextCursor) {
         if (items == null) { throw new IllegalArgumentException("items must not be null"); }
         if (items.contains(null)) { throw new IllegalArgumentException("items must not contain null"); }
-        this.items = Collections.unmodifiableList(new ArrayList<T>(items));
+        this.items = Collections.unmodifiableList(new ArrayList<>(items));
         this.nextCursor = normalize(nextCursor);
     }
     public List<T> getItems() { return items; }

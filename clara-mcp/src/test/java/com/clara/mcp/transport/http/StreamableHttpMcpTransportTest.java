@@ -79,7 +79,7 @@ public class StreamableHttpMcpTransportTest {
     }
 
     private static Set<String> hosts(String... values) {
-        Set<String> hosts = new LinkedHashSet<String>();
+        Set<String> hosts = new LinkedHashSet<>();
         for (String value : values) {
             hosts.add(value);
         }

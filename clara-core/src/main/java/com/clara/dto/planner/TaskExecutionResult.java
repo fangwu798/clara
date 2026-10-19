@@ -26,7 +26,7 @@ public final class TaskExecutionResult {
         if (outputs == null || actualBudget == null) {
             throw new IllegalArgumentException("task execution result is invalid");
         }
-        this.outputs = Collections.unmodifiableMap(new LinkedHashMap<String, Object>(outputs));
+        this.outputs = Collections.unmodifiableMap(new LinkedHashMap<>(outputs));
         this.actualBudget = actualBudget;
     }
 }

@@ -1,15 +1,15 @@
 package com.clara.mcp.registry.config;
 
+import com.clara.mcp.api.IMcpServerRegistry;
 import com.clara.mcp.registry.McpRegistrationStatus;
 import com.clara.mcp.registry.McpServerRegistration;
-import com.clara.mcp.registry.McpServerRegistry;
 import com.clara.mcp.registry.McpTransportProfile;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * 把加载出的 {@link McpServerConfig} 转换为 {@link McpServerRegistration} 并注册进 {@link McpServerRegistry}。
+ * 把加载出的 {@link McpServerConfig} 转换为 {@link McpServerRegistration} 并注册进 {@link IMcpServerRegistry}。
  *
  * <p>是什么、在哪一层：{@code clara-mcp} 注册层的装配入口，衔接「配置加载」与「服务端注册」。
  *
@@ -20,14 +20,14 @@ import java.util.List;
  * 的 {@code url} 生成；注册状态置为 {@link McpRegistrationStatus#ACTIVE}。
  */
 public final class McpServerRegistrar {
-    private final McpServerRegistry registry;
+    private final IMcpServerRegistry registry;
 
     /**
      * 创建注册器。
      *
      * @param registry 目标服务端注册表，不可为 null
      */
-    public McpServerRegistrar(McpServerRegistry registry) {
+    public McpServerRegistrar(IMcpServerRegistry registry) {
         if (registry == null) { throw new IllegalArgumentException("registry must not be null"); }
         this.registry = registry;
     }
@@ -41,7 +41,7 @@ public final class McpServerRegistrar {
      */
     public List<McpServerRegistration> registerAll(String tenantId, List<McpServerConfig> configs) {
         if (configs == null) { throw new IllegalArgumentException("configs must not be null"); }
-        List<McpServerRegistration> registered = new ArrayList<McpServerRegistration>(configs.size());
+        List<McpServerRegistration> registered = new ArrayList<>(configs.size());
         for (McpServerConfig config : configs) {
             McpServerRegistration registration = toRegistration(tenantId, config);
             registry.register(registration);

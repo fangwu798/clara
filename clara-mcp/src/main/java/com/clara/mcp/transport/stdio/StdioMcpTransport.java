@@ -2,14 +2,18 @@ package com.clara.mcp.transport.stdio;
 
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
+import com.clara.exception.HttpTransportException;
+import com.clara.mcp.McpErrors;
+import com.clara.mcp.api.IMcpJsonCodec;
+import com.clara.mcp.api.IMcpTransport;
+import com.clara.mcp.api.IMcpTransportListener;
+import com.clara.mcp.api.IProcessFactory;
+import com.clara.mcp.transport.McpDecodedMessage;
+import com.clara.transport.concurrent.DaemonThreads;
+import com.clara.transport.io.BoundedStreams;
 import com.clara.mcp.transport.jsonrpc.JsonRpcNotification;
 import com.clara.mcp.transport.jsonrpc.JsonRpcRequest;
 import com.clara.mcp.transport.jsonrpc.JsonRpcResponse;
-import com.clara.mcp.transport.McpDecodedMessage;
-import com.clara.mcp.transport.McpJsonCodec;
-import com.clara.mcp.transport.McpTransport;
-import com.clara.mcp.transport.McpTransportErrors;
-import com.clara.mcp.transport.McpTransportListener;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -29,10 +33,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
@@ -44,24 +46,24 @@ import java.util.function.Consumer;
  * <p>注意：可执行文件必须在允许列表中，工作目录必须真实存在。请求 ID 在未完成期间必须唯一；每个请求都应
  * 设置正超时。关闭、子进程退出或协议读取失败会使全部待处理 Future 失败，stderr 消费器不得阻塞读取线程。
  */
-public final class StdioMcpTransport implements McpTransport {
+public final class StdioMcpTransport implements IMcpTransport {
     private final List<String> command;
     private final Path workingDirectory;
     private final Map<String, String> environment;
     private final int maxMessageBytes;
     private final int maxStderrBytes;
     private final Consumer<String> stderrConsumer;
-    private final McpJsonCodec codec;
-    private final ProcessFactory processFactory;
+    private final IMcpJsonCodec codec;
+    private final IProcessFactory processFactory;
     private final ScheduledExecutorService executor;
     private final ConcurrentMap<String, PendingRequest> pending =
-            new ConcurrentHashMap<String, PendingRequest>();
+            new ConcurrentHashMap<>();
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Object writeLock = new Object();
     private volatile Process process;
     private volatile BufferedWriter writer;
-    private volatile McpTransportListener listener;
+    private volatile IMcpTransportListener listener;
 
     private StdioMcpTransport(Builder builder) {
         this.command = validateCommand(builder.command, builder.allowedExecutables);
@@ -77,12 +79,13 @@ public final class StdioMcpTransport implements McpTransport {
         this.codec = builder.codec;
         this.processFactory = builder.processFactory == null
                 ? new DefaultProcessFactory() : builder.processFactory;
-        this.executor = Executors.newScheduledThreadPool(4, new DaemonThreadFactory());
+        this.executor = Executors.newScheduledThreadPool(4,
+                DaemonThreads.daemonThreadFactory("clara-mcp-stdio-"));
     }
 
     public static Builder builder() { return new Builder(); }
 
-    public synchronized void start(McpTransportListener listener) {
+    public synchronized void start(IMcpTransportListener listener) {
         if (listener == null) { throw new IllegalArgumentException("listener must not be null"); }
         if (closed.get()) { throw closedError(); }
         if (!started.compareAndSet(false, true)) { throw new IllegalStateException("transport is already started"); }
@@ -105,17 +108,17 @@ public final class StdioMcpTransport implements McpTransport {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         if (timeoutMillis <= 0L) { throw new IllegalArgumentException("timeoutMillis must be positive"); }
         ensureRunning();
-        final CompletableFuture<JsonRpcResponse> future = new CompletableFuture<JsonRpcResponse>();
+        final CompletableFuture<JsonRpcResponse> future = new CompletableFuture<>();
         final PendingRequest item = new PendingRequest(future);
         if (pending.putIfAbsent(request.getId(), item) != null) {
-            future.completeExceptionally(McpTransportErrors.error(ErrorCodes.MCP_DUPLICATE_REQUEST_ID,
+            future.completeExceptionally(McpErrors.error(ErrorCodes.MCP_DUPLICATE_REQUEST_ID,
                     ErrorCategory.CONFLICT, false));
             return future;
         }
         item.timeout = executor.schedule(new Runnable() {
             public void run() {
                 if (pending.remove(request.getId(), item)) {
-                    future.completeExceptionally(McpTransportErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT,
+                    future.completeExceptionally(McpErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT,
                             ErrorCategory.TIMEOUT, true));
                     writeCancellation(request.getId(), "timeout");
                 }
@@ -181,7 +184,8 @@ public final class StdioMcpTransport implements McpTransport {
             BufferedReader reader = new BufferedReader(new InputStreamReader(
                     process.getInputStream(), StandardCharsets.UTF_8));
             String line;
-            while (!closed.get() && (line = readBoundedLine(reader, maxMessageBytes)) != null) {
+            while (!closed.get()
+                    && (line = BoundedStreams.readBoundedLine(reader, maxMessageBytes)) != null) {
                 if (line.trim().isEmpty()) continue;
                 try { handle(line); }
                 catch (RuntimeException exception) { listener.onFailure(exception); }
@@ -189,6 +193,8 @@ public final class StdioMcpTransport implements McpTransport {
             if (!closed.get()) signalFailure(ioError());
         } catch (IOException exception) {
             if (!closed.get()) signalFailure(ioError());
+        } catch (HttpTransportException exception) {
+            if (!closed.get()) signalFailure(messageTooLarge());
         } catch (RuntimeException exception) {
             if (!closed.get()) signalFailure(exception);
         }
@@ -235,7 +241,7 @@ public final class StdioMcpTransport implements McpTransport {
 
     private void signalFailure(RuntimeException failure) {
         failPending(failure);
-        McpTransportListener current = listener;
+        IMcpTransportListener current = listener;
         if (current != null) current.onFailure(failure);
     }
 
@@ -249,7 +255,7 @@ public final class StdioMcpTransport implements McpTransport {
 
     private void writeCancellation(String requestId, String reason) {
         if (closed.get() || !started.get()) return;
-        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        Map<String, Object> params = new LinkedHashMap<>();
         params.put("requestId", requestId); params.put("reason", reason);
         try { write(codec.encode(new JsonRpcNotification("notifications/cancelled", params))); }
         catch (RuntimeException ignored) { }
@@ -258,7 +264,7 @@ public final class StdioMcpTransport implements McpTransport {
     private void write(String message) {
         byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
         if (bytes.length > maxMessageBytes) {
-            throw McpTransportErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE,
+            throw McpErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE,
                     ErrorCategory.RESOURCE_LIMIT, false);
         }
         try {
@@ -273,25 +279,6 @@ public final class StdioMcpTransport implements McpTransport {
     private void ensureRunning() {
         if (closed.get()) { throw closedError(); }
         if (!started.get() || process == null) { throw new IllegalStateException("transport is not started"); }
-    }
-
-    private static String readBoundedLine(BufferedReader reader, int maxBytes) throws IOException {
-        StringBuilder result = new StringBuilder();
-        int value;
-        while ((value = reader.read()) >= 0) {
-            if (value == '\n') break;
-            if (value != '\r') result.append((char) value);
-            if (result.length() > maxBytes) {
-                throw McpTransportErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE,
-                        ErrorCategory.RESOURCE_LIMIT, false);
-            }
-        }
-        if (value < 0 && result.length() == 0) return null;
-        if (result.toString().getBytes(StandardCharsets.UTF_8).length > maxBytes) {
-            throw McpTransportErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE,
-                    ErrorCategory.RESOURCE_LIMIT, false);
-        }
-        return result.toString();
     }
 
     private static List<String> validateCommand(List<String> command, List<Path> allowed) {
@@ -310,7 +297,7 @@ public final class StdioMcpTransport implements McpTransport {
                 if (candidate != null && executable.equals(candidate.toRealPath())) { approved = true; break; }
             }
             if (!approved) { throw new IllegalArgumentException("executable is not allowlisted"); }
-            List<String> result = new ArrayList<String>(command);
+            List<String> result = new ArrayList<>(command);
             result.set(0, executable.toString());
             return Collections.unmodifiableList(result);
         } catch (IOException exception) {
@@ -334,14 +321,17 @@ public final class StdioMcpTransport implements McpTransport {
         if (source.containsKey(null) || source.containsValue(null)) {
             throw new IllegalArgumentException("environment must not contain null");
         }
-        return Collections.unmodifiableMap(new LinkedHashMap<String, String>(source));
+        return Collections.unmodifiableMap(new LinkedHashMap<>(source));
     }
 
     private static RuntimeException closedError() {
-        return McpTransportErrors.error(ErrorCodes.MCP_TRANSPORT_CLOSED, ErrorCategory.CANCELLED, false);
+        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_CLOSED, ErrorCategory.CANCELLED, false);
     }
     private static RuntimeException ioError() {
-        return McpTransportErrors.error(ErrorCodes.MCP_TRANSPORT_IO_ERROR, ErrorCategory.EXTERNAL_SERVICE, true);
+        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_IO_ERROR, ErrorCategory.EXTERNAL_SERVICE, true);
+    }
+    private static RuntimeException messageTooLarge() {
+        return McpErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false);
     }
 
     /**
@@ -357,7 +347,7 @@ public final class StdioMcpTransport implements McpTransport {
     /**
      * 提供进程工厂的默认实现。
      */
-    private static final class DefaultProcessFactory implements ProcessFactory {
+    private static final class DefaultProcessFactory implements IProcessFactory {
         public Process start(List<String> command, Path workingDirectory,
                 Map<String, String> environment) throws IOException {
             ProcessBuilder builder = new ProcessBuilder(command);
@@ -367,17 +357,6 @@ public final class StdioMcpTransport implements McpTransport {
             // 会在启动后立刻退出，发现阶段只会看到 stdout 直接 EOF（表现为「MCP 传输失败：读写异常」）。
             builder.environment().putAll(environment);
             return builder.start();
-        }
-    }
-
-    /**
-     * 负责创建守护进程线程实例。
-     */
-    private static final class DaemonThreadFactory implements ThreadFactory {
-        private final AtomicInteger sequence = new AtomicInteger();
-        public Thread newThread(Runnable runnable) {
-            Thread thread = new Thread(runnable, "clara-mcp-stdio-" + sequence.incrementAndGet());
-            thread.setDaemon(true); return thread;
         }
     }
 
@@ -392,8 +371,8 @@ public final class StdioMcpTransport implements McpTransport {
         private int maxMessageBytes = 1024 * 1024;
         private int maxStderrBytes = 64 * 1024;
         private Consumer<String> stderrConsumer;
-        private McpJsonCodec codec;
-        private ProcessFactory processFactory;
+        private IMcpJsonCodec codec;
+        private IProcessFactory processFactory;
         public Builder command(List<String> value) { command = value; return this; }
         public Builder allowedExecutables(List<Path> value) { allowedExecutables = value; return this; }
         public Builder workingDirectory(Path value) { workingDirectory = value; return this; }
@@ -401,8 +380,8 @@ public final class StdioMcpTransport implements McpTransport {
         public Builder maxMessageBytes(int value) { maxMessageBytes = value; return this; }
         public Builder maxStderrBytes(int value) { maxStderrBytes = value; return this; }
         public Builder stderrConsumer(Consumer<String> value) { stderrConsumer = value; return this; }
-        public Builder codec(McpJsonCodec value) { codec = value; return this; }
-        public Builder processFactory(ProcessFactory value) { processFactory = value; return this; }
+        public Builder codec(IMcpJsonCodec value) { codec = value; return this; }
+        public Builder processFactory(IProcessFactory value) { processFactory = value; return this; }
         public StdioMcpTransport build() { return new StdioMcpTransport(this); }
     }
 }

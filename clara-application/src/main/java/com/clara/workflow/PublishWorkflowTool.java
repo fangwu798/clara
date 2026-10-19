@@ -190,7 +190,7 @@ public final class PublishWorkflowTool implements IBuiltinTool {
      * 组装回执：标识、落盘路径与「怎么调用」提示，供模型直接转述给用户。
      */
     private static String result(String workflowId, Path target, boolean replaced, boolean dryRun) {
-        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("workflowId", workflowId);
         payload.put("path", display(target));
         payload.put("replaced", replaced);

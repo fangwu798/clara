@@ -128,14 +128,14 @@ public final class WorkflowDefinitionRegistry {
         if (directory == null || !Files.isDirectory(directory)) {
             return Collections.emptyMap();
         }
-        List<Path> files = new ArrayList<Path>();
+        List<Path> files = new ArrayList<>();
         try (Stream<Path> stream = Files.walk(directory)) {
             stream.filter(Files::isRegularFile).forEach(files::add);
         } catch (IOException e) {
             throw new IllegalArgumentException("工作流定义目录扫描失败（" + directory + "）：" + e.getMessage(), e);
         }
         Collections.sort(files);
-        Map<String, LoadedWorkflow> loaded = new LinkedHashMap<String, LoadedWorkflow>();
+        Map<String, LoadedWorkflow> loaded = new LinkedHashMap<>();
         for (Path file : files) {
             if (!isWorkflowFile(file)) {
                 continue;
@@ -159,7 +159,7 @@ public final class WorkflowDefinitionRegistry {
         if (directory == null || !Files.isDirectory(directory)) {
             return Collections.emptyMap();
         }
-        Map<String, String> stamps = new LinkedHashMap<String, String>();
+        Map<String, String> stamps = new LinkedHashMap<>();
         try (Stream<Path> stream = Files.walk(directory)) {
             stream.filter(Files::isRegularFile).filter(WorkflowDefinitionRegistry::isWorkflowFile)
                     .sorted().forEach(file -> stamps.put(file.toString(), signature(file)));
@@ -212,7 +212,7 @@ public final class WorkflowDefinitionRegistry {
      * @return 标识列表，非 null，可为空
      */
     public List<String> ids() {
-        List<String> ids = new ArrayList<String>(workflows.keySet());
+        List<String> ids = new ArrayList<>(workflows.keySet());
         Collections.sort(ids);
         return ids;
     }

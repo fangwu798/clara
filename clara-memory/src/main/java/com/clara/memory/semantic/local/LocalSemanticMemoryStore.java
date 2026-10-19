@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class LocalSemanticMemoryStore implements ISemanticMemoryStore {
 
     private final int dimension;
-    private final Map<String, MemoryEntry> entries = new ConcurrentHashMap<String, MemoryEntry>();
+    private final Map<String, MemoryEntry> entries = new ConcurrentHashMap<>();
     private volatile boolean closed = false;
 
     /**
@@ -51,7 +51,7 @@ public final class LocalSemanticMemoryStore implements ISemanticMemoryStore {
         if (values.isEmpty()) {
             return;
         }
-        Set<String> ids = new HashSet<String>();
+        Set<String> ids = new HashSet<>();
         for (MemoryEntry entry : values) {
             if (entry == null) {
                 throw new IllegalArgumentException("entries must not contain null");
@@ -77,7 +77,7 @@ public final class LocalSemanticMemoryStore implements ISemanticMemoryStore {
         if (query.getVector().length != dimension) {
             throw SemanticMemoryErrors.configMismatch();
         }
-        List<MemoryMatch> matches = new ArrayList<MemoryMatch>();
+        List<MemoryMatch> matches = new ArrayList<>();
         for (MemoryEntry entry : entries.values()) {
             if (!matches(query, entry)) {
                 continue;
@@ -103,7 +103,7 @@ public final class LocalSemanticMemoryStore implements ISemanticMemoryStore {
             }
         });
         if (matches.size() > query.getTopK()) {
-            matches = new ArrayList<MemoryMatch>(matches.subList(0, query.getTopK()));
+            matches = new ArrayList<>(matches.subList(0, query.getTopK()));
         }
         return Collections.unmodifiableList(matches);
     }
@@ -150,7 +150,7 @@ public final class LocalSemanticMemoryStore implements ISemanticMemoryStore {
                 && !query.getConversationId().equals(entry.getConversationId())) {
             return false;
         }
-        Map<String, String> filters = query.getMetadataFilters();
+        Map<String, String> filters = query.getFilters();
         if (filters != null && !filters.isEmpty()) {
             for (Map.Entry<String, String> filter : filters.entrySet()) {
                 String value = entry.getMetadata().get(filter.getKey());

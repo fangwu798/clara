@@ -31,6 +31,6 @@ public final class CompletionResponseDecoder extends AbstractResponseDecoder {
 
     @Override
     protected <R extends IResponse> StreamAssembler<R> createStreamAssembler(R target, List<StreamAssembler.Rule> deltas, List<StreamAssembler.Rule> singles, List<StreamAssembler.Rule> terminals, ModelProviderEnum provider) {
-        return new CompletionStreamAssembler<R>(target, deltas, singles, terminals, provider);
+        return new CompletionStreamAssembler<>(target, deltas, singles, terminals, provider);
     }
 }

@@ -1,7 +1,7 @@
 package com.clara.kernel.api.execute;
 
 import com.clara.core.model.IResponse;
-import com.clara.dto.model.RawHttpResponse;
+import com.clara.core.transport.RawHttpResponse;
 import com.clara.kernel.message.provider.StreamAssembler;
 
 /**

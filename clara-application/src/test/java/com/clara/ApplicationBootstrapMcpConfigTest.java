@@ -1,7 +1,7 @@
 package com.clara;
 
-import com.clara.mcp.client.McpClient;
-import com.clara.mcp.client.McpClientFactory;
+import com.clara.mcp.api.IMcpClient;
+import com.clara.mcp.api.IMcpClientFactory;
 import com.clara.mcp.client.McpInitialization;
 import com.clara.mcp.client.McpPage;
 import com.clara.mcp.client.McpServerCapabilities;
@@ -18,8 +18,8 @@ import com.clara.mcp.registry.capability.McpPromptDescriptor;
 import com.clara.mcp.registry.capability.McpResourceDescriptor;
 import com.clara.mcp.registry.capability.McpResourceTemplateDescriptor;
 import com.clara.mcp.registry.capability.McpToolDescriptor;
-import com.clara.model.embedding.HashingEmbeddingClient;
 import com.clara.mcp.tool.ExternalToolBinding;
+import com.clara.model.embedding.HashingEmbeddingClient;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +33,6 @@ import java.util.Map;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -114,7 +113,7 @@ public class ApplicationBootstrapMcpConfigTest {
         }
     }
 
-    private static ApplicationBootstrap bootstrap(McpClientFactory factory) {
+    private static ApplicationBootstrap bootstrap(IMcpClientFactory factory) {
         return new ApplicationBootstrap(new HashingEmbeddingClient(DIMENSION), DIMENSION, factory);
     }
 
@@ -133,21 +132,21 @@ public class ApplicationBootstrapMcpConfigTest {
     }
 
     private static McpToolDescriptor tool(String name) {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         return new McpToolDescriptor(name, name + " tool", schema);
     }
 
-    private static final class FakeClientFactory implements McpClientFactory {
-        private final Map<String, McpClient> clients = new HashMap<String, McpClient>();
+    private static final class FakeClientFactory implements IMcpClientFactory {
+        private final Map<String, IMcpClient> clients = new HashMap<>();
 
-        private FakeClientFactory put(String serverKey, McpClient client) {
+        private FakeClientFactory put(String serverKey, IMcpClient client) {
             clients.put(serverKey, client);
             return this;
         }
 
-        public McpClient create(McpServerRegistration registration) {
-            McpClient client = clients.get(registration.getServerKey());
+        public IMcpClient create(McpServerRegistration registration) {
+            IMcpClient client = clients.get(registration.getServerKey());
             if (client == null) {
                 throw new IllegalStateException("no fake client for " + registration.getServerKey());
             }
@@ -155,7 +154,7 @@ public class ApplicationBootstrapMcpConfigTest {
         }
     }
 
-    private static final class FakeClient implements McpClient {
+    private static final class FakeClient implements IMcpClient {
         private final McpInitialization initialization;
         private final List<McpToolDescriptor> tools;
 
@@ -163,23 +162,23 @@ public class ApplicationBootstrapMcpConfigTest {
             this.initialization = new McpInitialization(VERSION,
                     new McpServerIdentity(serverKey, "1.0.0"),
                     new McpServerCapabilities(true, false, false, false, false, false));
-            this.tools = new ArrayList<McpToolDescriptor>();
+            this.tools = new ArrayList<>();
             Collections.addAll(this.tools, toolList);
         }
 
         public McpInitialization initialize(List<String> supportedProtocolVersions) { return initialization; }
         public McpPage<McpToolDescriptor> listTools(String cursor) {
-            return new McpPage<McpToolDescriptor>(tools, null);
+            return new McpPage<>(tools, null);
         }
         public McpPage<McpResourceDescriptor> listResources(String cursor) {
-            return new McpPage<McpResourceDescriptor>(Collections.<McpResourceDescriptor>emptyList(), null);
+            return new McpPage<>(Collections.<McpResourceDescriptor>emptyList(), null);
         }
         public McpPage<McpResourceTemplateDescriptor> listResourceTemplates(String cursor) {
-            return new McpPage<McpResourceTemplateDescriptor>(
+            return new McpPage<>(
                     Collections.<McpResourceTemplateDescriptor>emptyList(), null);
         }
         public McpPage<McpPromptDescriptor> listPrompts(String cursor) {
-            return new McpPage<McpPromptDescriptor>(Collections.<McpPromptDescriptor>emptyList(), null);
+            return new McpPage<>(Collections.<McpPromptDescriptor>emptyList(), null);
         }
         public McpToolResult callTool(McpToolCall call) { throw new UnsupportedOperationException(); }
         public McpResourceContent readResource(McpResourceRequest request) {
@@ -191,7 +190,7 @@ public class ApplicationBootstrapMcpConfigTest {
         public void close() { }
     }
 
-    private static final class FailingClient implements McpClient {
+    private static final class FailingClient implements IMcpClient {
         public McpInitialization initialize(List<String> supportedProtocolVersions) {
             throw new IllegalStateException("simulated discovery failure");
         }

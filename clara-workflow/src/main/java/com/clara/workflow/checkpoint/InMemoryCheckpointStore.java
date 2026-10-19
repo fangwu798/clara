@@ -18,9 +18,9 @@ import java.util.concurrent.ConcurrentMap;
 public final class InMemoryCheckpointStore implements ICheckpointStore {
 
     private final ConcurrentMap<String, WorkflowCheckpoint> checkpoints =
-            new ConcurrentHashMap<String, WorkflowCheckpoint>();
+            new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ConcurrentMap<Long, WorkflowCheckpoint>> history =
-            new ConcurrentHashMap<String, ConcurrentMap<Long, WorkflowCheckpoint>>();
+            new ConcurrentHashMap<>();
 
     @Override
     public Optional<WorkflowCheckpoint> load(String instanceId) {
@@ -55,7 +55,7 @@ public final class InMemoryCheckpointStore implements ICheckpointStore {
             ConcurrentMap<Long, WorkflowCheckpoint> versions = history.get(checkpoint.getInstanceId());
             if (versions == null) {
                 ConcurrentMap<Long, WorkflowCheckpoint> created =
-                        new ConcurrentHashMap<Long, WorkflowCheckpoint>();
+                        new ConcurrentHashMap<>();
                 ConcurrentMap<Long, WorkflowCheckpoint> raced = history.putIfAbsent(
                         checkpoint.getInstanceId(), created);
                 versions = raced == null ? created : raced;

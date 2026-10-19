@@ -141,7 +141,7 @@ public class WorkflowDefinitionRegistryTest {
         @Override
         public IWorkflowAction create(WorkflowActionSpec spec) {
             return scope -> {
-                LinkedHashMap<String, Object> output = new LinkedHashMap<String, Object>();
+                LinkedHashMap<String, Object> output = new LinkedHashMap<>();
                 output.put("output", spec.getNodeId());
                 return output;
             };

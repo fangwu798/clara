@@ -42,8 +42,8 @@ public final class WorkflowDefinition {
         this.inputSchema = inputSchema;
         this.outputSchema = outputSchema;
         this.root = root;
-        List<IWorkflowNode> collected = new ArrayList<IWorkflowNode>();
-        collect(root, new HashSet<String>(), new HashSet<IWorkflowNode>(), collected);
+        List<IWorkflowNode> collected = new ArrayList<>();
+        collect(root, new HashSet<>(), new HashSet<>(), collected);
         this.nodes = Collections.unmodifiableList(collected);
     }
 

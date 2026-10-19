@@ -2,7 +2,7 @@ package com.clara.kernel.api.execute;
 
 import com.clara.core.model.IRequest;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.dto.model.RawHttpRequest;
+import com.clara.core.transport.RawHttpRequest;
 
 /**
  * 请求编码器契约：把 {@link IRequest} 派生对象编码成可直接发送的 {@link RawHttpRequest}。

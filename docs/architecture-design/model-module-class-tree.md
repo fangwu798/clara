@@ -1,5 +1,10 @@
 # clara-model 类结构文档（目标结构：类树 · 主要方法 · 职责）
 
+> **2026-10 传输层补充**：`sse.SseParser` / `sse.SseState` / `sse.SseEvent` 与 `Jdk8HttpTransport` 中的
+> `HttpURLConnection` 实现已下沉到独立模块 `clara-transport`（`DefaultSseEventParser` / `JdkHttpTransport`），
+> 通用契约位于 `com.clara.core.transport`；`clara-model` 的 `Jdk8HttpTransport` 现在只是适配器。
+> 下文涉及这些类的历史结构描述用于理解迁移前设计，当前结构以代码为准。
+
 > 配套文档：[model-module-redesign.md](model-module-redesign.md)（设计原则、方案对比、决策记录与待确认问题）。
 > 本文只画结构：包树、继承树、每个类的职责与主要方法。
 >

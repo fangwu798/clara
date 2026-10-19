@@ -56,12 +56,12 @@ public final class ToolActionFactory implements IWorkflowActionFactory {
 
     private static Map<String, Object> asMap(Object value, String nodeId) {
         if (value == null) {
-            return new LinkedHashMap<String, Object>();
+            return new LinkedHashMap<>();
         }
         if (!(value instanceof Map)) {
             throw new IllegalArgumentException("节点 " + nodeId + " 的 arguments 必须是对象");
         }
-        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        Map<String, Object> result = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
             result.put(String.valueOf(entry.getKey()), entry.getValue());
         }

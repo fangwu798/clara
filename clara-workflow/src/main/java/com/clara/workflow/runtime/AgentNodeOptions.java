@@ -117,7 +117,7 @@ public final class AgentNodeOptions {
         if (!(raw instanceof List)) {
             throw new IllegalArgumentException("AGENT 节点 attachments 必须是数组：" + spec.getNodeId());
         }
-        List<String> attachments = new ArrayList<String>();
+        List<String> attachments = new ArrayList<>();
         for (Object item : (List<?>) raw) {
             String reference = item == null ? null : String.valueOf(item).trim();
             if (reference != null && !reference.isEmpty()) {

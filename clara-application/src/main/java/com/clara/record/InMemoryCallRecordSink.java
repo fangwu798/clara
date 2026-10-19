@@ -64,7 +64,7 @@ public final class InMemoryCallRecordSink implements ICallRecordSink {
      * @return 不可变列表，非 null
      */
     public synchronized List<CallRecord> snapshot() {
-        return Collections.unmodifiableList(new ArrayList<CallRecord>(records));
+        return Collections.unmodifiableList(new ArrayList<>(records));
     }
 
     /**

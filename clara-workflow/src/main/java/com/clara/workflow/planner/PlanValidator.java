@@ -38,8 +38,8 @@ public final class PlanValidator {
                 || plan.getTasks().size() > limits.getMaxPlanSteps()) {
             throw PlannerErrors.error(ErrorCodes.PLAN_LIMIT_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
         }
-        Map<String, TaskNode> tasks = new HashMap<String, TaskNode>();
-        Set<String> outputs = new HashSet<String>();
+        Map<String, TaskNode> tasks = new HashMap<>();
+        Set<String> outputs = new HashSet<>();
         BudgetAmount maximum = BudgetAmount.ZERO;
         for (TaskNode task : plan.getTasks()) {
             if (tasks.put(task.getTaskId(), task) != null || !outputs.add(task.getOutputKey())) {
@@ -60,7 +60,7 @@ public final class PlanValidator {
                 }
             }
         }
-        Map<String, Integer> colors = new HashMap<String, Integer>();
+        Map<String, Integer> colors = new HashMap<>();
         for (TaskNode task : plan.getTasks()) {
             visit(task, tasks, colors);
         }

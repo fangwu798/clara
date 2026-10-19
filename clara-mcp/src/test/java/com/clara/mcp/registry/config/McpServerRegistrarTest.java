@@ -26,7 +26,7 @@ public class McpServerRegistrarTest {
 
     @Test
     public void stdioConfigMapsToRegistration() {
-        Map<String, String> env = new LinkedHashMap<String, String>();
+        Map<String, String> env = new LinkedHashMap<>();
         env.put("API_KEY", "secret");
         McpServerConfig config = McpServerConfig.of("processon",
                 Arrays.asList("npx", "-y", "@processon/mcp-server-processon"), env, null, null);
@@ -43,7 +43,7 @@ public class McpServerRegistrarTest {
 
     @Test
     public void httpConfigMapsToRegistration() {
-        Map<String, String> headers = new LinkedHashMap<String, String>();
+        Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Authorization", "Bearer xxx");
         McpServerConfig config = McpServerConfig.of("remote", null, null, "https://host/mcp", headers);
 

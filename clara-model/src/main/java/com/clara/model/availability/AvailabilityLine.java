@@ -220,14 +220,14 @@ public final class AvailabilityLine {
      * @return 与输入一一对应的输出行
      */
     public static List<AvailabilityLine> render(List<ModelCheckResult> results) {
-        List<String> aliases = new ArrayList<String>();
-        List<String> identities = new ArrayList<String>();
+        List<String> aliases = new ArrayList<>();
+        List<String> identities = new ArrayList<>();
         for (ModelCheckResult result : results) {
             aliases.add(result.getAlias());
             identities.add(identity(result));
         }
         ColumnWidths widths = widths(aliases, identities);
-        List<AvailabilityLine> lines = new ArrayList<AvailabilityLine>();
+        List<AvailabilityLine> lines = new ArrayList<>();
         for (ModelCheckResult result : results) {
             lines.add(line(result, widths));
         }

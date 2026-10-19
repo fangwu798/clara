@@ -1,6 +1,6 @@
 package com.clara.core.model;
 
-import com.clara.dto.model.RawHttpRequest;
+import com.clara.core.transport.RawHttpRequest;
 import com.clara.exception.ClaraException;
 
 /**

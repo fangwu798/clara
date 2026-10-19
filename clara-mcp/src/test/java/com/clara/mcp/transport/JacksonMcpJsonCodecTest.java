@@ -26,7 +26,7 @@ public class JacksonMcpJsonCodecTest {
 
     @Test
     public void requestRoundTripsAsServerRequest() {
-        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        Map<String, Object> params = new LinkedHashMap<>();
         params.put("protocolVersion", "2024-11-05");
         params.put("nested", Arrays.<Object>asList(1, "two"));
 
@@ -41,7 +41,7 @@ public class JacksonMcpJsonCodecTest {
 
     @Test
     public void notificationRoundTripsAsNotification() {
-        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        Map<String, Object> params = new LinkedHashMap<>();
         params.put("status", "ok");
 
         McpDecodedMessage message = codec.decode(

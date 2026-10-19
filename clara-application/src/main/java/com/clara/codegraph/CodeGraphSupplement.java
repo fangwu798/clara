@@ -71,7 +71,7 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
     private final IToolInvoker toolInvoker;
     private final CodeGraphSettings settings;
     private final IContextTraceSink traceSink;
-    private final Map<String, List<String>> cache = new ConcurrentHashMap<String, List<String>>();
+    private final Map<String, List<String>> cache = new ConcurrentHashMap<>();
 
     /**
      * 创建补充信息提供者。
@@ -150,7 +150,7 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
                 return Collections.emptyList();
             }
             trace(1, started, "pattern=" + pattern, preview(body));
-            List<String> knowledge = new ArrayList<String>();
+            List<String> knowledge = new ArrayList<>();
             knowledge.add(HEADER + "以下内容来自本机代码知识图谱（索引自当前工作目录，可直接作为事实使用，"
                     + "token 开销远小于读整份文件）：\n" + body + "\n" + FOOTER);
             return Collections.unmodifiableList(knowledge);
@@ -285,7 +285,7 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
         if (trimmed.length() < MIN_KEYWORD_LENGTH) {
             return "";
         }
-        List<String> keywords = new ArrayList<String>();
+        List<String> keywords = new ArrayList<>();
         StringBuilder token = new StringBuilder();
         // 多走一格并在末尾补分隔符，让收尾的 token 也走同一处 flush，省掉循环外的一次重复调用
         for (int index = 0; index <= trimmed.length(); index++) {
@@ -371,7 +371,7 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
             return;
         }
         long elapsedMillis = startedNanos == 0L ? 0L : (System.nanoTime() - startedNanos) / 1000000L;
-        List<String> lines = new ArrayList<String>();
+        List<String> lines = new ArrayList<>();
         for (String detail : details) {
             lines.add(detail);
         }

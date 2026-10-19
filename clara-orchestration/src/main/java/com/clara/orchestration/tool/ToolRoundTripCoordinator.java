@@ -75,7 +75,7 @@ public final class ToolRoundTripCoordinator {
             throw new IllegalArgumentException("response must not be null");
         }
         List<ToolCall> calls = assistantCalls(response);
-        List<IContent> messages = new ArrayList<IContent>();
+        List<IContent> messages = new ArrayList<>();
         messages.add(new ToolCallContent(calls));
         for (ToolCall call : calls) {
             messages.add(invokeSafely(call));
@@ -99,7 +99,7 @@ public final class ToolRoundTripCoordinator {
      * 把工具调用失败序列化为 {@code {"error":"..."}} 文本，回填给模型作为可读的失败观察。
      */
     private static String errorPayload(RuntimeException error) {
-        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("error", errorMessage(error));
         try {
             return JSON.writeValueAsString(payload);
@@ -127,7 +127,7 @@ public final class ToolRoundTripCoordinator {
         if (response.getToolCalls() != null && !response.getToolCalls().isEmpty()) {
             return response.getToolCalls();
         }
-        List<ToolCall> calls = new ArrayList<ToolCall>();
+        List<ToolCall> calls = new ArrayList<>();
         for (ResponsesToolCall call : response.getResponsesToolCalls()) {
             ToolCallFunction function = new ToolCallFunction();
             function.setName(call.name());

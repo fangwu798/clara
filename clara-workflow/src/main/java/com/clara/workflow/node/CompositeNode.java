@@ -26,7 +26,7 @@ public final class CompositeNode implements IWorkflowNode {
         List<IWorkflowNode> copied = requireChildren(children);
         this.id = id;
         this.type = type;
-        this.children = Collections.unmodifiableList(new ArrayList<IWorkflowNode>(copied));
+        this.children = Collections.unmodifiableList(new ArrayList<>(copied));
         this.outputKeys = union(copied);
     }
 
@@ -62,7 +62,7 @@ public final class CompositeNode implements IWorkflowNode {
     }
 
     private static Set<String> union(List<IWorkflowNode> nodes) {
-        Set<String> values = new LinkedHashSet<String>();
+        Set<String> values = new LinkedHashSet<>();
         for (IWorkflowNode node : nodes) {
             values.addAll(node.getOutputKeys());
         }

@@ -9,7 +9,7 @@ import java.util.Map;
  * 表示一次MCP工具调用：服务端身份（租户 + 服务端键 + 快照）、工具名与 Schema 哈希、参数与上下文。
  *
  * <p>是什么、在哪一层：{@code clara-mcp} 客户端的调用入参值对象，由宿主应用创建后交给
- * {@code McpGateway.callTool}；网关按其中的 {@code tenantId}、{@code serverKey} 在注册表与能力目录中定位
+ * {@code IMcpGateway.callTool}；网关按其中的 {@code tenantId}、{@code serverKey} 在注册表与能力目录中定位
  * 服务端，并核对 {@code schemaHash} 后再发起调用。
  *
  * <p>为什么显式携带租户：MCP 服务端注册表与能力目录按租户分区（同一 {@code serverKey} 在不同租户下是不同

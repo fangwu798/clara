@@ -167,9 +167,9 @@ public class SkillMatchCoordinatorTest {
     }
 
     private static Map<String, Object> schema() {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
-        schema.put("properties", new LinkedHashMap<String, Object>());
+        schema.put("properties", new LinkedHashMap<>());
         return schema;
     }
 
@@ -202,15 +202,15 @@ public class SkillMatchCoordinatorTest {
     /** 记录上报内容的观测口：看「上报了哪些点、分别是什么」。 */
     private static final class RecordingTrace implements IContextTraceSink {
 
-        private final List<String> sources = new ArrayList<String>();
-        private final List<Integer> hits = new ArrayList<Integer>();
-        private final List<List<String>> details = new ArrayList<List<String>>();
+        private final List<String> sources = new ArrayList<>();
+        private final List<Integer> hits = new ArrayList<>();
+        private final List<List<String>> details = new ArrayList<>();
 
         @Override
         public void onTrace(String source, int hitCount, long elapsedMillis, List<String> rendered) {
             sources.add(source);
             hits.add(hitCount);
-            details.add(new ArrayList<String>(rendered));
+            details.add(new ArrayList<>(rendered));
         }
     }
 }

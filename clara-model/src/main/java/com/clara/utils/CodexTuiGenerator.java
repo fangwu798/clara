@@ -118,7 +118,7 @@ public class CodexTuiGenerator {
         if (turnMetadata == null || turnMetadata.isEmpty()) {
             return Collections.emptyMap();
         }
-        Map<String, String> meta = new LinkedHashMap<String, String>();
+        Map<String, String> meta = new LinkedHashMap<>();
         String installationId = null;
         String turnId = null;
         String rootTurnId = null;

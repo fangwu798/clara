@@ -5,7 +5,7 @@ import com.clara.enums.ProtocolEnum;
 import com.clara.core.model.IResponse;
 import com.clara.kernel.api.execute.IResponseDecoder;
 import com.clara.kernel.config.ModelConfig;
-import com.clara.dto.model.RawHttpResponse;
+import com.clara.core.transport.RawHttpResponse;
 import com.clara.kernel.message.provider.completion.CompletionResponseDecoder;
 import com.clara.kernel.message.provider.response.ResponseResponseDecoder;
 

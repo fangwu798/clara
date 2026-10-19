@@ -7,11 +7,15 @@
 
 实现基于 MCP（Model Context Protocol）协议的外部服务联动：服务端注册与发现、能力目录（工具 / 资源 / 资源模板 / 提示词）、统一调用入口（工具调用 / 资源读取 / 提示词获取）与传输适配（stdio / streamable http），供编排层工具往返中的「外部工具」使用。
 
-本模块**整体按新业务重写、不做兼容**：`registry` / `client` / `transport` 三层均按本设计重写，现有代码仅作参考。命名规范与包结构以 `clara-core-contract-technical-design.md` 为准（本模块自有类型不以 `I` 前缀约束，接口按需命名）。
+本模块**整体按新业务重写、不做兼容**：`registry` / `client` / `transport` 三层均按本设计重写，现有代码仅作参考。命名规范与包结构以 `clara-core-contract-technical-design.md` 为准：对外接口统一放在 `com.clara.mcp.api` 包并加 `I` 前缀，实现类留在各自职责包，不使用类内嵌套接口。
 
 ## 2. 模块依赖
 
-- `clara-core`：跨层错误框架（`ClaraException` / `ClaraError` / `ErrorCodes` / `ErrorCategory`）；
+- `clara-core`：跨层错误框架（`ClaraException` / `ClaraError` / `ErrorCodes` / `ErrorCategory`），
+  以及通用传输契约（`com.clara.core.transport`：`IHttpTransport` / `IHttpCall` /
+  `RawHttpRequest` / `RawHttpResponse` / `HttpTransportPolicy` / `ISseEventParser`）；
+- `clara-transport`：通用 HTTP / SSE 传输实现（`JdkHttpTransport`、`DefaultSseEventParser`、
+  `BoundedStreams`、`DaemonThreads`）；
 - `clara-model`：会话上下文（`ConvContext`）与调用上下文（`CallContext`）；
 - 依赖方向：clara-mcp 不依赖 memory / skill / workflow / orchestration；编排层依赖本模块。
 
@@ -19,19 +23,28 @@
 
 ```
 clara-mcp/src/main/java/com/clara/mcp/
+├── api/                                   # 对外契约：只放接口，统一 I 前缀
+│   ├── IMcpClient.java                    # MCP 客户端协议接口
+│   ├── IMcpClientFactory.java             # 客户端工厂接口
+│   ├── IMcpGateway.java                   # 统一调用入口接口
+│   ├── IMcpServerRegistry.java            # 服务端注册表接口
+│   ├── IMcpCapabilityCatalog.java         # 能力目录接口
+│   ├── IMcpDiscoveryService.java          # 发现服务接口
+│   ├── IMcpTransport.java                 # 传输接口
+│   ├── IMcpTransportListener.java         # 传输监听接口
+│   ├── IMcpJsonCodec.java                 # JSON 编解码接口
+│   ├── IProcessFactory.java               # 进程工厂接口
+│   └── IMcpHeadersProvider.java           # http 鉴权头接口
+├── McpErrors.java                         # 模块统一错误工厂
 ├── registry/
-│   ├── McpServerRegistry.java             # 服务端注册表接口
 │   ├── InMemoryMcpServerRegistry.java     # 内存注册表
-│   ├── McpCapabilityCatalog.java          # 能力目录接口
 │   ├── InMemoryMcpCapabilityCatalog.java  # 内存能力目录
-│   ├── McpDiscoveryService.java           # 发现服务接口
 │   ├── DefaultMcpDiscoveryService.java    # 发现服务实现
 │   ├── McpServerRegistration.java         # 服务端注册项
 │   ├── McpServerSnapshot.java             # 能力快照
 │   ├── McpRegistrationStatus.java         # 注册状态枚举
 │   ├── McpTransportProfile.java           # 传输配置枚举
 │   ├── McpHealthStatus.java               # 健康状态枚举
-│   ├── McpErrors.java                     # 注册 / 发现领域错误
 │   ├── config/
 │   │   ├── McpServerConfig.java               # 服务端配置值对象（stdio/http 字段）
 │   │   ├── McpServerConfigLoader.java         # 单文件 json 配置加载（含 env 插值）
@@ -45,17 +58,13 @@ clara-mcp/src/main/java/com/clara/mcp/
 │       ├── McpPromptArgument.java             # 提示词参数
 │       └── SchemaHasher.java                  # Schema 哈希
 ├── client/
-│   ├── McpClient.java                     # MCP 客户端协议接口
 │   ├── DefaultMcpClient.java              # 客户端协议实现
-│   ├── McpClientFactory.java              # 客户端工厂接口
 │   ├── DefaultMcpClientFactory.java       # 客户端工厂实现
 │   ├── McpInitialization.java             # 初始化结果
 │   ├── McpServerIdentity.java             # 服务端身份
 │   ├── McpServerCapabilities.java         # 服务端能力
 │   ├── McpPage.java                       # 分页
-│   ├── McpClientErrors.java               # 客户端领域错误
 │   ├── gateway/
-│   │   ├── McpGateway.java                    # 统一调用入口接口
 │   │   └── DefaultMcpGateway.java             # 统一调用入口实现
 │   └── call/
 │       ├── McpToolCall.java                   # 工具调用入参
@@ -65,10 +74,6 @@ clara-mcp/src/main/java/com/clara/mcp/
 │       ├── McpPromptRequest.java              # 提示词获取入参
 │       └── McpPromptResult.java               # 提示词结果
 └── transport/
-    ├── McpTransport.java                  # 传输接口
-    ├── McpTransportListener.java          # 传输监听
-    ├── McpTransportErrors.java            # 传输错误
-    ├── McpJsonCodec.java                  # JSON 编解码接口
     ├── JacksonMcpJsonCodec.java           # Jackson 实现
     ├── McpDecodedMessage.java             # 解码消息
     ├── jsonrpc/
@@ -77,33 +82,30 @@ clara-mcp/src/main/java/com/clara/mcp/
     │   ├── JsonRpcError.java                  # JSON-RPC 错误
     │   └── JsonRpcNotification.java           # JSON-RPC 通知
     ├── stdio/
-    │   ├── ProcessFactory.java                # 进程工厂
     │   └── StdioMcpTransport.java             # stdio 传输
     └── http/
-        ├── McpHeadersProvider.java            # http 鉴权头
-        ├── StreamableHttpMcpTransport.java    # streamable http 传输
-        └── SseEventParser.java                # SSE 事件解析
+        └── StreamableHttpMcpTransport.java    # streamable http 协议适配（HTTP/SSE 委托 clara-transport）
 ```
 
 ## 4. 实现类清单（作用 / 使用范围 / 为什么需要 / 业务细节 / 技术细节）
 
 ### 4.1 注册与目录（`com.clara.mcp.registry`）
 
-**`McpServerRegistry` / `InMemoryMcpServerRegistry`（`com.clara.mcp.registry`）**
+**`IMcpServerRegistry`（`com.clara.mcp.api`）/ `InMemoryMcpServerRegistry`（`com.clara.mcp.registry`）**
 - 作用：登记并查找 MCP 服务端。
 - 使用范围：发现与调用前定位服务端。
 - 为什么需要：统一管理服务端接入信息与注册状态。
 - 业务细节：`register` 登记服务端；`listEnabled` 列出某租户下可用服务端；`get` 按租户 + 服务端标识取回；`updateStatus` 更新注册状态（可用 / 不兼容 / 需复核 / 停用）。
 - 技术细节：接口方法 `register(McpServerRegistration)` / `updateStatus(tenantId, serverKey, McpRegistrationStatus)` / `listEnabled(tenantId)` / `get(tenantId, serverKey)`；内存实现用 `ConcurrentHashMap`，键为「租户 + 服务端标识」。
 
-**`McpDiscoveryService` / `DefaultMcpDiscoveryService`（`com.clara.mcp.registry`）**
+**`IMcpDiscoveryService`（`com.clara.mcp.api`）/ `DefaultMcpDiscoveryService`（`com.clara.mcp.registry`）**
 - 作用：初始化服务端并分页发现其能力，发布能力快照。
 - 使用范围：服务端注册后的发现流程。
 - 为什么需要：外部能力必须先发现入目录才能被解析与调用。
 - 业务细节：`discover` 初始化连接、校验协议版本与服务端身份、按能力分页拉取工具 / 资源 / 资源模板 / 提示词并形成快照；`refresh` 发现成功后将快照发布到目录并把注册状态更新为可用，协议不兼容标记不兼容、身份变化标记需复核。
-- 技术细节：依赖 `McpServerRegistry` + `McpCapabilityCatalog` + `McpClientFactory`；校验协议版本在支持列表、身份与已审批身份一致；分页受 `maxPages` 约束、游标去重；`finally` 关闭客户端；快照含协议版本、身份、能力、健康状态。
+- 技术细节：依赖 `IMcpServerRegistry` + `IMcpCapabilityCatalog` + `IMcpClientFactory`；校验协议版本在支持列表、身份与已审批身份一致；分页受 `maxPages` 约束、游标去重；`finally` 关闭客户端；快照含协议版本、身份、能力、健康状态。
 
-**`McpCapabilityCatalog` / `InMemoryMcpCapabilityCatalog`（`com.clara.mcp.registry`）**
+**`IMcpCapabilityCatalog`（`com.clara.mcp.api`）/ `InMemoryMcpCapabilityCatalog`（`com.clara.mcp.registry`）**
 - 作用：保存各服务端能力快照并按标识解析能力。
 - 使用范围：调用前解析工具 / 资源 / 提示词。
 - 为什么需要：把「发现」与「调用」解耦，调用方按目录解析能力。
@@ -117,11 +119,11 @@ clara-mcp/src/main/java/com/clara/mcp/
 - 业务细节：注册项承载租户、服务端标识、传输方式（含地址 / 鉴权）与已审批身份；快照承载快照标识、租户、服务端标识、发现时间、协议版本、身份、能力、各类能力列表与健康状态。
 - 技术细节：不可变值对象 + 构造期校验；`McpRegistrationStatus`（可用 / 不兼容 / 需复核 / 停用）、`McpTransportProfile`（stdio / streamable http）、`McpHealthStatus`（健康 / 降级 / 不健康）。
 
-**`McpErrors` / `McpClientErrors`（`com.clara.mcp.registry` / `com.clara.mcp.client`）**
-- 作用：集中创建注册 / 发现与客户端领域错误。
+**`McpErrors`（`com.clara.mcp`）**
+- 作用：模块内唯一的领域错误工厂，集中创建客户端、注册 / 发现与传输错误。
 - 使用范围：本模块内部。
-- 为什么需要：统一错误码与分类（协议不兼容 / 身份变化 / 分页超限 / 游标重复 / 发现失败 / 非法消息 / 服务端或能力未找到 / Schema 不一致）。
-- 技术细节：静态工厂返回 `ClaraException(ClaraError)`，错误码取自 `ErrorCodes` 的 `MCP_*` 系列，分类区分能力 / 授权 / 资源限额 / 外部服务。
+- 为什么需要：统一错误码与分类（协议不兼容 / 身份变化 / 分页超限 / 游标重复 / 发现失败 / 非法消息 / 服务端或能力未找到 / Schema 不一致），避免各层各自维护一套工厂。
+- 技术细节：`error(String, ErrorCategory)` 默认不可重试，`error(String, ErrorCategory, boolean retryable)` 显式声明可重试性；返回 `ClaraException(ClaraError)`，错误码取自 `ErrorCodes` 的 `MCP_*` 系列。
 
 ### 4.2 能力描述（`com.clara.mcp.registry.capability`）
 
@@ -143,19 +145,19 @@ clara-mcp/src/main/java/com/clara/mcp/
 
 ### 4.4 客户端协议（`com.clara.mcp.client`）
 
-**`McpClient` / `DefaultMcpClient`（`com.clara.mcp.client`）**
+**`IMcpClient`（`com.clara.mcp.api`）/ `DefaultMcpClient`（`com.clara.mcp.client`）**
 - 作用：MCP 客户端协议（初始化、列表分页、工具调用、资源读取、提示词获取）。
 - 使用范围：发现与调用时经工厂创建。
 - 为什么需要：把 MCP 协议交互集中在客户端，屏蔽传输细节。
 - 业务细节：客户端完成协议初始化并返回能力与身份；提供工具 / 资源 / 资源模板 / 提示词的分页列表；提供工具调用、资源读取、提示词获取；关闭释放传输。
-- 技术细节：`DefaultMcpClient(McpTransport, long requestTimeoutMillis)`；首次请求惰性 `transport.start(listener)`；请求带唯一 id，`sendRequest(...).get(timeout)`；错误响应 / 非法结构 / 传输异常分别映射为领域错误；`close()` 幂等并释放传输。
+- 技术细节：`DefaultMcpClient(IMcpTransport, long requestTimeoutMillis)`；首次请求惰性 `transport.start(listener)`；请求带唯一 id，`sendRequest(...).get(timeout)`；错误响应 / 非法结构 / 传输异常分别映射为领域错误；`close()` 幂等并释放传输。
 
-**`McpClientFactory` / `DefaultMcpClientFactory`（`com.clara.mcp.client`）**
+**`IMcpClientFactory`（`com.clara.mcp.api`）/ `DefaultMcpClientFactory`（`com.clara.mcp.client`）**
 - 作用：按服务端注册项创建客户端（含对应传输）。
 - 使用范围：发现与调用。
 - 为什么需要：把「传输选型」与「客户端协议」隔离，便于新增传输。
 - 业务细节：`create(registration)` 按传输方式装配传输并包装为客户端。
-- 技术细节：`stdio` → `StdioMcpTransport`（经 `ProcessFactory` 启动子进程）；`streamable http` → `StreamableHttpMcpTransport`（+ `McpHeadersProvider` 鉴权）；未知 / 不支持的传输方式抛 `CAPABILITY_NOT_SUPPORTED`。
+- 技术细节：`stdio` → `StdioMcpTransport`（经 `IProcessFactory` 启动子进程）；`streamable http` → `StreamableHttpMcpTransport`（+ `IMcpHeadersProvider` 鉴权）；未知 / 不支持的传输方式抛 `CAPABILITY_NOT_SUPPORTED`。
 
 **`McpInitialization` / `McpServerIdentity` / `McpServerCapabilities` / `McpPage`（`com.clara.mcp.client`）**
 - 作用：初始化结果、服务端身份、服务端能力与分页结果。
@@ -166,12 +168,12 @@ clara-mcp/src/main/java/com/clara/mcp/
 
 ### 4.5 调用入口与入参出参（`com.clara.mcp.client.gateway` / `com.clara.mcp.client.call`）
 
-**`McpGateway` / `DefaultMcpGateway`（`com.clara.mcp.client.gateway`）**
+**`IMcpGateway`（`com.clara.mcp.api`）/ `DefaultMcpGateway`（`com.clara.mcp.client.gateway`）**
 - 作用：对外统一调用入口（工具调用 / 资源读取 / 提示词获取）。
 - 使用范围：编排层外部工具调用。
 - 为什么需要：屏蔽客户端与协议细节，向编排层提供稳定入口。
 - 业务细节：`callTool` 按服务端标识 + 工具名与参数调用外部工具并返回结果；`readResource` 按资源 URI 读取内容；`getPrompt` 按提示词名与参数获取提示词。
-- 技术细节：依赖 `McpServerRegistry`（定位服务端、校验注册状态）、`McpCapabilityCatalog`（解析能力、校验 Schema 哈希）、`McpClientFactory`（创建客户端）；调用前核对取消令牌；`finally` 关闭客户端；方法签名 `callTool(McpToolCall)` / `readResource(McpResourceRequest)` / `getPrompt(McpPromptRequest)`。
+- 技术细节：依赖 `IMcpServerRegistry`（定位服务端、校验注册状态）、`IMcpCapabilityCatalog`（解析能力、校验 Schema 哈希）、`IMcpClientFactory`（创建客户端）；调用前核对取消令牌；`finally` 关闭客户端；方法签名 `callTool(McpToolCall)` / `readResource(McpResourceRequest)` / `getPrompt(McpPromptRequest)`。
 
 **`McpToolCall` / `McpResourceRequest` / `McpPromptRequest` / `McpToolResult` / `McpResourceContent` / `McpPromptResult`（`com.clara.mcp.client.call`）**
 - 作用：调用入参与结果的载体。
@@ -182,35 +184,36 @@ clara-mcp/src/main/java/com/clara/mcp/
 
 ### 4.6 传输与 JSON-RPC（`com.clara.mcp.transport` / `com.clara.mcp.transport.jsonrpc` / `com.clara.mcp.transport.stdio` / `com.clara.mcp.transport.http`）
 
-**`McpTransport` / `McpTransportListener` / `McpTransportErrors`（`com.clara.mcp.transport`）**
+**`IMcpTransport` / `IMcpTransportListener`（`com.clara.mcp.api`）/ `McpErrors`（`com.clara.mcp`）**
 - 作用：传输抽象：启动、发送请求 / 通知、取消、健康检查与错误。
 - 使用范围：客户端协议交互。
 - 为什么需要：屏蔽 stdio 与 streamable http 的差异。
 - 业务细节：启动并注册监听，异步返回响应；发送通知；按请求 id 取消；健康检查。
-- 技术细节：`start(McpTransportListener)` / `sendRequest(JsonRpcRequest, long)`(`CompletableFuture<JsonRpcResponse>`) / `sendNotification(JsonRpcNotification)` / `cancel(String)` / `checkHealth()`；`extends Closeable`。
+- 技术细节：`start(IMcpTransportListener)` / `sendRequest(JsonRpcRequest, long)`(`CompletableFuture<JsonRpcResponse>`) / `sendNotification(JsonRpcNotification)` / `cancel(String)` / `checkHealth()`；`extends Closeable`。
 
 **`JsonRpcRequest` / `JsonRpcResponse` / `JsonRpcError` / `JsonRpcNotification`（`com.clara.mcp.transport.jsonrpc`）**
 - 作用：JSON-RPC 2.0 消息载体。
 - 使用范围：客户端与传输之间。
 - 为什么需要：MCP 基于 JSON-RPC，统一消息结构。
 - 业务细节：请求含 id / method / params；响应含 id / result 或 error；通知无 id。
-- 技术细节：不可变值对象，配合 `McpJsonCodec` 编解码。
+- 技术细节：不可变值对象，配合 `IMcpJsonCodec` 编解码。
 
-**`StdioMcpTransport` / `ProcessFactory`（`com.clara.mcp.transport.stdio`）**
+**`StdioMcpTransport`（`com.clara.mcp.transport.stdio`）/ `IProcessFactory`（`com.clara.mcp.api`）**
 - 作用：以本地子进程方式与 stdio 服务端通信。
 - 使用范围：stdio 传输的服务端。
 - 为什么需要：支持本地 MCP 服务端。
 - 业务细节：按注册项地址启动子进程，按行读写 JSON-RPC 消息。
-- 技术细节：经 `ProcessFactory` 启动进程，标准输入输出按行编解码；关闭时销毁进程与流；后台线程排空 stderr 防阻塞。首项命令必须是绝对路径且命中允许清单；子进程环境在**继承父进程环境**的基础上叠加配置里的 `env`——清空环境会让服务端拿不到 `PATH`、`USERPROFILE` 这类变量，启动即退出，而发现阶段只能观察到 stdout 直接 EOF。
+- 技术细节：经 `IProcessFactory` 启动进程，标准输入输出按行编解码；关闭时销毁进程与流；后台线程排空 stderr 防阻塞。首项命令必须是绝对路径且命中允许清单；子进程环境在**继承父进程环境**的基础上叠加配置里的 `env`——清空环境会让服务端拿不到 `PATH`、`USERPROFILE` 这类变量，启动即退出，而发现阶段只能观察到 stdout 直接 EOF。
 
-**`StreamableHttpMcpTransport` / `McpHeadersProvider` / `SseEventParser`（`com.clara.mcp.transport.http`）**
+**`StreamableHttpMcpTransport`（`com.clara.mcp.transport.http`）/ `IMcpHeadersProvider`（`com.clara.mcp.api`）**
 - 作用：以 streamable http 方式与远端服务端通信。
 - 使用范围：http 传输的服务端。
 - 为什么需要：支持远端 MCP 服务端。
 - 业务细节：经 HTTP POST 发送 JSON-RPC，按 SSE 事件流接收响应。
-- 技术细节：`McpHeadersProvider` 提供鉴权头；`SseEventParser` 解析事件流；关闭释放连接。
+- 技术细节：`IMcpHeadersProvider` 提供鉴权头；JSON-RPC、会话 ID、`Last-Event-ID` 与重连由本类处理；
+  连接、超时、体积上限与 SSE 解析统一委托 `clara-transport` 的 `JdkHttpTransport`。
 
-**`McpJsonCodec` / `JacksonMcpJsonCodec` / `McpDecodedMessage`（`com.clara.mcp.transport`）**
+**`IMcpJsonCodec`（`com.clara.mcp.api`）/ `JacksonMcpJsonCodec` / `McpDecodedMessage`（`com.clara.mcp.transport`）**
 - 作用：JSON-RPC 消息编解码。
 - 使用范围：传输层。
 - 为什么需要：把线格式 JSON 与消息对象互转，协议编解码集中一处。
@@ -221,18 +224,19 @@ clara-mcp/src/main/java/com/clara/mcp/
 
 ### 5.1 注册 → 发现 → 目录 → 调用闭环
 
-1. **注册**：`McpServerRegistry.register` 登记服务端（租户 + 服务端标识 + 传输方式（含地址 / 鉴权）+ 已审批身份）；
-2. **发现**：`McpDiscoveryService.refresh` 经 `McpClientFactory` 创建客户端 → `initialize` 校验协议版本与身份 → 按能力分页拉取工具 / 资源 / 资源模板 / 提示词 → 形成 `McpServerSnapshot`；
-3. **发布与状态**：`McpCapabilityCatalog.publish(snapshot)` 保存快照，注册状态更新为 `ACTIVE`；协议不兼容 → `INCOMPATIBLE`，身份变化 → `REVIEW_REQUIRED`；
-4. **解析**：调用前 `McpCapabilityCatalog.resolveTool/Resource/Prompt` 按名称与期望 Schema 哈希解析能力，哈希不一致抛 `MCP_SCHEMA_MISMATCH`；
-5. **调用**：`McpGateway.callTool/readResource/getPrompt` 经客户端发起调用并返回结果，`finally` 关闭客户端。
+1. **注册**：`IMcpServerRegistry.register` 登记服务端（租户 + 服务端标识 + 传输方式（含地址 / 鉴权）+ 已审批身份）；
+2. **发现**：`IMcpDiscoveryService.refresh` 经 `IMcpClientFactory` 创建客户端 → `initialize` 校验协议版本与身份 → 按能力分页拉取工具 / 资源 / 资源模板 / 提示词 → 形成 `McpServerSnapshot`；
+3. **发布与状态**：`IMcpCapabilityCatalog.publish(snapshot)` 保存快照，注册状态更新为 `ACTIVE`；协议不兼容 → `INCOMPATIBLE`，身份变化 → `REVIEW_REQUIRED`；
+4. **解析**：调用前 `IMcpCapabilityCatalog.resolveTool/Resource/Prompt` 按名称与期望 Schema 哈希解析能力，哈希不一致抛 `MCP_SCHEMA_MISMATCH`；
+5. **调用**：`IMcpGateway.callTool/readResource/getPrompt` 经客户端发起调用并返回结果，`finally` 关闭客户端。
 
 ### 5.2 传输抽象（stdio / streamable http）
 
-- 统一 `McpTransport` 接口：`start` 启动并注册监听，`sendRequest` 异步返回响应，`sendNotification` 单向通知，`cancel` 按请求 id 取消，`checkHealth` 健康检查；
-- stdio：经 `ProcessFactory` 启动子进程（继承父进程环境再叠加配置 `env`），按行读写 JSON-RPC，后台排空 stderr，关闭时销毁进程；
-- http：经 streamable http POST 发送、SSE 解析响应，关闭释放连接；
-- 新增传输只需新增 `McpTransport` 实现 + 在 `DefaultMcpClientFactory` 注册分派。
+- 统一 `IMcpTransport` 接口：`start` 启动并注册监听，`sendRequest` 异步返回响应，`sendNotification` 单向通知，`cancel` 按请求 id 取消，`checkHealth` 健康检查；
+- stdio：经 `IProcessFactory` 启动子进程（继承父进程环境再叠加配置 `env`），按行读写 JSON-RPC，后台排空 stderr，关闭时销毁进程；
+- http：`StreamableHttpMcpTransport` 只做 MCP 协议适配（JSON-RPC、会话、`Last-Event-ID`、重连），
+  连接、超时、体积上限与 SSE 解析统一委托 `clara-transport`；
+- 新增传输只需新增 `IMcpTransport` 实现 + 在 `DefaultMcpClientFactory` 注册分派。
 
 ### 5.3 客户端协议与 JSON-RPC 方法映射
 
@@ -290,7 +294,7 @@ clara-mcp/src/main/java/com/clara/mcp/
 ### 5.9 与对话编排的衔接
 
 - 编排层工具往返中，**本地工具走 clara-skill，外部工具走 clara-mcp**；
-- 装配层（clara-application）以组合 `IToolInvoker` 实现分派：工具名命中本地技能注册表 → 走 skill；否则按「外部工具路由」定位（租户 / 服务端 / 快照 / Schema），用当前 `ConvContext` / `CallContext` 与参数构造 `McpToolCall` → `McpGateway.callTool`，结果序列化为 JSON 文本回填；
+- 装配层（clara-application）以组合 `IToolInvoker` 实现分派：工具名命中本地技能注册表 → 走 skill；否则按「外部工具路由」定位（租户 / 服务端 / 快照 / Schema），用当前 `ConvContext` / `CallContext` 与参数构造 `McpToolCall` → `IMcpGateway.callTool`，结果序列化为 JSON 文本回填；
 - 外部工具的路由信息（工具名 → 服务端 / 快照 / Schema）由宿主在发现后登记，编排层不感知 MCP 协议细节。
 
 ### 5.10 服务端配置与本地目录识别
@@ -328,7 +332,7 @@ http 形态（有 `url`，可选 `headers`）：
 
 **env 插值**：`env` 与 `headers` 的值支持 `${VAR}` 占位，从系统环境变量解析；**变量未定义时抛错并在消息中指明变量名**（不静默保留原文），避免把未解析的占位符当真实密钥外发。
 
-**注册流程**：宿主读取配置 →（可选）`McpServerConfigDirectoryLoader.load()` 合并 → `McpServerRegistrar.registerAll(tenantId, configs)` 逐条转换为 `McpServerRegistration`（状态 `ACTIVE`）并 `McpServerRegistry.register` → 交由 `DefaultMcpDiscoveryService` 发现。`DefaultMcpClientFactory` 优先使用注册项的结构化字段：stdio 用 `command` + `env` 启动子进程，http 用 `url` + per-server `headers` 作为请求头。stdio 首项命令若是裸命令名（如 `npx` / `node`），工厂先在允许清单里按文件名（含去掉扩展名的名字）解析成绝对路径——MCP 配置惯例写裸命令名，而传输层只接受绝对路径；清单里匹配不到则原样下传，由传输层照旧拒绝。
+**注册流程**：宿主读取配置 →（可选）`McpServerConfigDirectoryLoader.load()` 合并 → `McpServerRegistrar.registerAll(tenantId, configs)` 逐条转换为 `McpServerRegistration`（状态 `ACTIVE`）并 `IMcpServerRegistry.register` → 交由 `DefaultMcpDiscoveryService` 发现。`DefaultMcpClientFactory` 优先使用注册项的结构化字段：stdio 用 `command` + `env` 启动子进程，http 用 `url` + per-server `headers` 作为请求头。stdio 首项命令若是裸命令名（如 `npx` / `node`），工厂先在允许清单里按文件名（含去掉扩展名的名字）解析成绝对路径——MCP 配置惯例写裸命令名，而传输层只接受绝对路径；清单里匹配不到则原样下传，由传输层照旧拒绝。
 
 ## 6. 业务场景与功能映射
 
@@ -339,39 +343,39 @@ http 形态（有 `url`，可选 `headers`）：
 ### 6.2 典型业务场景（业务流程 → 技术落点）
 
 **场景一：接入并发现外部服务端**
-登记服务端 → 创建客户端 → 初始化校验 → 分页发现能力 → 发布能力快照 → 状态置为可用。落点：`McpServerRegistry` + `DefaultMcpDiscoveryService` + `McpCapabilityCatalog`。
+登记服务端 → 创建客户端 → 初始化校验 → 分页发现能力 → 发布能力快照 → 状态置为可用。落点：`IMcpServerRegistry` + `DefaultMcpDiscoveryService` + `IMcpCapabilityCatalog`。
 
 **场景二：编排层调用外部工具**
-工具往返中识别为外部工具 → 解析工具描述（Schema 校验）→ 调用服务端工具 → 返回结果回填。落点：`McpGateway.callTool` + `McpToolCall` / `McpToolResult`。
+工具往返中识别为外部工具 → 解析工具描述（Schema 校验）→ 调用服务端工具 → 返回结果回填。落点：`IMcpGateway.callTool` + `McpToolCall` / `McpToolResult`。
 
 **场景三：读取资源 / 获取提示词**
-按资源 URI 读取内容、按提示词名与参数获取提示词。落点：`McpGateway.readResource` / `getPrompt`。
+按资源 URI 读取内容、按提示词名与参数获取提示词。落点：`IMcpGateway.readResource` / `getPrompt`。
 
 **场景四：健康检查与状态维护**
-探测服务端健康、按发现结果更新注册状态（可用 / 不兼容 / 需复核）。落点：`McpTransport.checkHealth` + `McpServerRegistry.updateStatus`。
+探测服务端健康、按发现结果更新注册状态（可用 / 不兼容 / 需复核）。落点：`IMcpTransport.checkHealth` + `IMcpServerRegistry.updateStatus`。
 
 ### 6.3 功能需求映射（业务 FR → 技术实现）
 
 | 业务需求 | 实现落点 |
 | --- | --- |
-| FR-M1 服务端注册 | `McpServerRegistry` / `InMemoryMcpServerRegistry` |
-| FR-M2 能力发现 | `McpDiscoveryService` / `DefaultMcpDiscoveryService` + `McpClient` / `DefaultMcpClient` |
-| FR-M3 能力目录 | `McpCapabilityCatalog` / `InMemoryMcpCapabilityCatalog` |
-| FR-M4 工具调用 | `McpGateway` / `DefaultMcpGateway` + `McpToolCall` / `McpToolResult` |
-| FR-M5 资源读取与提示词获取 | `McpGateway.readResource` / `getPrompt` |
-| FR-M6 传输与健康 | `McpTransport`（stdio / streamable http）+ `checkHealth` |
+| FR-M1 服务端注册 | `IMcpServerRegistry` / `InMemoryMcpServerRegistry` |
+| FR-M2 能力发现 | `IMcpDiscoveryService` / `DefaultMcpDiscoveryService` + `IMcpClient` / `DefaultMcpClient` |
+| FR-M3 能力目录 | `IMcpCapabilityCatalog` / `InMemoryMcpCapabilityCatalog` |
+| FR-M4 工具调用 | `IMcpGateway` / `DefaultMcpGateway` + `McpToolCall` / `McpToolResult` |
+| FR-M5 资源读取与提示词获取 | `IMcpGateway.readResource` / `getPrompt` |
+| FR-M6 传输与健康 | `IMcpTransport`（stdio / streamable http）+ `checkHealth` |
 | FR-M7 服务端配置管理 | `McpServerConfigLoader` / `McpServerConfigDirectoryLoader` / `McpServerRegistrar` |
 
 ### 6.4 业务规则与决策的落点
 
 | 业务规则 / 决策 | 落点 |
 | --- | --- |
-| 所有对外联动统一走 MCP 协议 | 全模块（`McpClient` + `McpTransport`） |
-| 外部能力必须先发现入目录再调用 | `DefaultMcpDiscoveryService` → `McpCapabilityCatalog` → `McpGateway` |
+| 所有对外联动统一走 MCP 协议 | 全模块（`IMcpClient` + `IMcpTransport`） |
+| 外部能力必须先发现入目录再调用 | `DefaultMcpDiscoveryService` → `IMcpCapabilityCatalog` → `IMcpGateway` |
 | 协议版本不兼容标记 / 身份变化标记需复核 | `DefaultMcpDiscoveryService` + `McpErrors` |
 | 分页受页数约束、游标不重复 | `DefaultMcpDiscoveryService` 分页收集 |
-| 调用前核对 Schema 哈希 | `McpCapabilityCatalog.resolve*` + `SchemaHasher` |
-| 按租户 + 服务端标识分区 | `McpServerRegistry` / `McpCapabilityCatalog` / `McpToolCall.tenantId` |
+| 调用前核对 Schema 哈希 | `IMcpCapabilityCatalog.resolve*` + `SchemaHasher` |
+| 按租户 + 服务端标识分区 | `IMcpServerRegistry` / `IMcpCapabilityCatalog` / `McpToolCall.tenantId` |
 | 配置来源与覆盖规则 | `McpServerConfigDirectoryLoader` + `McpServerConfigLoader` |
 
 ## 7. 非目标

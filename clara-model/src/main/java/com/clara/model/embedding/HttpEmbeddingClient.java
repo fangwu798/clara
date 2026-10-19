@@ -1,19 +1,28 @@
 package com.clara.model.embedding;
 
 import com.clara.core.memory.IEmbeddingClient;
+import com.clara.exception.HttpTransportException;
+import com.clara.core.transport.HttpTransportPolicy;
+import com.clara.core.transport.IExecutionGuard;
+import com.clara.core.transport.IHttpCall;
+import com.clara.core.transport.IHttpTransport;
+import com.clara.core.transport.RawHttpRequest;
+import com.clara.core.transport.RawHttpResponse;
+import com.clara.core.transport.sse.SseParserConfig;
+import com.clara.transport.http.HostEndpointPolicy;
+import com.clara.transport.http.JdkHttpTransport;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 基于 OpenAI 兼容 {@code /embeddings} 接口的嵌入客户端，实现 {@link IEmbeddingClient} 契约。
@@ -39,6 +48,14 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
      * 默认读取超时毫秒数。
      */
     private static final int DEFAULT_READ_TIMEOUT_MILLIS = 60000;
+    /**
+     * 嵌入请求体最大字节数。
+     */
+    private static final int DEFAULT_MAX_REQUEST_BYTES = 16 * 1024 * 1024;
+    /**
+     * 嵌入响应体最大字节数。
+     */
+    private static final int DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 
     /**
      * 嵌入接口端点，必须是绝对 HTTP(S) 地址。
@@ -64,6 +81,14 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
      * 请求 / 响应体 JSON 解析器。
      */
     private final ObjectMapper json;
+    /**
+     * 通用 HTTP 传输实现。
+     */
+    private final IHttpTransport httpTransport;
+    /**
+     * 嵌入接口的传输策略。
+     */
+    private final HttpTransportPolicy transportPolicy;
 
     /**
      * 使用默认超时创建嵌入客户端。
@@ -107,6 +132,17 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
         this.connectTimeoutMillis = connectTimeoutMillis;
         this.readTimeoutMillis = readTimeoutMillis;
         this.json = new ObjectMapper();
+        boolean allowHttp = "http".equalsIgnoreCase(endpoint.getScheme());
+        this.httpTransport = new JdkHttpTransport();
+        this.transportPolicy = new HttpTransportPolicy(
+                new HostEndpointPolicy(Collections.singleton(endpoint.getHost()), allowHttp),
+                connectTimeoutMillis, readTimeoutMillis,
+                DEFAULT_MAX_REQUEST_BYTES, DEFAULT_MAX_RESPONSE_BYTES,
+                Collections.<String, String>emptyMap(),
+                new SseParserConfig(SseParserConfig.DEFAULT_MAX_LINE_BYTES,
+                        SseParserConfig.DEFAULT_MAX_EVENT_BYTES,
+                        SseParserConfig.DEFAULT_MAX_EVENTS,
+                        DEFAULT_MAX_RESPONSE_BYTES, false));
     }
 
     /**
@@ -282,35 +318,29 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
         body.put("input", text);
         byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);
 
-        HttpURLConnection connection = null;
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("Content-Type", "application/json");
+        headers.put("Accept", "application/json");
+        headers.put("Authorization", "Bearer " + apiKey);
+        RawHttpRequest request = new RawHttpRequest("POST", endpoint, headers, payload);
+        IHttpCall call = httpTransport.newCall(request, transportPolicy, IExecutionGuard.NONE);
+        RawHttpResponse response;
         try {
-            connection = (HttpURLConnection) endpoint.toURL().openConnection();
-            connection.setRequestMethod("POST");
-            connection.setConnectTimeout(connectTimeoutMillis);
-            connection.setReadTimeout(readTimeoutMillis);
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("Authorization", "Bearer " + apiKey);
-            OutputStream output = connection.getOutputStream();
-            output.write(payload);
-            output.flush();
-            output.close();
-
-            int status = connection.getResponseCode();
-            InputStream input = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
-            byte[] responseBody = readAll(input);
-            if (status < 200 || status >= 300) {
-                throw new IllegalStateException("embedding request failed: HTTP " + status
-                        + " " + new String(responseBody, StandardCharsets.UTF_8));
-            }
-            return parse(responseBody);
-        } catch (IOException exception) {
+            response = call.execute();
+        } catch (HttpTransportException exception) {
             throw new IllegalStateException("embedding request failed", exception);
         } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+            call.close();
+        }
+        if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
+            throw new IllegalStateException("embedding request failed: HTTP "
+                    + response.getStatusCode() + " "
+                    + new String(response.getBody(), StandardCharsets.UTF_8));
+        }
+        try {
+            return parse(response.getBody());
+        } catch (IOException exception) {
+            throw new IllegalStateException("embedding request failed", exception);
         }
     }
 
@@ -332,7 +362,7 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
         if (!embedding.isArray() || embedding.size() == 0) {
             throw new IllegalStateException("embedding response missing embedding vector");
         }
-        List<Float> values = new ArrayList<Float>();
+        List<Float> values = new ArrayList<>();
         for (JsonNode node : embedding) {
             if (!node.isNumber()) {
                 throw new IllegalStateException("embedding vector contains a non-number");
@@ -346,31 +376,4 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
         return result;
     }
 
-    /**
-     * 完整读取输入流并关闭。
-     *
-     * @param input 输入流，可为 null
-     * @return 读取到的字节；input 为 null 时返回空数组
-     * @throws IOException 读取失败时
-     */
-    private static byte[] readAll(InputStream input) throws IOException {
-        if (input == null) {
-            return new byte[0];
-        }
-        try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int count;
-            while ((count = input.read(buffer)) >= 0) {
-                output.write(buffer, 0, count);
-            }
-            return output.toByteArray();
-        } finally {
-            try {
-                input.close();
-            } catch (IOException ignored) {
-                // 关闭失败不影响已读取的结果
-            }
-        }
-    }
 }

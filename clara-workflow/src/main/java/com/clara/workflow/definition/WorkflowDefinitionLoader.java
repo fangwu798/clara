@@ -51,7 +51,7 @@ public final class WorkflowDefinitionLoader {
     /**
      * 节点中不参与动作属性透传的结构化字段。
      */
-    private static final Set<String> STRUCTURAL_FIELDS = Collections.unmodifiableSet(new HashSet<String>(
+    private static final Set<String> STRUCTURAL_FIELDS = Collections.unmodifiableSet(new HashSet<>(
             Arrays.asList("id", "type", "outputKeys", "idempotencyKey", "children", "action")));
 
     private final List<IWorkflowActionFactory> actionFactories;
@@ -68,7 +68,7 @@ public final class WorkflowDefinitionLoader {
             throw new IllegalArgumentException("actionFactories must not be null");
         }
         this.actionFactories = Collections.unmodifiableList(
-                new ArrayList<IWorkflowActionFactory>(actionFactories));
+                new ArrayList<>(actionFactories));
     }
 
     /**
@@ -115,7 +115,7 @@ public final class WorkflowDefinitionLoader {
      */
     private static List<String> declaredOutputs(JsonNode root) {
         JsonNode node = root.get("outputs");
-        List<String> outputs = new ArrayList<String>();
+        List<String> outputs = new ArrayList<>();
         if (node != null && node.isArray()) {
             for (JsonNode item : node) {
                 if (item.isTextual() && !item.textValue().trim().isEmpty()) {
@@ -218,7 +218,7 @@ public final class WorkflowDefinitionLoader {
         if (childrenNode == null || !childrenNode.isArray() || childrenNode.size() == 0) {
             throw invalid(file, id, "组合节点缺少 children");
         }
-        List<IWorkflowNode> children = new ArrayList<IWorkflowNode>();
+        List<IWorkflowNode> children = new ArrayList<>();
         for (JsonNode child : childrenNode) {
             if (!child.isObject()) {
                 throw invalid(file, id, "children 元素必须是对象");
@@ -229,7 +229,7 @@ public final class WorkflowDefinitionLoader {
     }
 
     private Set<String> outputKeys(JsonNode node, Path file, String id) {
-        Set<String> keys = new LinkedHashSet<String>();
+        Set<String> keys = new LinkedHashSet<>();
         JsonNode keysNode = node.get("outputKeys");
         if (keysNode != null && keysNode.isArray()) {
             for (JsonNode key : keysNode) {
@@ -245,7 +245,7 @@ public final class WorkflowDefinitionLoader {
     }
 
     private Map<String, Object> attributes(JsonNode node) {
-        Map<String, Object> attributes = new LinkedHashMap<String, Object>();
+        Map<String, Object> attributes = new LinkedHashMap<>();
         collectAttributes(node, attributes);
         JsonNode actionNode = node.get("action");
         if (actionNode != null && actionNode.isObject()) {

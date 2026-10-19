@@ -66,22 +66,22 @@ public final class McpServerSnapshot {
     public McpHealthStatus getHealthStatus() { return healthStatus; }
     private static <T> List<T> immutable(List<T> values) {
         if (values.contains(null)) { throw new IllegalArgumentException("capabilities must not contain null"); }
-        return Collections.unmodifiableList(new ArrayList<T>(values));
+        return Collections.unmodifiableList(new ArrayList<>(values));
     }
     private static void uniqueToolNames(List<McpToolDescriptor> values) {
-        Set<String> names = new HashSet<String>();
+        Set<String> names = new HashSet<>();
         for (McpToolDescriptor value : values) if (value == null || !names.add(value.getName())) { throw duplicate(); }
     }
     private static void uniqueResourceUris(List<McpResourceDescriptor> values) {
-        Set<String> names = new HashSet<String>();
+        Set<String> names = new HashSet<>();
         for (McpResourceDescriptor value : values) if (value == null || !names.add(value.getUri())) { throw duplicate(); }
     }
     private static void uniquePromptNames(List<McpPromptDescriptor> values) {
-        Set<String> names = new HashSet<String>();
+        Set<String> names = new HashSet<>();
         for (McpPromptDescriptor value : values) if (value == null || !names.add(value.getName())) { throw duplicate(); }
     }
     private static void uniqueResourceTemplateUris(List<McpResourceTemplateDescriptor> values) {
-        Set<String> names = new HashSet<String>();
+        Set<String> names = new HashSet<>();
         for (McpResourceTemplateDescriptor value : values) {
             if (value == null || !names.add(value.getUriTemplate())) { throw duplicate(); }
         }

@@ -20,13 +20,13 @@ public final class McpPromptDescriptor {
             throw new IllegalArgumentException("arguments must not be null or contain null");
         }
         this.name = name; this.description = description;
-        this.arguments = Collections.unmodifiableList(new ArrayList<McpPromptArgument>(arguments));
-        List<Object> values = new ArrayList<Object>();
-        Map<String, Object> prompt = new LinkedHashMap<String, Object>();
+        this.arguments = Collections.unmodifiableList(new ArrayList<>(arguments));
+        List<Object> values = new ArrayList<>();
+        Map<String, Object> prompt = new LinkedHashMap<>();
         prompt.put("name", name); prompt.put("description", description);
         values.add(prompt);
         for (McpPromptArgument argument : arguments) {
-            Map<String, Object> value = new LinkedHashMap<String, Object>();
+            Map<String, Object> value = new LinkedHashMap<>();
             value.put("name", argument.getName()); value.put("description", argument.getDescription());
             value.put("required", argument.isRequired());
             values.add(value);

@@ -97,6 +97,6 @@ public class AgentNodeOptionsTest {
     }
 
     private static Map<String, Object> attributes() {
-        return new LinkedHashMap<String, Object>();
+        return new LinkedHashMap<>();
     }
 }

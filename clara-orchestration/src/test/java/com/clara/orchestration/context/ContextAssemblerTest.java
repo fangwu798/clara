@@ -68,7 +68,7 @@ public class ContextAssemblerTest {
         UserContent u1 = new UserContent("one");
         UserContent u2 = new UserContent("two");
         UserContent u3 = new UserContent("three");
-        List<IContent> evicted = new ArrayList<IContent>();
+        List<IContent> evicted = new ArrayList<>();
         ISummarizeCoordinator summarize = messages -> {
             evicted.addAll(messages);
             return new SystemContent("SUMMARY");
@@ -221,8 +221,8 @@ public class ContextAssemblerTest {
 
         FakeWindowMemory(String conversationId, List<IContent> history, List<IContent> windowed) {
             this.conversationId = conversationId;
-            this.history = new ArrayList<IContent>(history);
-            this.windowed = new ArrayList<IContent>(windowed);
+            this.history = new ArrayList<>(history);
+            this.windowed = new ArrayList<>(windowed);
         }
 
         @Override
@@ -237,12 +237,12 @@ public class ContextAssemblerTest {
 
         @Override
         public List<IContent> messages() {
-            return new ArrayList<IContent>(history);
+            return new ArrayList<>(history);
         }
 
         @Override
         public List<IContent> window(WindowPolicy policy, ITokenCountEstimator estimator) {
-            return new ArrayList<IContent>(windowed);
+            return new ArrayList<>(windowed);
         }
 
         @Override

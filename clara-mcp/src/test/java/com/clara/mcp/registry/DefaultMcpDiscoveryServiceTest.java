@@ -2,22 +2,23 @@ package com.clara.mcp.registry;
 
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCodes;
-import com.clara.mcp.client.McpClient;
+import com.clara.mcp.api.IMcpClient;
+import com.clara.mcp.api.IMcpClientFactory;
+import com.clara.mcp.api.IMcpServerRegistry;
 import com.clara.mcp.client.McpInitialization;
 import com.clara.mcp.client.McpPage;
+import com.clara.mcp.client.McpServerCapabilities;
+import com.clara.mcp.client.McpServerIdentity;
 import com.clara.mcp.client.call.McpPromptRequest;
 import com.clara.mcp.client.call.McpPromptResult;
 import com.clara.mcp.client.call.McpResourceContent;
 import com.clara.mcp.client.call.McpResourceRequest;
-import com.clara.mcp.client.McpServerCapabilities;
-import com.clara.mcp.client.McpServerIdentity;
-import com.clara.mcp.client.McpClientFactory;
+import com.clara.mcp.client.call.McpToolCall;
+import com.clara.mcp.client.call.McpToolResult;
 import com.clara.mcp.registry.capability.McpPromptDescriptor;
 import com.clara.mcp.registry.capability.McpResourceDescriptor;
 import com.clara.mcp.registry.capability.McpResourceTemplateDescriptor;
 import com.clara.mcp.registry.capability.McpToolDescriptor;
-import com.clara.mcp.client.call.McpToolCall;
-import com.clara.mcp.client.call.McpToolResult;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -46,7 +46,7 @@ public class DefaultMcpDiscoveryServiceTest {
     @Test
     public void discoverBuildsSnapshotAndClosesClient() {
         FakeClient client = new FakeClient(new McpInitialization(VERSION, IDENTITY, ALL));
-        client.toolPages.add(new McpPage<McpToolDescriptor>(tools(descriptor("echo")), null));
+        client.toolPages.add(new McpPage<>(tools(descriptor("echo")), null));
         client.resources.add(new McpResourceDescriptor("file://a.txt", "a", "text/plain"));
         client.templates.add(new McpResourceTemplateDescriptor("file://{name}", "t", "text/plain"));
         DefaultMcpDiscoveryService service = service(new FakeClientFactory(client), 10);
@@ -92,9 +92,9 @@ public class DefaultMcpDiscoveryServiceTest {
     @Test
     public void discoverThrowsWhenPaginationLimitExceeded() {
         FakeClient client = new FakeClient(new McpInitialization(VERSION, IDENTITY, ALL));
-        client.toolPages.add(new McpPage<McpToolDescriptor>(Collections.<McpToolDescriptor>emptyList(), "c1"));
-        client.toolPages.add(new McpPage<McpToolDescriptor>(Collections.<McpToolDescriptor>emptyList(), "c2"));
-        client.toolPages.add(new McpPage<McpToolDescriptor>(Collections.<McpToolDescriptor>emptyList(), "c3"));
+        client.toolPages.add(new McpPage<>(Collections.<McpToolDescriptor>emptyList(), "c1"));
+        client.toolPages.add(new McpPage<>(Collections.<McpToolDescriptor>emptyList(), "c2"));
+        client.toolPages.add(new McpPage<>(Collections.<McpToolDescriptor>emptyList(), "c3"));
         DefaultMcpDiscoveryService service = service(new FakeClientFactory(client), 2);
 
         assertCode(ErrorCodes.MCP_PAGINATION_LIMIT_EXCEEDED, new Runnable() {
@@ -107,8 +107,8 @@ public class DefaultMcpDiscoveryServiceTest {
     @Test
     public void discoverThrowsWhenCursorRepeats() {
         FakeClient client = new FakeClient(new McpInitialization(VERSION, IDENTITY, ALL));
-        client.toolPages.add(new McpPage<McpToolDescriptor>(Collections.<McpToolDescriptor>emptyList(), "c1"));
-        client.toolPages.add(new McpPage<McpToolDescriptor>(Collections.<McpToolDescriptor>emptyList(), "c1"));
+        client.toolPages.add(new McpPage<>(Collections.<McpToolDescriptor>emptyList(), "c1"));
+        client.toolPages.add(new McpPage<>(Collections.<McpToolDescriptor>emptyList(), "c1"));
         DefaultMcpDiscoveryService service = service(new FakeClientFactory(client), 10);
 
         assertCode(ErrorCodes.MCP_PAGINATION_CURSOR_REPEATED, new Runnable() {
@@ -121,7 +121,7 @@ public class DefaultMcpDiscoveryServiceTest {
     @Test
     public void refreshPublishesSnapshotAndActivatesRegistration() {
         FakeClient client = new FakeClient(new McpInitialization(VERSION, IDENTITY, ALL));
-        client.toolPages.add(new McpPage<McpToolDescriptor>(tools(descriptor("echo")), null));
+        client.toolPages.add(new McpPage<>(tools(descriptor("echo")), null));
         FakeRegistry registry = new FakeRegistry(registration(IDENTITY.getName(), IDENTITY.getVersion()));
         InMemoryMcpCapabilityCatalog catalog = new InMemoryMcpCapabilityCatalog();
         DefaultMcpDiscoveryService service = new DefaultMcpDiscoveryService(registry, catalog,
@@ -166,7 +166,7 @@ public class DefaultMcpDiscoveryServiceTest {
         assertSame(McpRegistrationStatus.REVIEW_REQUIRED, registry.status);
     }
 
-    private static DefaultMcpDiscoveryService service(McpClientFactory factory, int maxPages) {
+    private static DefaultMcpDiscoveryService service(IMcpClientFactory factory, int maxPages) {
         return new DefaultMcpDiscoveryService(emptyRegistry(), new InMemoryMcpCapabilityCatalog(), factory,
                 Arrays.asList(VERSION), maxPages, new java.util.function.Supplier<String>() {
                     public String get() { return "snapshot-1"; }
@@ -175,7 +175,7 @@ public class DefaultMcpDiscoveryServiceTest {
                 });
     }
 
-    private static McpServerRegistry emptyRegistry() {
+    private static IMcpServerRegistry emptyRegistry() {
         return new FakeRegistry(null);
     }
 
@@ -185,13 +185,13 @@ public class DefaultMcpDiscoveryServiceTest {
     }
 
     private static List<McpToolDescriptor> tools(McpToolDescriptor tool) {
-        List<McpToolDescriptor> values = new ArrayList<McpToolDescriptor>();
+        List<McpToolDescriptor> values = new ArrayList<>();
         values.add(tool);
         return values;
     }
 
     private static McpToolDescriptor descriptor(String name) {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         return new McpToolDescriptor(name, "echo tool", schema);
     }
@@ -205,7 +205,7 @@ public class DefaultMcpDiscoveryServiceTest {
         }
     }
 
-    private static final class FakeRegistry implements McpServerRegistry {
+    private static final class FakeRegistry implements IMcpServerRegistry {
         private final McpServerRegistration registration;
         private McpRegistrationStatus status;
 
@@ -222,20 +222,20 @@ public class DefaultMcpDiscoveryServiceTest {
         }
     }
 
-    private static final class FakeClientFactory implements McpClientFactory {
-        private final McpClient client;
+    private static final class FakeClientFactory implements IMcpClientFactory {
+        private final IMcpClient client;
 
-        private FakeClientFactory(McpClient client) { this.client = client; }
+        private FakeClientFactory(IMcpClient client) { this.client = client; }
 
-        public McpClient create(McpServerRegistration registration) { return client; }
+        public IMcpClient create(McpServerRegistration registration) { return client; }
     }
 
-    private static final class FakeClient implements McpClient {
+    private static final class FakeClient implements IMcpClient {
         private final McpInitialization initialization;
-        private final List<McpPage<McpToolDescriptor>> toolPages = new ArrayList<McpPage<McpToolDescriptor>>();
-        private final List<McpResourceDescriptor> resources = new ArrayList<McpResourceDescriptor>();
+        private final List<McpPage<McpToolDescriptor>> toolPages = new ArrayList<>();
+        private final List<McpResourceDescriptor> resources = new ArrayList<>();
         private final List<McpResourceTemplateDescriptor> templates =
-                new ArrayList<McpResourceTemplateDescriptor>();
+                new ArrayList<>();
         private int toolPageIndex;
         private int closeCount;
 
@@ -244,20 +244,20 @@ public class DefaultMcpDiscoveryServiceTest {
         public McpInitialization initialize(List<String> supportedProtocolVersions) { return initialization; }
         public McpPage<McpToolDescriptor> listTools(String cursor) {
             if (toolPages.isEmpty()) {
-                return new McpPage<McpToolDescriptor>(Collections.<McpToolDescriptor>emptyList(), null);
+                return new McpPage<>(Collections.<McpToolDescriptor>emptyList(), null);
             }
             int index = Math.min(toolPageIndex, toolPages.size() - 1);
             toolPageIndex++;
             return toolPages.get(index);
         }
         public McpPage<McpResourceDescriptor> listResources(String cursor) {
-            return new McpPage<McpResourceDescriptor>(resources, null);
+            return new McpPage<>(resources, null);
         }
         public McpPage<McpResourceTemplateDescriptor> listResourceTemplates(String cursor) {
-            return new McpPage<McpResourceTemplateDescriptor>(templates, null);
+            return new McpPage<>(templates, null);
         }
         public McpPage<McpPromptDescriptor> listPrompts(String cursor) {
-            return new McpPage<McpPromptDescriptor>(Collections.<McpPromptDescriptor>emptyList(), null);
+            return new McpPage<>(Collections.<McpPromptDescriptor>emptyList(), null);
         }
         public McpToolResult callTool(McpToolCall call) { throw new UnsupportedOperationException(); }
         public McpResourceContent readResource(McpResourceRequest request) {

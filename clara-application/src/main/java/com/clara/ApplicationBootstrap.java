@@ -1,22 +1,22 @@
 package com.clara;
 
+import com.clara.api.IBuiltinTool;
 import com.clara.codegraph.CodeGraphSupplement;
 import com.clara.config.AlwaysPromptSettings;
 import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
 import com.clara.config.ModelRegistry;
-import com.clara.api.IBuiltinTool;
-import com.clara.memory.semantic.milvus.MilvusSettings;
 import com.clara.context.ConvContext;
+import com.clara.core.memory.IContextSupplementProvider;
+import com.clara.core.memory.IContextTraceSink;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.memory.IWindowMemory;
 import com.clara.core.message.IContent;
 import com.clara.core.model.IResponse;
+import com.clara.core.model.IStreamModel;
 import com.clara.core.skill.IPromptProvider;
-import com.clara.core.memory.IContextSupplementProvider;
-import com.clara.core.memory.IContextTraceSink;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowEngine;
@@ -24,27 +24,27 @@ import com.clara.dto.record.CallRecord;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
-import com.clara.core.model.IStreamModel;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
-import com.clara.mcp.client.gateway.DefaultMcpGateway;
-import com.clara.mcp.client.gateway.McpGateway;
+import com.clara.mcp.api.IMcpCapabilityCatalog;
+import com.clara.mcp.api.IMcpClientFactory;
+import com.clara.mcp.api.IMcpDiscoveryService;
+import com.clara.mcp.api.IMcpGateway;
+import com.clara.mcp.api.IMcpServerRegistry;
 import com.clara.mcp.client.DefaultMcpClientFactory;
+import com.clara.mcp.client.gateway.DefaultMcpGateway;
 import com.clara.mcp.registry.DefaultMcpDiscoveryService;
 import com.clara.mcp.registry.InMemoryMcpCapabilityCatalog;
 import com.clara.mcp.registry.InMemoryMcpServerRegistry;
-import com.clara.mcp.registry.McpCapabilityCatalog;
-import com.clara.mcp.registry.McpDiscoveryService;
 import com.clara.mcp.registry.McpServerRegistration;
-import com.clara.mcp.registry.McpServerRegistry;
 import com.clara.mcp.registry.McpServerSnapshot;
 import com.clara.mcp.registry.McpTransportProfile;
 import com.clara.mcp.registry.config.McpServerConfig;
 import com.clara.mcp.registry.config.McpServerConfigDirectoryLoader;
 import com.clara.mcp.registry.config.McpServerConfigLoader;
 import com.clara.mcp.registry.config.McpServerRegistrar;
-import com.clara.mcp.client.McpClientFactory;
+import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.mcp.transport.JacksonMcpJsonCodec;
 import com.clara.memory.persistence.ConversationStore;
 import com.clara.memory.persistence.InMemoryConversationStore;
@@ -55,6 +55,7 @@ import com.clara.memory.semantic.milvus.MilvusBackendConfig;
 import com.clara.memory.semantic.milvus.MilvusBackendFactory;
 import com.clara.memory.semantic.milvus.MilvusCollectionSpec;
 import com.clara.memory.semantic.milvus.MilvusSemanticMemoryStore;
+import com.clara.memory.semantic.milvus.MilvusSettings;
 import com.clara.memory.summarize.DefaultSummarizeCoordinator;
 import com.clara.memory.window.ConversationIndexingWindowMemory;
 import com.clara.memory.window.DefaultWindowMemory;
@@ -84,21 +85,18 @@ import com.clara.skill.tool.builtin.BuiltinToolExecutor;
 import com.clara.tool.CompositeToolCatalog;
 import com.clara.tool.CompositeToolInvoker;
 import com.clara.tool.McpToolCatalog;
-import com.clara.mcp.tool.ExternalToolCatalog;
-import com.clara.mcp.tool.McpExternalToolRegistrar;
 import com.clara.tool.ToolInvocationPurpose;
 import com.clara.workflow.AgentActionFactory;
 import com.clara.workflow.PublishWorkflowTool;
 import com.clara.workflow.ReviewActionFactory;
 import com.clara.workflow.WorkflowCatalog;
-import com.clara.workflow.runtime.ToolActionFactory;
 import com.clara.workflow.WorkflowRunTool;
-import com.clara.workflow.runtime.WorkflowRunner;
 import com.clara.workflow.checkpoint.InMemoryCheckpointStore;
 import com.clara.workflow.definition.WorkflowDefinitionLoader;
 import com.clara.workflow.definition.WorkflowDefinitionRegistry;
 import com.clara.workflow.engine.DefaultWorkflowEngine;
-
+import com.clara.workflow.runtime.ToolActionFactory;
+import com.clara.workflow.runtime.WorkflowRunner;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -225,12 +223,11 @@ public final class ApplicationBootstrap implements Closeable {
     private ConversationStore conversationStore;
     private final ITokenCountEstimator tokenCountEstimator;
     private final SkillRegistry skillRegistry;
-    private final McpServerRegistry mcpServerRegistry;
-    private final McpCapabilityCatalog mcpCapabilityCatalog;
-    private final McpClientFactory mcpClientFactory;
-    private final McpDiscoveryService mcpDiscoveryService;
-    private final McpGateway mcpGateway;
-    private final McpExternalToolRegistrar mcpExternalToolRegistrar;
+    private final IMcpServerRegistry mcpServerRegistry;
+    private final IMcpCapabilityCatalog mcpCapabilityCatalog;
+    private final IMcpClientFactory mcpClientFactory;
+    private final IMcpDiscoveryService mcpDiscoveryService;
+    private final IMcpGateway mcpGateway;
     private final ExternalToolCatalog externalToolCatalog;
     private final IWorkflowEngine workflowEngine;
     private final ModelRegistry modelRegistry;
@@ -283,7 +280,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @throws IllegalArgumentException 参数非法时
      */
     ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension,
-            McpClientFactory mcpClientFactory) {
+            IMcpClientFactory mcpClientFactory) {
         this(embeddingClient, embeddingDimension, mcpClientFactory, null);
     }
 
@@ -299,7 +296,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @throws IllegalArgumentException 参数非法时
      */
     ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension,
-            McpClientFactory mcpClientFactory, IContextTraceSink contextTrace) {
+            IMcpClientFactory mcpClientFactory, IContextTraceSink contextTrace) {
         if (embeddingClient == null) {
             throw new IllegalArgumentException("embeddingClient must not be null");
         }
@@ -339,7 +336,6 @@ public final class ApplicationBootstrap implements Closeable {
         this.mcpCapabilityCatalog = new InMemoryMcpCapabilityCatalog();
         this.mcpGateway = new DefaultMcpGateway(mcpServerRegistry, mcpCapabilityCatalog, mcpClientFactory);
         this.mcpDiscoveryService = new DefaultMcpDiscoveryService(mcpServerRegistry, mcpCapabilityCatalog, mcpClientFactory, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCP_DISCOVERY_MAX_PAGES);
-        this.mcpExternalToolRegistrar = new McpExternalToolRegistrar();
         this.externalToolCatalog = new ExternalToolCatalog();
 
         // 工具调用：本地 skill 优先、外部 mcp 兜底，交给编排层的工具往返协调器
@@ -617,7 +613,7 @@ public final class ApplicationBootstrap implements Closeable {
      */
     private static List<String> alwaysPrompts(AlwaysPromptSettings settings, IPromptProvider promptProvider,
             boolean codeGraphEnabled) {
-        List<String> prompts = new ArrayList<String>();
+        List<String> prompts = new ArrayList<>();
         for (String id : settings.getIds()) {
             if (AlwaysPromptSettings.CODE_GRAPH_GUIDE.equals(id) && !codeGraphEnabled) {
                 continue;
@@ -657,7 +653,7 @@ public final class ApplicationBootstrap implements Closeable {
      *
      * @return MCP 调用门面，非 null
      */
-    public McpGateway mcpGateway() {
+    public IMcpGateway mcpGateway() {
         return mcpGateway;
     }
 
@@ -675,7 +671,7 @@ public final class ApplicationBootstrap implements Closeable {
      *
      * @return MCP 服务端注册表，非 null
      */
-    public McpServerRegistry mcpServerRegistry() {
+    public IMcpServerRegistry mcpServerRegistry() {
         return mcpServerRegistry;
     }
 
@@ -684,7 +680,7 @@ public final class ApplicationBootstrap implements Closeable {
      *
      * @return MCP 能力目录，非 null
      */
-    public McpCapabilityCatalog mcpCapabilityCatalog() {
+    public IMcpCapabilityCatalog mcpCapabilityCatalog() {
         return mcpCapabilityCatalog;
     }
 
@@ -693,7 +689,7 @@ public final class ApplicationBootstrap implements Closeable {
      *
      * @return MCP 发现服务，非 null
      */
-    public McpDiscoveryService mcpDiscoveryService() {
+    public IMcpDiscoveryService mcpDiscoveryService() {
         return mcpDiscoveryService;
     }
 
@@ -712,10 +708,10 @@ public final class ApplicationBootstrap implements Closeable {
      * 完成「配置加载 → 注册服务端 → 发现能力 → 登记外部工具」的一站式接入链路。
      *
      * <p>流程：用 {@link McpServerConfigDirectoryLoader} 递归加载 {@code configDirectory} 下的 {@code *.json}
-     * 配置；用 {@link McpServerRegistrar#registerAll(String, List)} 把配置注册进 {@link McpServerRegistry}；
-     * 对每个已注册服务端调用 {@link McpDiscoveryService#refresh(String, String)} 完成发现（发布快照并更新状态）；
-     * 再从 {@link McpCapabilityCatalog#latest(String, String)} 取回快照，用 {@link McpExternalToolRegistrar}
-     * 把其工具登记进 {@link ExternalToolCatalog}。
+     * 配置；用 {@link McpServerRegistrar#registerAll(String, List)} 把配置注册进 {@link IMcpServerRegistry}；
+     * 对每个已注册服务端调用 {@link IMcpDiscoveryService#refresh(String, String)} 完成发现（发布快照并更新状态）；
+     * 再从 {@link IMcpCapabilityCatalog#latest(String, String)} 取回快照，用
+     * {@link ExternalToolCatalog#registerSnapshot(String, McpServerSnapshot)} 把其工具登记进路由目录。
      *
      * <p>失败隔离：单个服务端的发现失败（协议不兼容、身份变化、连接异常等）会被捕获并跳过，不影响其余服务端，
      * 也不阻断方法返回；返回值只统计发现成功的服务端数。发现失败时注册状态已由发现服务按需更新为
@@ -746,7 +742,7 @@ public final class ApplicationBootstrap implements Closeable {
                 mcpDiscoveryService.refresh(tenantId, serverKey);
                 McpServerSnapshot snapshot = mcpCapabilityCatalog.latest(tenantId, serverKey);
                 if (snapshot != null) {
-                    mcpExternalToolRegistrar.register(tenantId, snapshot, externalToolCatalog);
+                    externalToolCatalog.registerSnapshot(tenantId, snapshot);
                 }
                 discovered++;
             } catch (RuntimeException ignored) {
@@ -766,7 +762,7 @@ public final class ApplicationBootstrap implements Closeable {
      *
      * @return MCP 客户端工厂，非 null
      */
-    private static McpClientFactory defaultMcpClientFactory() {
+    private static IMcpClientFactory defaultMcpClientFactory() {
         return new DefaultMcpClientFactory(new JacksonMcpJsonCodec(), null,
                 allowedStdioExecutables(), Paths.get("").toAbsolutePath(), null,
                 MCP_REQUEST_TIMEOUT_MILLIS);
@@ -786,8 +782,8 @@ public final class ApplicationBootstrap implements Closeable {
      * @return 允许清单，非 null、非空
      */
     private static List<Path> allowedStdioExecutables() {
-        Set<Path> allowed = new LinkedHashSet<Path>();
-        Set<String> seen = new LinkedHashSet<String>();
+        Set<Path> allowed = new LinkedHashSet<>();
+        Set<String> seen = new LinkedHashSet<>();
         try {
             List<McpServerConfig> configs = new McpServerConfigDirectoryLoader(
                     new McpServerConfigLoader(), ConfigLocator.locate(DEFAULT_MCP_CONFIG_DIRECTORY)).load();
@@ -810,7 +806,7 @@ public final class ApplicationBootstrap implements Closeable {
         if (allowed.isEmpty()) {
             allowed.add(Paths.get("node").toAbsolutePath());
         }
-        return Collections.unmodifiableList(new ArrayList<Path>(allowed));
+        return Collections.unmodifiableList(new ArrayList<>(allowed));
     }
 
     /**
@@ -844,7 +840,7 @@ public final class ApplicationBootstrap implements Closeable {
         }
         // Windows 上先按 PATHEXT 补全、裸名字放最后：nodejs 目录里同时存在无扩展名的 npx（Unix shell 脚本）
         // 与可执行的 npx.cmd，先试裸名字会选中那个脚本，最终以「不是有效的 Win32 应用程序」启动失败。
-        List<String> names = new ArrayList<String>();
+        List<String> names = new ArrayList<>();
         if (token.indexOf('.') < 0) {
             String pathExt = System.getenv("PATHEXT");
             if (pathExt != null) {

@@ -31,7 +31,7 @@ public final class HistorySanitizer {
         if (messages == null || messages.isEmpty()) {
             return messages == null ? java.util.Collections.<IContent>emptyList() : messages;
         }
-        List<IContent> result = new ArrayList<IContent>(messages.size());
+        List<IContent> result = new ArrayList<>(messages.size());
         for (IContent message : messages) {
             if (isInvalidAssistant(message)) {
                 continue;

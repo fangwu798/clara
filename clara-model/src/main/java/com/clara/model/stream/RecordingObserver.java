@@ -81,7 +81,7 @@ public final class RecordingObserver<R extends IResponse> implements IStreamObse
     /**
      * 工具调用参数按 index 拼装中的中间结果。
      */
-    private final Map<Integer, String[]> toolCalls = new LinkedHashMap<Integer, String[]>();
+    private final Map<Integer, String[]> toolCalls = new LinkedHashMap<>();
 
     /**
      * 已收到的事件总数。
@@ -269,7 +269,7 @@ public final class RecordingObserver<R extends IResponse> implements IStreamObse
      * @return 工具调用列表，非 null；没有任何调用时为空列表
      */
     public List<ToolCall> toolCalls() {
-        List<ToolCall> result = new ArrayList<ToolCall>();
+        List<ToolCall> result = new ArrayList<>();
         for (Map.Entry<Integer, String[]> entry : toolCalls.entrySet()) {
             String[] call = entry.getValue();
             if (call[1] == null && call[2] == null) {

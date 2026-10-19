@@ -3,7 +3,6 @@ package com.clara.config;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
-
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -75,13 +74,13 @@ public final class ModelFailover {
      * <p>去重按别名（{@link ConfigLocator#aliasOf(Path)}，大小写不敏感）而不是路径对象：同一份配置可能以
      * 相对 / 绝对两种写法传入，按路径比较会把同一个模型排两次、白白多打一次失败请求。
      *
-     * @param ranked  启动期按首字符响应时间升序排好的可用模型配置，可为 null 或空
+     * @param ranked  启动期按首字符响应时间升序排列好可用模型配置，可为 null 或空
      * @param current 当前生效的模型配置，可为 null
      * @return 本轮尝试顺序，非 null；都为空时返回空列表（调用方据此只跑当前模型，不换）
      */
     public static List<Path> attemptOrder(List<Path> ranked, Path current) {
-        Set<String> seen = new LinkedHashSet<String>();
-        List<Path> order = new ArrayList<Path>();
+        Set<String> seen = new LinkedHashSet<>();
+        List<Path> order = new ArrayList<>();
         add(order, seen, current);
         if (ranked != null) {
             for (Path path : ranked) {

@@ -44,7 +44,7 @@ public final class UsageTrendChart {
     /**
      * 采样点：{@code [时间戳毫秒, 累计 token]}。
      */
-    private final List<long[]> samples = new ArrayList<long[]>();
+    private final List<long[]> samples = new ArrayList<>();
 
     /**
      * 累计 token（自会话开始）。

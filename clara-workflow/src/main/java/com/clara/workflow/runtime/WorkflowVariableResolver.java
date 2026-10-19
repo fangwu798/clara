@@ -56,14 +56,14 @@ public final class WorkflowVariableResolver {
             return substitute(text, scope, nodeId);
         }
         if (value instanceof Map) {
-            Map<String, Object> resolved = new LinkedHashMap<String, Object>();
+            Map<String, Object> resolved = new LinkedHashMap<>();
             for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
                 resolved.put(String.valueOf(entry.getKey()), resolveValue(entry.getValue(), scope, nodeId));
             }
             return resolved;
         }
         if (value instanceof List) {
-            List<Object> resolved = new ArrayList<Object>();
+            List<Object> resolved = new ArrayList<>();
             for (Object item : (List<?>) value) {
                 resolved.add(resolveValue(item, scope, nodeId));
             }

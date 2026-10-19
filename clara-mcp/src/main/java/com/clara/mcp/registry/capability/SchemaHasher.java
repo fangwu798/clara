@@ -42,7 +42,7 @@ public final class SchemaHasher {
             target.append(']');
         } else if (value instanceof Map) {
             Map<?, ?> map = (Map<?, ?>) value;
-            List<String> keys = new ArrayList<String>();
+            List<String> keys = new ArrayList<>();
             for (Object key : map.keySet()) {
                 if (!(key instanceof String)) { throw new IllegalArgumentException("map keys must be strings"); }
                 keys.add((String) key);

@@ -7,18 +7,18 @@ import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
-import com.clara.mcp.registry.capability.McpPromptDescriptor;
-import com.clara.mcp.registry.capability.McpResourceDescriptor;
-import com.clara.mcp.registry.capability.McpResourceTemplateDescriptor;
-import com.clara.mcp.registry.capability.McpToolDescriptor;
+import com.clara.mcp.api.IMcpTransport;
+import com.clara.mcp.api.IMcpTransportListener;
 import com.clara.mcp.client.call.McpPromptRequest;
 import com.clara.mcp.client.call.McpPromptResult;
 import com.clara.mcp.client.call.McpResourceContent;
 import com.clara.mcp.client.call.McpResourceRequest;
 import com.clara.mcp.client.call.McpToolCall;
 import com.clara.mcp.client.call.McpToolResult;
-import com.clara.mcp.transport.McpTransport;
-import com.clara.mcp.transport.McpTransportListener;
+import com.clara.mcp.registry.capability.McpPromptDescriptor;
+import com.clara.mcp.registry.capability.McpResourceDescriptor;
+import com.clara.mcp.registry.capability.McpResourceTemplateDescriptor;
+import com.clara.mcp.registry.capability.McpToolDescriptor;
 import com.clara.mcp.transport.jsonrpc.JsonRpcError;
 import com.clara.mcp.transport.jsonrpc.JsonRpcNotification;
 import com.clara.mcp.transport.jsonrpc.JsonRpcRequest;
@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -284,7 +283,7 @@ public class DefaultMcpClientTest {
     }
 
     private static Map<String, Object> map(Object... keyValues) {
-        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        Map<String, Object> result = new LinkedHashMap<>();
         for (int index = 0; index < keyValues.length; index += 2) {
             result.put((String) keyValues[index], keyValues[index + 1]);
         }
@@ -304,9 +303,9 @@ public class DefaultMcpClientTest {
         }
     }
 
-    private static final class FakeTransport implements McpTransport {
-        private final List<JsonRpcRequest> requests = new ArrayList<JsonRpcRequest>();
-        private final List<JsonRpcNotification> notifications = new ArrayList<JsonRpcNotification>();
+    private static final class FakeTransport implements IMcpTransport {
+        private final List<JsonRpcRequest> requests = new ArrayList<>();
+        private final List<JsonRpcNotification> notifications = new ArrayList<>();
         private JsonRpcResponse response;
         private RuntimeException failure;
         private boolean never;
@@ -314,11 +313,11 @@ public class DefaultMcpClientTest {
         private int closed;
         private int cancellations;
 
-        public void start(McpTransportListener listener) { started++; }
+        public void start(IMcpTransportListener listener) { started++; }
 
         public CompletableFuture<JsonRpcResponse> sendRequest(JsonRpcRequest request, long timeoutMillis) {
             requests.add(request);
-            CompletableFuture<JsonRpcResponse> future = new CompletableFuture<JsonRpcResponse>();
+            CompletableFuture<JsonRpcResponse> future = new CompletableFuture<>();
             if (failure != null) { future.completeExceptionally(failure); return future; }
             if (never) { return future; }
             future.complete(response);

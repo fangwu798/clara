@@ -99,7 +99,7 @@ public class MilvusSemanticMemoryStoreBm25Test {
     private static final class RecordingBackend implements MilvusBackend {
 
         private final MilvusCollectionSpec spec;
-        private final List<MilvusBackendQuery> queries = new ArrayList<MilvusBackendQuery>();
+        private final List<MilvusBackendQuery> queries = new ArrayList<>();
         private List<MemoryEntry> upserted = Collections.emptyList();
         private List<MemoryMatch> results = Collections.emptyList();
 
@@ -114,13 +114,13 @@ public class MilvusSemanticMemoryStoreBm25Test {
 
         @Override
         public void upsert(String collection, List<MemoryEntry> entries) {
-            this.upserted = new ArrayList<MemoryEntry>(entries);
+            this.upserted = new ArrayList<>(entries);
         }
 
         @Override
         public List<MemoryMatch> search(String collection, MilvusBackendQuery query) {
             queries.add(query);
-            return new ArrayList<MemoryMatch>(results);
+            return new ArrayList<>(results);
         }
 
         @Override

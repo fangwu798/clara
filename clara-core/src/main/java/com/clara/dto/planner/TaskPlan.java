@@ -39,8 +39,8 @@ public final class TaskPlan {
                 || limits == null || status == null) {
             throw new IllegalArgumentException("task plan is invalid");
         }
-        List<TaskNode> copied = new ArrayList<TaskNode>(tasks.size());
-        Set<String> ids = new HashSet<String>();
+        List<TaskNode> copied = new ArrayList<>(tasks.size());
+        Set<String> ids = new HashSet<>();
         for (TaskNode task : tasks) {
             if (task == null || !ids.add(task.getTaskId())) {
                 throw new IllegalArgumentException("task IDs must be unique");

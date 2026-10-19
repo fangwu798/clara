@@ -89,8 +89,8 @@ public final class WorkflowCatalog {
      * @return 标识到描述的映射，描述缺失时值为空串；非 null
      */
     public static Map<String, String> descriptions() {
-        Map<String, String> result = new LinkedHashMap<String, String>();
-        List<Entry> entries = new ArrayList<Entry>(scan());
+        Map<String, String> result = new LinkedHashMap<>();
+        List<Entry> entries = new ArrayList<>(scan());
         Collections.sort(entries, (left, right) -> left.id.compareTo(right.id));
         for (Entry entry : entries) {
             result.put(entry.id, entry.description == null ? "" : entry.description);
@@ -122,14 +122,14 @@ public final class WorkflowCatalog {
      * @return 文本行列表，非 null，可为空
      */
     public static List<String> customSummaries() {
-        List<Entry> entries = new ArrayList<Entry>();
+        List<Entry> entries = new ArrayList<>();
         for (Entry entry : scan()) {
             if (entry.custom) {
                 entries.add(entry);
             }
         }
         Collections.sort(entries, (left, right) -> left.id.compareTo(right.id));
-        List<String> lines = new ArrayList<String>();
+        List<String> lines = new ArrayList<>();
         for (Entry entry : entries) {
             lines.add(entry.label());
         }
@@ -142,13 +142,13 @@ public final class WorkflowCatalog {
      * @return 清单文本，无可用工作流时返回空串，非 null
      */
     public static String catalogText() {
-        List<Entry> entries = new ArrayList<Entry>(scan());
+        List<Entry> entries = new ArrayList<>(scan());
         if (entries.isEmpty()) {
             return "";
         }
         Collections.sort(entries, (left, right) -> left.id.compareTo(right.id));
-        List<String> builtin = new ArrayList<String>();
-        List<String> custom = new ArrayList<String>();
+        List<String> builtin = new ArrayList<>();
+        List<String> custom = new ArrayList<>();
         for (Entry entry : entries) {
             (entry.custom ? custom : builtin).add(entry.label());
         }
@@ -193,7 +193,7 @@ public final class WorkflowCatalog {
         if (directory == null || !Files.isDirectory(directory)) {
             return Collections.emptyList();
         }
-        List<Entry> entries = new ArrayList<Entry>();
+        List<Entry> entries = new ArrayList<>();
         try (Stream<Path> stream = Files.walk(directory)) {
             stream.filter(Files::isRegularFile).filter(WorkflowCatalog::isWorkflowFile)
                     .sorted().forEach(file -> collect(entries, file, directory));
@@ -245,7 +245,7 @@ public final class WorkflowCatalog {
         if (required == null || !required.isArray()) {
             return null;
         }
-        List<String> names = new ArrayList<String>();
+        List<String> names = new ArrayList<>();
         for (JsonNode item : required) {
             if (item.isTextual() && !item.textValue().trim().isEmpty()) {
                 names.add(item.textValue().trim());

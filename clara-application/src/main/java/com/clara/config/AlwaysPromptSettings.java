@@ -58,7 +58,7 @@ public final class AlwaysPromptSettings {
     private final List<String> ids;
 
     private AlwaysPromptSettings(List<String> ids) {
-        this.ids = Collections.unmodifiableList(new ArrayList<String>(ids));
+        this.ids = Collections.unmodifiableList(new ArrayList<>(ids));
     }
 
     /**
@@ -86,7 +86,7 @@ public final class AlwaysPromptSettings {
         if (value == null || !value.isArray()) {
             return defaults();
         }
-        List<String> ids = new ArrayList<String>();
+        List<String> ids = new ArrayList<>();
         for (JsonNode element : value) {
             if (element != null && element.isTextual() && !element.asText().trim().isEmpty()) {
                 ids.add(element.asText().trim());

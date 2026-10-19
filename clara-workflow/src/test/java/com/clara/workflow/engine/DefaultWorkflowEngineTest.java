@@ -36,7 +36,7 @@ import static org.junit.Assert.assertTrue;
 public class DefaultWorkflowEngineTest {
 
     private final InMemoryCheckpointStore store = new InMemoryCheckpointStore();
-    private final List<DefaultWorkflowEngine> engines = new ArrayList<DefaultWorkflowEngine>();
+    private final List<DefaultWorkflowEngine> engines = new ArrayList<>();
 
     @After
     public void tearDown() {
@@ -59,7 +59,7 @@ public class DefaultWorkflowEngineTest {
         return WorkflowNodes.action(id, WorkflowNodeTypeEnum.TOOL, Collections.singleton(outputKey),
                 "idem-" + id, scope -> {
                     ran.add(id);
-                    Map<String, Object> output = new LinkedHashMap<String, Object>();
+                    Map<String, Object> output = new LinkedHashMap<>();
                     output.put(outputKey, "value-" + id);
                     return output;
                 });
@@ -70,7 +70,7 @@ public class DefaultWorkflowEngineTest {
         return WorkflowNodes.action(id, WorkflowNodeTypeEnum.TOOL, Collections.singleton(outputKey),
                 "idem-" + id, scope -> {
                     int value = counter.incrementAndGet();
-                    Map<String, Object> output = new LinkedHashMap<String, Object>();
+                    Map<String, Object> output = new LinkedHashMap<>();
                     output.put(outputKey, value);
                     return output;
                 });
@@ -78,7 +78,7 @@ public class DefaultWorkflowEngineTest {
 
     @Test
     public void executesActionNodeAndWritesCheckpoint() {
-        List<String> ran = new ArrayList<String>();
+        List<String> ran = new ArrayList<>();
         WorkflowResult result = engine(2).start(definition(action("a1", "out", ran)), "inst-1",
                 Collections.emptyMap());
 
@@ -97,7 +97,7 @@ public class DefaultWorkflowEngineTest {
 
     @Test
     public void executesSequenceInOrder() {
-        List<String> ran = new ArrayList<String>();
+        List<String> ran = new ArrayList<>();
         IWorkflowNode root = WorkflowNodes.sequence("seq",
                 Arrays.asList(action("a", "outA", ran), action("b", "outB", ran)));
         WorkflowResult result = engine(2).start(definition(root), "inst-seq", Collections.emptyMap());
@@ -110,7 +110,7 @@ public class DefaultWorkflowEngineTest {
 
     @Test
     public void executesParallelBranches() {
-        List<String> ran = Collections.synchronizedList(new ArrayList<String>());
+        List<String> ran = Collections.synchronizedList(new ArrayList<>());
         IWorkflowNode root = WorkflowNodes.parallel("par",
                 Arrays.asList(action("a", "outA", ran), action("b", "outB", ran)));
         WorkflowResult result = engine(2).start(definition(root), "inst-par", Collections.emptyMap());
@@ -124,11 +124,11 @@ public class DefaultWorkflowEngineTest {
 
     @Test
     public void selectsTrueBranchWhenConditionHolds() {
-        List<String> ran = new ArrayList<String>();
+        List<String> ran = new ArrayList<>();
         IScopeCondition condition = scope -> Boolean.TRUE.equals(scope.get("flag"));
         IWorkflowNode root = WorkflowNodes.condition("cond", condition,
                 action("t", "outT", ran), action("f", "outF", ran));
-        Map<String, Object> inputs = new LinkedHashMap<String, Object>();
+        Map<String, Object> inputs = new LinkedHashMap<>();
         inputs.put("flag", Boolean.TRUE);
 
         WorkflowResult result = engine(2).start(definition(root), "inst-cond", inputs);
@@ -141,11 +141,11 @@ public class DefaultWorkflowEngineTest {
 
     @Test
     public void selectsFalseBranchWhenConditionFails() {
-        List<String> ran = new ArrayList<String>();
+        List<String> ran = new ArrayList<>();
         IScopeCondition condition = scope -> Boolean.TRUE.equals(scope.get("flag"));
         IWorkflowNode root = WorkflowNodes.condition("cond", condition,
                 action("t", "outT", ran), action("f", "outF", ran));
-        Map<String, Object> inputs = new LinkedHashMap<String, Object>();
+        Map<String, Object> inputs = new LinkedHashMap<>();
         inputs.put("flag", Boolean.FALSE);
 
         WorkflowResult result = engine(2).start(definition(root), "inst-cond-false", inputs);
@@ -269,8 +269,8 @@ public class DefaultWorkflowEngineTest {
     @Test
     public void closeReleasesParallelExecutor() {
         IWorkflowNode root = WorkflowNodes.parallel("par",
-                Arrays.asList(action("a", "outA", new ArrayList<String>()),
-                        action("b", "outB", new ArrayList<String>())));
+                Arrays.asList(action("a", "outA", new ArrayList<>()),
+                        action("b", "outB", new ArrayList<>())));
         WorkflowDefinition definition = definition(root);
         DefaultWorkflowEngine engine = engine(2);
         engine.start(definition, "inst-open", Collections.emptyMap());

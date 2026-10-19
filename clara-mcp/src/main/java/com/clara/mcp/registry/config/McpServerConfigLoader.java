@@ -77,7 +77,7 @@ public final class McpServerConfigLoader {
         JsonNode servers = root.get("mcpServers");
         if (servers == null) { throw new IllegalArgumentException("mcp config must contain an 'mcpServers' object"); }
         if (!servers.isObject()) { throw new IllegalArgumentException("'mcpServers' must be a json object"); }
-        List<McpServerConfig> result = new ArrayList<McpServerConfig>();
+        List<McpServerConfig> result = new ArrayList<>();
         Iterator<Map.Entry<String, JsonNode>> fields = servers.fields();
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> field = fields.next();
@@ -118,7 +118,7 @@ public final class McpServerConfigLoader {
     }
 
     private static List<String> command(JsonNode commandNode, JsonNode argsNode, String serverKey) {
-        List<String> parts = new ArrayList<String>();
+        List<String> parts = new ArrayList<>();
         if (commandNode != null && !commandNode.isNull()) {
             if (commandNode.isArray()) {
                 for (JsonNode element : commandNode) { parts.add(requireText(element, "command", serverKey)); }
@@ -140,7 +140,7 @@ public final class McpServerConfigLoader {
     }
 
     private Map<String, String> interpolatedMap(JsonNode node, String field, String serverKey) {
-        Map<String, String> result = new LinkedHashMap<String, String>();
+        Map<String, String> result = new LinkedHashMap<>();
         if (node == null || node.isNull()) { return result; }
         if (!node.isObject()) {
             throw new IllegalArgumentException("field '" + field + "' of server '" + serverKey + "' must be a json object");

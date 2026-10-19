@@ -7,7 +7,7 @@ import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.core.model.IResponse;
 import com.clara.kernel.api.execute.IResponseDecoder;
-import com.clara.dto.model.RawHttpResponse;
+import com.clara.core.transport.RawHttpResponse;
 import com.clara.utils.ExceptionUtils;
 import com.clara.utils.deserialize.ResponseDecoderSupport;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -69,9 +69,9 @@ public abstract class AbstractResponseDecoder implements IResponseDecoder {
         }
         ModelProviderEnum provider = provider();
         CapabilityKindEnum capability = capability();
-        List<StreamAssembler.Rule> deltas = new ArrayList<StreamAssembler.Rule>();
-        List<StreamAssembler.Rule> singles = new ArrayList<StreamAssembler.Rule>();
-        List<StreamAssembler.Rule> terminals = new ArrayList<StreamAssembler.Rule>();
+        List<StreamAssembler.Rule> deltas = new ArrayList<>();
+        List<StreamAssembler.Rule> singles = new ArrayList<>();
+        List<StreamAssembler.Rule> terminals = new ArrayList<>();
         for (Field field : ResponseDecoderSupport.fields(responseType)) {
             ResponseAdapter adapter = ResponseDecoderSupport.match(field, provider, capability);
             if (adapter == null) {

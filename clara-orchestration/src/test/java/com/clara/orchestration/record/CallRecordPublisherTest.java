@@ -67,7 +67,7 @@ public class CallRecordPublisherTest {
 
     private static final class RecordingSink implements ICallRecordSink {
 
-        private final List<CallRecord> records = new ArrayList<CallRecord>();
+        private final List<CallRecord> records = new ArrayList<>();
 
         @Override
         public void accept(CallRecord record) {

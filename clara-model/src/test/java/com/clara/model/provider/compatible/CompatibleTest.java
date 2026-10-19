@@ -8,7 +8,7 @@ import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
-import com.clara.dto.model.RawHttpResponse;
+import com.clara.core.transport.RawHttpResponse;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
 import com.clara.core.message.IContent;
 import com.clara.kernel.message.delta.ImageItem;
@@ -516,7 +516,7 @@ public class CompatibleTest {
      * @return 消息列表
      */
     private static List<IContent> toolResultMessages(ToolCall call) {
-        List<IContent> messages = new ArrayList<IContent>();
+        List<IContent> messages = new ArrayList<>();
         messages.add(new UserContent(TOOL_PROMPT));
         messages.add(new ToolCallContent(Collections.singletonList(call)));
         messages.add(new ToolContent(call.getId(), TOOL_RESULT));
@@ -542,7 +542,7 @@ public class CompatibleTest {
     private static ToolCall requireToolCall(HttpResponse response) throws Exception {
         assertSuccess(response);
         if (response.getResponsesToolCalls() != null && !response.getResponsesToolCalls().isEmpty()) {
-            List<ToolCall> calls = new ArrayList<ToolCall>();
+            List<ToolCall> calls = new ArrayList<>();
             for (ResponsesToolCall call : response.getResponsesToolCalls()) {
                 calls.add(toToolCall(call));
             }
@@ -704,12 +704,12 @@ public class CompatibleTest {
      * @return JSON Schema 结构
      */
     private static Map<String, Object> weatherSchema() {
-        Map<String, Object> city = new LinkedHashMap<String, Object>();
+        Map<String, Object> city = new LinkedHashMap<>();
         city.put("type", "string");
         city.put("description", "城市名称，例如：杭州");
-        Map<String, Object> properties = new LinkedHashMap<String, Object>();
+        Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("city", city);
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         schema.put("properties", properties);
         schema.put("required", Collections.singletonList("city"));

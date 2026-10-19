@@ -2,8 +2,8 @@ package com.clara.mcp.client;
 
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCodes;
+import com.clara.mcp.api.IMcpClient;
 import com.clara.mcp.client.DefaultMcpClient;
-import com.clara.mcp.client.McpClient;
 import com.clara.mcp.registry.McpRegistrationStatus;
 import com.clara.mcp.registry.McpServerRegistration;
 import com.clara.mcp.registry.McpTransportProfile;
@@ -14,7 +14,6 @@ import java.util.Collections;
 import java.util.List;
 import org.junit.Assume;
 import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -29,7 +28,7 @@ public class DefaultMcpClientFactoryTest {
     @Test
     public void streamableHttpProfileCreatesClient() throws Exception {
         DefaultMcpClientFactory factory = factoryFor(Paths.get("."));
-        McpClient client = factory.create(registration("http-server",
+        IMcpClient client = factory.create(registration("http-server",
                 McpTransportProfile.STREAMABLE_HTTP, "https://mcp.example.com/rpc"));
 
         assertNotNull(client);
@@ -43,7 +42,7 @@ public class DefaultMcpClientFactoryTest {
         Assume.assumeFalse("working directory must not contain spaces for command parsing",
                 base.toString().contains(" "));
         DefaultMcpClientFactory factory = factoryFor(base);
-        McpClient client = factory.create(registration("stdio-server",
+        IMcpClient client = factory.create(registration("stdio-server",
                 McpTransportProfile.STDIO, base.toString()));
 
         assertNotNull(client);
@@ -63,7 +62,7 @@ public class DefaultMcpClientFactoryTest {
                 Collections.singletonList(base), base, null, 1000L);
         List<String> command = Collections.singletonList(bare);
 
-        McpClient client = factory.create(registrationWithCommand(bare, command));
+        IMcpClient client = factory.create(registrationWithCommand(bare, command));
 
         assertNotNull(client);
         client.close();

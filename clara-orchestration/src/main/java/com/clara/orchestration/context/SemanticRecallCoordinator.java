@@ -110,9 +110,9 @@ public final class SemanticRecallCoordinator {
                 System.currentTimeMillis(), null, userInput);
         List<MemoryMatch> matches = semanticMemoryStore.search(query);
         Set<String> visible = visibleTexts(visibleMessages);
-        List<String> knowledge = new ArrayList<String>();
-        List<String> details = new ArrayList<String>();
-        List<String> duplicates = new ArrayList<String>();
+        List<String> knowledge = new ArrayList<>();
+        List<String> details = new ArrayList<>();
+        List<String> duplicates = new ArrayList<>();
         int aboveThreshold = 0;
         double bestScore = Double.NEGATIVE_INFINITY;
         for (MemoryMatch match : matches) {
@@ -174,7 +174,7 @@ public final class SemanticRecallCoordinator {
         if (messages == null || messages.isEmpty()) {
             return Collections.emptySet();
         }
-        Set<String> texts = new HashSet<String>();
+        Set<String> texts = new HashSet<>();
         for (IContent message : messages) {
             String text = ConversationMemoryText.of(message);
             if (text != null) {

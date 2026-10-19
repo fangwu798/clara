@@ -30,7 +30,7 @@ import java.util.List;
  */
 public final class StreamingToolCallObserver implements IStreamObserver {
 
-    private final RecordingObserver<IResponse> recorder = new RecordingObserver<IResponse>(IResponse.class);
+    private final RecordingObserver<IResponse> recorder = new RecordingObserver<>(IResponse.class);
 
     private final IStreamObserver delegate;
 

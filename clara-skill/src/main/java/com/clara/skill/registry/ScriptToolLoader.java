@@ -42,7 +42,7 @@ public final class ScriptToolLoader {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** 脚本声明缓存：脚本绝对路径 → （文件签名, 声明）。 */
-    private final Map<String, CachedTool> cache = new ConcurrentHashMap<String, CachedTool>();
+    private final Map<String, CachedTool> cache = new ConcurrentHashMap<>();
 
     private volatile boolean pythonMissingWarned;
 
@@ -112,7 +112,7 @@ public final class ScriptToolLoader {
     private String describe(File script) {
         Process process = null;
         try {
-            List<String> command = new ArrayList<String>();
+            List<String> command = new ArrayList<>();
             command.add(PythonScriptExecutor.pythonPath());
             command.add(script.getAbsolutePath());
             command.add("--describe");
@@ -198,7 +198,7 @@ public final class ScriptToolLoader {
         if (node == null || !node.isObject()) {
             return null;
         }
-        Map<String, String> result = new LinkedHashMap<String, String>();
+        Map<String, String> result = new LinkedHashMap<>();
         Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> field = fields.next();

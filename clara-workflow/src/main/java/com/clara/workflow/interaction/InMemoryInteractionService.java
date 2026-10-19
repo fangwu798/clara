@@ -38,9 +38,9 @@ public final class InMemoryInteractionService implements IInteractionService {
     private final ITimeSource timeSource;
     private final int maxInteractionsPerRun;
     private final Map<String, InteractionRequest> requests =
-            new LinkedHashMap<String, InteractionRequest>();
+            new LinkedHashMap<>();
     private final Map<String, FeedbackResult> feedbackByKey =
-            new LinkedHashMap<String, FeedbackResult>();
+            new LinkedHashMap<>();
 
     public InMemoryInteractionService(IInteractionResumeCoordinator coordinator,
             IAnswerSchemaValidator schemaValidator, ITimeSource timeSource, int maxInteractionsPerRun) {
@@ -84,7 +84,7 @@ public final class InMemoryInteractionService implements IInteractionService {
     public synchronized List<InteractionRequest> pending(String runId) {
         requireId(runId);
         expire(timeSource.currentTimeMillis());
-        List<InteractionRequest> result = new ArrayList<InteractionRequest>();
+        List<InteractionRequest> result = new ArrayList<>();
         for (InteractionRequest request : requests.values()) {
             if (request.getContext().getRunId().equals(runId)
                     && request.getState() == InteractionStateEnum.PENDING) {
@@ -158,8 +158,8 @@ public final class InMemoryInteractionService implements IInteractionService {
                 InteractionStateEnum.ANSWERED, response, null);
         ResumeOutcome outcome = null;
         if (!hasOtherRequiredInteraction(request)) {
-            Map<String, Object> scopeUpdates = new LinkedHashMap<String, Object>();
-            List<InteractionResponse> responses = new ArrayList<InteractionResponse>();
+            Map<String, Object> scopeUpdates = new LinkedHashMap<>();
+            List<InteractionResponse> responses = new ArrayList<>();
             for (InteractionRequest value : requests.values()) {
                 if (value.getContext().getRunId().equals(request.getContext().getRunId())
                         && value.getContext().getInstanceId().equals(request.getContext().getInstanceId())
@@ -214,7 +214,7 @@ public final class InMemoryInteractionService implements IInteractionService {
     }
 
     private void expire(long now) {
-        List<InteractionRequest> expired = new ArrayList<InteractionRequest>();
+        List<InteractionRequest> expired = new ArrayList<>();
         for (InteractionRequest request : requests.values()) {
             if (request.getState() == InteractionStateEnum.PENDING
                     && now >= request.getContext().getExpiresAtEpochMillis()) {
@@ -311,7 +311,7 @@ public final class InMemoryInteractionService implements IInteractionService {
     }
 
     private static boolean validOptions(Question question, Collection<?> selected) {
-        Set<Object> unique = new HashSet<Object>();
+        Set<Object> unique = new HashSet<>();
         if (selected.isEmpty()) {
             return !question.isRequired();
         }

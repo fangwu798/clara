@@ -125,15 +125,15 @@ clara-application/src/main/java/com/clara/
 - 作用：实现 core 契约 `IToolInvoker` 的组合工具调用器，在本地技能工具与外部 MCP 工具之间按工具名分派，是工具往返（`ToolRoundTripCoordinator`）的统一执行入口。
 - 使用范围：由 `ApplicationBootstrap` 装配后交给 orchestration 的工具往返协调器，替代原先直接注入的 skill `DefaultToolInvoker`。
 - 为什么需要：模型返回的工具名可能既包含本地技能，也包含外部 MCP 工具；需要一个判定点决定走本地脚本还是走 clara-mcp，避免 orchestration 感知工具来源。
-- 业务细节：**本地优先、外部兜底**——`SkillRegistry.findToolByName(name)` 命中即委托本地 `IToolInvoker`（skill 的 `DefaultToolInvoker`）执行；否则查 `ExternalToolCatalog.find(name)`，命中则用当前 `ConvContext.current()` / `currentCall()` 与绑定信息构造 `McpToolCall` 调 `McpGateway.callTool`，把 `McpToolResult` 内容序列化为 JSON 文本作为 `ToolResult.output`（`callId` 沿用 `IToolInvocation.callId()`）；两处都未命中则抛领域错误，指明本地技能未注册且外部工具未登记。降级：外部工具目录为空时非本地工具一律按「未找到」处理；`mcpGateway` 为 null 时外部分支抛「未接入」错误。
-- 技术细节：构造注入 `SkillRegistry` + 本地 `IToolInvoker` + `McpGateway` + `ExternalToolCatalog`（除 `mcpGateway` 可空外均要求非 null）；工具名空白抛 `INVALID_ARGUMENT`，未命中抛 `SKILL_NOT_FOUND`，网关缺失抛 `CAPABILITY_NOT_SUPPORTED`，缺少会话 / 调用上下文或入参非法 JSON 抛 `INVALID_ARGUMENT`；入参 JSON 字符串经 `ObjectMapper` 解析为参数 map（空白视为空 map）。
+- 业务细节：**本地优先、外部兜底**——`SkillRegistry.findToolByName(name)` 命中即委托本地 `IToolInvoker`（skill 的 `DefaultToolInvoker`）执行；否则查 `ExternalToolCatalog.find(name)`，命中则用当前 `ConvContext.current()` / `currentCall()` 与绑定信息构造 `McpToolCall` 调 `IMcpGateway.callTool`，把 `McpToolResult` 内容序列化为 JSON 文本作为 `ToolResult.output`（`callId` 沿用 `IToolInvocation.callId()`）；两处都未命中则抛领域错误，指明本地技能未注册且外部工具未登记。降级：外部工具目录为空时非本地工具一律按「未找到」处理；`mcpGateway` 为 null 时外部分支抛「未接入」错误。
+- 技术细节：构造注入 `SkillRegistry` + 本地 `IToolInvoker` + `IMcpGateway` + `ExternalToolCatalog`（除 `mcpGateway` 可空外均要求非 null）；工具名空白抛 `INVALID_ARGUMENT`，未命中抛 `SKILL_NOT_FOUND`，网关缺失抛 `CAPABILITY_NOT_SUPPORTED`，缺少会话 / 调用上下文或入参非法 JSON 抛 `INVALID_ARGUMENT`；入参 JSON 字符串经 `ObjectMapper` 解析为参数 map（空白视为空 map）。
 
 **`ExternalToolCatalog`（`com.clara.tool`，新增）**
 - 作用：外部工具路由登记表，维护「工具名 → `ExternalToolBinding`」映射，是「名字是不是外部工具、走哪个 MCP 服务端」的唯一判定与查询点。
 - 使用范围：由 `ApplicationBootstrap` 创建并持有；宿主 / 能力发现流程登记外部工具，`CompositeToolInvoker` 查询路由。
 - 为什么需要：本地工具由 skill 注册表判定，外部工具需另有一处登记；把登记与查询收敛到一个线程安全目录，避免在调用链路里硬编码服务端信息。
-- 业务细节：`register(toolName, binding)` 登记（同名覆盖）、`find(toolName)` 查找（未命中返回 null）、`clear()` 清空、`snapshot()` 返回当次不可变副本供观测 / 审计。
-- 技术细节：内部用 `ConcurrentHashMap` 存储，登记 / 查找 / 清空可并发；`register` 校验工具名非空白、绑定非 null；`snapshot()` 返回 `LinkedHashMap` 的不可修改副本。
+- 业务细节：`register(toolName, binding)` 登记（同名覆盖）、`registerSnapshot(tenantId, snapshot)` 把一次 MCP 能力快照中的全部工具登记为路由绑定、`find(toolName)` 查找（未命中返回 null）、`clear()` 清空、`snapshot()` 返回当次不可变副本供观测 / 审计。
+- 技术细节：内部用 `ConcurrentHashMap` 存储，登记 / 查找 / 清空可并发；`register` 校验工具名非空白、绑定非 null；`registerSnapshot` 校验租户非空白、快照非 null，遍历快照工具逐条登记并返回登记个数；`snapshot()` 返回 `LinkedHashMap` 的不可修改副本。
 
 **`ExternalToolBinding`（`com.clara.tool`，新增）**
 - 作用：外部工具路由绑定值对象，承载 `tenantId` / `serverKey` / `snapshotId` / `schemaHash`，用于在调用时构造 `McpToolCall`。
@@ -141,19 +141,12 @@ clara-application/src/main/java/com/clara/
 - 为什么需要：把「一次外部工具调用所需的 MCP 定位信息」打包为一个不可变值对象，避免散落的多个参数。
 - 技术细节：构造后不可变、可跨线程共享；任一字段为 null 或空白时构造抛 `IllegalArgumentException`。
 
-**`McpExternalToolRegistrar`（`com.clara.tool`，新增）**
-- 作用：把一次 MCP 能力快照（`McpServerSnapshot`）中的工具登记为外部工具路由绑定，衔接「MCP 发现」与「`ExternalToolCatalog` 登记」。
-- 使用范围：由 `ApplicationBootstrap` 持有，在 `loadMcpServers` 流程发现成功后调用；也可由宿主对任意快照直接调用。
-- 为什么需要：发现只产出能力快照，工具名要进入外部工具路由目录才能被 `CompositeToolInvoker` 命中；把「快照 → 绑定」的转换收敛到一处，避免装配层散落遍历逻辑。
-- 业务细节：`register(tenantId, snapshot, catalog)` 遍历快照工具，对每个工具登记 `ExternalToolBinding(tenantId, snapshot.getServerKey(), snapshot.getSnapshotId(), tool.getSchemaHash())`（同名工具按目录约定以最后一次为准），返回登记的工具个数。
-- 技术细节：无状态、可跨线程共享；`tenantId` 空白、`snapshot` / `catalog` 为 null 时抛 `IllegalArgumentException`；不持有 MCP 客户端、不发起调用。
-
 **`McpToolCatalog`（`com.clara.tool`，新增）**
 - 作用：core 契约 `IToolCatalog` 的实现，把「已发现并已登记」的 MCP 工具声明成可下发给模型的工具。
 - 使用范围：由 `ApplicationBootstrap` 装配进 `CompositeToolCatalog`，供编排层组装请求体时取「本轮可下发工具」。
 - 为什么需要：调用侧路由早已能按工具名转给 MCP 网关，但下发侧原先只声明技能注册表里的本地工具，模型永远不知道该调用哪个外部工具；补上本目录后「发现 → 声明 → 调用」才闭合。
-- 业务细节：只列注册状态可用的服务端（`McpServerRegistry.listEnabled(tenantId)`）的最新快照，把工具名 / 描述 / 入参 Schema 转成 `ToolContext(ToolSpecification)`；入参 Schema 直接沿用 MCP 声明的 JSON Schema，不额外包装。
-- 技术细节：`McpServerRegistry` 与 `McpCapabilityCatalog` 都可被后续发现流程更新，故每次调用都重新读取快照、不缓存；实例无状态可跨线程共享；构造要求 `tenantId` 非空白。
+- 业务细节：只列注册状态可用的服务端（`IMcpServerRegistry.listEnabled(tenantId)`）的最新快照，把工具名 / 描述 / 入参 Schema 转成 `ToolContext(ToolSpecification)`；入参 Schema 直接沿用 MCP 声明的 JSON Schema，不额外包装。
+- 技术细节：`IMcpServerRegistry` 与 `IMcpCapabilityCatalog` 都可被后续发现流程更新，故每次调用都重新读取快照、不缓存；实例无状态可跨线程共享；构造要求 `tenantId` 非空白。
 
 **`CompositeToolCatalog`（`com.clara.tool`，新增）**
 - 作用：把本地技能工具与外部 MCP 工具合成一份下发声明，同名时本地优先。
@@ -200,15 +193,15 @@ clara-application/src/main/java/com/clara/
 
 ### 5.5 外部工具接入
 
-1. **装配**：`ApplicationBootstrap` 以 `InMemoryMcpServerRegistry` + `InMemoryMcpCapabilityCatalog` + `DefaultMcpClientFactory` 组装 `DefaultMcpGateway` 与 `DefaultMcpDiscoveryService`（支持协议版本 `2024-11-05`、单类能力最大分页 16），并创建 `ExternalToolCatalog` 与 `McpExternalToolRegistrar`；工具往返由 `CompositeToolInvoker` 承担（本地 skill 优先、外部 mcp 兜底）。**构造阶段不访问网络**：MCP 服务端连接推迟到显式调用 `loadMcpServers`。
+1. **装配**：`ApplicationBootstrap` 以 `InMemoryMcpServerRegistry` + `InMemoryMcpCapabilityCatalog` + `DefaultMcpClientFactory` 组装 `DefaultMcpGateway` 与 `DefaultMcpDiscoveryService`（支持协议版本 `2024-11-05`、单类能力最大分页 16），并创建 `ExternalToolCatalog`；工具往返由 `CompositeToolInvoker` 承担（本地 skill 优先、外部 mcp 兜底）。**构造阶段不访问网络**：MCP 服务端连接推迟到显式调用 `loadMcpServers`。
 2. **配置 → 注册 → 发现 → 登记（`loadMcpServers`）**：`loadMcpServers(tenantId, configDirectory)`（便捷重载 `loadMcpServers(tenantId)` 用默认目录 `config/mcp`）依次完成：
    - a. `McpServerConfigDirectoryLoader(new McpServerConfigLoader(), configDirectory).load()` 递归加载并合并 `*.json` 配置；
-   - b. `McpServerRegistrar(registry).registerAll(tenantId, configs)` 把配置转为注册项（状态 `ACTIVE`）登记进 `McpServerRegistry`；
+   - b. `McpServerRegistrar(registry).registerAll(tenantId, configs)` 把配置转为注册项（状态 `ACTIVE`）登记进 `IMcpServerRegistry`；
    - c. 对每个已注册服务端调用 `DefaultMcpDiscoveryService.refresh(tenantId, serverKey)` 完成发现（发布快照 + 按结果更新注册状态）；
-   - d. 用 `McpCapabilityCatalog.latest(tenantId, serverKey)` 取回快照，交 `McpExternalToolRegistrar.register(tenantId, snapshot, catalog)` 把其工具登记进 `ExternalToolCatalog`；
+   - d. 用 `IMcpCapabilityCatalog.latest(tenantId, serverKey)` 取回快照，交 `ExternalToolCatalog.registerSnapshot(tenantId, snapshot)` 把其工具登记进外部工具路由目录；
    - e. 返回成功发现的服务端数。**失败隔离**：单个服务端的发现失败（协议不兼容 / 身份变化 / 连接异常）被捕获并跳过，不影响其余服务端，也不阻断返回；配置加载失败属装配期错误，直接抛出。
-3. **路由登记**：`ExternalToolCatalog` 维护「工具名 → `ExternalToolBinding`（tenantId / serverKey / snapshotId / schemaHash）」。装配层通过 `loadMcpServers` 自动登记；宿主也可对发现后的快照手动调用 `McpExternalToolRegistrar.register` 或直接 `ExternalToolCatalog.register`。
-4. **调用分派**：工具往返时 `CompositeToolInvoker.invoke` 先查 `SkillRegistry.findToolByName`，命中委托本地 `IToolInvoker`；否则查 `ExternalToolCatalog.find`，命中则用当前 `ConvContext.current()` / `currentCall()` 与绑定构造 `McpToolCall` 交 `McpGateway.callTool`，把 `McpToolResult` 内容转为 JSON 文本作为 `ToolResult.output`；两处均未命中抛领域错误（本地技能未注册且外部工具未登记）。
+3. **路由登记**：`ExternalToolCatalog` 维护「工具名 → `ExternalToolBinding`（tenantId / serverKey / snapshotId / schemaHash）」。装配层通过 `loadMcpServers` 自动调用 `registerSnapshot`；宿主也可对任意快照手动调用 `registerSnapshot` 或逐条 `register`。
+4. **调用分派**：工具往返时 `CompositeToolInvoker.invoke` 先查 `SkillRegistry.findToolByName`，命中委托本地 `IToolInvoker`；否则查 `ExternalToolCatalog.find`，命中则用当前 `ConvContext.current()` / `currentCall()` 与绑定构造 `McpToolCall` 交 `IMcpGateway.callTool`，把 `McpToolResult` 内容转为 JSON 文本作为 `ToolResult.output`；两处均未命中抛领域错误（本地技能未注册且外部工具未登记）。
 5. **降级**：`mcpGateway` 为 null 时外部分支抛「未接入」错误；目录为空时非本地工具按「未找到」处理。
 
 ## 6. 业务场景与功能映射

@@ -55,8 +55,8 @@ public final class ToolWorkflowAction implements IWorkflowAction {
         this.nodeId = nodeId;
         this.toolName = toolName;
         this.argumentsTemplate = argumentsTemplate == null
-                ? new LinkedHashMap<String, Object>()
-                : new LinkedHashMap<String, Object>(argumentsTemplate);
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(argumentsTemplate);
     }
 
     @Override
@@ -64,7 +64,7 @@ public final class ToolWorkflowAction implements IWorkflowAction {
         if (scope == null) {
             throw new IllegalArgumentException("scope must not be null");
         }
-        Map<String, Object> arguments = new LinkedHashMap<String, Object>();
+        Map<String, Object> arguments = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : argumentsTemplate.entrySet()) {
             arguments.put(entry.getKey(),
                     WorkflowVariableResolver.resolveValue(entry.getValue(), scope, nodeId));
@@ -84,7 +84,7 @@ public final class ToolWorkflowAction implements IWorkflowAction {
         call.setFunction(function);
 
         ToolResult result = toolInvoker.invoke(call);
-        Map<String, Object> output = new LinkedHashMap<String, Object>();
+        Map<String, Object> output = new LinkedHashMap<>();
         output.put("output", result.getOutput());
         return output;
     }

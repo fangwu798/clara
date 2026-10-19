@@ -31,11 +31,11 @@ public class AnswerSchemaValidatorTest {
     public void enforcesRequiredFields() {
         String schema = "{\"required\":[\"name\",\"age\"]}";
 
-        Map<String, Object> partial = new LinkedHashMap<String, Object>();
+        Map<String, Object> partial = new LinkedHashMap<>();
         partial.put("name", "Alice");
         assertFalse(validator.isValid(schema, partial));
 
-        Map<String, Object> complete = new LinkedHashMap<String, Object>();
+        Map<String, Object> complete = new LinkedHashMap<>();
         complete.put("name", "Alice");
         complete.put("age", Integer.valueOf(30));
         assertTrue(validator.isValid(schema, complete));

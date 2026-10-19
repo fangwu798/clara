@@ -469,7 +469,7 @@ public final class ConfigLocator {
      */
     public static Map<String, String> roleBindings() {
         Path file = locateFile(MODEL_ROLES);
-        Map<String, String> bindings = new LinkedHashMap<String, String>();
+        Map<String, String> bindings = new LinkedHashMap<>();
         if (!Files.isRegularFile(file)) {
             return bindings;
         }

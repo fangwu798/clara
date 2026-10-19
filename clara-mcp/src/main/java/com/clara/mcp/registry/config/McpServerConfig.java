@@ -112,7 +112,7 @@ public final class McpServerConfig {
 
     private static List<String> immutableCommand(List<String> source) {
         if (source == null) { return Collections.emptyList(); }
-        List<String> result = new ArrayList<String>(source.size());
+        List<String> result = new ArrayList<>(source.size());
         for (String token : source) {
             if (isBlank(token)) { throw new IllegalArgumentException("command must not contain blank tokens"); }
             result.add(token);
@@ -122,7 +122,7 @@ public final class McpServerConfig {
 
     private static Map<String, String> immutableMap(Map<String, String> source, String field) {
         if (source == null) { return Collections.emptyMap(); }
-        Map<String, String> result = new LinkedHashMap<String, String>();
+        Map<String, String> result = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : source.entrySet()) {
             if (isBlank(entry.getKey()) || entry.getValue() == null) {
                 throw new IllegalArgumentException(field + " must not contain blank keys or null values");

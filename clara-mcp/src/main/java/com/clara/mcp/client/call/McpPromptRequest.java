@@ -9,7 +9,7 @@ import java.util.Map;
  * 封装MCP提示词操作的输入参数：服务端身份（租户 + 服务端键 + 快照）、提示词名与 Schema 哈希、上下文。
  *
  * <p>是什么、在哪一层：{@code clara-mcp} 客户端的调用入参值对象，由宿主应用创建后交给
- * {@code McpGateway.getPrompt}；网关按其中的 {@code tenantId}、{@code serverKey} 定位服务端并核对
+ * {@code IMcpGateway.getPrompt}；网关按其中的 {@code tenantId}、{@code serverKey} 定位服务端并核对
  * {@code schemaHash} 后取回提示词。
  *
  * <p>为什么显式携带租户：MCP 服务端注册表与能力目录按租户分区，而会话上下文 {@link ConvContext} 已不再

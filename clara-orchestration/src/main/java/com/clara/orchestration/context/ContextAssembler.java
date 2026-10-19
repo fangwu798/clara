@@ -95,7 +95,7 @@ public final class ContextAssembler {
         this.skillMatchCoordinator = skillMatchCoordinator;
         this.basePrompts = basePrompts == null
                 ? Collections.<String>emptyList()
-                : Collections.unmodifiableList(new ArrayList<String>(basePrompts));
+                : Collections.unmodifiableList(new ArrayList<>(basePrompts));
     }
 
     /**
@@ -123,7 +123,7 @@ public final class ContextAssembler {
         List<IContent> prepared = ToolOutputCompactor.compact(windowed, effective.getToolOutputMaxChars());
         String userInput = latestUserInput(windowMemory.conversationId(), history);
 
-        List<IContent> systemParts = new ArrayList<IContent>();
+        List<IContent> systemParts = new ArrayList<>();
         if (effective.isCompressEnabled()) {
             IContent summary = windowCompressionCoordinator.summarize(evicted(history, windowed));
             if (summary != null) {
@@ -141,7 +141,7 @@ public final class ContextAssembler {
                 effective, prepared);
 
         String systemText = systemText(systemParts, basePrompts, matched.getPrompts(), supplement, recall);
-        List<IContent> messages = new ArrayList<IContent>();
+        List<IContent> messages = new ArrayList<>();
         if (!systemText.isEmpty()) {
             messages.add(new SystemContent(systemText));
         }
@@ -153,9 +153,9 @@ public final class ContextAssembler {
      * 取完整历史中最早被窗口淘汰的消息（窗口裁剪从最旧开始整组淘汰）。
      */
     private static List<IContent> evicted(List<IContent> history, List<IContent> windowed) {
-        Set<IContent> kept = Collections.newSetFromMap(new IdentityHashMap<IContent, Boolean>());
+        Set<IContent> kept = Collections.newSetFromMap(new IdentityHashMap<>());
         kept.addAll(windowed);
-        List<IContent> evicted = new ArrayList<IContent>();
+        List<IContent> evicted = new ArrayList<>();
         for (IContent message : history) {
             if (!kept.contains(message)) {
                 evicted.add(message);
@@ -221,8 +221,8 @@ public final class ContextAssembler {
         private final List<ToolContext> tools;
 
         AssembledContext(List<IContent> messages, List<ToolContext> tools) {
-            this.messages = Collections.unmodifiableList(new ArrayList<IContent>(messages));
-            this.tools = Collections.unmodifiableList(new ArrayList<ToolContext>(tools));
+            this.messages = Collections.unmodifiableList(new ArrayList<>(messages));
+            this.tools = Collections.unmodifiableList(new ArrayList<>(tools));
         }
 
         public List<IContent> getMessages() {

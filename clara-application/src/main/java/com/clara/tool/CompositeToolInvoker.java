@@ -9,7 +9,7 @@ import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
-import com.clara.mcp.client.gateway.McpGateway;
+import com.clara.mcp.api.IMcpGateway;
 import com.clara.mcp.client.call.McpToolCall;
 import com.clara.mcp.client.call.McpToolResult;
 import com.clara.mcp.tool.ExternalToolBinding;
@@ -17,7 +17,6 @@ import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.skill.registry.SkillRegistry;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -34,7 +33,7 @@ import java.util.Map;
  *       {@link IToolInvoker}（skill 模块的 {@code DefaultToolInvoker}）执行；</li>
  *   <li><b>外部工具</b>：否则查 {@link ExternalToolCatalog#find(String)}，命中则用当前
  *       {@link ConvContext#current()} 与 {@link ConvContext#currentCall()} 和绑定信息构造
- *       {@link McpToolCall}，经 {@link McpGateway#callTool(McpToolCall)} 调用，把返回内容序列化为 JSON
+ *       {@link McpToolCall}，经 {@link IMcpGateway#callTool(McpToolCall)} 调用，把返回内容序列化为 JSON
  *       文本作为 {@link ToolResult#getOutput()}（{@code callId} 沿用 {@link IToolInvocation#callId()}）；</li>
  *   <li>两处都未命中：抛领域错误，指明本地技能未注册且外部工具未登记。</li>
  * </ol>
@@ -51,7 +50,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
 
     private final SkillRegistry skillRegistry;
     private final IToolInvoker localToolInvoker;
-    private final McpGateway mcpGateway;
+    private final IMcpGateway mcpGateway;
     private final ExternalToolCatalog externalToolCatalog;
 
     /**
@@ -64,7 +63,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
      * @throws IllegalArgumentException 除 mcpGateway 外的依赖为 null 时
      */
     public CompositeToolInvoker(SkillRegistry skillRegistry, IToolInvoker localToolInvoker,
-            McpGateway mcpGateway, ExternalToolCatalog externalToolCatalog) {
+            IMcpGateway mcpGateway, ExternalToolCatalog externalToolCatalog) {
         if (skillRegistry == null) {
             throw new IllegalArgumentException("skillRegistry must not be null");
         }

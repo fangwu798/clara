@@ -1,7 +1,7 @@
 package com.clara.kernel.http;
 
-import com.clara.dto.model.RawHttpRequest;
-import com.clara.dto.model.RawHttpResponse;
+import com.clara.core.transport.RawHttpRequest;
+import com.clara.core.transport.RawHttpResponse;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -29,10 +29,10 @@ import java.util.Objects;
  */
 public final class RawHttpFormatter {
 
-    private static final String CRLF = "\r\n";
+    private RawHttpFormatter(){
 
-    private RawHttpFormatter() {
     }
+    private static final String CRLF = "\r\n";
 
     /**
      * 将请求渲染为 HTTP raw 字符串。
@@ -71,7 +71,9 @@ public final class RawHttpFormatter {
     public static String format(RawHttpResponse response) {
         StringBuilder out = new StringBuilder();
 
-        out.append("HTTP/1.1 ").append(response.getStatusCode()).append(' ')
+        out.append("HTTP/1.1 ")
+                .append(response.getStatusCode())
+                .append(' ')
                 .append(reasonPhrase(response.getStatusCode())).append(CRLF);
 
         for (Map.Entry<String, List<String>> header : response.getHeaders().entrySet()) {
@@ -86,7 +88,7 @@ public final class RawHttpFormatter {
     }
 
     /**
-     * 从请求端点补全 Host 头（含非默认端口）。
+     * 从请求端点补充 Host 头（含非默认端口）。
      */
     private static void appendHost(StringBuilder out, java.net.URI endpoint) {
         String host = endpoint.getHost();

@@ -52,7 +52,7 @@ public final class ScalarMapDeserializer extends JsonDeserializer<Map<String, Ob
         if (parser.currentToken() != JsonToken.START_OBJECT) {
             throw InvalidFormatException.from(parser, "扩展参数必须是键值对象", parser.getText(), Map.class);
         }
-        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        Map<String, Object> result = new LinkedHashMap<>();
         while (true) {
             JsonToken token = parser.nextToken();
             if (token == JsonToken.END_OBJECT) {

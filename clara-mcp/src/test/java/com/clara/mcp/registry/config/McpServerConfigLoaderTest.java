@@ -16,7 +16,7 @@ import static org.junit.Assert.fail;
  * {@link McpServerConfigLoader} 的行为测试：stdio / http 解析、env 插值与非法输入。
  */
 public class McpServerConfigLoaderTest {
-    private final Map<String, String> variables = new HashMap<String, String>();
+    private final Map<String, String> variables = new HashMap<>();
     private final McpServerConfigLoader loader = new McpServerConfigLoader(new ObjectMapper(), key -> variables.get(key));
 
     @Test

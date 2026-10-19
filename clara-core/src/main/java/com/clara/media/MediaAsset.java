@@ -42,7 +42,7 @@ public final class MediaAsset {
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
         this.metadata = metadata == null ? Collections.<String, String>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+                : Collections.unmodifiableMap(new LinkedHashMap<>(metadata));
     }
 
     private static String required(String value, String name) {

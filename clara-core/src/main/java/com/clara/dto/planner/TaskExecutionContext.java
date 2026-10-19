@@ -34,7 +34,7 @@ public final class TaskExecutionContext {
         this.plan = plan;
         this.attempt = attempt;
         this.idempotencyKey = idempotencyKey;
-        this.values = Collections.unmodifiableMap(new LinkedHashMap<String, Object>(values));
+        this.values = Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }
 
     private static boolean blank(String value) {

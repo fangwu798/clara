@@ -80,12 +80,12 @@ public final class McpServerConfigDirectoryLoader {
      * @return 已按 {@code serverKey} 去重的配置列表（保持首次出现的顺序），非 null
      */
     public List<McpServerConfig> load() {
-        Map<String, McpServerConfig> merged = new LinkedHashMap<String, McpServerConfig>();
+        Map<String, McpServerConfig> merged = new LinkedHashMap<>();
         if (includeClasspath) {
             mergeInto(merged, classpathDirectories());
         }
         mergeInto(merged, Collections.singletonList(runtimeDirectory));
-        return Collections.unmodifiableList(new ArrayList<McpServerConfig>(merged.values()));
+        return Collections.unmodifiableList(new ArrayList<>(merged.values()));
     }
 
     public Path getRuntimeDirectory() { return runtimeDirectory; }
@@ -102,7 +102,7 @@ public final class McpServerConfigDirectoryLoader {
     }
 
     private static List<Path> classpathDirectories() {
-        List<Path> result = new ArrayList<Path>();
+        List<Path> result = new ArrayList<>();
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         if (loader == null) { loader = McpServerConfigDirectoryLoader.class.getClassLoader(); }
         if (loader == null) { return result; }
@@ -126,7 +126,7 @@ public final class McpServerConfigDirectoryLoader {
 
     private static List<Path> jsonFiles(Path directory) {
         if (directory == null || !Files.isDirectory(directory)) { return Collections.emptyList(); }
-        final List<Path> files = new ArrayList<Path>();
+        final List<Path> files = new ArrayList<>();
         try {
             Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
                 @Override

@@ -196,7 +196,7 @@ public final class ExceptionUtils {
      */
     public static ClaraException providerFailure(ModelProviderEnum provider, int status, String providerMessage) {
         ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION : status == 403 ? ErrorCategory.AUTHORIZATION : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
-        Map<String, String> details = new LinkedHashMap<String, String>();
+        Map<String, String> details = new LinkedHashMap<>();
         String detail = withoutRequestId(providerMessage);
         if (detail != null) {
             details.put("providerMessage", detail);
@@ -237,7 +237,7 @@ public final class ExceptionUtils {
      * @return 外部服务类、不可重试的异常
      */
     public static ClaraException providerEventFailure(ModelProviderEnum provider, String providerCode, String providerMessage) {
-        Map<String, String> details = new LinkedHashMap<String, String>();
+        Map<String, String> details = new LinkedHashMap<>();
         String detail = withoutRequestId(providerMessage);
         if (detail != null) {
             details.put("providerMessage", detail);
@@ -332,7 +332,7 @@ public final class ExceptionUtils {
      * @return 中文提示；错误码未登记时返回错误码本身
      */
     private static String message(String code, ModelProviderEnum provider, String providerCode) {
-        Map<String, String> args = new LinkedHashMap<String, String>();
+        Map<String, String> args = new LinkedHashMap<>();
         args.put("provider", provider == null ? UNKNOWN : provider.name());
         args.put("providerCode", providerCode == null || providerCode.trim().isEmpty() ? UNKNOWN : providerCode);
         return ErrorMessages.of(code, args);

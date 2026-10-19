@@ -22,7 +22,6 @@ import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
 import com.clara.workflow.WorkflowCatalog;
 import com.clara.workflow.runtime.WorkflowProgress;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -475,8 +474,7 @@ public final class ClaraApplication {
      * @param input      用户输入，非空白
      * @param monitor    ESC 取消监听器，非 null
      */
-    private static void converse(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry,
-            List<Path> candidates, String input, CancelKeyMonitor monitor) {
+    private static void converse(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry, List<Path> candidates, String input, CancelKeyMonitor monitor) {
         // 本轮取消令牌：交给监听器置位，随请求下发给编排层，进而让模型调用与脚本工具在检查点终止。
         // 一次对话可能换模型重试，令牌跨尝试共用——用户按 ESC 取消的是整轮，不是某一次尝试。
         CancellationToken cancellationToken = new CancellationToken();
@@ -490,8 +488,7 @@ public final class ClaraApplication {
                 Path configPath = plan.get(index);
                 if (index > 0) {
                     registry.select(configPath);
-                    view.emit("  [failover] 上一个模型不可用，已切到 " + ConfigLocator.aliasOf(configPath)
-                            + " 重试（会话历史按模型隔离，切回原模型即恢复原上下文）", ConsoleView.ANSI_YELLOW);
+                    view.emit("  [failover] 上一个模型不可用，已切到 " + ConfigLocator.aliasOf(configPath) + " 重试（会话历史按模型隔离，切回原模型即恢复原上下文）", ConsoleView.ANSI_YELLOW);
                 }
                 ConversationResult result = converseOnce(view, bootstrap, registry.currentConfiguration(), input,
                         cancellationToken);
@@ -507,9 +504,7 @@ public final class ClaraApplication {
                 }
                 if (index == plan.size() - 1) {
                     // 只有一个候补都没有时别报「试完 N 个」，那种说法会让用户以为换过了别的模型。
-                    view.emit(plan.size() > 1
-                            ? "  [failover] 已按响应时间顺序试完 " + plan.size() + " 个可用模型，均不可用；可用 /model 手动指定，或检查网络与凭据"
-                            : "  [failover] 没有其它可用模型可切换；可用 /model 手动指定，或检查网络与凭据", ConsoleView.ANSI_RED);
+                    view.emit(plan.size() > 1 ? "  [failover] 已按响应时间顺序试完 " + plan.size() + " 个可用模型，均不可用；可用 /model 手动指定，或检查网络与凭据" : "  [failover] 没有其它可用模型可切换；可用 /model 手动指定，或检查网络与凭据", ConsoleView.ANSI_RED);
                 }
             }
         }

@@ -41,7 +41,7 @@ public final class TaskNode {
                 || timeoutMillis <= 0L || budget == null || handler == null) {
             throw new IllegalArgumentException("task node is invalid");
         }
-        List<String> copied = new ArrayList<String>();
+        List<String> copied = new ArrayList<>();
         if (dependencies != null) {
             for (String dependency : dependencies) {
                 if (blank(dependency)) {

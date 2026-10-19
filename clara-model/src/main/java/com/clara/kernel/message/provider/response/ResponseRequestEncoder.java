@@ -116,7 +116,7 @@ public final class ResponseRequestEncoder extends AbstractRequestEncoder {
             body.put("include", Collections.singletonList("reasoning.encrypted_content"));
         }
         if (!body.containsKey("text")) {
-            Map<String, Object> text = new LinkedHashMap<String, Object>();
+            Map<String, Object> text = new LinkedHashMap<>();
             text.put("verbosity", "low");
             body.put("text", text);
         }

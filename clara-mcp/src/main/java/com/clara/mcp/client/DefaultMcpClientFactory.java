@@ -2,15 +2,16 @@ package com.clara.mcp.client;
 
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
-import com.clara.mcp.registry.McpErrors;
+import com.clara.mcp.McpErrors;
+import com.clara.mcp.api.IMcpClient;
+import com.clara.mcp.api.IMcpClientFactory;
+import com.clara.mcp.api.IMcpHeadersProvider;
+import com.clara.mcp.api.IMcpJsonCodec;
+import com.clara.mcp.api.IProcessFactory;
+import com.clara.mcp.client.DefaultMcpClient;
 import com.clara.mcp.registry.McpServerRegistration;
 import com.clara.mcp.registry.McpTransportProfile;
-import com.clara.mcp.client.DefaultMcpClient;
-import com.clara.mcp.client.McpClient;
-import com.clara.mcp.transport.McpJsonCodec;
-import com.clara.mcp.transport.http.McpHeadersProvider;
 import com.clara.mcp.transport.http.StreamableHttpMcpTransport;
-import com.clara.mcp.transport.stdio.ProcessFactory;
 import com.clara.mcp.transport.stdio.StdioMcpTransport;
 import java.net.URI;
 import java.nio.file.Path;
@@ -25,7 +26,7 @@ import java.util.Set;
 /**
  * 按服务端注册项的传输方式创建 {@link DefaultMcpClient} 的客户端工厂默认实现。
  *
- * <p>是什么、在哪一层：{@code clara-mcp} 注册层对 {@link McpClientFactory} 的实现，被
+ * <p>是什么、在哪一层：{@code clara-mcp} 注册层对 {@link IMcpClientFactory} 的实现，被
  * {@code DefaultMcpDiscoveryService}（发现）与 {@code DefaultMcpGateway}（调用）使用，使它们不感知传输
  * 方式与连接细节。
  *
@@ -37,12 +38,12 @@ import java.util.Set;
  * <p>注意：stdio 的命令行按空白拆分（首次出现的可执行文件放入允许列表校验），因此可执行文件路径不应含
  * 空格；http 端点只允许已注册地址自身的主机，默认只接受 HTTPS。
  */
-public final class DefaultMcpClientFactory implements McpClientFactory {
-    private final McpJsonCodec codec;
-    private final ProcessFactory processFactory;
+public final class DefaultMcpClientFactory implements IMcpClientFactory {
+    private final IMcpJsonCodec codec;
+    private final IProcessFactory processFactory;
     private final List<Path> allowedExecutables;
     private final Path workingDirectory;
-    private final McpHeadersProvider headersProvider;
+    private final IMcpHeadersProvider headersProvider;
     private final long requestTimeoutMillis;
 
     /**
@@ -55,27 +56,33 @@ public final class DefaultMcpClientFactory implements McpClientFactory {
      * @param headersProvider      http 传输提供的鉴权请求头，可为 null
      * @param requestTimeoutMillis 客户端单次请求超时毫秒数，必须为正
      */
-    public DefaultMcpClientFactory(McpJsonCodec codec, ProcessFactory processFactory,
-            List<Path> allowedExecutables, Path workingDirectory, McpHeadersProvider headersProvider,
-            long requestTimeoutMillis) {
-        if (codec == null) { throw new IllegalArgumentException("codec must not be null"); }
+    public DefaultMcpClientFactory(IMcpJsonCodec codec, IProcessFactory processFactory,
+                                   List<Path> allowedExecutables, Path workingDirectory, IMcpHeadersProvider headersProvider,
+                                   long requestTimeoutMillis) {
+        if (codec == null) {
+            throw new IllegalArgumentException("codec must not be null");
+        }
         if (allowedExecutables == null || allowedExecutables.isEmpty() || allowedExecutables.contains(null)) {
             throw new IllegalArgumentException("allowedExecutables must not be empty");
         }
-        if (workingDirectory == null) { throw new IllegalArgumentException("workingDirectory must not be null"); }
+        if (workingDirectory == null) {
+            throw new IllegalArgumentException("workingDirectory must not be null");
+        }
         if (requestTimeoutMillis <= 0L) {
             throw new IllegalArgumentException("requestTimeoutMillis must be positive");
         }
         this.codec = codec;
         this.processFactory = processFactory;
-        this.allowedExecutables = Collections.unmodifiableList(new ArrayList<Path>(allowedExecutables));
+        this.allowedExecutables = Collections.unmodifiableList(new ArrayList<>(allowedExecutables));
         this.workingDirectory = workingDirectory;
         this.headersProvider = headersProvider;
         this.requestTimeoutMillis = requestTimeoutMillis;
     }
 
-    public McpClient create(McpServerRegistration registration) {
-        if (registration == null) { throw new IllegalArgumentException("registration must not be null"); }
+    public IMcpClient create(McpServerRegistration registration) {
+        if (registration == null) {
+            throw new IllegalArgumentException("registration must not be null");
+        }
         McpTransportProfile profile = registration.getTransportProfile();
         if (profile == McpTransportProfile.STDIO) {
             return new DefaultMcpClient(stdio(registration), requestTimeoutMillis);
@@ -87,16 +94,19 @@ public final class DefaultMcpClientFactory implements McpClientFactory {
     }
 
     private StdioMcpTransport stdio(McpServerRegistration registration) {
-        List<String> command = registration.getCommand().isEmpty()
-                ? split(registration.getAddress()) : registration.getCommand();
+        List<String> command = registration.getCommand().isEmpty() ? split(registration.getAddress()) : registration.getCommand();
         command = absolutize(command);
         StdioMcpTransport.Builder builder = StdioMcpTransport.builder()
                 .command(command)
                 .allowedExecutables(allowedExecutables)
                 .workingDirectory(workingDirectory)
                 .codec(codec);
-        if (!registration.getEnv().isEmpty()) { builder.environment(registration.getEnv()); }
-        if (processFactory != null) { builder.processFactory(processFactory); }
+        if (!registration.getEnv().isEmpty()) {
+            builder.environment(registration.getEnv());
+        }
+        if (processFactory != null) {
+            builder.processFactory(processFactory);
+        }
         return builder.build();
     }
 
@@ -120,7 +130,7 @@ public final class DefaultMcpClientFactory implements McpClientFactory {
             int dot = fileName.lastIndexOf('.');
             String stem = dot > 0 ? fileName.substring(0, dot) : fileName;
             if (fileName.equalsIgnoreCase(head) || stem.equalsIgnoreCase(head)) {
-                List<String> resolved = new ArrayList<String>(command);
+                List<String> resolved = new ArrayList<>(command);
                 resolved.set(0, candidate.toString());
                 return resolved;
             }
@@ -130,29 +140,35 @@ public final class DefaultMcpClientFactory implements McpClientFactory {
 
     private StreamableHttpMcpTransport http(McpServerRegistration registration) {
         URI endpoint = URI.create(registration.getAddress());
-        Set<String> allowedHosts = new LinkedHashSet<String>();
+        Set<String> allowedHosts = new LinkedHashSet<>();
         allowedHosts.add(endpoint.getHost());
         StreamableHttpMcpTransport.Builder builder = StreamableHttpMcpTransport.builder()
                 .endpoint(endpoint)
                 .allowedHosts(allowedHosts)
                 .codec(codec);
-        McpHeadersProvider provider = registration.getHeaders().isEmpty()
+        IMcpHeadersProvider provider = registration.getHeaders().isEmpty()
                 ? headersProvider : fixedHeaders(registration.getHeaders());
-        if (provider != null) { builder.headersProvider(provider); }
+        if (provider != null) {
+            builder.headersProvider(provider);
+        }
         return builder.build();
     }
 
-    private static McpHeadersProvider fixedHeaders(final Map<String, String> headers) {
-        return new McpHeadersProvider() {
-            public Map<String, String> getHeaders() { return headers; }
+    private static IMcpHeadersProvider fixedHeaders(final Map<String, String> headers) {
+        return new IMcpHeadersProvider() {
+            public Map<String, String> getHeaders() {
+                return headers;
+            }
         };
     }
 
     private static List<String> split(String address) {
         String[] tokens = address == null ? new String[0] : address.trim().split("\\s+");
-        List<String> command = new ArrayList<String>();
+        List<String> command = new ArrayList<>();
         for (String token : tokens) {
-            if (!token.isEmpty()) { command.add(token); }
+            if (!token.isEmpty()) {
+                command.add(token);
+            }
         }
         if (command.isEmpty()) {
             throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.VALIDATION);

@@ -195,7 +195,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
 
     private void executeParallel(CompositeNode node, final Run run, final String key) {
         final ExecutionScope base = run.scope.copy();
-        List<Future<ExecutionScope>> futures = new ArrayList<Future<ExecutionScope>>();
+        List<Future<ExecutionScope>> futures = new ArrayList<>();
         for (final IWorkflowNode child : node.getChildren()) {
             futures.add(parallelExecutor.submit(new Callable<ExecutionScope>() {
                 @Override
@@ -268,7 +268,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         if (!run.scope.contains(node.getInputKey())) {
             throw new WaitingInput(node.getId(), node.getInputKey());
         }
-        Map<String, Object> output = new LinkedHashMap<String, Object>();
+        Map<String, Object> output = new LinkedHashMap<>();
         output.put(node.getInputKey(), run.scope.get(node.getInputKey()));
         run.scope.complete(key, node.getId(), output);
         if (persist) {

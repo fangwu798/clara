@@ -35,7 +35,7 @@ public final class LoadedWorkflow {
         this.definition = definition;
         this.outputs = outputs == null
                 ? Collections.<String>emptyList()
-                : Collections.unmodifiableList(new ArrayList<String>(outputs));
+                : Collections.unmodifiableList(new ArrayList<>(outputs));
     }
 
     public WorkflowDefinition getDefinition() {

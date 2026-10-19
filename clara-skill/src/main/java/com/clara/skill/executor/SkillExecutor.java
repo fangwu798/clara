@@ -35,7 +35,7 @@ public final class SkillExecutor {
         private final CancellationToken token = new CancellationToken();
         private final CountDownLatch done = new CountDownLatch(1);
         private final AtomicReference<SkillExecutionStatus> status =
-                new AtomicReference<SkillExecutionStatus>(SkillExecutionStatus.RUNNING);
+                new AtomicReference<>(SkillExecutionStatus.RUNNING);
         private volatile String result;
         private volatile RuntimeException failure;
 

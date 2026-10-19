@@ -111,7 +111,7 @@ public final class ReviewNodeOptions {
             throw new IllegalArgumentException("REVIEW 节点 " + ATTRIBUTE_ROLES + " 必须是数组："
                     + spec.getNodeId());
         }
-        List<String> roles = new ArrayList<String>();
+        List<String> roles = new ArrayList<>();
         for (Object item : (List<?>) raw) {
             String role = item == null ? null : String.valueOf(item).trim();
             if (role != null && !role.isEmpty()) {

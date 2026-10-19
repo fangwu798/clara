@@ -30,7 +30,7 @@ public final class ConversationSnapshot {
         if (messages == null) {
             throw new IllegalArgumentException("messages must not be null");
         }
-        List<IContent> copy = new ArrayList<IContent>(messages.size());
+        List<IContent> copy = new ArrayList<>(messages.size());
         for (IContent message : messages) {
             if (message == null) {
                 throw new IllegalArgumentException("messages must not contain null");

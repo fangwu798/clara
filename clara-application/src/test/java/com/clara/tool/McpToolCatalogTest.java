@@ -101,14 +101,14 @@ public class McpToolCatalogTest {
     }
 
     private static McpToolDescriptor tool(String name) {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         return new McpToolDescriptor(name, name + " tool", schema);
     }
 
     private static McpServerSnapshot snapshot(String tenantId, String serverKey, String snapshotId,
             McpToolDescriptor... tools) {
-        List<McpToolDescriptor> values = new ArrayList<McpToolDescriptor>();
+        List<McpToolDescriptor> values = new ArrayList<>();
         Collections.addAll(values, tools);
         return new McpServerSnapshot(snapshotId, tenantId, serverKey, 1L, VERSION,
                 new McpServerIdentity(SERVER, "0.11.0"),

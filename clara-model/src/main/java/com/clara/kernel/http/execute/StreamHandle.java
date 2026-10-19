@@ -12,10 +12,10 @@ import com.clara.kernel.api.execute.ISseListener;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.kernel.http.execute.sse.SseEvent;
+import com.clara.core.transport.sse.SseEvent;
 import com.clara.core.model.IStreamHandle;
 import com.clara.core.model.IStreamObserver;
-import com.clara.dto.model.RawHttpResponse;
+import com.clara.core.transport.RawHttpResponse;
 import com.clara.dto.model.StreamEvent;
 import com.clara.utils.ExceptionUtils;
 import com.clara.kernel.message.provider.ProviderResponseDecoder;
@@ -52,7 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>事件语义：一次流中 {@code RESPONSE_COMPLETE} 与 {@code ERROR} 只会出现其中一个且只出现一次；
  * 增量事件的 sequence 由本类统一编号，从 0 开始单调递增。
  *
- * <p>生命周期与线程安全：读取在单独的守护线程上执行，句柄状态用原子标记保护，可被其他线程安全地
+ * <p>生命周期与线程安全：读取在单独守护线程上执行，句柄状态用原子标记保护，可被其他线程安全地
  * 取消与查询；一次流对应一个句柄，不可复用。
  *
  * <p>失败语义：{@code transport}、{@code request}、{@code responseType}、{@code observer} 为 null，
@@ -138,9 +138,9 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
         this.request = request;
         this.assembler = ProviderResponseDecoder.streamAssembler(responseType);
         this.observer = observer;
-        ConvContext context = ConvContext.current();
-        this.context = context;
-        this.cancellationToken = context == null ? null : context.getCancellationToken();
+        ConvContext current = ConvContext.current();
+        this.context = current;
+        this.cancellationToken = current == null ? null : current.getCancellationToken();
         this.executor = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "clara-stream");
             thread.setDaemon(true);
@@ -157,20 +157,12 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      * @return 本句柄，非 null
      */
     public StreamHandle start() {
-        executor.submit(new Runnable() {
-            @Override
-            public void run() {
-                if (context == null) {
-                    read();
-                    return;
-                }
-                ConvContext.runWith(context, new Runnable() {
-                    @Override
-                    public void run() {
-                        read();
-                    }
-                });
+        executor.submit(() -> {
+            if (context == null) {
+                read();
+                return;
             }
+            ConvContext.runWith(context, this::read);
         });
         return this;
     }
@@ -186,8 +178,7 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
         try {
             RawHttpResponse response = transport.execute(request, StreamHandle.this);
             if (response != null && !isSuccess(response.getStatusCode())) {
-                fail(ExceptionUtils.providerFailure(provider(), response.getStatusCode(),
-                        providerErrorMessage(response)));
+                fail(ExceptionUtils.providerFailure(provider(), response.getStatusCode(), providerErrorMessage(response)));
                 return;
             }
             complete();
@@ -317,8 +308,7 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
         if (!done.compareAndSet(false, true)) {
             return;
         }
-        emit(StreamEventEnum.RESPONSE_COMPLETE, cancelled.get() ? FinishReasonEnum.CANCELLED.name() : null,
-                assembler.result(), null, null, null);
+        emit(StreamEventEnum.RESPONSE_COMPLETE, cancelled.get() ? FinishReasonEnum.CANCELLED.name() : null, assembler.result(), null, null, null);
         executor.shutdown();
     }
 
@@ -352,7 +342,7 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
     /**
      * 构造并回调一个领域事件。
      *
-     * <p>观察者自身抛出的异常会被吞掉：它不应再次触发回调链，也不应影响本句柄的终态标记。
+     * <p>观察者自身抛出的异常会吞掉：它不应再次触发回调链，也不应影响本句柄的终态标记。
      *
      * @param type       事件类型，非 null
      * @param payload    事件负载，可为 null
@@ -361,12 +351,12 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      * @param toolName   工具名，可为 null
      * @param error      错误信息，仅错误事件非 null
      */
-    private synchronized void emit(StreamEventEnum type, String payload, IResponse response, String toolCallId,
-            String toolName, ClaraError error) {
+    private synchronized void emit(StreamEventEnum type, String payload, IResponse response, String toolCallId, String toolName, ClaraError error) {
         StreamEvent event = new StreamEvent(type, sequence++, payload, toolCallId, toolName, response, error);
         try {
             observer.onEvent(event);
         } catch (RuntimeException ignored) {
+            // 观察者回调失败不能中断数据流或影响本对象的终态标记。
         }
     }
 }

@@ -48,7 +48,7 @@ public class MilvusBm25IntegrationTest {
         MilvusCollectionSpec spec = new MilvusCollectionSpec(COLLECTION, MilvusSettings.DEFAULT_ANALYZER);
         MilvusBackend backend = MilvusBackendFactory.create(new MilvusBackendConfig(HOST, PORT), spec);
         MilvusSemanticMemoryStore store = open(backend, spec);
-        List<String> ids = new ArrayList<String>();
+        List<String> ids = new ArrayList<>();
         try {
             long now = System.currentTimeMillis();
             MemoryEntry pricing = entry("bm25-pricing", "套餐算费特殊规则怎么透传多方案", now);

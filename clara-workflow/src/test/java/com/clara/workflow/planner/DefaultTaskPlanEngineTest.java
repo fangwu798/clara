@@ -70,7 +70,7 @@ public class DefaultTaskPlanEngineTest {
 
     @Test
     public void executesTasksFollowingDependencies() {
-        final List<String> order = new ArrayList<String>();
+        final List<String> order = new ArrayList<>();
         TaskNode a = node("A", null, "outA", RetryPolicy.NONE, 1000L, context -> {
             order.add("A");
             return new TaskExecutionResult(Collections.<String, Object>singletonMap("outA", "va"),

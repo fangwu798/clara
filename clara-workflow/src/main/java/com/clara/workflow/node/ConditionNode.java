@@ -50,7 +50,7 @@ public final class ConditionNode implements IWorkflowNode {
 
     @Override
     public List<IWorkflowNode> children() {
-        List<IWorkflowNode> result = new ArrayList<IWorkflowNode>();
+        List<IWorkflowNode> result = new ArrayList<>();
         result.add(whenTrue);
         if (whenFalse != null) {
             result.add(whenFalse);
@@ -71,7 +71,7 @@ public final class ConditionNode implements IWorkflowNode {
     }
 
     private static Set<String> unionBranches(IWorkflowNode one, IWorkflowNode two) {
-        Set<String> values = new LinkedHashSet<String>(one.getOutputKeys());
+        Set<String> values = new LinkedHashSet<>(one.getOutputKeys());
         if (two != null) {
             values.addAll(two.getOutputKeys());
         }

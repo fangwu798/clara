@@ -31,7 +31,7 @@ public final class WorkflowNodes {
     }
 
     public static IWorkflowNode parallel(String id, List<IWorkflowNode> children) {
-        Set<String> outputs = new LinkedHashSet<String>();
+        Set<String> outputs = new LinkedHashSet<>();
         for (IWorkflowNode child : requireChildren(children)) {
             for (String key : child.getOutputKeys()) {
                 if (!outputs.add(key)) {

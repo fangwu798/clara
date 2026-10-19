@@ -54,7 +54,7 @@ public class ModelAvailabilityManagerTest {
             return ModelCheckResult.unavailable(path, alias,
                     provider.getProvider().name(), chat.getModelId(), "denied");
         };
-        List<AvailabilityLine> output = new ArrayList<AvailabilityLine>();
+        List<AvailabilityLine> output = new ArrayList<>();
 
         List<Path> usable = new ModelAvailabilityManager(name -> "test-key", probe, 1000L)
                 .checkAndPersist(configs, clara, output::add);
@@ -151,7 +151,7 @@ public class ModelAvailabilityManagerTest {
         Path invalid = temporary.newFile("invalid.yml").toPath();
         Files.write(invalid, Collections.singletonList("provider: INVALID"), StandardCharsets.UTF_8);
         Path clara = temporary.newFile("invalid-clara.yml").toPath();
-        List<AvailabilityLine> output = new ArrayList<AvailabilityLine>();
+        List<AvailabilityLine> output = new ArrayList<>();
 
         List<Path> usable = new ModelAvailabilityManager(name -> "key",
                 (path, alias, provider, chat, timeout) -> {
@@ -173,8 +173,8 @@ public class ModelAvailabilityManagerTest {
         Path clara = temporary.newFile("streaming.yml").toPath();
         List<Path> configs = Arrays.asList(config("deepseek-completion.yml"),
                 config("deepseek-response.yml"), config("kimi-completion.yml"));
-        List<AvailabilityLine> output = new ArrayList<AvailabilityLine>();
-        List<String> emittedBeforeSecondProbe = new ArrayList<String>();
+        List<AvailabilityLine> output = new ArrayList<>();
+        List<String> emittedBeforeSecondProbe = new ArrayList<>();
         AtomicInteger probes = new AtomicInteger();
         IModelProbe probe = (path, alias, provider, chat, timeout) -> {
             if (probes.incrementAndGet() == 2) {

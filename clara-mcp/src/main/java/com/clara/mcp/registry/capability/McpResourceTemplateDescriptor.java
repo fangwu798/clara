@@ -16,7 +16,7 @@ public final class McpResourceTemplateDescriptor {
             throw new IllegalArgumentException("uriTemplate must not be blank");
         }
         this.uriTemplate = uriTemplate; this.name = name; this.mimeType = mimeType;
-        Map<String, Object> value = new LinkedHashMap<String, Object>();
+        Map<String, Object> value = new LinkedHashMap<>();
         value.put("uriTemplate", uriTemplate); value.put("name", name); value.put("mimeType", mimeType);
         this.schemaHash = new SchemaHasher().hash(value);
     }

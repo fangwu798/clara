@@ -41,6 +41,6 @@ public final class ResponseResponseDecoder extends AbstractResponseDecoder {
 
     @Override
     protected <R extends IResponse> StreamAssembler<R> createStreamAssembler(R target, List<StreamAssembler.Rule> deltas, List<StreamAssembler.Rule> singles, List<StreamAssembler.Rule> terminals, ModelProviderEnum provider) {
-        return new ResponseStreamAssembler<R>(target, deltas, singles, terminals, provider);
+        return new ResponseStreamAssembler<>(target, deltas, singles, terminals, provider);
     }
 }

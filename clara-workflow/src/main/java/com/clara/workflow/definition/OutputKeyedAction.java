@@ -40,7 +40,7 @@ final class OutputKeyedAction implements IWorkflowAction {
                 value = produced.values().iterator().next();
             }
         }
-        Map<String, Object> output = new LinkedHashMap<String, Object>();
+        Map<String, Object> output = new LinkedHashMap<>();
         output.put(outputKey, value);
         return output;
     }

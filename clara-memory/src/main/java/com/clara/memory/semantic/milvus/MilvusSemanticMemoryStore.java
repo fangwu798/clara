@@ -57,7 +57,7 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
         if (entries.isEmpty()) {
             return;
         }
-        Set<String> ids = new HashSet<String>();
+        Set<String> ids = new HashSet<>();
         for (MemoryEntry entry : entries) {
             if (entry == null) {
                 throw new IllegalArgumentException("entries must not contain null");
@@ -101,7 +101,7 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
         if (matches == null) {
             return Collections.emptyList();
         }
-        List<MemoryMatch> filtered = new ArrayList<MemoryMatch>();
+        List<MemoryMatch> filtered = new ArrayList<>();
         for (MemoryMatch match : matches) {
             if (match != null && match.getScore() >= query.getMinScore()) {
                 filtered.add(match);
@@ -123,7 +123,7 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
             }
         });
         if (filtered.size() > query.getTopK()) {
-            filtered = new ArrayList<MemoryMatch>(filtered.subList(0, query.getTopK()));
+            filtered = new ArrayList<>(filtered.subList(0, query.getTopK()));
         }
         return Collections.unmodifiableList(filtered);
     }

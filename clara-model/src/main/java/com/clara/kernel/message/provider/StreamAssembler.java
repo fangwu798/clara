@@ -95,7 +95,7 @@ public abstract class StreamAssembler<R extends IResponse> {
                 ResponseDecoderSupport.write(rule.field, target, ResponseDecoderSupport.convert(rule.field.getGenericType(), node, provider));
             }
         }
-        List<StreamEvent> events = new ArrayList<StreamEvent>();
+        List<StreamEvent> events = new ArrayList<>();
         for (Rule rule : deltas) {
             if (!rule.streamEvent.isEmpty() && !rule.streamEvent.equals(sseEvent)) {
                 continue;

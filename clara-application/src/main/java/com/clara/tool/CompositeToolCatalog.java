@@ -40,10 +40,10 @@ public final class CompositeToolCatalog implements IToolCatalog {
 
     @Override
     public List<ToolContext> availableTools() {
-        Map<String, ToolContext> merged = new LinkedHashMap<String, ToolContext>();
+        Map<String, ToolContext> merged = new LinkedHashMap<>();
         collect(primary, merged);
         collect(secondary, merged);
-        return Collections.unmodifiableList(new ArrayList<ToolContext>(merged.values()));
+        return Collections.unmodifiableList(new ArrayList<>(merged.values()));
     }
 
     /**

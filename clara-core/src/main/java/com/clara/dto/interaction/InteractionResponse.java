@@ -36,7 +36,7 @@ public final class InteractionResponse {
         }
         this.interactionId = interactionId;
         this.answer = answer == null ? Collections.<String, Object>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<String, Object>(answer));
+                : Collections.unmodifiableMap(new LinkedHashMap<>(answer));
         this.responderId = responderId;
         this.idempotencyKey = idempotencyKey;
         this.submittedAtEpochMillis = submittedAtEpochMillis;

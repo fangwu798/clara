@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class InMemoryConversationStore implements ConversationStore {
 
     private final ConcurrentHashMap<String, ConversationSnapshot> snapshots =
-            new ConcurrentHashMap<String, ConversationSnapshot>();
+            new ConcurrentHashMap<>();
 
     @Override
     public ConversationSnapshot loadSnapshot(ConversationKey key) {
@@ -41,7 +41,7 @@ public final class InMemoryConversationStore implements ConversationStore {
                 if (currentVersion != expectedVersion) {
                     throw ConversationStoreErrors.versionConflict();
                 }
-                List<IContent> merged = new ArrayList<IContent>();
+                List<IContent> merged = new ArrayList<>();
                 if (current != null) {
                     merged.addAll(current.messages());
                 }

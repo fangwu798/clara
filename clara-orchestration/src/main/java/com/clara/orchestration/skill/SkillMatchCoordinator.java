@@ -96,8 +96,8 @@ public final class SkillMatchCoordinator {
      * @return 匹配结果，非 null（无命中时为空结果）
      */
     public MatchedSkill match(String userInput, ContextControlConfig control) {
-        List<String> prompts = new ArrayList<String>();
-        List<String> details = new ArrayList<String>();
+        List<String> prompts = new ArrayList<>();
+        List<String> details = new ArrayList<>();
         long started = System.nanoTime();
         if (control != null && control.getRetrievalCount() > 0
                 && embeddingClient != null && semanticMemoryStore != null
@@ -114,7 +114,7 @@ public final class SkillMatchCoordinator {
             }
             // 明细先报「召回几条 / 过阈值几条 / 最高分」：只报一个数会分不清「库里没数据」与「分数不够」
             details.add(summary(candidates.size(), aboveThreshold, control, bestScore));
-            Set<String> seen = new LinkedHashSet<String>();
+            Set<String> seen = new LinkedHashSet<>();
             for (MemoryMatch match : candidates) {
                 String sourceId = match.getEntry().getSourceId();
                 if (promptProvider == null || sourceId == null
@@ -194,8 +194,8 @@ public final class SkillMatchCoordinator {
         private final List<ToolContext> tools;
 
         MatchedSkill(List<String> prompts, List<ToolContext> tools) {
-            this.prompts = Collections.unmodifiableList(new ArrayList<String>(prompts));
-            this.tools = Collections.unmodifiableList(new ArrayList<ToolContext>(tools));
+            this.prompts = Collections.unmodifiableList(new ArrayList<>(prompts));
+            this.tools = Collections.unmodifiableList(new ArrayList<>(tools));
         }
 
         public List<String> getPrompts() {

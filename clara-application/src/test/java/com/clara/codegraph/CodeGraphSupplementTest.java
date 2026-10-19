@@ -235,23 +235,23 @@ public class CodeGraphSupplementTest {
     /** 记录上报内容的观测口：断言「打了哪些点、报了什么」用。 */
     private static final class RecordingTrace implements IContextTraceSink {
 
-        private final List<String> sources = new ArrayList<String>();
-        private final List<Integer> hits = new ArrayList<Integer>();
-        private final List<List<String>> details = new ArrayList<List<String>>();
+        private final List<String> sources = new ArrayList<>();
+        private final List<Integer> hits = new ArrayList<>();
+        private final List<List<String>> details = new ArrayList<>();
 
         @Override
         public void onTrace(String source, int hitCount, long elapsedMillis, List<String> rendered) {
             sources.add(source);
             hits.add(hitCount);
-            details.add(new ArrayList<String>(rendered));
+            details.add(new ArrayList<>(rendered));
         }
     }
 
     /** 假工具调用器：记录每次调用的工具名与入参，按需要回结果或抛异常。 */
     private static final class RecordingInvoker implements IToolInvoker {
 
-        private final List<String> names = Collections.synchronizedList(new ArrayList<String>());
-        private final List<String> arguments = Collections.synchronizedList(new ArrayList<String>());
+        private final List<String> names = Collections.synchronizedList(new ArrayList<>());
+        private final List<String> arguments = Collections.synchronizedList(new ArrayList<>());
         private String output = "";
         private RuntimeException failure;
 

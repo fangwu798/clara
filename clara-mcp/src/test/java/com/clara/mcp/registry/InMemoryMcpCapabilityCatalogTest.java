@@ -169,7 +169,7 @@ public class InMemoryMcpCapabilityCatalogTest {
 
     private static McpServerSnapshot snapshot(String snapshotId, String tenantId, String serverKey,
             long discoveredAt, McpToolDescriptor tool) {
-        List<McpToolDescriptor> tools = new ArrayList<McpToolDescriptor>();
+        List<McpToolDescriptor> tools = new ArrayList<>();
         tools.add(tool);
         return new McpServerSnapshot(snapshotId, tenantId, serverKey, discoveredAt, VERSION, IDENTITY, CAPS,
                 tools, Collections.<McpResourceDescriptor>emptyList(),
@@ -178,7 +178,7 @@ public class InMemoryMcpCapabilityCatalogTest {
     }
 
     private static McpToolDescriptor tool(String name) {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         return new McpToolDescriptor(name, "echo tool", schema);
     }

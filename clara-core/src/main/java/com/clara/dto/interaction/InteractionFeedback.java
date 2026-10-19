@@ -44,7 +44,7 @@ public final class InteractionFeedback {
         this.expectedInstanceVersion = expectedInstanceVersion;
         this.idempotencyKey = idempotencyKey;
         this.answer = answer == null ? Collections.<String, Object>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<String, Object>(answer));
+                : Collections.unmodifiableMap(new LinkedHashMap<>(answer));
     }
 
     private static boolean blank(String value) {

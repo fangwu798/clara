@@ -96,7 +96,7 @@ public final class ConversationIndexingWindowMemory implements IWindowMemory {
      * 把一批消息写入语义记忆；失败的条目跳过，整体失败只提示不抛出。
      */
     private void index(List<IContent> messages, int offset) {
-        List<MemoryEntry> entries = new ArrayList<MemoryEntry>(messages.size());
+        List<MemoryEntry> entries = new ArrayList<>(messages.size());
         long now = System.currentTimeMillis();
         for (int position = 0; position < messages.size(); position++) {
             IContent message = messages.get(position);

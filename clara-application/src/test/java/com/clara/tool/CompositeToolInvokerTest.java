@@ -7,7 +7,7 @@ import com.clara.core.tool.IToolInvocation;
 import com.clara.dto.tool.ToolResult;
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCodes;
-import com.clara.mcp.client.gateway.McpGateway;
+import com.clara.mcp.api.IMcpGateway;
 import com.clara.mcp.client.call.McpPromptRequest;
 import com.clara.mcp.client.call.McpPromptResult;
 import com.clara.mcp.client.call.McpResourceContent;
@@ -17,10 +17,6 @@ import com.clara.mcp.client.call.McpToolResult;
 import com.clara.mcp.tool.ExternalToolBinding;
 import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.skill.registry.SkillRegistry;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -28,7 +24,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -163,8 +161,8 @@ public class CompositeToolInvokerTest {
     }
 
     private static McpToolResult mcpResult() {
-        List<Map<String, Object>> content = new ArrayList<Map<String, Object>>();
-        Map<String, Object> item = new LinkedHashMap<String, Object>();
+        List<Map<String, Object>> content = new ArrayList<>();
+        Map<String, Object> item = new LinkedHashMap<>();
         item.put("type", "text");
         item.put("text", "hello");
         content.add(item);
@@ -189,7 +187,7 @@ public class CompositeToolInvokerTest {
         }
     }
 
-    private static final class RecordingMcpGateway implements McpGateway {
+    private static final class RecordingMcpGateway implements IMcpGateway {
         private McpToolCall received;
         private McpToolResult result;
 

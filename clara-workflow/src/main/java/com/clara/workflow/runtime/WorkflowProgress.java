@@ -24,7 +24,7 @@ public final class WorkflowProgress {
     /**
      * 当前线程注册的通道；未注册时为 null。
      */
-    private static final ThreadLocal<WorkflowProgress> CURRENT = new ThreadLocal<WorkflowProgress>();
+    private static final ThreadLocal<WorkflowProgress> CURRENT = new ThreadLocal<>();
 
     private final IStreamObserver observer;
     private final Consumer<String> notice;

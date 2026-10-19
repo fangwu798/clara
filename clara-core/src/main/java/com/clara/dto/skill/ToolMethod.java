@@ -47,7 +47,7 @@ public final class ToolMethod {
         this.description = description;
         this.parameters = parameters;
         this.script = script;
-        LinkedHashMap<String, String> copied = new LinkedHashMap<String, String>();
+        LinkedHashMap<String, String> copied = new LinkedHashMap<>();
         if (metadata != null) {
             for (Map.Entry<String, String> value : metadata.entrySet()) {
                 if (blank(value.getKey()) || value.getValue() == null) {

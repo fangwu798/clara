@@ -22,9 +22,10 @@ Clara 是一套面向 Java 8 的 AI 应用运行时库。它提供模型调用�
 | --- | --- | --- |
 | clara-bom | 统一管理各模块版本 | 外部项目通过 dependencyManagement 导入 |
 | clara-core | 能力/角色/协议及各领域枚举（document / interaction / memory / planner / skill / workflow）、结构化错误模型与跨模块契约（含媒体契约与值对象） | 所有模块的公共基础 |
-| clara-model | 调用上下文、Provider 配置、HTTP/SSE 传输、模型调用实现（协议编解码、Token 估算、嵌入） | 同步/流式对话、Embedding、Token 估算与 OpenAI/DeepSeek/火山方舟/阿里云/Kimi/Anthropic 协议适配 |
+| clara-transport | 通用 HTTP / SSE 传输实现（连接与超时、体积上限、SSE 解析、有界流、端点与请求头校验） | 模型调用与 MCP 调用共享同一套传输语义 |
+| clara-model | 调用上下文、Provider 配置、模型调用实现（协议编解码、Token 估算、嵌入、传输适配） | 同步/流式对话、Embedding、Token 估算与 OpenAI/DeepSeek/火山方舟/阿里云/Kimi/Anthropic 协议适配 |
 | clara-memory | 窗口记忆、会话持久化、语义记忆 | 消息/Token 窗口裁剪、本地/JDBC 会话存储、Milvus 召回 |
-| clara-mcp | MCP 客户端、服务注册表、能力目录与传输、外部工具路由 | stdio 或 Streamable HTTP 接入外部 MCP 工具、资源与提示词 |
+| clara-mcp | MCP 客户端、服务注册表、能力目录、协议传输适配与外部工具路由 | stdio 或 Streamable HTTP 接入外部 MCP 工具、资源与提示词 |
 | clara-workflow | 工作流定义、DAG 执行、任务规划、预算台账、人工交互网关、内置动作与运行支撑 | 多步骤任务、并行/条件/循环节点、失败恢复与 WAITING_INPUT 挂起 |
 | clara-orchestration | 对话编排、上下文组装、工具往返、技能匹配 | 组合模型、记忆、技能、工具与工作流 |
 | clara-skill | 技能注册表、执行器、Schema 校验与工具执行 | 业务能力封装为可版本化、可授权的技能 |
@@ -33,6 +34,7 @@ Clara 是一套面向 Java 8 的 AI 应用运行时库。它提供模型调用�
 ### 模块依赖
 
 - **clara-core 不依赖任何业务模块**，只提供契约、枚举与错误模型。
+- **clara-transport 只依赖 core**，提供通用 HTTP / SSE 实现；model 与 mcp 依赖 transport。
 - 各能力模块（model / memory / mcp / workflow / skill）依赖 core，并按需相互依赖（如 memory 依赖 model）。
 - **clara-orchestration 仅通过接口使用各能力**，不接触 Provider / Store / Transport 实现。
 - **clara-application 负责整体装配**，业务模块不得反向依赖应用模块。
@@ -311,7 +313,7 @@ clara-mcp 支持 stdio 与 Streamable HTTP，围绕注册、初始化、能力�
 2. 建立传输，完成协议初始化与版本协商。
 3. 发现并缓存 tools、resources、resource templates 与 prompts。
 4. 保存为带版本信息的目录快照。
-5. 通过 McpGateway 执行工具、读资源、取提示词。
+5. 通过 IMcpGateway 执行工具、读资源、取提示词。
 6. 配置变更时重连或刷新；关闭时释放子进程与连接。
 
 注意：stdio 会启动受控子进程，应限制可执行文件路径与工作目录；Streamable HTTP 应使用 HTTPS；发现结果可能过期；InMemoryMcpServerRegistry 适合单实例。
@@ -490,11 +492,11 @@ clara-skill 将业务能力封装为可注册、可校验、可执行的技能�
 
 ## 当前验证状态
 
-根据迁移任务记录（docs/migration-design/tasks.md），2026-09-07 离线验收：
+根据本次传输层重构（2026-10-19）离线验证：
 
-- 九个模块在单一 Maven reactor 中构建通过。
+- 十个模块在单一 Maven reactor 中编译通过。
 - 产物为 Java 8 字节码（major version 52）。
-- 64 个测试套件、234 个测试全部通过，零失败、零错误、零跳过。
+- clara-transport 23 个测试、clara-model 17 个测试、clara-mcp 127 个测试、clara-application 指定 12 个测试全部通过。
 - 核心 API 未暴露 Provider SDK 类型；模型调用通过 provider 与 model 标识选择与隔离。
 
 实时验证仍需单独完成：供应商账号权限与配额、流式/工具调用往返、Milvus 版本与集合结构、生产状态持久化与恢复。
@@ -506,9 +508,10 @@ clara/
 |-- pom.xml                    # 根 POM，聚合各模块
 |-- clara-bom/                 # 版本清单
 |-- clara-core/                # 枚举与错误模型
+|-- clara-transport/           # 通用 HTTP / SSE 传输实现
 |-- clara-model/               # 模型内核、Provider 配置、媒体资产
 |-- clara-memory/              # 窗口记忆、会话持久化、语义记忆
-|-- clara-mcp/                 # MCP 客户端、注册表与传输
+|-- clara-mcp/                 # MCP 客户端、注册表与协议传输适配
 |-- clara-workflow/            # 工作流引擎、任务规划、人工交互
 |-- clara-orchestration/       # 对话编排与能力组合
 |-- clara-skill/               # 技能注册、执行与工具
@@ -535,5 +538,6 @@ clara/
 - Java 8 依赖与许可基线：docs/migration-design/java8-dependencies.md
 - 技术设计：docs/technical-design/ 下各模块设计文档
 - 业务设计：docs/business-design/ 下各模块业务文档
+- clara-mcp 模块学习指南（设计思想与类架构）：docs/architecture-design/clara-mcp-module-learning-guide.md
 
 仓库当前未附带完整许可证合规材料。分发或商用前应补齐许可证、NOTICE 与第三方归属清单。

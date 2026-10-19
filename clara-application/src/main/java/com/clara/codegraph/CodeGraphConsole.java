@@ -269,7 +269,7 @@ public final class CodeGraphConsole {
         if (result.exitCode < 0) {
             return result.output;
         }
-        List<String> notes = new ArrayList<String>();
+        List<String> notes = new ArrayList<>();
         String lastPlain = "";
         for (String line : result.output.split("\r?\n")) {
             String text = line.trim();

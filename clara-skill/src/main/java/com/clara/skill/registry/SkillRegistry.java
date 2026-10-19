@@ -142,8 +142,8 @@ public final class SkillRegistry {
      * 重扫内置与运行期目录并整体替换索引，随后增量同步语义记忆（仅在调用方持锁时执行）。
      */
     private void rescan() {
-        Map<String, ToolMethod> previousTools = new LinkedHashMap<String, ToolMethod>(tools);
-        Map<String, PromptDefinition> previousPrompts = new LinkedHashMap<String, PromptDefinition>(prompts);
+        Map<String, ToolMethod> previousTools = new LinkedHashMap<>(tools);
+        Map<String, PromptDefinition> previousPrompts = new LinkedHashMap<>(prompts);
 
         Map<String, ToolMethod> newTools = new ConcurrentHashMap<>();
         Map<String, PromptDefinition> newPrompts = new ConcurrentHashMap<>();
@@ -169,7 +169,7 @@ public final class SkillRegistry {
         if (runtimeRoot == null) {
             return Collections.emptyMap();
         }
-        Map<String, String> stamps = new LinkedHashMap<String, String>();
+        Map<String, String> stamps = new LinkedHashMap<>();
         collectStamps(stamps, listFiles(new File(runtimeRoot, "prompt")));
         collectStamps(stamps, listScriptFiles(new File(runtimeRoot, "scripts")));
         return Collections.unmodifiableMap(stamps);
@@ -376,7 +376,7 @@ public final class SkillRegistry {
     }
 
     private MemoryEntry indexTool(ToolMethod method) {
-        Map<String, String> metadata = new LinkedHashMap<String, String>();
+        Map<String, String> metadata = new LinkedHashMap<>();
         if (method.getParameters() != null && !method.getParameters().trim().isEmpty()) {
             metadata.put(MemoryEntry.TOOL_PARAMETERS_METADATA_KEY, method.getParameters());
         }

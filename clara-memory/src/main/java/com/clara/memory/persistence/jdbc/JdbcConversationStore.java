@@ -96,7 +96,7 @@ public final class JdbcConversationStore implements ConversationStore {
         if (current.version() != expectedVersion) {
             throw ConversationStoreErrors.versionConflict();
         }
-        List<IContent> merged = new ArrayList<IContent>(current.messages().size() + messages.size());
+        List<IContent> merged = new ArrayList<>(current.messages().size() + messages.size());
         merged.addAll(current.messages());
         for (IContent message : messages) {
             if (message == null) {

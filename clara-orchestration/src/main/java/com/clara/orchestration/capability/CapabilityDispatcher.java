@@ -120,7 +120,7 @@ public final class CapabilityDispatcher {
         if (images == null || images.isEmpty()) {
             return null;
         }
-        List<String> references = new ArrayList<String>();
+        List<String> references = new ArrayList<>();
         for (ImageItem image : images) {
             if (image == null) {
                 continue;

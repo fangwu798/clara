@@ -52,7 +52,7 @@ public final class ToolOutputCompactor {
         if (boundary <= 0) {
             return messages;
         }
-        List<IContent> result = new ArrayList<IContent>(messages.size());
+        List<IContent> result = new ArrayList<>(messages.size());
         boolean changed = false;
         for (int index = 0; index < messages.size(); index++) {
             IContent message = messages.get(index);

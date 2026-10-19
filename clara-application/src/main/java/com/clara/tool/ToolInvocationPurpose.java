@@ -100,7 +100,7 @@ public final class ToolInvocationPurpose {
     }
 
     private static Map<String, String> commandPurposes() {
-        Map<String, String> result = new LinkedHashMap<String, String>();
+        Map<String, String> result = new LinkedHashMap<>();
         result.put("java", "运行 Java 程序");
         result.put("javac", "编译 Java 源代码");
         result.put("mvn", "构建 Maven 项目");

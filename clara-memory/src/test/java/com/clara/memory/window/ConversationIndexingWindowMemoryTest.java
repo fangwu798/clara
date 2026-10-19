@@ -119,7 +119,7 @@ public class ConversationIndexingWindowMemoryTest {
      */
     private static final class RecordingStore implements ISemanticMemoryStore {
 
-        final List<MemoryEntry> entries = new ArrayList<MemoryEntry>();
+        final List<MemoryEntry> entries = new ArrayList<>();
         int upsertCalls = 0;
         boolean failUpsert = false;
         String deletedConversation = null;

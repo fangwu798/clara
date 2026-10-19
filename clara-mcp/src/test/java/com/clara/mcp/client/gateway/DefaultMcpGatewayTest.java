@@ -7,10 +7,10 @@ import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
-import com.clara.mcp.registry.InMemoryMcpCapabilityCatalog;
-import com.clara.mcp.registry.McpCapabilityCatalog;
-import com.clara.mcp.client.McpClient;
-import com.clara.mcp.client.McpClientFactory;
+import com.clara.mcp.api.IMcpCapabilityCatalog;
+import com.clara.mcp.api.IMcpClient;
+import com.clara.mcp.api.IMcpClientFactory;
+import com.clara.mcp.api.IMcpServerRegistry;
 import com.clara.mcp.client.McpInitialization;
 import com.clara.mcp.client.McpPage;
 import com.clara.mcp.client.McpServerCapabilities;
@@ -21,16 +21,16 @@ import com.clara.mcp.client.call.McpResourceContent;
 import com.clara.mcp.client.call.McpResourceRequest;
 import com.clara.mcp.client.call.McpToolCall;
 import com.clara.mcp.client.call.McpToolResult;
+import com.clara.mcp.registry.InMemoryMcpCapabilityCatalog;
 import com.clara.mcp.registry.McpHealthStatus;
-import com.clara.mcp.registry.capability.McpPromptDescriptor;
 import com.clara.mcp.registry.McpRegistrationStatus;
+import com.clara.mcp.registry.McpServerRegistration;
+import com.clara.mcp.registry.McpServerSnapshot;
+import com.clara.mcp.registry.McpTransportProfile;
+import com.clara.mcp.registry.capability.McpPromptDescriptor;
 import com.clara.mcp.registry.capability.McpResourceDescriptor;
 import com.clara.mcp.registry.capability.McpResourceTemplateDescriptor;
-import com.clara.mcp.registry.McpServerRegistration;
-import com.clara.mcp.registry.McpServerRegistry;
-import com.clara.mcp.registry.McpServerSnapshot;
 import com.clara.mcp.registry.capability.McpToolDescriptor;
-import com.clara.mcp.registry.McpTransportProfile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,7 +38,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -189,8 +188,8 @@ public class DefaultMcpGatewayTest {
         return new McpInitialization(VERSION, IDENTITY, CAPS);
     }
 
-    private static McpServerRegistry registry(final McpServerRegistration value) {
-        return new McpServerRegistry() {
+    private static IMcpServerRegistry registry(final McpServerRegistration value) {
+        return new IMcpServerRegistry() {
             public void register(McpServerRegistration registration) { }
             public void updateStatus(String tenantId, String serverKey, McpRegistrationStatus status) { }
             public List<McpServerRegistration> listEnabled(String tenantId) {
@@ -212,13 +211,13 @@ public class DefaultMcpGatewayTest {
     }
 
     private static List<McpToolDescriptor> tools(McpToolDescriptor tool) {
-        List<McpToolDescriptor> values = new ArrayList<McpToolDescriptor>();
+        List<McpToolDescriptor> values = new ArrayList<>();
         values.add(tool);
         return values;
     }
 
     private static McpToolDescriptor descriptor(String name) {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         return new McpToolDescriptor(name, "echo tool", schema);
     }
@@ -227,14 +226,14 @@ public class DefaultMcpGatewayTest {
         ConvContext conversation = new ConvContext("user-1", "conv-1", null, null);
         CallContext call = new CallContext("trace-1", System.currentTimeMillis() + 10000L,
                 new CancellationToken());
-        Map<String, Object> arguments = new LinkedHashMap<String, Object>();
+        Map<String, Object> arguments = new LinkedHashMap<>();
         arguments.put("text", "hi");
         return new McpToolCall(TENANT, SERVER, SNAPSHOT, toolName, schemaHash, arguments, conversation, call);
     }
 
     private static List<Map<String, Object>> content() {
-        List<Map<String, Object>> content = new ArrayList<Map<String, Object>>();
-        Map<String, Object> item = new LinkedHashMap<String, Object>();
+        List<Map<String, Object>> content = new ArrayList<>();
+        Map<String, Object> item = new LinkedHashMap<>();
         item.put("type", "text");
         item.put("text", "hello");
         content.add(item);
@@ -256,7 +255,7 @@ public class DefaultMcpGatewayTest {
         }
     }
 
-    private static final class StubCatalog implements McpCapabilityCatalog {
+    private static final class StubCatalog implements IMcpCapabilityCatalog {
         private final McpServerSnapshot snapshot;
         private ClaraException toolFailure;
 
@@ -280,19 +279,19 @@ public class DefaultMcpGatewayTest {
         }
     }
 
-    private static final class FakeClientFactory implements McpClientFactory {
-        private final McpClient client;
+    private static final class FakeClientFactory implements IMcpClientFactory {
+        private final IMcpClient client;
         private int created;
 
-        private FakeClientFactory(McpClient client) { this.client = client; }
+        private FakeClientFactory(IMcpClient client) { this.client = client; }
 
-        public McpClient create(McpServerRegistration registration) {
+        public IMcpClient create(McpServerRegistration registration) {
             created++;
             return client;
         }
     }
 
-    private static final class FakeClient implements McpClient {
+    private static final class FakeClient implements IMcpClient {
         private final McpInitialization initialization;
         private McpToolResult toolResult;
         private RuntimeException callFailure;

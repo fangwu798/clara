@@ -134,7 +134,7 @@ public class PublishWorkflowToolTest {
     }
 
     private static String arguments(String yaml, boolean dryRun) throws Exception {
-        LinkedHashMap<String, Object> payload = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("yaml", yaml);
         payload.put("dryRun", Boolean.valueOf(dryRun));
         return JSON.writeValueAsString(payload);
@@ -170,7 +170,7 @@ public class PublishWorkflowToolTest {
         @Override
         public IWorkflowAction create(WorkflowActionSpec spec) {
             return scope -> {
-                LinkedHashMap<String, Object> output = new LinkedHashMap<String, Object>();
+                LinkedHashMap<String, Object> output = new LinkedHashMap<>();
                 output.put("output", spec.getNodeId());
                 return output;
             };

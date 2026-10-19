@@ -2,6 +2,8 @@ package com.clara.mcp.registry;
 
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
+import com.clara.mcp.McpErrors;
+import com.clara.mcp.api.IMcpCapabilityCatalog;
 import com.clara.mcp.registry.capability.McpPromptDescriptor;
 import com.clara.mcp.registry.capability.McpResourceDescriptor;
 import com.clara.mcp.registry.capability.McpToolDescriptor;
@@ -11,11 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 提供MCP能力目录的内存实现。
  */
-public final class InMemoryMcpCapabilityCatalog implements McpCapabilityCatalog {
+public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog {
     private final Map<String, McpServerSnapshot> snapshots =
-            new ConcurrentHashMap<String, McpServerSnapshot>();
+            new ConcurrentHashMap<>();
     private final Map<String, McpServerSnapshot> latest =
-            new ConcurrentHashMap<String, McpServerSnapshot>();
+            new ConcurrentHashMap<>();
 
     public void publish(McpServerSnapshot snapshot) {
         if (snapshot == null) { throw new IllegalArgumentException("snapshot must not be null"); }

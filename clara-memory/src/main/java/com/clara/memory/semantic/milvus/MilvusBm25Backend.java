@@ -138,7 +138,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
         }
         for (int from = 0; from < entries.size(); from += MAX_INSERT_BATCH) {
             List<MemoryEntry> slice = entries.subList(from, Math.min(entries.size(), from + MAX_INSERT_BATCH));
-            List<JsonObject> rows = new ArrayList<JsonObject>(slice.size());
+            List<JsonObject> rows = new ArrayList<>(slice.size());
             for (MemoryEntry entry : slice) {
                 if (entry == null) {
                     throw new IllegalArgumentException("entries must not contain null");
@@ -174,7 +174,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
             builder.filter(expr);
         }
         SearchResp response = execute("search", () -> client.search(builder.build()));
-        List<MemoryMatch> matches = new ArrayList<MemoryMatch>();
+        List<MemoryMatch> matches = new ArrayList<>();
         for (List<SearchResp.SearchResult> group : response.getSearchResults()) {
             for (SearchResp.SearchResult hit : group) {
                 if (hit == null || hit.getEntity() == null) {
@@ -240,7 +240,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
      * @param spec 集合规格，非 null
      */
     private void createCollection(MilvusCollectionSpec spec) {
-        List<CreateCollectionReq.FieldSchema> fields = new ArrayList<CreateCollectionReq.FieldSchema>();
+        List<CreateCollectionReq.FieldSchema> fields = new ArrayList<>();
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_ID).dataType(DataType.VarChar)
                 .maxLength(Integer.valueOf(128)).isPrimaryKey(true).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_SOURCE_TYPE).dataType(DataType.VarChar)
@@ -441,7 +441,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
      * @return 元数据映射，非 null
      */
     private static Map<String, String> toMetadata(Object value) {
-        Map<String, String> result = new LinkedHashMap<String, String>();
+        Map<String, String> result = new LinkedHashMap<>();
         if (value instanceof JsonObject) {
             for (Map.Entry<String, JsonElement> entry : ((JsonObject) value).entrySet()) {
                 if (entry.getValue() != null && entry.getValue().isJsonPrimitive()) {

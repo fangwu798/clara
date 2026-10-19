@@ -124,6 +124,6 @@ public class MilvusSemanticMemoryStoreIntegrationTest {
     }
 
     private static List<MemoryMatch> emptyIfNull(List<MemoryMatch> matches) {
-        return matches == null ? new ArrayList<MemoryMatch>() : matches;
+        return matches == null ? new ArrayList<>() : matches;
     }
 }

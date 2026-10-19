@@ -86,7 +86,7 @@ public final class ReviewWorkflowAction implements IWorkflowAction {
         String conclusion = speak(instanceId, options.moderator(), options.rounds(), topic,
                 discussion.toString(), true);
 
-        Map<String, Object> response = new LinkedHashMap<String, Object>();
+        Map<String, Object> response = new LinkedHashMap<>();
         response.put("output", conclusion);
         return response;
     }

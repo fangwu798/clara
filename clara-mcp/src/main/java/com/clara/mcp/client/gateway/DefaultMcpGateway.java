@@ -3,10 +3,12 @@ package com.clara.mcp.client.gateway;
 import com.clara.context.CallContext;
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
-import com.clara.mcp.registry.McpCapabilityCatalog;
-import com.clara.mcp.client.McpClient;
-import com.clara.mcp.client.McpClientErrors;
-import com.clara.mcp.client.McpClientFactory;
+import com.clara.mcp.McpErrors;
+import com.clara.mcp.api.IMcpCapabilityCatalog;
+import com.clara.mcp.api.IMcpClient;
+import com.clara.mcp.api.IMcpClientFactory;
+import com.clara.mcp.api.IMcpGateway;
+import com.clara.mcp.api.IMcpServerRegistry;
 import com.clara.mcp.client.McpInitialization;
 import com.clara.mcp.client.call.McpPromptRequest;
 import com.clara.mcp.client.call.McpPromptResult;
@@ -17,10 +19,10 @@ import com.clara.mcp.client.call.McpToolResult;
 import com.clara.mcp.registry.McpHealthStatus;
 import com.clara.mcp.registry.McpRegistrationStatus;
 import com.clara.mcp.registry.McpServerRegistration;
-import com.clara.mcp.registry.McpServerRegistry;
 import com.clara.mcp.registry.McpServerSnapshot;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.function.Function;
 
 /**
  * 在调用 MCP 工具、资源和提示词前统一校验注册状态、能力快照、Schema 与服务端身份。
@@ -32,13 +34,13 @@ import java.util.Collections;
  * 能力已变化时会拒绝执行；客户端由网关关闭，调用方不得复用或管理该实例。服务端所属租户由调用请求显式携带
  * （会话上下文已不再携带租户标识），网关据此在按租户分区的注册表与能力目录中定位服务端。
  */
-public final class DefaultMcpGateway implements McpGateway {
-    private final McpServerRegistry registry;
-    private final McpCapabilityCatalog catalog;
-    private final McpClientFactory clientFactory;
+public final class DefaultMcpGateway implements IMcpGateway {
+    private final IMcpServerRegistry registry;
+    private final IMcpCapabilityCatalog catalog;
+    private final IMcpClientFactory clientFactory;
 
-    public DefaultMcpGateway(McpServerRegistry registry, McpCapabilityCatalog catalog,
-            McpClientFactory clientFactory) {
+    public DefaultMcpGateway(IMcpServerRegistry registry, IMcpCapabilityCatalog catalog,
+            IMcpClientFactory clientFactory) {
         if (registry == null || catalog == null || clientFactory == null) {
             throw new IllegalArgumentException("dependencies must not be null");
         }
@@ -52,9 +54,7 @@ public final class DefaultMcpGateway implements McpGateway {
         Prepared prepared = prepare(call.getTenantId(), call.getCall(), call.getServerKey(), call.getSnapshotId());
         catalog.resolveTool(call.getTenantId(), call.getServerKey(), call.getSnapshotId(),
                 call.getToolName(), call.getSchemaHash());
-        return execute(prepared, new Operation<McpToolResult>() {
-            public McpToolResult run(McpClient client) { return client.callTool(call); }
-        });
+        return execute(prepared, client -> client.callTool(call));
     }
 
     public McpResourceContent readResource(final McpResourceRequest request) {
@@ -63,9 +63,7 @@ public final class DefaultMcpGateway implements McpGateway {
                 request.getSnapshotId());
         catalog.resolveResource(request.getTenantId(), request.getServerKey(),
                 request.getSnapshotId(), request.getUri(), request.getSchemaHash());
-        return execute(prepared, new Operation<McpResourceContent>() {
-            public McpResourceContent run(McpClient client) { return client.readResource(request); }
-        });
+        return execute(prepared, client -> client.readResource(request));
     }
 
     public McpPromptResult getPrompt(final McpPromptRequest request) {
@@ -74,9 +72,7 @@ public final class DefaultMcpGateway implements McpGateway {
                 request.getSnapshotId());
         catalog.resolvePrompt(request.getTenantId(), request.getServerKey(),
                 request.getSnapshotId(), request.getPromptName(), request.getSchemaHash());
-        return execute(prepared, new Operation<McpPromptResult>() {
-            public McpPromptResult run(McpClient client) { return client.getPrompt(request); }
-        });
+        return execute(prepared, client -> client.getPrompt(request));
     }
 
     /**
@@ -92,17 +88,17 @@ public final class DefaultMcpGateway implements McpGateway {
         call.getCancellationToken().throwIfCancellationRequested(call.getTraceId());
         McpServerRegistration registration = registry.get(tenantId, serverKey);
         if (registration == null) {
-            throw McpClientErrors.error(ErrorCodes.MCP_SERVER_NOT_FOUND, ErrorCategory.CONFIGURATION);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_FOUND, ErrorCategory.CONFIGURATION);
         }
         if (registration.getStatus() != McpRegistrationStatus.ACTIVE) {
-            throw McpClientErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategory.AUTHORIZATION);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategory.AUTHORIZATION);
         }
         McpServerSnapshot snapshot = catalog.get(tenantId, serverKey, snapshotId);
         if (snapshot == null) {
-            throw McpClientErrors.error(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, ErrorCategory.CAPABILITY);
+            throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, ErrorCategory.CAPABILITY);
         }
         if (snapshot.getHealthStatus() != McpHealthStatus.HEALTHY) {
-            throw McpClientErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategory.EXTERNAL_SERVICE);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategory.EXTERNAL_SERVICE);
         }
         return new Prepared(registration, snapshot);
     }
@@ -115,17 +111,17 @@ public final class DefaultMcpGateway implements McpGateway {
      * @param <T>       结果类型
      * @return 操作结果，非 null
      */
-    private <T> T execute(Prepared prepared, Operation<T> operation) {
-        McpClient client = clientFactory.create(prepared.registration);
+    private <T> T execute(Prepared prepared, Function<IMcpClient, T> operation) {
+        IMcpClient client = clientFactory.create(prepared.registration);
         RuntimeException failure = null;
         try {
             McpInitialization initialization = client.initialize(
                     Collections.singletonList(prepared.snapshot.getProtocolVersion()));
             if (!prepared.snapshot.getProtocolVersion().equals(initialization.getProtocolVersion())
                     || !prepared.snapshot.getIdentity().equals(initialization.getIdentity())) {
-                throw McpClientErrors.error(ErrorCodes.MCP_CAPABILITY_CHANGED, ErrorCategory.CAPABILITY);
+                throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_CHANGED, ErrorCategory.CAPABILITY);
             }
-            return operation.run(client);
+            return operation.apply(client);
         } catch (RuntimeException exception) {
             failure = exception;
             throw exception;
@@ -134,20 +130,11 @@ public final class DefaultMcpGateway implements McpGateway {
                 client.close();
             } catch (IOException exception) {
                 if (failure == null) {
-                    throw McpClientErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED,
+                    throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED,
                             ErrorCategory.EXTERNAL_SERVICE);
                 }
             }
         }
-    }
-
-    /**
-     * 在客户端上执行的一次操作。
-     *
-     * @param <T> 结果类型
-     */
-    private interface Operation<T> {
-        T run(McpClient client);
     }
 
     /**

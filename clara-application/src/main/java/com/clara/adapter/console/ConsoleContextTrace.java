@@ -89,7 +89,7 @@ public final class ConsoleContextTrace implements IContextTraceSink {
      * @return 渲染后的行列表，至少一行，非 null
      */
     static List<String> lines(String source, int hits, long elapsedMillis, List<String> details) {
-        List<String> rendered = new ArrayList<String>();
+        List<String> rendered = new ArrayList<>();
         String label = "[" + label(source) + "]";
         String status = hits > 0 ? "命中 " + hits + " 条" : "未命中";
         rendered.add(LINE_INDENT + StringUtils.padRight(label, LABEL_WIDTH) + status

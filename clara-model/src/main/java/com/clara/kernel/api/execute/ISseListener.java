@@ -1,7 +1,8 @@
 package com.clara.kernel.api.execute;
 
 import com.clara.core.model.IStreamObserver;
-import com.clara.kernel.http.execute.sse.SseEvent;
+import com.clara.core.transport.sse.ISseEventListener;
+import com.clara.core.transport.sse.SseEvent;
 
 /**
  * 监听服务提供商 SSE 的生命周期事件（传输层接口）。
@@ -12,7 +13,7 @@ import com.clara.kernel.http.execute.sse.SseEvent;
  * {@link com.clara.dto.model.StreamEvent} 后交给
  * {@link IStreamObserver}。
  */
-public interface ISseListener {
+public interface ISseListener extends ISseEventListener {
 
     /**
      * 处理一个解析完成的 SSE 事件。
@@ -20,5 +21,6 @@ public interface ISseListener {
      * @param event 已解析的 SSE 事件，包含事件名、数据以及可选的 id 与重试间隔，非 null
      * @return {@code true} 继续接收后续事件；{@code false} 提前结束流（传输层停止读取并正常返回）
      */
+    @Override
     boolean onEvent(SseEvent event);
 }

@@ -2,7 +2,7 @@ package com.clara.kernel.http;
 
 import com.clara.context.ConvContext;
 import com.clara.core.model.IRequest;
-import com.clara.dto.model.RawHttpRequest;
+import com.clara.core.transport.RawHttpRequest;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.BasicParameters;
 import com.clara.kernel.message.ImageParameters;
@@ -46,7 +46,9 @@ public class HttpRequest extends ImageParameters {
      * @return {@code HttpRequest.class}，非 null
      */
     @Override
+    @SuppressWarnings("unchecked")
     public <T extends IRequest> Class<T> getCls() {
+        // 实现固定返回自身类型；转换由 getCls 的接口契约保证。
         return (Class<T>) HttpRequest.class;
     }
 

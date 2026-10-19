@@ -34,8 +34,8 @@ public final class WindowSupport {
         if (messages == null || policy == null) {
             throw new IllegalArgumentException("messages and policy must not be null");
         }
-        List<IContent> system = new ArrayList<IContent>();
-        List<IContent> body = new ArrayList<IContent>();
+        List<IContent> system = new ArrayList<>();
+        List<IContent> body = new ArrayList<>();
         for (IContent message : messages) {
             if (isSystemInstruction(message)) {
                 system.add(message);
@@ -43,11 +43,11 @@ public final class WindowSupport {
                 body.add(message);
             }
         }
-        List<List<IContent>> remaining = new ArrayList<List<IContent>>(groupRoundTrips(body));
+        List<List<IContent>> remaining = new ArrayList<>(groupRoundTrips(body));
         while (!remaining.isEmpty() && !within(system, remaining, policy, estimator)) {
             remaining.remove(0);
         }
-        List<IContent> result = new ArrayList<IContent>(system.size());
+        List<IContent> result = new ArrayList<>(system.size());
         result.addAll(system);
         for (List<IContent> group : remaining) {
             result.addAll(group);
@@ -83,7 +83,7 @@ public final class WindowSupport {
      * @return 有序分组列表，非 null
      */
     public static List<List<IContent>> groupRoundTrips(List<IContent> body) {
-        List<List<IContent>> groups = new ArrayList<List<IContent>>();
+        List<List<IContent>> groups = new ArrayList<>();
         if (body == null) {
             return groups;
         }
@@ -91,7 +91,7 @@ public final class WindowSupport {
         while (index < body.size()) {
             IContent message = body.get(index);
             if (startsToolRoundTrip(message)) {
-                List<IContent> group = new ArrayList<IContent>();
+                List<IContent> group = new ArrayList<>();
                 group.add(message);
                 index++;
                 while (index < body.size() && isToolResult(body.get(index))) {
@@ -100,7 +100,7 @@ public final class WindowSupport {
                 }
                 groups.add(group);
             } else {
-                List<IContent> single = new ArrayList<IContent>();
+                List<IContent> single = new ArrayList<>();
                 single.add(message);
                 groups.add(single);
                 index++;
@@ -133,7 +133,7 @@ public final class WindowSupport {
 
     private static boolean within(List<IContent> system, List<List<IContent>> remaining,
             WindowPolicy policy, ITokenCountEstimator estimator) {
-        List<IContent> all = new ArrayList<IContent>(system.size());
+        List<IContent> all = new ArrayList<>(system.size());
         all.addAll(system);
         for (List<IContent> group : remaining) {
             all.addAll(group);

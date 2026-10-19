@@ -1,5 +1,6 @@
 package com.clara.mcp.registry;
 
+import com.clara.mcp.api.IMcpServerRegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -11,7 +12,7 @@ import java.util.Map;
  * 已审批身份与注册状态。
  *
  * <p>不可变值对象 + 构造期校验；{@link #withStatus(McpRegistrationStatus)} 返回带新状态的副本，
- * 供 {@code McpServerRegistry.updateStatus} 做无锁替换。
+ * 供 {@code IMcpServerRegistry.updateStatus} 做无锁替换。
  *
  * <p>结构化连接参数（可选）：stdio 用 {@link #getCommand()}（首个元素为可执行文件，其后为参数）与
  * {@link #getEnv()}；http 用 {@link #getHeaders()} 附加鉴权等请求头。{@code address} 仍保留为兼容字段：
@@ -86,11 +87,11 @@ public final class McpServerRegistration {
     }
     private static List<String> immutableCommand(List<String> source) {
         if (source == null || source.isEmpty()) { return Collections.emptyList(); }
-        return Collections.unmodifiableList(new ArrayList<String>(source));
+        return Collections.unmodifiableList(new ArrayList<>(source));
     }
     private static Map<String, String> immutableMap(Map<String, String> source) {
         if (source == null || source.isEmpty()) { return Collections.emptyMap(); }
-        return Collections.unmodifiableMap(new LinkedHashMap<String, String>(source));
+        return Collections.unmodifiableMap(new LinkedHashMap<>(source));
     }
     private static boolean isBlank(String value) { return value == null || value.trim().isEmpty(); }
 }

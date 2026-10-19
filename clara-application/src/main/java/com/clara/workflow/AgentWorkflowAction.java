@@ -96,8 +96,8 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         this.promptId = promptId;
         this.promptText = blank(promptText) ? null : promptText;
         this.promptVars = promptVars == null
-                ? new LinkedHashMap<String, Object>()
-                : new LinkedHashMap<String, Object>(promptVars);
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(promptVars);
         this.options = options;
     }
 
@@ -156,7 +156,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         }
         progress("节点 " + nodeId + "：完成");
         Object output = output(capability, result.getContent());
-        Map<String, Object> response = new LinkedHashMap<String, Object>();
+        Map<String, Object> response = new LinkedHashMap<>();
         response.put("output", output);
         return response;
     }
@@ -188,7 +188,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
      * 实际下发内容、也更短；无可展示取值时回退为提示词模板本身的摘要。
      */
     private String inputPreview(Map<String, String> resolved) {
-        List<String> parts = new ArrayList<String>();
+        List<String> parts = new ArrayList<>();
         for (Map.Entry<String, String> entry : resolved.entrySet()) {
             if (blank(entry.getValue())) {
                 continue;
@@ -242,7 +242,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         if (blank(content)) {
             throw new IllegalStateException("工作流 AGENT 节点图片生成结果为空（节点 " + nodeId + "）");
         }
-        List<String> references = new ArrayList<String>();
+        List<String> references = new ArrayList<>();
         for (String reference : content.split("\\r?\\n")) {
             if (blank(reference)) {
                 continue;
@@ -252,7 +252,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         if (references.isEmpty()) {
             throw new IllegalStateException("工作流 AGENT 节点未产出可用图片（节点 " + nodeId + "）");
         }
-        Map<String, Object> output = new LinkedHashMap<String, Object>();
+        Map<String, Object> output = new LinkedHashMap<>();
         output.put("mediaType", capability == CapabilityKindEnum.VIDEO ? "VIDEO" : "IMAGE");
         output.put("references", references);
         return output;
@@ -265,7 +265,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         if (options.attachments().isEmpty()) {
             return null;
         }
-        List<String> resolved = new ArrayList<String>();
+        List<String> resolved = new ArrayList<>();
         for (String template : options.attachments()) {
             String reference = WorkflowVariableResolver.stringify(
                     WorkflowVariableResolver.resolveValue(template, scope, nodeId));
@@ -280,7 +280,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
      * 解析节点声明的提示词变量为实际取值（键 → 字符串值）。
      */
     private Map<String, String> resolveVars(ExecutionScope scope) {
-        Map<String, String> resolved = new LinkedHashMap<String, String>();
+        Map<String, String> resolved = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : promptVars.entrySet()) {
             Object value = WorkflowVariableResolver.resolveValue(entry.getValue(), scope, nodeId);
             resolved.put(entry.getKey(), WorkflowVariableResolver.stringify(value));

@@ -1,5 +1,7 @@
 package com.clara.mcp.tool;
 
+import com.clara.mcp.registry.McpServerSnapshot;
+import com.clara.mcp.registry.capability.McpToolDescriptor;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ExternalToolCatalog {
 
     private final Map<String, ExternalToolBinding> bindings =
-            new ConcurrentHashMap<String, ExternalToolBinding>();
+            new ConcurrentHashMap<>();
 
     /**
      * 登记一个外部工具的路由绑定，同名重复登记以最后一次为准。
@@ -54,6 +56,33 @@ public final class ExternalToolCatalog {
     }
 
     /**
+     * 把一次能力快照中的全部工具登记为路由绑定。
+     *
+     * <p>每个工具登记为 {@code ExternalToolBinding(tenantId, snapshot.getServerKey(),
+     * snapshot.getSnapshotId(), tool.getSchemaHash())}；同名工具按 {@link #register} 的约定以最后一次为准。
+     *
+     * @param tenantId 租户标识，不可为空白
+     * @param snapshot 能力快照，不可为 null
+     * @return 登记的工具个数，非负
+     * @throws IllegalArgumentException 入参非法时
+     */
+    public int registerSnapshot(String tenantId, McpServerSnapshot snapshot) {
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new IllegalArgumentException("tenantId must not be blank");
+        }
+        if (snapshot == null) {
+            throw new IllegalArgumentException("snapshot must not be null");
+        }
+        int registered = 0;
+        for (McpToolDescriptor tool : snapshot.getTools()) {
+            register(tool.getName(), new ExternalToolBinding(tenantId, snapshot.getServerKey(),
+                    snapshot.getSnapshotId(), tool.getSchemaHash()));
+            registered++;
+        }
+        return registered;
+    }
+
+    /**
      * 清空全部登记。
      */
     public void clear() {
@@ -67,6 +96,6 @@ public final class ExternalToolCatalog {
      */
     public Map<String, ExternalToolBinding> snapshot() {
         return Collections.unmodifiableMap(
-                new LinkedHashMap<String, ExternalToolBinding>(bindings));
+                new LinkedHashMap<>(bindings));
     }
 }

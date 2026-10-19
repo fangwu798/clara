@@ -68,8 +68,8 @@ public class AvailabilityLineTest {
                 ModelCheckResult.available(Paths.get("a.yml"), "a", "OPENAI", "gpt", 12L),
                 ModelCheckResult.unavailable(Paths.get("bb.yml"), "bb", "DEEPSEEK", "ds-v4-pro", "denied"),
                 ModelCheckResult.missingCredential(Paths.get("ccc.yml"), "ccc", "CLARA_KIMI_API_KEY"));
-        List<String> aliases = new ArrayList<String>();
-        List<String> identities = new ArrayList<String>();
+        List<String> aliases = new ArrayList<>();
+        List<String> identities = new ArrayList<>();
         for (ModelCheckResult result : results) {
             aliases.add(result.getAlias());
             identities.add(AvailabilityLine.identity(result.getProvider(), result.getModel()));

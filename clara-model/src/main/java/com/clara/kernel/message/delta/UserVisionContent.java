@@ -49,7 +49,7 @@ public final class UserVisionContent implements IContent {
         this.text = text;
         this.images = images == null
                 ? Collections.<String>emptyList()
-                : Collections.unmodifiableList(new ArrayList<String>(images));
+                : Collections.unmodifiableList(new ArrayList<>(images));
     }
 
     /**
@@ -70,17 +70,17 @@ public final class UserVisionContent implements IContent {
 
     @Override
     public Map<String, Object> toCompletionMessage() {
-        List<Map<String, Object>> parts = new ArrayList<Map<String, Object>>();
+        List<Map<String, Object>> parts = new ArrayList<>();
         addTextPart(parts);
         for (String image : images) {
-            Map<String, Object> reference = new LinkedHashMap<String, Object>();
+            Map<String, Object> reference = new LinkedHashMap<>();
             reference.put("url", image);
-            Map<String, Object> part = new LinkedHashMap<String, Object>();
+            Map<String, Object> part = new LinkedHashMap<>();
             part.put("type", "image_url");
             part.put("image_url", reference);
             parts.add(part);
         }
-        Map<String, Object> message = new LinkedHashMap<String, Object>();
+        Map<String, Object> message = new LinkedHashMap<>();
         message.put("role", "user");
         message.put("content", parts);
         return message;
@@ -88,20 +88,20 @@ public final class UserVisionContent implements IContent {
 
     @Override
     public List<Map<String, Object>> toResponseInputItems() {
-        List<Map<String, Object>> parts = new ArrayList<Map<String, Object>>();
+        List<Map<String, Object>> parts = new ArrayList<>();
         if (hasText()) {
-            Map<String, Object> part = new LinkedHashMap<String, Object>();
+            Map<String, Object> part = new LinkedHashMap<>();
             part.put("type", "input_text");
             part.put("text", text);
             parts.add(part);
         }
         for (String image : images) {
-            Map<String, Object> part = new LinkedHashMap<String, Object>();
+            Map<String, Object> part = new LinkedHashMap<>();
             part.put("type", "input_image");
             part.put("image_url", image);
             parts.add(part);
         }
-        Map<String, Object> item = new LinkedHashMap<String, Object>();
+        Map<String, Object> item = new LinkedHashMap<>();
         item.put("type", "message");
         item.put("role", "user");
         item.put("content", parts);
@@ -112,7 +112,7 @@ public final class UserVisionContent implements IContent {
         if (!hasText()) {
             return;
         }
-        Map<String, Object> part = new LinkedHashMap<String, Object>();
+        Map<String, Object> part = new LinkedHashMap<>();
         part.put("type", "text");
         part.put("text", text);
         parts.add(part);

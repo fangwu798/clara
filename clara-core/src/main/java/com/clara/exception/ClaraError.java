@@ -111,7 +111,7 @@ public final class ClaraError {
         this.retryAfterMillis = retryAfterMillis;
         this.safeDetails = safeDetails == null
                 ? Collections.<String, String>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(safeDetails));
+                : Collections.unmodifiableMap(new LinkedHashMap<>(safeDetails));
     }
     /**
      * 读取稳定错误码。

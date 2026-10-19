@@ -20,10 +20,10 @@ public class SchemaHasherTest {
 
     @Test
     public void sameSchemaDifferentKeyOrderProducesSameHash() {
-        Map<String, Object> first = new LinkedHashMap<String, Object>();
+        Map<String, Object> first = new LinkedHashMap<>();
         first.put("b", 2);
         first.put("a", 1);
-        Map<String, Object> second = new LinkedHashMap<String, Object>();
+        Map<String, Object> second = new LinkedHashMap<>();
         second.put("a", 1);
         second.put("b", 2);
 
@@ -32,17 +32,17 @@ public class SchemaHasherTest {
 
     @Test
     public void nestedStructureIsCanonicalized() {
-        Map<String, Object> firstInner = new LinkedHashMap<String, Object>();
+        Map<String, Object> firstInner = new LinkedHashMap<>();
         firstInner.put("y", "2");
         firstInner.put("x", "1");
-        Map<String, Object> first = new LinkedHashMap<String, Object>();
+        Map<String, Object> first = new LinkedHashMap<>();
         first.put("props", firstInner);
         first.put("required", Arrays.asList("x", "y"));
 
-        Map<String, Object> secondInner = new LinkedHashMap<String, Object>();
+        Map<String, Object> secondInner = new LinkedHashMap<>();
         secondInner.put("x", "1");
         secondInner.put("y", "2");
-        Map<String, Object> second = new LinkedHashMap<String, Object>();
+        Map<String, Object> second = new LinkedHashMap<>();
         second.put("required", Arrays.asList("x", "y"));
         second.put("props", secondInner);
 
@@ -51,9 +51,9 @@ public class SchemaHasherTest {
 
     @Test
     public void differentValuesProduceDifferentHash() {
-        Map<String, Object> first = new LinkedHashMap<String, Object>();
+        Map<String, Object> first = new LinkedHashMap<>();
         first.put("type", "object");
-        Map<String, Object> second = new LinkedHashMap<String, Object>();
+        Map<String, Object> second = new LinkedHashMap<>();
         second.put("type", "array");
 
         assertNotEquals(hasher.hash(first), hasher.hash(second));
@@ -74,7 +74,7 @@ public class SchemaHasherTest {
 
     @Test
     public void hashIsLowercaseHexSha256() {
-        String hash = hasher.hash(new LinkedHashMap<String, Object>());
+        String hash = hasher.hash(new LinkedHashMap<>());
 
         assertEquals(64, hash.length());
         assertTrue(hash.matches("[0-9a-f]{64}"));
@@ -94,7 +94,7 @@ public class SchemaHasherTest {
     public void deeplyNestedValueRejected() {
         Object value = "leaf";
         for (int depth = 0; depth < 120; depth++) {
-            List<Object> wrapper = new ArrayList<Object>();
+            List<Object> wrapper = new ArrayList<>();
             wrapper.add(value);
             value = wrapper;
         }

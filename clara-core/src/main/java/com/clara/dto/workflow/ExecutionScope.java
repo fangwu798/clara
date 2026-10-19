@@ -25,8 +25,8 @@ public final class ExecutionScope {
      * 以初始输入创建作用域。
      */
     public ExecutionScope(Map<String, Object> inputs) {
-        this(copyMap(inputs), new LinkedHashMap<String, Map<String, Object>>(),
-                new LinkedHashSet<String>(), new LinkedHashMap<String, String>(), 0L);
+        this(copyMap(inputs), new LinkedHashMap<>(),
+                new LinkedHashSet<>(), new LinkedHashMap<>(), 0L);
     }
 
     private ExecutionScope(Map<String, Object> variables,
@@ -56,26 +56,26 @@ public final class ExecutionScope {
     }
 
     public synchronized Map<String, Object> getVariables() {
-        return Collections.unmodifiableMap(new LinkedHashMap<String, Object>(variables));
+        return Collections.unmodifiableMap(new LinkedHashMap<>(variables));
     }
 
     public synchronized Map<String, Map<String, Object>> getNodeResults() {
-        Map<String, Map<String, Object>> copy = new LinkedHashMap<String, Map<String, Object>>();
+        Map<String, Map<String, Object>> copy = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Object>> entry : nodeResults.entrySet()) {
             copy.put(entry.getKey(),
-                    Collections.unmodifiableMap(new LinkedHashMap<String, Object>(entry.getValue())));
+                    Collections.unmodifiableMap(new LinkedHashMap<>(entry.getValue())));
         }
         return Collections.unmodifiableMap(copy);
     }
 
     public synchronized ExecutionScope copy() {
-        Map<String, Map<String, Object>> results = new LinkedHashMap<String, Map<String, Object>>();
+        Map<String, Map<String, Object>> results = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Object>> entry : nodeResults.entrySet()) {
-            results.put(entry.getKey(), new LinkedHashMap<String, Object>(entry.getValue()));
+            results.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
         }
-        return new ExecutionScope(new LinkedHashMap<String, Object>(variables), results,
-                new LinkedHashSet<String>(completedExecutions),
-                new LinkedHashMap<String, String>(controls), version);
+        return new ExecutionScope(new LinkedHashMap<>(variables), results,
+                new LinkedHashSet<>(completedExecutions),
+                new LinkedHashMap<>(controls), version);
     }
 
     public synchronized boolean isCompleted(String executionKey) {
@@ -118,8 +118,8 @@ public final class ExecutionScope {
     }
 
     private static Map<String, Object> copyMap(Map<String, Object> values) {
-        return values == null ? new LinkedHashMap<String, Object>()
-                : new LinkedHashMap<String, Object>(values);
+        return values == null ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(values);
     }
 
     private static boolean equal(Object left, Object right) {

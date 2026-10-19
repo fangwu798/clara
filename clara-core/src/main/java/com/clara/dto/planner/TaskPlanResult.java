@@ -38,8 +38,8 @@ public final class TaskPlanResult {
         this.plan = plan;
         this.status = status;
         this.taskStatuses = Collections.unmodifiableMap(
-                new LinkedHashMap<String, TaskNodeStatusEnum>(taskStatuses));
-        this.outputs = Collections.unmodifiableMap(new LinkedHashMap<String, Object>(outputs));
+                new LinkedHashMap<>(taskStatuses));
+        this.outputs = Collections.unmodifiableMap(new LinkedHashMap<>(outputs));
         this.steps = steps;
     }
 }

@@ -205,11 +205,11 @@ public final class ResponseDecoderSupport {
      * 取响应类型及父类的实例字段，父类字段在前。
      */
     public static List<Field> fields(Class<?> type) {
-        List<Class<?>> hierarchy = new ArrayList<Class<?>>();
+        List<Class<?>> hierarchy = new ArrayList<>();
         for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
             hierarchy.add(0, current);
         }
-        List<Field> fields = new ArrayList<Field>();
+        List<Field> fields = new ArrayList<>();
         for (Class<?> current : hierarchy) {
             for (Field field : current.getDeclaredFields()) {
                 if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {

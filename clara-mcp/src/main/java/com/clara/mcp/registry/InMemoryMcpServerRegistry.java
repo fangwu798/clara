@@ -2,6 +2,8 @@ package com.clara.mcp.registry;
 
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
+import com.clara.mcp.McpErrors;
+import com.clara.mcp.api.IMcpServerRegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -12,9 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 提供MCP服务端注册表的内存实现。
  */
-public final class InMemoryMcpServerRegistry implements McpServerRegistry {
+public final class InMemoryMcpServerRegistry implements IMcpServerRegistry {
     private final Map<String, McpServerRegistration> registrations =
-            new ConcurrentHashMap<String, McpServerRegistration>();
+            new ConcurrentHashMap<>();
 
     public void register(McpServerRegistration registration) {
         if (registration == null) { throw new IllegalArgumentException("registration must not be null"); }
@@ -34,7 +36,7 @@ public final class InMemoryMcpServerRegistry implements McpServerRegistry {
     }
     public List<McpServerRegistration> listEnabled(String tenantId) {
         require(tenantId, "tenantId");
-        List<McpServerRegistration> result = new ArrayList<McpServerRegistration>();
+        List<McpServerRegistration> result = new ArrayList<>();
         for (McpServerRegistration registration : registrations.values()) {
             if (tenantId.equals(registration.getTenantId()) && registration.isEnabled()) {
                 result.add(registration);

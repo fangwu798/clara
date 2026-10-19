@@ -26,7 +26,7 @@ public final class HumanNode implements IWorkflowNode {
         }
         this.id = id;
         this.inputKey = inputKey;
-        Set<String> outputs = new LinkedHashSet<String>();
+        Set<String> outputs = new LinkedHashSet<>();
         outputs.add(inputKey);
         this.outputKeys = Collections.unmodifiableSet(outputs);
     }

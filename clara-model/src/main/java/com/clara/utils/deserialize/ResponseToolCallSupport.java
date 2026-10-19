@@ -40,7 +40,7 @@ public final class ResponseToolCallSupport {
         if (node == null || !node.isArray()) {
             return null;
         }
-        List<ResponsesToolCall> result = new ArrayList<ResponsesToolCall>();
+        List<ResponsesToolCall> result = new ArrayList<>();
         for (JsonNode item : node) {
             if (!item.isObject() || !"function_call".equals(textOrNull(item.get("type")))) {
                 continue;
@@ -54,13 +54,13 @@ public final class ResponseToolCallSupport {
     }
 
     public static String toolCallsPayload(List<ResponsesToolCall> calls) {
-        List<Map<String, Object>> items = new ArrayList<Map<String, Object>>();
+        List<Map<String, Object>> items = new ArrayList<>();
         int index = 0;
         for (ResponsesToolCall call : calls) {
-            Map<String, Object> item = new LinkedHashMap<String, Object>();
+            Map<String, Object> item = new LinkedHashMap<>();
             item.put("index", Integer.valueOf(index++));
             item.put("id", call.getCallId());
-            Map<String, Object> function = new LinkedHashMap<String, Object>();
+            Map<String, Object> function = new LinkedHashMap<>();
             function.put("name", call.getName());
             function.put("arguments", call.getArguments());
             item.put("function", function);

@@ -52,7 +52,7 @@ public class CompositeToolCatalogTest {
     }
 
     private static List<String> names(IToolCatalog catalog) {
-        List<String> names = new ArrayList<String>();
+        List<String> names = new ArrayList<>();
         for (ToolContext tool : catalog.availableTools()) {
             names.add(tool.getFunction().getName());
         }
@@ -64,7 +64,7 @@ public class CompositeToolCatalogTest {
         return new IToolCatalog() {
             @Override
             public List<ToolContext> availableTools() {
-                List<ToolContext> tools = new ArrayList<ToolContext>();
+                List<ToolContext> tools = new ArrayList<>();
                 for (String name : values) {
                     tools.add(spec(name));
                 }
@@ -105,7 +105,7 @@ public class CompositeToolCatalogTest {
     }
 
     private static Map<String, Object> schema() {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         return schema;
     }

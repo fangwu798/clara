@@ -16,9 +16,9 @@ import java.util.Map;
  */
 public final class InMemoryBudgetLedger implements IBudgetLedger {
 
-    private final Map<String, RunAccount> runs = new LinkedHashMap<String, RunAccount>();
+    private final Map<String, RunAccount> runs = new LinkedHashMap<>();
     private final Map<String, BudgetReservation> reservations =
-            new LinkedHashMap<String, BudgetReservation>();
+            new LinkedHashMap<>();
 
     @Override
     public synchronized void openRun(String runId, BudgetAmount limit) {

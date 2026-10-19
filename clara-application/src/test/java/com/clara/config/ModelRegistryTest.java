@@ -38,7 +38,7 @@ public class ModelRegistryTest {
     public void setUp() throws Exception {
         alpha = write("alpha.yml", providerYaml("alpha-model"));
         beta = write("beta.yml", providerYaml("beta-model"));
-        Map<String, String> roles = new LinkedHashMap<String, String>();
+        Map<String, String> roles = new LinkedHashMap<>();
         roles.put("reviewer", "beta");
         registry = new ModelRegistry(Arrays.asList(alpha, beta), roles);
         registry.select(alpha);

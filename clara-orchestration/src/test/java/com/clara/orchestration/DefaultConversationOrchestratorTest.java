@@ -75,7 +75,7 @@ public class DefaultConversationOrchestratorTest {
     }
 
     private static IWindowMemory memory(IContent... messages) {
-        final List<IContent> history = new ArrayList<IContent>(Arrays.asList(messages));
+        final List<IContent> history = new ArrayList<>(Arrays.asList(messages));
         return new IWindowMemory() {
             @Override
             public String conversationId() {

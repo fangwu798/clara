@@ -119,16 +119,16 @@ public final class MilvusGrpcBackend implements MilvusBackend {
         if (entries.isEmpty()) {
             return;
         }
-        List<String> ids = new ArrayList<String>();
-        List<String> sourceTypes = new ArrayList<String>();
-        List<String> sourceIds = new ArrayList<String>();
-        List<String> conversationIds = new ArrayList<String>();
-        List<String> contents = new ArrayList<String>();
-        List<String> contentHashes = new ArrayList<String>();
-        List<List<Float>> vectors = new ArrayList<List<Float>>();
-        List<Long> createdAts = new ArrayList<Long>();
-        List<Long> expiresAts = new ArrayList<Long>();
-        List<JsonObject> metadatas = new ArrayList<JsonObject>();
+        List<String> ids = new ArrayList<>();
+        List<String> sourceTypes = new ArrayList<>();
+        List<String> sourceIds = new ArrayList<>();
+        List<String> conversationIds = new ArrayList<>();
+        List<String> contents = new ArrayList<>();
+        List<String> contentHashes = new ArrayList<>();
+        List<List<Float>> vectors = new ArrayList<>();
+        List<Long> createdAts = new ArrayList<>();
+        List<Long> expiresAts = new ArrayList<>();
+        List<JsonObject> metadatas = new ArrayList<>();
         for (MemoryEntry entry : entries) {
             if (entry == null) {
                 throw new IllegalArgumentException("entries must not contain null");
@@ -144,7 +144,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
             expiresAts.add(Long.valueOf(entry.getExpiresAtEpochMillis()));
             metadatas.add(toJson(entry.getMetadata()));
         }
-        List<InsertParam.Field> fields = new ArrayList<InsertParam.Field>();
+        List<InsertParam.Field> fields = new ArrayList<>();
         fields.add(field(FIELD_ID, ids));
         fields.add(field(FIELD_SOURCE_TYPE, sourceTypes));
         fields.add(field(FIELD_SOURCE_ID, sourceIds));
@@ -184,7 +184,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
         checkStatus(result, "search");
         SearchResultsWrapper wrapper = new SearchResultsWrapper(result.getData().getResults());
         List<QueryResultsWrapper.RowRecord> records = wrapper.getRowRecords(0);
-        List<MemoryMatch> matches = new ArrayList<MemoryMatch>();
+        List<MemoryMatch> matches = new ArrayList<>();
         for (QueryResultsWrapper.RowRecord record : records) {
             MemoryEntry entry = toEntry(record);
             double score = ((Number) record.get("score")).doubleValue();
@@ -243,7 +243,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
     // ------------------------------------------------------------------ 集合创建
 
     private void createCollection(MilvusCollectionSpec spec) {
-        List<FieldType> fields = new ArrayList<FieldType>();
+        List<FieldType> fields = new ArrayList<>();
         fields.add(FieldType.newBuilder().withName(FIELD_ID).withDataType(DataType.VarChar)
                 .withMaxLength(Integer.valueOf(128)).withPrimaryKey(true).build());
         fields.add(FieldType.newBuilder().withName(FIELD_SOURCE_TYPE).withDataType(DataType.VarChar)
@@ -333,7 +333,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
     }
 
     private static List<Float> toFloatList(float[] vector) {
-        List<Float> values = new ArrayList<Float>(vector.length);
+        List<Float> values = new ArrayList<>(vector.length);
         for (float value : vector) {
             values.add(Float.valueOf(value));
         }
@@ -363,7 +363,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
     }
 
     private static Map<String, String> toMetadata(Object value) {
-        Map<String, String> result = new LinkedHashMap<String, String>();
+        Map<String, String> result = new LinkedHashMap<>();
         if (value instanceof JsonObject) {
             JsonObject object = (JsonObject) value;
             for (Map.Entry<String, JsonElement> entry : object.entrySet()) {

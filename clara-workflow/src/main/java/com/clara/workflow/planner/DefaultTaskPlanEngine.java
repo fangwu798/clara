@@ -61,9 +61,9 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         TaskPlan plan = validator.validate(draft);
         budgets.openRun(runId, validator.getLimits().getTotalBudget());
         Map<String, Object> values = inputs == null
-                ? new LinkedHashMap<String, Object>()
-                : new LinkedHashMap<String, Object>(inputs);
-        Map<String, TaskNodeStatusEnum> statuses = new LinkedHashMap<String, TaskNodeStatusEnum>();
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(inputs);
+        Map<String, TaskNodeStatusEnum> statuses = new LinkedHashMap<>();
         for (TaskNode task : plan.getTasks()) {
             statuses.put(task.getTaskId(), TaskNodeStatusEnum.PENDING);
         }
@@ -74,9 +74,9 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
             if (ready.isEmpty()) {
                 throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.VALIDATION);
             }
-            final Map<String, Object> batchValues = new LinkedHashMap<String, Object>(values);
-            List<Future<TaskOutcome>> futures = new ArrayList<Future<TaskOutcome>>();
-            List<BudgetReservation> reservations = new ArrayList<BudgetReservation>();
+            final Map<String, Object> batchValues = new LinkedHashMap<>(values);
+            List<Future<TaskOutcome>> futures = new ArrayList<>();
+            List<BudgetReservation> reservations = new ArrayList<>();
             try {
                 for (TaskNode task : ready) {
                     statuses.put(task.getTaskId(), TaskNodeStatusEnum.READY);
@@ -240,7 +240,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
 
     private static List<TaskNode> readyTasks(TaskPlan plan, Map<String, TaskNodeStatusEnum> statuses,
             int maximum) {
-        List<TaskNode> result = new ArrayList<TaskNode>();
+        List<TaskNode> result = new ArrayList<>();
         for (TaskNode task : plan.getTasks()) {
             if (statuses.get(task.getTaskId()) != TaskNodeStatusEnum.PENDING) {
                 continue;

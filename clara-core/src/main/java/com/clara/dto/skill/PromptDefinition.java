@@ -30,7 +30,7 @@ public final class PromptDefinition {
         if (blank(id) || segments == null || segments.isEmpty()) {
             throw new IllegalArgumentException("prompt definition is invalid");
         }
-        List<PromptSegment> copied = new ArrayList<PromptSegment>(segments.size());
+        List<PromptSegment> copied = new ArrayList<>(segments.size());
         for (PromptSegment segment : segments) {
             if (segment == null) {
                 throw new IllegalArgumentException("prompt segment must not be null");

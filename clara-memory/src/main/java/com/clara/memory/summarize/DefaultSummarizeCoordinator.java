@@ -46,7 +46,7 @@ public final class DefaultSummarizeCoordinator implements ISummarizeCoordinator 
             throw new IllegalArgumentException("evicted must not be null");
         }
         String prompt = promptProvider.summarizePrompt();
-        List<IContent> messages = new ArrayList<IContent>(evicted.size() + 1);
+        List<IContent> messages = new ArrayList<>(evicted.size() + 1);
         messages.add(new SystemContent(prompt));
         for (IContent message : evicted) {
             if (message != null) {

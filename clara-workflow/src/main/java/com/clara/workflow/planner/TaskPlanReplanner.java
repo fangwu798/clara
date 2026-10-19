@@ -51,7 +51,7 @@ public final class TaskPlanReplanner {
     }
 
     private static Map<String, TaskNode> index(TaskPlan plan) {
-        Map<String, TaskNode> result = new HashMap<String, TaskNode>();
+        Map<String, TaskNode> result = new HashMap<>();
         for (TaskNode task : plan.getTasks()) {
             result.put(task.getTaskId(), task);
         }

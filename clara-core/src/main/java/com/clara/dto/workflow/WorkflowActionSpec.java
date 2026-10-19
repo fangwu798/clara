@@ -34,8 +34,8 @@ public final class WorkflowActionSpec {
         this.nodeId = nodeId;
         this.kind = kind;
         this.attributes = Collections.unmodifiableMap(attributes == null
-                ? new LinkedHashMap<String, Object>()
-                : new LinkedHashMap<String, Object>(attributes));
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(attributes));
     }
 
     public String getNodeId() {

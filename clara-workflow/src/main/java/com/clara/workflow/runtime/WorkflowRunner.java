@@ -71,7 +71,7 @@ public final class WorkflowRunner {
         }
         WorkflowResult result = engine.start(definition, instanceId, inputs);
 
-        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("workflowId", workflowId);
         payload.put("instanceId", instanceId);
         payload.put("status", result.getStatus() == null ? null : result.getStatus().name());
@@ -79,7 +79,7 @@ public final class WorkflowRunner {
         payload.put("waitingInputKey", result.getWaitingInputKey());
 
         List<String> declaredOutputs = registry.outputs(workflowId);
-        Map<String, Object> outputs = new LinkedHashMap<String, Object>();
+        Map<String, Object> outputs = new LinkedHashMap<>();
         ExecutionScope scope = result.getScope();
         if (scope != null) {
             for (Map.Entry<String, Object> entry : scope.getVariables().entrySet()) {
@@ -119,11 +119,11 @@ public final class WorkflowRunner {
 
     private static LinkedHashMap<String, Object> parseInputs(String inputsJson) {
         if (inputsJson == null || inputsJson.trim().isEmpty()) {
-            return new LinkedHashMap<String, Object>();
+            return new LinkedHashMap<>();
         }
         try {
             LinkedHashMap<String, Object> inputs = JSON.readValue(inputsJson, INPUTS_TYPE);
-            return inputs == null ? new LinkedHashMap<String, Object>() : inputs;
+            return inputs == null ? new LinkedHashMap<>() : inputs;
         } catch (IOException e) {
             throw new IllegalArgumentException("工作流输入不是合法 JSON 对象：" + e.getMessage(), e);
         }

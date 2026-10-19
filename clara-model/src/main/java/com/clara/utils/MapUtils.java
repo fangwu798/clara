@@ -41,7 +41,7 @@ public final class MapUtils {
         if (source == null || source.isEmpty()) {
             return Collections.emptyMap();
         }
-        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        Map<String, Object> result = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : source.entrySet()) {
             if (StringUtils.isBlank(entry.getKey())) {
                 throw new IllegalArgumentException("map key must not be blank");

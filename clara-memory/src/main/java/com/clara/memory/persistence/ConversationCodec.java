@@ -41,9 +41,9 @@ public final class ConversationCodec {
         if (snapshot == null) {
             throw new IllegalArgumentException("snapshot must not be null");
         }
-        Map<String, Object> root = new LinkedHashMap<String, Object>();
+        Map<String, Object> root = new LinkedHashMap<>();
         root.put("version", Long.valueOf(snapshot.version()));
-        List<Map<String, Object>> messages = new ArrayList<Map<String, Object>>();
+        List<Map<String, Object>> messages = new ArrayList<>();
         for (IContent message : snapshot.messages()) {
             messages.add(message.toCompletionMessage());
         }
@@ -77,7 +77,7 @@ public final class ConversationCodec {
             if (!(messagesValue instanceof List)) {
                 throw ConversationStoreErrors.corrupted();
             }
-            List<IContent> messages = new ArrayList<IContent>();
+            List<IContent> messages = new ArrayList<>();
             for (Object item : (List<Object>) messagesValue) {
                 if (!(item instanceof Map)) {
                     throw ConversationStoreErrors.corrupted();
@@ -119,7 +119,7 @@ public final class ConversationCodec {
 
     @SuppressWarnings("unchecked")
     private static List<ToolCall> decodeToolCalls(List<Object> rawCalls) {
-        List<ToolCall> calls = new ArrayList<ToolCall>(rawCalls.size());
+        List<ToolCall> calls = new ArrayList<>(rawCalls.size());
         for (Object item : rawCalls) {
             if (!(item instanceof Map)) {
                 throw ConversationStoreErrors.corrupted();

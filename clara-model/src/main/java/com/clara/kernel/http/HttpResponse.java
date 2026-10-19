@@ -8,7 +8,7 @@ import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.ProtocolEnum;
 import com.clara.enums.StreamEventEnum;
 import com.clara.core.model.IResponse;
-import com.clara.dto.model.RawHttpResponse;
+import com.clara.core.transport.RawHttpResponse;
 import com.clara.kernel.message.delta.ImageItem;
 import com.clara.dto.tool.ResponsesToolCall;
 import com.clara.dto.tool.ToolCall;
@@ -151,7 +151,9 @@ public class HttpResponse implements IResponse {
     private Integer webSearchCount;
 
     @Override
+    @SuppressWarnings("unchecked")
     public <T extends IResponse> Class<T> getCls() {
+        // 实现固定返回自身类型；转换由 getCls 的接口契约保证。
         return (Class<T>) HttpResponse.class;
     }
 

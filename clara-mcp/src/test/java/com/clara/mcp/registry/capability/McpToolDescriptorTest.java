@@ -17,17 +17,17 @@ public class McpToolDescriptorTest {
 
     @Test
     public void schemaHashStableAcrossKeyOrder() {
-        Map<String, Object> first = new LinkedHashMap<String, Object>();
+        Map<String, Object> first = new LinkedHashMap<>();
         first.put("type", "object");
-        Map<String, Object> firstProps = new LinkedHashMap<String, Object>();
+        Map<String, Object> firstProps = new LinkedHashMap<>();
         firstProps.put("b", "2");
         firstProps.put("a", "1");
         first.put("properties", firstProps);
 
-        Map<String, Object> secondProps = new LinkedHashMap<String, Object>();
+        Map<String, Object> secondProps = new LinkedHashMap<>();
         secondProps.put("a", "1");
         secondProps.put("b", "2");
-        Map<String, Object> second = new LinkedHashMap<String, Object>();
+        Map<String, Object> second = new LinkedHashMap<>();
         second.put("properties", secondProps);
         second.put("type", "object");
 
@@ -37,7 +37,7 @@ public class McpToolDescriptorTest {
 
     @Test
     public void schemaHashIndependentOfDescription() {
-        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
 
         assertEquals(new McpToolDescriptor("echo", "first", schema).getSchemaHash(),
@@ -46,9 +46,9 @@ public class McpToolDescriptorTest {
 
     @Test
     public void schemaChangeChangesHash() {
-        Map<String, Object> first = new LinkedHashMap<String, Object>();
+        Map<String, Object> first = new LinkedHashMap<>();
         first.put("type", "object");
-        Map<String, Object> second = new LinkedHashMap<String, Object>();
+        Map<String, Object> second = new LinkedHashMap<>();
         second.put("type", "array");
 
         assertNotEquals(new McpToolDescriptor("echo", "d", first).getSchemaHash(),
@@ -57,9 +57,9 @@ public class McpToolDescriptorTest {
 
     @Test
     public void inputSchemaIsReadOnlyDefensiveCopy() {
-        Map<String, Object> source = new LinkedHashMap<String, Object>();
+        Map<String, Object> source = new LinkedHashMap<>();
         source.put("type", "object");
-        Map<String, Object> nested = new LinkedHashMap<String, Object>();
+        Map<String, Object> nested = new LinkedHashMap<>();
         nested.put("city", "string");
         source.put("properties", nested);
 

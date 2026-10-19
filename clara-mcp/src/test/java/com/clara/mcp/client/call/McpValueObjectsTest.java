@@ -57,7 +57,7 @@ public class McpValueObjectsTest {
 
     @Test
     public void toolCallCopiesArgumentsToReadOnlyView() {
-        Map<String, Object> source = new LinkedHashMap<String, Object>();
+        Map<String, Object> source = new LinkedHashMap<>();
         source.put("text", "hi");
         McpToolCall call = new McpToolCall(TENANT, SERVER, SNAPSHOT, "echo", HASH, source,
                 conversation(), call());
@@ -87,7 +87,7 @@ public class McpValueObjectsTest {
 
     @Test
     public void promptRequestCopiesArguments() {
-        Map<String, Object> source = new LinkedHashMap<String, Object>();
+        Map<String, Object> source = new LinkedHashMap<>();
         source.put("topic", "java");
         McpPromptRequest request = new McpPromptRequest(TENANT, SERVER, SNAPSHOT, "explain", HASH, source,
                 conversation(), call());
@@ -105,7 +105,7 @@ public class McpValueObjectsTest {
         assertIllegalArgument(new Runnable() {
             public void run() { new McpPromptResult("desc", null, false); }
         });
-        List<Map<String, Object>> withNull = new ArrayList<Map<String, Object>>();
+        List<Map<String, Object>> withNull = new ArrayList<>();
         withNull.add(null);
         assertIllegalArgument(new Runnable() {
             public void run() { new McpPromptResult("desc", withNull, false); }
@@ -114,8 +114,8 @@ public class McpValueObjectsTest {
 
     @Test
     public void promptResultExposesContentAndErrorFlag() {
-        List<Map<String, Object>> messages = new ArrayList<Map<String, Object>>();
-        Map<String, Object> message = new LinkedHashMap<String, Object>();
+        List<Map<String, Object>> messages = new ArrayList<>();
+        Map<String, Object> message = new LinkedHashMap<>();
         message.put("role", "user");
         messages.add(message);
         McpPromptResult result = new McpPromptResult("desc", messages, true);

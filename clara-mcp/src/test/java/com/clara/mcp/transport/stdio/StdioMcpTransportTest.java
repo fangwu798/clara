@@ -2,11 +2,12 @@ package com.clara.mcp.transport.stdio;
 
 import com.clara.exception.ClaraException;
 import com.clara.exception.ErrorCodes;
+import com.clara.mcp.api.IMcpTransportListener;
+import com.clara.mcp.api.IProcessFactory;
+import com.clara.mcp.transport.JacksonMcpJsonCodec;
 import com.clara.mcp.transport.jsonrpc.JsonRpcNotification;
 import com.clara.mcp.transport.jsonrpc.JsonRpcRequest;
 import com.clara.mcp.transport.jsonrpc.JsonRpcResponse;
-import com.clara.mcp.transport.JacksonMcpJsonCodec;
-import com.clara.mcp.transport.McpTransportListener;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,14 +27,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Assume;
 import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * {@link StdioMcpTransport} 的行为测试：用假 {@link ProcessFactory} 做逐行 JSON-RPC 往返，不启动真实进程。
+ * {@link StdioMcpTransport} 的行为测试：用假 {@link IProcessFactory} 做逐行 JSON-RPC 往返，不启动真实进程。
  */
 public class StdioMcpTransportTest {
     private static final String RESPONSE = "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"result\":{\"ok\":true}}";
@@ -58,7 +58,7 @@ public class StdioMcpTransportTest {
                 .build();
 
         transport.start(new SilentListener());
-        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        Map<String, Object> params = new LinkedHashMap<>();
         params.put("x", 1);
         JsonRpcResponse response = transport.sendRequest(new JsonRpcRequest("1", "ping", params), 2000L)
                 .get(3, TimeUnit.SECONDS);
@@ -112,13 +112,13 @@ public class StdioMcpTransportTest {
         assertTrue("stderr should contain " + expected + " but was: " + buffer, buffer.indexOf(expected) >= 0);
     }
 
-    private static final class SilentListener implements McpTransportListener {
+    private static final class SilentListener implements IMcpTransportListener {
         public void onNotification(JsonRpcNotification notification) { }
         public void onServerRequest(JsonRpcRequest request) { }
         public void onFailure(Throwable failure) { }
     }
 
-    private static final class FakeProcessFactory implements ProcessFactory {
+    private static final class FakeProcessFactory implements IProcessFactory {
         private final Process process;
 
         private FakeProcessFactory(Process process) { this.process = process; }

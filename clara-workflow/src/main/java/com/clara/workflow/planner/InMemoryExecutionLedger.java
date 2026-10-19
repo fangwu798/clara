@@ -17,7 +17,7 @@ import java.util.Optional;
 public final class InMemoryExecutionLedger implements IExecutionLedger {
 
     private final Map<String, ExecutionRecord> records =
-            new LinkedHashMap<String, ExecutionRecord>();
+            new LinkedHashMap<>();
 
     @Override
     public synchronized ExecutionRecord recordIntent(String idempotencyKey, String planId,

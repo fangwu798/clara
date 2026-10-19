@@ -48,8 +48,8 @@ public final class Question {
             throw new IllegalArgumentException("question fields are invalid");
         }
         List<InteractionOption> copied = options == null ? Collections.<InteractionOption>emptyList()
-                : new ArrayList<InteractionOption>(options);
-        Set<String> ids = new HashSet<String>();
+                : new ArrayList<>(options);
+        Set<String> ids = new HashSet<>();
         for (InteractionOption option : copied) {
             if (option == null || !ids.add(option.getOptionId())) {
                 throw new IllegalArgumentException("question option IDs must be unique");
@@ -64,7 +64,7 @@ public final class Question {
         this.options = Collections.unmodifiableList(copied);
         this.answerSchema = answerSchema;
         this.defaultAnswer = defaultAnswer == null ? Collections.<String, Object>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<String, Object>(defaultAnswer));
+                : Collections.unmodifiableMap(new LinkedHashMap<>(defaultAnswer));
         this.required = required;
         this.scopeKey = scopeKey;
         this.maxTextLength = maxTextLength;

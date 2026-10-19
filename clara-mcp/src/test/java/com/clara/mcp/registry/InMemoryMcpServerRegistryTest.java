@@ -121,7 +121,7 @@ public class InMemoryMcpServerRegistryTest {
         final int perThread = 25;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         final CountDownLatch start = new CountDownLatch(1);
-        List<Future<Void>> futures = new ArrayList<Future<Void>>();
+        List<Future<Void>> futures = new ArrayList<>();
         for (int thread = 0; thread < threads; thread++) {
             final int id = thread;
             futures.add(pool.submit(new Callable<Void>() {

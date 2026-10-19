@@ -78,7 +78,7 @@ public final class MemoryEntry {
         this.vector = vector.clone();
         this.createdAtEpochMillis = createdAtEpochMillis;
         this.expiresAtEpochMillis = expiresAtEpochMillis;
-        LinkedHashMap<String, String> copied = new LinkedHashMap<String, String>();
+        LinkedHashMap<String, String> copied = new LinkedHashMap<>();
         if (metadata != null) {
             for (Map.Entry<String, String> value : metadata.entrySet()) {
                 if (blank(value.getKey()) || value.getValue() == null) {

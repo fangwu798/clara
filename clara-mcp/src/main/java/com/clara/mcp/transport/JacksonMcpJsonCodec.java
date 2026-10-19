@@ -2,6 +2,8 @@ package com.clara.mcp.transport;
 
 import com.clara.exception.ErrorCategory;
 import com.clara.exception.ErrorCodes;
+import com.clara.mcp.McpErrors;
+import com.clara.mcp.api.IMcpJsonCodec;
 import com.clara.mcp.transport.jsonrpc.JsonRpcError;
 import com.clara.mcp.transport.jsonrpc.JsonRpcNotification;
 import com.clara.mcp.transport.jsonrpc.JsonRpcRequest;
@@ -17,7 +19,7 @@ import java.util.Map;
 /**
  * 负责JacksonMCPJSON数据的编码与解码。
  */
-public final class JacksonMcpJsonCodec implements McpJsonCodec {
+public final class JacksonMcpJsonCodec implements IMcpJsonCodec {
     private static final TypeReference<Map<String, Object>> MAP =
             new TypeReference<Map<String, Object>>() { };
     private final ObjectMapper mapper;
@@ -73,10 +75,10 @@ public final class JacksonMcpJsonCodec implements McpJsonCodec {
         return mapper.convertValue(node, MAP);
     }
     private static Map<String, Object> envelope() {
-        Map<String, Object> value = new LinkedHashMap<String, Object>(); value.put("jsonrpc", "2.0"); return value;
+        Map<String, Object> value = new LinkedHashMap<>(); value.put("jsonrpc", "2.0"); return value;
     }
     private static String text(JsonNode value) { return value == null ? null : value.asText(null); }
     private static RuntimeException invalid() {
-        return McpTransportErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.VALIDATION, false);
+        return McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.VALIDATION, false);
     }
 }

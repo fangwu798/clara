@@ -32,7 +32,7 @@ public final class ActionNode implements IWorkflowNode {
         this.type = type;
         this.outputKeys = outputKeys == null
                 ? Collections.<String>emptySet()
-                : Collections.unmodifiableSet(new LinkedHashSet<String>(outputKeys));
+                : Collections.unmodifiableSet(new LinkedHashSet<>(outputKeys));
         this.idempotencyKey = idempotencyKey;
         this.action = action;
     }

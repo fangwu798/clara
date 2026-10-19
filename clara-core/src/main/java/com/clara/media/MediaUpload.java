@@ -40,7 +40,7 @@ public final class MediaUpload {
         this.durationMs = durationMs;
         this.expiresAt = expiresAt;
         this.metadata = metadata == null ? Collections.<String, String>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+                : Collections.unmodifiableMap(new LinkedHashMap<>(metadata));
         this.input = input;
     }
 

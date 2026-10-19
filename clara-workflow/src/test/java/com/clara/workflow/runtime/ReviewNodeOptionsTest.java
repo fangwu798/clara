@@ -89,7 +89,7 @@ public class ReviewNodeOptionsTest {
     }
 
     private static Map<String, Object> validAttributes() {
-        Map<String, Object> attributes = new LinkedHashMap<String, Object>();
+        Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("prompt", "review_panel");
         attributes.put("roles", Arrays.asList("architect", "reviewer"));
         attributes.put("moderator", "architect");

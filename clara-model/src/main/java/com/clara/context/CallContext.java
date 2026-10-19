@@ -10,8 +10,8 @@ import lombok.Getter;
  * 同一份跟踪标识、截止时间与取消信号。
  *
  * <p>谁创建谁调用：由 {@link ConvContext#newCall(long)} 在传输层真正发出请求时创建
- * （见 {@code com.clara.kernel.http.execute.Jdk8HttpTransport}），随后作为参数传给读取循环与
- * SSE 解析器（{@code SseParser}）；这些层只读取，不修改。
+ * （见 {@code com.clara.kernel.http.execute.Jdk8HttpTransport}），随后由适配器转换为通用执行守卫，
+ * 传给 {@code clara-transport} 的读取循环与 SSE 解析器；这些层只读取，不修改。
  *
  * <p>使用方法（典型序列）：
  * <ol>

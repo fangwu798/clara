@@ -37,7 +37,7 @@ public class WindowCompressionCoordinatorTest {
     @Test
     public void summarizeDelegatesToCoordinatorWhenEvictedPresent() {
         IContent summary = new SystemContent("compressed");
-        List<List<IContent>> captured = new ArrayList<List<IContent>>();
+        List<List<IContent>> captured = new ArrayList<>();
         ISummarizeCoordinator delegate = evicted -> {
             captured.add(evicted);
             return summary;

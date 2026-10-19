@@ -192,7 +192,7 @@ public class ToolRoundTripCoordinatorTest {
 
     private static final class RecordingInvoker implements IToolInvoker {
 
-        private final List<String> callIds = new ArrayList<String>();
+        private final List<String> callIds = new ArrayList<>();
 
         @Override
         public ToolResult invoke(IToolInvocation invocation) {

@@ -599,7 +599,7 @@ public final class ConsoleView implements Closeable {
         private final ConsoleView view;
         private final ToolPurposeResolver toolPurpose;
         private int mode = MODE_IDLE;
-        private final Set<String> notedCalls = new HashSet<String>();
+        private final Set<String> notedCalls = new HashSet<>();
         private boolean printed;
 
         ConsoleStreamObserver(ConsoleView view, ToolPurposeResolver toolPurpose) {

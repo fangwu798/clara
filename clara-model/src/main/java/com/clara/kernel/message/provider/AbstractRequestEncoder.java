@@ -10,7 +10,7 @@ import com.clara.core.model.IRequest;
 import com.clara.kernel.api.execute.IRequestEncoder;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.dto.model.RawHttpRequest;
+import com.clara.core.transport.RawHttpRequest;
 import com.clara.kernel.http.TransportConfig;
 import com.clara.kernel.message.delta.Thinking;
 import com.clara.utils.ExceptionUtils;
@@ -97,7 +97,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
      * 把请求对象的字段按适配规则收敛为请求体映射。
      */
     protected Map<String, Object> bodyOf(IRequest request, ModelProviderEnum provider, CapabilityKindEnum capability) {
-        Map<String, Object> body = new LinkedHashMap<String, Object>();
+        Map<String, Object> body = new LinkedHashMap<>();
         for (Class<?> type : hierarchyOf(request.getClass())) {
             for (Field field : type.getDeclaredFields()) {
                 if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
@@ -113,7 +113,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
      * 计算继承链上的所有类型，顺序为「最上层父类在前、具体类在后」。
      */
     private static List<Class<?>> hierarchyOf(Class<?> type) {
-        List<Class<?>> hierarchy = new ArrayList<Class<?>>();
+        List<Class<?>> hierarchy = new ArrayList<>();
         for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
             hierarchy.add(0, current);
         }
@@ -232,7 +232,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
         if (child instanceof Map) {
             nested = (Map<String, Object>) child;
         } else {
-            nested = new LinkedHashMap<String, Object>();
+            nested = new LinkedHashMap<>();
             body.put(head, nested);
         }
         write(nested, name.substring(dot + 1), value);
@@ -365,7 +365,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
      * 合并平台级默认请求头与调用方请求头，并补缺省的内容类型。
      */
     private static Map<String, String> mergedHeaders(Map<String, String> headers, TransportConfig transport) {
-        Map<String, String> merged = new LinkedHashMap<String, String>();
+        Map<String, String> merged = new LinkedHashMap<>();
         merged.putAll(transport.getHeaders());
         if (headers != null) {
             merged.putAll(headers);

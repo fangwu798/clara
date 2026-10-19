@@ -114,7 +114,7 @@ public final class ErrorMessages {
      * @return 错误码到中文提示模板的不可变映射，非 null
      */
     private static Map<String, String> templates() {
-        Map<String, String> messages = new LinkedHashMap<String, String>();
+        Map<String, String> messages = new LinkedHashMap<>();
         messages.put(ErrorCodes.INVOCATION_CANCELLED, "调用已被取消：调用方在完成前终止了本次调用");
         messages.put(ErrorCodes.CAPABILITY_NOT_SUPPORTED, "不支持该能力：当前平台或实现未提供请求的能力");
         messages.put(ErrorCodes.MODEL_ALREADY_REGISTERED, "模型已注册：同一标识的模型被重复注册");

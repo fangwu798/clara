@@ -6,7 +6,7 @@ import com.clara.core.model.IRequest;
 import com.clara.kernel.api.execute.IRequestEncoder;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.dto.model.RawHttpRequest;
+import com.clara.core.transport.RawHttpRequest;
 import com.clara.kernel.message.provider.completion.CompletionRequestEncoder;
 import com.clara.kernel.message.provider.response.ResponseRequestEncoder;
 

@@ -3,7 +3,7 @@ package com.clara.kernel.api.execute;
 import com.clara.exception.ClaraException;
 import com.clara.core.model.IRequest;
 import com.clara.core.model.IResponse;
-import com.clara.dto.model.RawHttpResponse;
+import com.clara.core.transport.RawHttpResponse;
 import com.clara.kernel.http.execute.StreamHandle;
 import com.clara.core.model.IStreamHandle;
 import com.clara.core.model.IStreamObserver;

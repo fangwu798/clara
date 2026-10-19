@@ -18,6 +18,11 @@
             </dependency>
             <dependency>
                 <groupId>com.clara</groupId>
+                <artifactId>clara-transport</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.clara</groupId>
                 <artifactId>clara-model</artifactId>
                 <version>${project.version}</version>
             </dependency>

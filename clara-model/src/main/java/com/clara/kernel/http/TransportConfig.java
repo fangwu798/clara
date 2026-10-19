@@ -1,18 +1,17 @@
 package com.clara.kernel.http;
 
-import com.clara.dto.model.RawHttpRequest;
+import com.clara.core.transport.HttpHeaders;
+import com.clara.core.transport.HttpTransportPolicy;
+import com.clara.utils.HttpUrisUtils;
+import com.clara.core.transport.sse.SseParserConfig;
+import com.clara.transport.http.OriginEndpointPolicy;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -43,15 +42,6 @@ import java.util.Set;
  */
 @Data
 public final class TransportConfig {
-    /**
-     * 请求头名的合法字符集。
-     */
-    private static final String HEADER_NAME = "[!#$%&'*+.^_`|~0-9A-Za-z-]+";
-    /**
-     * 由传输层自行管理的请求头，配置中不允许出现。
-     */
-    private static final Set<String> TRANSPORT_CONTROLLED_HEADERS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList("host", "content-length", "connection", "transfer-encoding")));
-
     /**
      * 允许访问的源白名单，元素已归一化为 {@code scheme://host:port}。
      *
@@ -148,9 +138,9 @@ public final class TransportConfig {
         if (connectTimeoutMillis <= 0 || readTimeoutMillis <= 0 || maxRequestBytes <= 0 || maxResponseBytes <= 0) {
             throw new IllegalArgumentException("transport limits must be positive");
         }
-        LinkedHashSet<String> normalized = new LinkedHashSet<String>();
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
         for (String value : allowedOrigins) {
-            normalized.add(normalizeConfiguredOrigin(value, allowHttp));
+            normalized.add(HttpUrisUtils.normalizeOrigin(value, allowHttp));
         }
         this.allowedOrigins = Collections.unmodifiableSet(normalized);
         this.connectTimeoutMillis = connectTimeoutMillis;
@@ -158,7 +148,7 @@ public final class TransportConfig {
         this.maxRequestBytes = maxRequestBytes;
         this.maxResponseBytes = maxResponseBytes;
         this.allowHttp = allowHttp;
-        this.headers = validateHeaders(headers);
+        this.headers = HttpHeaders.validate(headers);
     }
 
 
@@ -173,96 +163,27 @@ public final class TransportConfig {
      */
     public boolean allows(URI endpoint) {
         try {
-            return allowedOrigins.contains(origin(endpoint, allowHttp));
+            return allowedOrigins.contains(HttpUrisUtils.origin(endpoint, allowHttp));
         } catch (IllegalArgumentException exception) {
             return false;
         }
     }
 
     /**
-     * 校验并冻结平台级默认请求头。
+     * 转换为通用传输策略，供 {@code IHttpTransport} 使用。
      *
-     * <p>校验规则与 {@link RawHttpRequest} 保持一致：头名必须是合法 token、头值不得包含 CR/LF、
-     * 同名头（忽略大小写）不得重复、不得占用传输层自行管理的头。这些头只用于补充，适配器已设置的
-     * 同名头不会被覆盖。
+     * <p>SSE 的单行、单事件与总字节上限都受 {@code maxResponseBytes} 约束，避免流式响应突破配置上限。
      *
-     * @param headers 配置中声明的请求头，可为 null
-     * @return 不可变的请求头映射，非 null；headers 为 null 或空时返回空映射
-     * @throws IllegalArgumentException 头名或头值非法、同名头重复、占用了传输层管理的头时
+     * @return 通用传输策略，非 null
      */
-    private static Map<String, String> validateHeaders(Map<String, String> headers) {
-        if (headers == null || headers.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        LinkedHashMap<String, String> safe = new LinkedHashMap<String, String>();
-        Set<String> names = new HashSet<String>();
-        for (Map.Entry<String, String> entry : headers.entrySet()) {
-            String name = entry.getKey();
-            String value = entry.getValue();
-            if (name == null || !name.matches(HEADER_NAME)) {
-                throw new IllegalArgumentException("invalid configured header name");
-            }
-            if (value == null || value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0) {
-                throw new IllegalArgumentException("invalid configured header value");
-            }
-            String lower = name.toLowerCase(Locale.ROOT);
-            if (!names.add(lower)) {
-                throw new IllegalArgumentException("duplicate configured header name");
-            }
-            if (TRANSPORT_CONTROLLED_HEADERS.contains(lower)) {
-                throw new IllegalArgumentException("transport-controlled header must not be configured");
-            }
-            safe.put(name, value);
-        }
-        return Collections.unmodifiableMap(safe);
-    }
-
-    /**
-     * 归一化配置中的源站写法。
-     *
-     * @param value     配置值，不得为空白
-     * @param allowHttp 是否允许明文 HTTP
-     * @return 归一化后的 {@code scheme://host:port}
-     * @throws IllegalArgumentException 值为空白、URI 语法非法、含路径/查询/片段或协议不被允许时
-     */
-    private static String normalizeConfiguredOrigin(String value, boolean allowHttp) {
-        if (value == null || value.trim().isEmpty()) {
-            throw new IllegalArgumentException("origin must not be blank");
-        }
-        try {
-            URI uri = new URI(value);
-            if (uri.getRawPath() != null && !uri.getRawPath().isEmpty() && !"/".equals(uri.getRawPath())
-                    || uri.getRawQuery() != null || uri.getRawFragment() != null) {
-                throw new IllegalArgumentException("allowed origin must not contain path, query, or fragment");
-            }
-            return origin(uri, allowHttp);
-        } catch (URISyntaxException exception) {
-            throw new IllegalArgumentException("invalid allowed origin", exception);
-        }
-    }
-
-    /**
-     * 把 URI 归一化为源站三元组。
-     *
-     * @param uri       待归一化的 URI
-     * @param allowHttp 是否允许明文 HTTP
-     * @return {@code scheme://host:port}，端口缺省时按协议补 443 或 80
-     * @throws IllegalArgumentException 协议或主机缺失、含用户信息、协议不被允许时
-     */
-    private static String origin(URI uri, boolean allowHttp) {
-        String scheme = uri.getScheme();
-        String host = uri.getHost();
-        if (scheme == null || host == null || uri.getUserInfo() != null) {
-            throw new IllegalArgumentException("endpoint must have a safe origin");
-        }
-        scheme = scheme.toLowerCase(Locale.ROOT);
-        host = host.toLowerCase(Locale.ROOT);
-        if (!"https".equals(scheme) && !(allowHttp && "http".equals(scheme))) {
-            throw new IllegalArgumentException("endpoint scheme is not allowed");
-        }
-        int port = uri.getPort();
-        int effectivePort = port < 0 ? ("https".equals(scheme) ? 443 : 80) : port;
-        String authorityHost = host.indexOf(':') >= 0 ? "[" + host + "]" : host;
-        return scheme + "://" + authorityHost + ":" + effectivePort;
+    public HttpTransportPolicy toHttpTransportPolicy() {
+        int maxTotal = maxResponseBytes;
+        int maxEvent = Math.min(SseParserConfig.DEFAULT_MAX_EVENT_BYTES, maxTotal);
+        int maxLine = Math.min(SseParserConfig.DEFAULT_MAX_LINE_BYTES, maxEvent);
+        SseParserConfig sse = new SseParserConfig(maxLine, maxEvent,
+                SseParserConfig.DEFAULT_MAX_EVENTS, maxTotal, false);
+        return new HttpTransportPolicy(new OriginEndpointPolicy(allowedOrigins, allowHttp),
+                connectTimeoutMillis, readTimeoutMillis, maxRequestBytes, maxResponseBytes,
+                headers, sse);
     }
 }
