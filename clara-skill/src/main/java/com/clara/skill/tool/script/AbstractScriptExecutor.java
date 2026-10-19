@@ -44,7 +44,8 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
         File direct = new File(spec.getScript());
         if (direct.isFile()) {
             scriptFile = direct.toPath().toAbsolutePath();
-            workingDir = scriptFile.getParent() == null ? new File(".") : scriptFile.getParent().toFile();
+            Path parent = scriptFile.getParent();
+            workingDir = parent == null ? new File(".") : parent.toFile();
         } else {
             try {
                 tempDir = Files.createTempDirectory("clara-skill");
@@ -137,12 +138,7 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
      * 在后台线程中排空输出流，避免进程因管道缓冲写满而死锁。
      */
     private Thread drain(InputStream in, final StringBuilder target) {
-        return startDrain(in, new StreamConsumer() {
-            @Override
-            public void consume(char[] buffer, int length, StringBuilder pending) {
-                target.append(buffer, 0, length);
-            }
-        });
+        return startDrain(in, (buffer, length, pending) -> target.append(buffer, 0, length));
     }
 
     /**
@@ -152,17 +148,14 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
      * {@code logs} 下的运行日志，而非只在结束后一次性返回。stdout 是脚本结果的 JSON 通道，不回显。
      */
     private Thread drainEchoing(InputStream in, final StringBuilder target) {
-        return startDrain(in, new StreamConsumer() {
-            @Override
-            public void consume(char[] buffer, int length, StringBuilder pending) {
-                target.append(buffer, 0, length);
-                for (int index = 0; index < length; index++) {
-                    char current = buffer[index];
-                    if (current == '\n') {
-                        echo(pending);
-                    } else if (current != '\r') {
-                        pending.append(current);
-                    }
+        return startDrain(in, (buffer, length, pending) -> {
+            target.append(buffer, 0, length);
+            for (int index = 0; index < length; index++) {
+                char current = buffer[index];
+                if (current == '\n') {
+                    echo(pending);
+                } else if (current != '\r') {
+                    pending.append(current);
                 }
             }
         });
@@ -176,21 +169,19 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
      * @return 后台守护线程
      */
     private Thread startDrain(final InputStream in, final StreamConsumer consumer) {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
-                    StringBuilder pending = new StringBuilder();
-                    char[] buffer = new char[1024];
-                    int read;
-                    while ((read = reader.read(buffer)) != -1) {
-                        consumer.consume(buffer, read, pending);
-                    }
-                    echo(pending);
-                    reader.close();
-                } catch (IOException ignored) {
+        Thread thread = new Thread(() -> {
+            try {
+                InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
+                StringBuilder pending = new StringBuilder();
+                char[] buffer = new char[1024];
+                int read;
+                while ((read = reader.read(buffer)) != -1) {
+                    consumer.consume(buffer, read, pending);
                 }
+                echo(pending);
+                reader.close();
+            } catch (IOException ignored) {
+                // 流已关闭（进程退出）时读取失败属于正常情况。
             }
         });
         thread.setDaemon(true);
@@ -203,7 +194,7 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
      */
     private static void echo(StringBuilder pending) {
         if (pending.length() > 0) {
-            System.out.println(SCRIPT_LOG_PREFIX + pending);
+            System.out.println(SCRIPT_LOG_PREFIX + pending); // NOSONAR CLI output by design
         }
         pending.setLength(0);
     }
@@ -265,10 +256,12 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
         try {
             Files.deleteIfExists(tempDir.resolve("script" + extension()));
         } catch (IOException ignored) {
+            // 临时目录清理失败不影响执行结果。
         }
         try {
             Files.deleteIfExists(tempDir);
         } catch (IOException ignored) {
+            // 临时目录清理失败不影响执行结果。
         }
     }
 }

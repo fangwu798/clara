@@ -16,7 +16,6 @@ import java.util.Map;
 public final class BoundedCachingConversationStore implements ConversationStore {
 
     private final ConversationStore delegate;
-    private final int maxCachedConversations;
     private final int maxCachedMessages;
     private final Map<String, ConversationSnapshot> cache;
 
@@ -37,14 +36,8 @@ public final class BoundedCachingConversationStore implements ConversationStore 
             throw new IllegalArgumentException("cache limits must be positive");
         }
         this.delegate = delegate;
-        this.maxCachedConversations = maxCachedConversations;
         this.maxCachedMessages = maxCachedMessages;
-        this.cache = new LinkedHashMap<String, ConversationSnapshot>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, ConversationSnapshot> eldest) {
-                return size() > maxCachedConversations;
-            }
-        };
+        this.cache = new BoundedLruCache(maxCachedConversations);
     }
 
     @Override
@@ -85,6 +78,23 @@ public final class BoundedCachingConversationStore implements ConversationStore 
     private static void requireKey(ConversationKey key) {
         if (key == null) {
             throw new IllegalArgumentException("key must not be null");
+        }
+    }
+
+    @SuppressWarnings("java:S2160")
+    private static final class BoundedLruCache extends LinkedHashMap<String, ConversationSnapshot> {
+        private static final long serialVersionUID = 1L;
+
+        private final int maxEntries;
+
+        private BoundedLruCache(int maxEntries) {
+            super(16, 0.75f, true);
+            this.maxEntries = maxEntries;
+        }
+
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, ConversationSnapshot> eldest) {
+            return size() > maxEntries;
         }
     }
 }

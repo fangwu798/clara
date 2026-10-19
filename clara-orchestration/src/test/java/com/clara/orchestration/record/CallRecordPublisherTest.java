@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -23,7 +24,7 @@ public class CallRecordPublisherTest {
     public void publishDoesNothingWhenSinkIsNull() {
         CallRecordPublisher publisher = new CallRecordPublisher(null);
         publisher.publish(request(), response(), ModelProviderEnum.OPENAI, "m1");
-        // 不抛异常即通过
+        assertNotNull(publisher);
     }
 
     @Test

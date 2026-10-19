@@ -3,6 +3,8 @@ package com.clara.core.transport;
 import lombok.Data;
 
 import java.net.URI;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -83,7 +85,8 @@ public final class RawHttpRequest {
         }
         this.method = normalizedMethod;
         this.endpoint = endpoint;
-        this.headers = HttpHeaders.validate(headers);
+        this.headers = Collections.unmodifiableMap(
+                new LinkedHashMap<>(HttpHeaders.validate(headers)));
         this.body = safeBody.clone();
     }
 

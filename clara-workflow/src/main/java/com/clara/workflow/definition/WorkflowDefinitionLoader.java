@@ -13,7 +13,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -46,6 +45,8 @@ import java.util.Set;
  * 同样显式失败。
  */
 public final class WorkflowDefinitionLoader {
+
+    private static final String FIELD_VALUE = "value";
 
     private static final String DEFAULT_VERSION = "1.0.0";
 
@@ -132,7 +133,8 @@ public final class WorkflowDefinitionLoader {
         if (StringUtils.isBlank(id)) {
             throw invalid(file, null, "存在缺少 id 的节点");
         }
-        WorkflowNodeTypeEnum type = resolveType(text(node, "type"));
+        String typeText = text(node, "type");
+        WorkflowNodeTypeEnum type = typeText == null ? null : resolveType(typeText);
         if (type == null) {
             throw invalid(file, id, "缺少或未知的节点类型");
         }
@@ -170,8 +172,8 @@ public final class WorkflowDefinitionLoader {
             throw invalid(file, id, "CONDITION 节点缺少 condition.key");
         }
         String operator = text(condition, "operator");
-        String expected = condition.has("value") && !condition.get("value").isNull()
-                ? condition.get("value").asText() : null;
+        String expected = condition.has(FIELD_VALUE) && !condition.get(FIELD_VALUE).isNull()
+                ? condition.get(FIELD_VALUE).asText() : null;
         JsonNode whenTrue = node.get("whenTrue");
         if (whenTrue == null || !whenTrue.isObject()) {
             throw invalid(file, id, "CONDITION 节点缺少 whenTrue 分支");

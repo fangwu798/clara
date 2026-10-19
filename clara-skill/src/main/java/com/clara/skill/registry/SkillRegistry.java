@@ -9,6 +9,7 @@ import com.clara.enums.memory.MemorySourceTypeEnum;
 import com.clara.skill.SkillErrors;
 
 import java.io.File;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -19,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 技能注册表：按分类扫描 {@code tools/}、{@code prompt/} 与 {@code scripts/} 目录（内置 {@code resource/config}
@@ -48,7 +50,8 @@ public final class SkillRegistry {
     private final Map<String, PromptDefinition> prompts = new ConcurrentHashMap<>();
 
     /** 运行期来源文件签名（绝对路径 → 修改时间:大小），用于发现 prompt / scripts 目录的运行期改动。 */
-    private volatile Map<String, String> sourceStamps = Collections.emptyMap();
+    private final AtomicReference<Map<String, String>> sourceStamps =
+            new AtomicReference<>(Collections.emptyMap());
 
     /** 重载互斥：签名比对与整体替换串行化，避免并发触发重复重载。 */
     private final Object reloadLock = new Object();
@@ -100,7 +103,7 @@ public final class SkillRegistry {
                 return new File(url.toURI());
             }
             return null;
-        } catch (Exception e) {
+        } catch (URISyntaxException e) {
             return null;
         }
     }
@@ -132,7 +135,7 @@ public final class SkillRegistry {
      */
     private void refreshChanged() {
         synchronized (reloadLock) {
-            if (!scanStamps().equals(sourceStamps)) {
+            if (!scanStamps().equals(sourceStamps.get())) {
                 rescan();
             }
         }
@@ -155,7 +158,7 @@ public final class SkillRegistry {
         prompts.clear();
         prompts.putAll(newPrompts);
         rebuildToolNames();
-        sourceStamps = scanStamps();
+        sourceStamps.set(scanStamps());
 
         syncSemanticMemory(previousTools, previousPrompts);
     }
@@ -348,26 +351,42 @@ public final class SkillRegistry {
             return;
         }
         List<MemoryEntry> entries = new ArrayList<>();
+        changedTools(entries, previousTools);
+        changedPrompts(entries, previousPrompts);
+        if (!entries.isEmpty()) {
+            memoryStore.upsert(entries);
+        }
+        deleteMissingToolEntries(previousTools);
+        deleteMissingPromptEntries(previousPrompts);
+    }
+
+    private void changedTools(List<MemoryEntry> entries, Map<String, ToolMethod> previousTools) {
         for (ToolMethod method : tools.values()) {
             ToolMethod before = previousTools.get(method.getId());
             if (before == null || !before.equals(method)) {
                 entries.add(indexTool(method));
             }
         }
+    }
+
+    private void changedPrompts(List<MemoryEntry> entries, Map<String, PromptDefinition> previousPrompts) {
         for (PromptDefinition prompt : prompts.values()) {
             PromptDefinition before = previousPrompts.get(prompt.getId());
             if (before == null || !before.equals(prompt)) {
                 entries.add(indexPrompt(prompt));
             }
         }
-        if (!entries.isEmpty()) {
-            memoryStore.upsert(entries);
-        }
+    }
+
+    private void deleteMissingToolEntries(Map<String, ToolMethod> previousTools) {
         for (String id : previousTools.keySet()) {
             if (!tools.containsKey(id)) {
                 memoryStore.deleteById(entryId(MemorySourceTypeEnum.TOOL_DESCRIPTION, id));
             }
         }
+    }
+
+    private void deleteMissingPromptEntries(Map<String, PromptDefinition> previousPrompts) {
         for (String id : previousPrompts.keySet()) {
             if (!prompts.containsKey(id)) {
                 memoryStore.deleteById(entryId(MemorySourceTypeEnum.PROMPT, id));

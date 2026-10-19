@@ -111,17 +111,28 @@ public final class McpServerConfigDirectoryLoader {
             while (resources.hasMoreElements()) {
                 URL url = resources.nextElement();
                 if (!"file".equals(url.getProtocol())) { continue; }
-                try {
-                    URI uri = url.toURI();
-                    result.add(Paths.get(uri));
-                } catch (URISyntaxException ignored) {
-                    // skip malformed classpath entries
+                Path path = toLocalPath(url);
+                if (path != null) {
+                    result.add(path);
                 }
             }
         } catch (IOException ignored) {
             // no classpath configuration available
         }
         return result;
+    }
+
+    /**
+     * 把 classpath 的 file URL 转为本地路径；URL 非法时返回 null。
+     */
+    private static Path toLocalPath(URL url) {
+        try {
+            URI uri = url.toURI();
+            return Paths.get(uri);
+        } catch (URISyntaxException ignored) {
+            // skip malformed classpath entries
+            return null;
+        }
     }
 
     private static List<Path> jsonFiles(Path directory) {
@@ -143,6 +154,7 @@ public final class McpServerConfigDirectoryLoader {
     }
 
     private static boolean isJson(Path file) {
-        return file.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".json");
+        Path fileName = file.getFileName();
+        return fileName != null && fileName.toString().toLowerCase(Locale.ROOT).endsWith(".json");
     }
 }

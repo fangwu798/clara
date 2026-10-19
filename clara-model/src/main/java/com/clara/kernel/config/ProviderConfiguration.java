@@ -236,17 +236,7 @@ public final class ProviderConfiguration implements Closeable {
             }
             //调用OPENAI的时候如果使用了中转站的时候 中转站可能禁止API调用需要模拟codex的调用
             if (provider == ModelProviderEnum.OPENAI) {
-                Map<String, String> headerConfig = ConvContext.current().getProviderConfiguration().getTransport().getHeaders();
-                if (headerConfig.containsKey("x-Transfer")) {
-                    CodexTuiGenerator generator = new CodexTuiGenerator();
-                    Map<String, String> codexHeaders = generator.buildHeaders();
-                    for (String key : codexHeaders.keySet()) {
-                        if (!headers.containsKey(key)) {
-                            headers.put(key, codexHeaders.get(key));
-                        }
-                    }
-                }
-
+                applyCodexHeaders(headers);
             }
             if (contentType != null) {
                 headers.put("Content-Type", contentType);
@@ -255,6 +245,18 @@ public final class ProviderConfiguration implements Closeable {
             return Collections.unmodifiableMap(headers);
         } finally {
             Arrays.fill(secret, '\0');
+        }
+    }
+
+    private void applyCodexHeaders(Map<String, String> headers) {
+        Map<String, String> headerConfig = ConvContext.current().getProviderConfiguration().getTransport().getHeaders();
+        if (headerConfig.containsKey("x-Transfer")) {
+            Map<String, String> codexHeaders = new CodexTuiGenerator().buildHeaders();
+            for (Map.Entry<String, String> entry : codexHeaders.entrySet()) {
+                if (!headers.containsKey(entry.getKey())) {
+                    headers.put(entry.getKey(), entry.getValue());
+                }
+            }
         }
     }
 

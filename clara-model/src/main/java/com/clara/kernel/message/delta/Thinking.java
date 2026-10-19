@@ -1,7 +1,5 @@
 package com.clara.kernel.message.delta;
 
-import com.clara.core.annotation.ProviderAdapter;
-import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.ThinkingEnum;
 import lombok.Data;
 

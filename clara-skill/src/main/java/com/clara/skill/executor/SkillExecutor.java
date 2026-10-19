@@ -37,7 +37,7 @@ public final class SkillExecutor {
         private final AtomicReference<SkillExecutionStatus> status =
                 new AtomicReference<>(SkillExecutionStatus.RUNNING);
         private volatile String result;
-        private volatile RuntimeException failure;
+        private final AtomicReference<RuntimeException> failure = new AtomicReference<>();
 
         /**
          * 查询当前执行状态。
@@ -100,7 +100,11 @@ public final class SkillExecutor {
                 throw SkillErrors.cancelled();
             }
             if (current == SkillExecutionStatus.FAILED) {
-                throw failure;
+                RuntimeException cause = failure.get();
+                if (cause != null) {
+                    throw cause;
+                }
+                throw new IllegalStateException("execution failed without a recorded cause");
             }
             throw new IllegalStateException("execution is still running");
         }
@@ -121,7 +125,7 @@ public final class SkillExecutor {
         }
 
         private void fail(RuntimeException error) {
-            failure = error;
+            failure.set(error);
             status.set(SkillExecutionStatus.FAILED);
             done.countDown();
         }
@@ -173,12 +177,7 @@ public final class SkillExecutor {
      */
     public SkillExecutionHandle submit(String toolName, String argumentsJson) {
         final SkillExecutionHandle handle = new SkillExecutionHandle();
-        Thread worker = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                execute(toolName, argumentsJson, handle);
-            }
-        });
+        Thread worker = new Thread(() -> execute(toolName, argumentsJson, handle));
         worker.setDaemon(true);
         worker.start();
         return handle;

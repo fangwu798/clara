@@ -125,7 +125,11 @@ public final class DefaultMcpClientFactory implements IMcpClientFactory {
         }
         String head = command.get(0);
         for (Path candidate : allowedExecutables) {
-            String fileName = candidate.getFileName().toString();
+            Path fileNamePath = candidate.getFileName();
+            if (fileNamePath == null) {
+                continue;
+            }
+            String fileName = fileNamePath.toString();
             int dot = fileName.lastIndexOf('.');
             String stem = dot > 0 ? fileName.substring(0, dot) : fileName;
             if (fileName.equalsIgnoreCase(head) || stem.equalsIgnoreCase(head)) {
@@ -154,11 +158,7 @@ public final class DefaultMcpClientFactory implements IMcpClientFactory {
     }
 
     private static IMcpHeadersProvider fixedHeaders(final Map<String, String> headers) {
-        return new IMcpHeadersProvider() {
-            public Map<String, String> getHeaders() {
-                return headers;
-            }
-        };
+        return () -> headers;
     }
 
     private static List<String> split(String address) {

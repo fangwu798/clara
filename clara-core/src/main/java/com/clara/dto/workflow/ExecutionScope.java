@@ -108,7 +108,7 @@ public final class ExecutionScope {
     public synchronized void merge(ExecutionScope base, ExecutionScope branch) {
         for (Map.Entry<String, Object> entry : branch.variables.entrySet()) {
             if (!base.variables.containsKey(entry.getKey())
-                    || !ObjectUtils.equal(base.variables.get(entry.getKey()), entry.getValue())) {
+                    || !ObjectUtils.areEqual(base.variables.get(entry.getKey()), entry.getValue())) {
                 variables.put(entry.getKey(), entry.getValue());
             }
         }

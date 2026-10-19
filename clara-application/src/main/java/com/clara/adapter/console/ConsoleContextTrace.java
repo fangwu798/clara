@@ -16,7 +16,7 @@ import java.util.List;
  * 有没有参与、命中几条、耗时多久、阈值卡在哪儿；打印后可直接观察执行情况。
  * 同一份文本由 {@link ConsoleView#emit(String, String)} 同时落详细日志，事后也可回查。
  *
- * <p>排版：标签列按 {@link StringUtils#padRight(String, int)} 的显示宽度补齐（中文按两列算），
+ * <p>排版：标签列按 {@link StringUtils#padRight(String, int)} 的显示宽度（中文按两列算），
  * 所以「[图谱]」「[向量]」「[提示词]」后的状态列在终端里是对齐的。
  *
  * <p>线程安全：只持有只读的视图引用，可跨线程调用。
@@ -29,7 +29,7 @@ public final class ConsoleContextTrace implements IContextTraceSink {
     public static final String SOURCE_CODE_GRAPH = "code_graph";
 
     /**
-     * 知识源标识：语义记忆（Milvus 向量召回），与 {@code SemanticRecallCoordinator} 一致。
+     * 知识源标识：语义记忆（向量召回），与 {@code SemanticRecallCoordinator} 一致。
      */
     public static final String SOURCE_SEMANTIC_RECALL = "semantic_recall";
 

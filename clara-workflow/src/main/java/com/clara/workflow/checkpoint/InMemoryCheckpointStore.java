@@ -21,6 +21,7 @@ public final class InMemoryCheckpointStore implements ICheckpointStore {
             new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ConcurrentMap<Long, WorkflowCheckpoint>> history =
             new ConcurrentHashMap<>();
+    private final Object saveLock = new Object();
 
     @Override
     public Optional<WorkflowCheckpoint> load(String instanceId) {
@@ -45,7 +46,7 @@ public final class InMemoryCheckpointStore implements ICheckpointStore {
         if (checkpoint == null) {
             throw new IllegalArgumentException("checkpoint must not be null");
         }
-        synchronized (checkpoints) {
+        synchronized (saveLock) {
             WorkflowCheckpoint current = checkpoints.get(checkpoint.getInstanceId());
             long actual = current == null ? -1L : current.getVersion();
             if (actual != expectedVersion || checkpoint.getVersion() != expectedVersion + 1L) {

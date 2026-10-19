@@ -45,8 +45,12 @@ public final class ToolActionFactory implements IWorkflowActionFactory {
             throw new IllegalArgumentException("spec must not be null");
         }
         Object toolValue = spec.getAttribute("tool");
-        String tool = toolValue instanceof String ? (String) toolValue
-                : (toolValue == null ? null : String.valueOf(toolValue));
+        String tool = null;
+        if (toolValue instanceof String) {
+            tool = (String) toolValue;
+        } else if (toolValue != null) {
+            tool = String.valueOf(toolValue);
+        }
         if (tool == null || tool.trim().isEmpty()) {
             throw new IllegalArgumentException("TOOL 节点缺少 tool：" + spec.getNodeId());
         }

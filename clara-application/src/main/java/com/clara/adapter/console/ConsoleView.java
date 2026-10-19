@@ -42,6 +42,9 @@ import java.util.Set;
  */
 public final class ConsoleView implements Closeable {
 
+    private static final String UTF_8 = "UTF-8";
+    private static final String ERROR_PREFIX = "[error] ";
+
     /**
      * ANSI 控制码：淡绿色（助手回复）。
      */
@@ -115,10 +118,12 @@ public final class ConsoleView implements Closeable {
     private static final OutputStream SINK = new OutputStream() {
         @Override
         public void write(int value) {
+            // 精简模式下丢弃框架写入标准输出的内容。
         }
 
         @Override
         public void write(byte[] buffer, int offset, int length) {
+            // 精简模式下丢弃框架写入标准输出的内容。
         }
     };
 
@@ -160,10 +165,9 @@ public final class ConsoleView implements Closeable {
      * @param forcedColor   命令行强制的颜色取值（如 {@code never}），可为 null
      * @throws UnsupportedEncodingException 应用输出流初始化失败时
      */
-    public ConsoleView(Path logsDirectory, boolean fullLogging, String forcedColor)
-            throws UnsupportedEncodingException {
-        this.frameworkTarget = System.out;
-        this.out = new PrintStream(new FileOutputStream(FileDescriptor.out), true, "UTF-8");
+    public ConsoleView(Path logsDirectory, boolean fullLogging, String forcedColor) throws UnsupportedEncodingException {
+        this.frameworkTarget = System.out; // NOSONAR CLI output by design
+        this.out = new PrintStream(new FileOutputStream(FileDescriptor.out), true, UTF_8);
         this.fullLogging = fullLogging;
         this.logFilePath = openLogFile(logsDirectory);
         writeLogHeader();
@@ -268,7 +272,7 @@ public final class ConsoleView implements Closeable {
     }
 
     /**
-     * 创建一个新的流式观察者，用于实时渲染模型思考、正文与工具调用过程。
+     * 创建一个新流式观察者，用于实时渲染模型思考、正文与工具调用过程。
      *
      * @param toolPurpose 工具用途解析器：按「工具名 + 本次入参」返回一句用途说明（为 null 时不展示）；
      *                    用于在「调用工具」日志中简要说明调用目的
@@ -348,7 +352,7 @@ public final class ConsoleView implements Closeable {
     /**
      * 打印交互提示：常用命令与自然语言可触发的工作流，末尾补一个空行与后续对话分隔。
      *
-     * <p>显示约定：命令列与用法列按显示宽度右侧补空格，纵向成列便于扫读；完整命令清单由 {@code /?} 给出，
+     * <p>显示约定：命令列与用法列按显示宽度右侧补充空格，纵向成列便于扫读；完整命令清单由 {@code /?} 给出，
      * 此处只列最常用的几条，避免启动时刷屏；ESC 取消能力由调用方按终端是否支持单独提示，这里不重复。
      *
      * @param customWorkflows 自定义工作流的「标识（描述）」文本行（{@code config/workflow/custom} 下），
@@ -482,12 +486,15 @@ public final class ConsoleView implements Closeable {
      * 应用当前日志模式：把 {@code System.out} 接到「控制台分支 + 文件分支」的合流上。
      */
     private void applyLogMode() {
-        OutputStream consoleSide = fullLogging
-                ? new GrayLineOutputStream(out, colorsEnabled ? ANSI_GRAY : "")
-                : SINK;
+        OutputStream consoleSide;
+        if (fullLogging) {
+            consoleSide = new GrayLineOutputStream(out, colorsEnabled ? ANSI_GRAY : "");
+        } else {
+            consoleSide = SINK;
+        }
         OutputStream target = fileOut == null ? consoleSide : new TeeOutputStream(consoleSide, fileOut);
         try {
-            System.setOut(new PrintStream(target, true, "UTF-8"));
+            System.setOut(new PrintStream(target, true, UTF_8));
         } catch (UnsupportedEncodingException failure) {
             System.setOut(frameworkTarget);
         }
@@ -509,7 +516,7 @@ public final class ConsoleView implements Closeable {
         try {
             Files.createDirectories(logsDirectory);
             Path logFile = logsDirectory.resolve("clara-" + timestamp() + ".log");
-            fileOut = new PrintStream(new FileOutputStream(logFile.toFile(), true), true, "UTF-8");
+            fileOut = new PrintStream(new FileOutputStream(logFile.toFile(), true), true, UTF_8);
             return logFile.toString();
         } catch (IOException | RuntimeException failure) {
             fileOut = null;
@@ -531,7 +538,7 @@ public final class ConsoleView implements Closeable {
     }
 
     /**
-     * 当前时间戳（{@code yyyyMMdd-HHmmss}）。
+     * 当前时间戳
      */
     private static String timestamp() {
         return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
@@ -663,12 +670,12 @@ public final class ConsoleView implements Closeable {
          */
         private static String errorLine(ClaraError error) {
             if (error == null) {
-                return "[error] ";
+                return ERROR_PREFIX;
             }
             String message = error.getSafeDetails().get("providerMessage");
             return message == null || message.trim().isEmpty()
-                    ? "[error] " + error.getSafeMessage()
-                    : "[error] " + error.getSafeMessage() + "：" + message.trim();
+                    ? ERROR_PREFIX + error.getSafeMessage()
+                    : ERROR_PREFIX + error.getSafeMessage() + "：" + message.trim();
         }
 
         /**
@@ -721,7 +728,7 @@ public final class ConsoleView implements Closeable {
         }
 
         /**
-         * 结束当前段：补换行并复位颜色。
+         * 结束当前段：换行并复位颜色。
          */
         private void end() {
             if (mode != MODE_IDLE) {

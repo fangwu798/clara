@@ -47,7 +47,7 @@ public final class ScalarMapDeserializer extends JsonDeserializer<Map<String, Ob
     @Override
     public Map<String, Object> deserialize(JsonParser parser, DeserializationContext context) throws IOException {
         if (parser.currentToken() == JsonToken.VALUE_NULL) {
-            return null;
+            return null; // NOSONAR null 表示“未配置”，与空对象语义不同，调用方依赖这一区分
         }
         if (parser.currentToken() != JsonToken.START_OBJECT) {
             throw InvalidFormatException.from(parser, "扩展参数必须是键值对象", parser.getText(), Map.class);
@@ -61,22 +61,32 @@ public final class ScalarMapDeserializer extends JsonDeserializer<Map<String, Ob
             if (token != JsonToken.FIELD_NAME) {
                 throw InvalidFormatException.from(parser, "扩展参数必须是键值对象", parser.getText(), Map.class);
             }
-            String name = parser.getCurrentName();
-            JsonToken valueToken = parser.nextToken();
-            if (valueToken == JsonToken.VALUE_STRING) {
-                result.put(name, parser.getText());
-            } else if (valueToken == JsonToken.VALUE_NUMBER_INT) {
-                long integral = parser.getLongValue();
-                result.put(name, integral >= Integer.MIN_VALUE && integral <= Integer.MAX_VALUE
-                        ? Integer.valueOf((int) integral) : Long.valueOf(integral));
-            } else if (valueToken == JsonToken.VALUE_NUMBER_FLOAT) {
-                result.put(name, Double.valueOf(parser.getDoubleValue()));
-            } else if (valueToken == JsonToken.VALUE_TRUE || valueToken == JsonToken.VALUE_FALSE) {
-                result.put(name, Boolean.valueOf(parser.getBooleanValue()));
-            } else {
-                throw InvalidFormatException.from(parser,
-                        "扩展参数只允许字符串、数字或布尔值：" + name, valueToken == null ? null : valueToken.asString(), Object.class);
-            }
+            readEntry(parser, result);
+        }
+    }
+
+    private static void readEntry(JsonParser parser, Map<String, Object> result) throws IOException {
+        String name = parser.getCurrentName();
+        JsonToken valueToken = parser.nextToken();
+        if (valueToken == JsonToken.VALUE_STRING) {
+            result.put(name, parser.getText());
+        } else if (valueToken == JsonToken.VALUE_NUMBER_INT) {
+            putIntegral(result, name, parser.getLongValue());
+        } else if (valueToken == JsonToken.VALUE_NUMBER_FLOAT) {
+            result.put(name, Double.valueOf(parser.getDoubleValue()));
+        } else if (valueToken == JsonToken.VALUE_TRUE || valueToken == JsonToken.VALUE_FALSE) {
+            result.put(name, Boolean.valueOf(parser.getBooleanValue()));
+        } else {
+            throw InvalidFormatException.from(parser, "扩展参数只允许字符串、数字或布尔值：" + name,
+                    valueToken == null ? null : valueToken.asString(), Object.class);
+        }
+    }
+
+    private static void putIntegral(Map<String, Object> result, String name, long integral) {
+        if (integral >= Integer.MIN_VALUE && integral <= Integer.MAX_VALUE) {
+            result.put(name, Integer.valueOf((int) integral));
+        } else {
+            result.put(name, Long.valueOf(integral));
         }
     }
 }

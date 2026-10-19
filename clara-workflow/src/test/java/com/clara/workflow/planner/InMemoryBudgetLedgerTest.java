@@ -74,8 +74,8 @@ public class InMemoryBudgetLedgerTest {
         ledger.openRun("r", LIMIT);
         ledger.reserve("r", "t1", new BudgetAmount(60L, 60L, 60L));
 
-        ClaraException error = assertThrows(ClaraException.class,
-                () -> ledger.reserve("r", "t2", new BudgetAmount(60L, 60L, 60L)));
+        BudgetAmount second = new BudgetAmount(60L, 60L, 60L);
+        ClaraException error = assertThrows(ClaraException.class, () -> ledger.reserve("r", "t2", second));
         assertEquals(ErrorCodes.BUDGET_EXCEEDED, error.getError().getCode());
     }
 
@@ -97,8 +97,8 @@ public class InMemoryBudgetLedgerTest {
         ledger.openRun("r", LIMIT);
         ledger.openRun("r", LIMIT);
 
-        ClaraException error = assertThrows(ClaraException.class,
-                () -> ledger.openRun("r", new BudgetAmount(1L, 1L, 1L)));
+        BudgetAmount conflicting = new BudgetAmount(1L, 1L, 1L);
+        ClaraException error = assertThrows(ClaraException.class, () -> ledger.openRun("r", conflicting));
         assertEquals(ErrorCodes.BUDGET_RESERVATION_INVALID, error.getError().getCode());
     }
 

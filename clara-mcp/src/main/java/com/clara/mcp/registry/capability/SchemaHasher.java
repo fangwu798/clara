@@ -30,32 +30,55 @@ public final class SchemaHasher {
         if (depth > 100) { throw new IllegalArgumentException("structured value is too deeply nested"); }
         if (value == null) { target.append('n'); return; }
         if (value instanceof String) {
-            String text = (String) value;
-            target.append('s').append(text.length()).append(':').append(text);
+            appendString(target, (String) value);
         } else if (value instanceof Boolean) {
             target.append('b').append(value);
         } else if (value instanceof Number) {
-            target.append('d').append(value.getClass().getName()).append(':').append(value);
+            appendNumber(target, (Number) value);
         } else if (value instanceof List) {
-            target.append('[');
-            for (Object item : (List<?>) value) append(target, item, depth + 1);
-            target.append(']');
+            appendList(target, (List<?>) value, depth);
         } else if (value instanceof Map) {
-            Map<?, ?> map = (Map<?, ?>) value;
-            List<String> keys = new ArrayList<>();
-            for (Object key : map.keySet()) {
-                if (!(key instanceof String)) { throw new IllegalArgumentException("map keys must be strings"); }
-                keys.add((String) key);
-            }
-            Collections.sort(keys);
-            target.append('{');
-            for (String key : keys) {
-                append(target, key, depth + 1);
-                append(target, map.get(key), depth + 1);
-            }
-            target.append('}');
+            appendMap(target, (Map<?, ?>) value, depth);
         } else {
             throw new IllegalArgumentException("unsupported structured value: " + value.getClass().getName());
         }
+    }
+
+    private static void appendString(StringBuilder target, String text) {
+        target.append('s').append(text.length()).append(':').append(text);
+    }
+
+    private static void appendNumber(StringBuilder target, Number value) {
+        target.append('d').append(value.getClass().getName()).append(':').append(value);
+    }
+
+    private static void appendList(StringBuilder target, List<?> values, int depth) {
+        target.append('[');
+        for (Object item : values) {
+            append(target, item, depth + 1);
+        }
+        target.append(']');
+    }
+
+    private static void appendMap(StringBuilder target, Map<?, ?> map, int depth) {
+        List<String> keys = sortedKeys(map);
+        target.append('{');
+        for (String key : keys) {
+            append(target, key, depth + 1);
+            append(target, map.get(key), depth + 1);
+        }
+        target.append('}');
+    }
+
+    private static List<String> sortedKeys(Map<?, ?> map) {
+        List<String> keys = new ArrayList<>();
+        for (Object key : map.keySet()) {
+            if (!(key instanceof String)) {
+                throw new IllegalArgumentException("map keys must be strings");
+            }
+            keys.add((String) key);
+        }
+        Collections.sort(keys);
+        return keys;
     }
 }

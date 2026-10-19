@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -31,6 +32,8 @@ import java.util.concurrent.TimeUnit;
  * 进程并自备超时（导入给 30 分钟）。
  */
 public final class CodeGraphConsole {
+
+    private static final String FIELD_ERROR = "error";
 
     /**
      * 技能脚本相对仓库根的路径。
@@ -92,7 +95,7 @@ public final class CodeGraphConsole {
             return "[skip] 按需挂载只在 Windows + Docker Desktop 上可用，已跳过。";
         }
         Path script = ConfigLocator.locate(Paths.get(MOUNT_SCRIPT));
-        if (script == null) {
+        if (!Files.isRegularFile(script)) {
             return "[warn] 未找到按需挂载脚本：" + MOUNT_SCRIPT + "（不用容器部署图谱时忽略即可）。";
         }
         // -Optional：宿主机上没跑容器部署时只提示、不报错（启动时不该每次弹一段失败信息）。
@@ -128,7 +131,7 @@ public final class CodeGraphConsole {
 
     private static String execute(String requestJson, long timeoutSeconds) {
         Path script = ConfigLocator.locate(Paths.get(SCRIPT));
-        if (script == null) {
+        if (!Files.isRegularFile(script)) {
             return "[error] 未找到图谱技能脚本：" + SCRIPT + "（请在仓库根运行，或检查 config/ 目录）。";
         }
         ProcessBuilder builder = new ProcessBuilder(pythonCommand(), script.toString());
@@ -269,30 +272,36 @@ public final class CodeGraphConsole {
         if (result.exitCode < 0) {
             return result.output;
         }
-        List<String> notes = new ArrayList<>();
-        String lastPlain = "";
-        for (String line : result.output.split("\r?\n")) {
-            String text = line.trim();
-            if (text.isEmpty()) {
-                continue;
-            }
-            if (text.startsWith(MOUNT_PREFIX)) {
-                notes.add(text.substring(MOUNT_PREFIX.length()));
-            } else {
-                lastPlain = text;
-            }
-        }
-        boolean skipped = false;
-        for (String note : notes) {
-            if (note.startsWith("跳过")) {
-                skipped = true;
-                break;
-            }
-        }
+        List<String> notes = mountNotes(result.output);
+        boolean skipped = anySkipped(notes);
         // 已可见（启动时最常走的那条路）只有一句说明：直接回它，免得每次启动都多两行套话。
         if (result.exitCode == 0 && !skipped && notes.size() == 1) {
             return notes.get(0);
         }
+        return mountReport(result, notes, skipped);
+    }
+
+    private static List<String> mountNotes(String output) {
+        List<String> notes = new ArrayList<>();
+        for (String line : output.split("\r?\n")) {
+            String text = line.trim();
+            if (!text.isEmpty() && text.startsWith(MOUNT_PREFIX)) {
+                notes.add(text.substring(MOUNT_PREFIX.length()));
+            }
+        }
+        return notes;
+    }
+
+    private static boolean anySkipped(List<String> notes) {
+        for (String note : notes) {
+            if (note.startsWith("跳过")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String mountReport(Result result, List<String> notes, boolean skipped) {
         StringBuilder out = new StringBuilder();
         if (result.exitCode == 0) {
             out.append(skipped ? "结果：跳过按需挂载（见说明）\n" : "结果：容器能看到当前工作目录\n");
@@ -305,12 +314,23 @@ public final class CodeGraphConsole {
             out.append("说明：").append(String.join("；", notes)).append('\n');
         }
         if (result.exitCode != 0 && result.exitCode != 3) {
-            String reason = lastPlain.isEmpty() && !notes.isEmpty() ? notes.get(notes.size() - 1) : lastPlain;
+            String reason = mountReason(result.output, notes);
             if (!reason.isEmpty()) {
                 out.append("原因：").append(reason).append('\n');
             }
         }
         return out.toString().trim();
+    }
+
+    private static String mountReason(String output, List<String> notes) {
+        String lastPlain = "";
+        for (String line : output.split("\r?\n")) {
+            String text = line.trim();
+            if (!text.isEmpty() && !text.startsWith(MOUNT_PREFIX)) {
+                lastPlain = text;
+            }
+        }
+        return lastPlain.isEmpty() && !notes.isEmpty() ? notes.get(notes.size() - 1) : lastPlain;
     }
 
     /**
@@ -339,11 +359,11 @@ public final class CodeGraphConsole {
             // prepare 按动作说清楚：index_failed 这类结果里的 error 只是原因，整条渲染成「失败」会丢掉
             // 「未导入 + 后台导入失败」这层上下文
             out.append(prepareSummary(root)).append('\n');
-            if (root.hasNonNull("error")) {
-                out.append("原因：").append(field(root, "error")).append('\n');
+            if (root.hasNonNull(FIELD_ERROR)) {
+                out.append("原因：").append(field(root, FIELD_ERROR)).append('\n');
             }
-        } else if (root.hasNonNull("error")) {
-            out.append("结果：失败\n原因：").append(field(root, "error")).append('\n');
+        } else if (root.hasNonNull(FIELD_ERROR)) {
+            out.append("结果：失败\n原因：").append(field(root, FIELD_ERROR)).append('\n');
         } else if ("prepare".equals(op)) {
             out.append(prepareSummary(root)).append('\n');
         } else {

@@ -85,23 +85,36 @@ public final class McpServerConfig {
         Map<String, String> environment = immutableMap(env, "env");
         Map<String, String> headerMap = immutableMap(headers, "headers");
         String endpoint = StringUtils.isBlank(url) ? null : url.trim();
-        if (transportProfile == McpTransportProfile.STDIO) {
-            if (commandLine.isEmpty()) { throw new IllegalArgumentException("stdio config requires a command"); }
-            if (endpoint != null) { throw new IllegalArgumentException("stdio config must not define url"); }
-            if (!headerMap.isEmpty()) { throw new IllegalArgumentException("stdio config must not define headers"); }
-        } else if (transportProfile == McpTransportProfile.STREAMABLE_HTTP) {
-            if (endpoint == null) { throw new IllegalArgumentException("http config requires a url"); }
-            if (!commandLine.isEmpty()) { throw new IllegalArgumentException("http config must not define command"); }
-            if (!environment.isEmpty()) { throw new IllegalArgumentException("http config must not define env"); }
-        } else {
-            throw new IllegalArgumentException("unsupported transportProfile: " + transportProfile);
-        }
+        validateTransport(transportProfile, commandLine, environment, endpoint, headerMap);
         this.serverKey = serverKey;
         this.transportProfile = transportProfile;
         this.command = commandLine;
         this.env = environment;
         this.url = endpoint;
         this.headers = headerMap;
+    }
+
+    private static void validateTransport(McpTransportProfile profile, List<String> command,
+            Map<String, String> env, String endpoint, Map<String, String> headers) {
+        if (profile == McpTransportProfile.STDIO) {
+            requireStdio(command, endpoint, headers);
+        } else if (profile == McpTransportProfile.STREAMABLE_HTTP) {
+            requireHttp(command, env, endpoint);
+        } else {
+            throw new IllegalArgumentException("unsupported transportProfile: " + profile);
+        }
+    }
+
+    private static void requireStdio(List<String> command, String endpoint, Map<String, String> headers) {
+        if (command.isEmpty()) { throw new IllegalArgumentException("stdio config requires a command"); }
+        if (endpoint != null) { throw new IllegalArgumentException("stdio config must not define url"); }
+        if (!headers.isEmpty()) { throw new IllegalArgumentException("stdio config must not define headers"); }
+    }
+
+    private static void requireHttp(List<String> command, Map<String, String> env, String endpoint) {
+        if (endpoint == null) { throw new IllegalArgumentException("http config requires a url"); }
+        if (!command.isEmpty()) { throw new IllegalArgumentException("http config must not define command"); }
+        if (!env.isEmpty()) { throw new IllegalArgumentException("http config must not define env"); }
     }
 
     public String getServerKey() { return serverKey; }

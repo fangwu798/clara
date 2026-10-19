@@ -1,5 +1,6 @@
 package com.clara.adapter.console;
 
+import com.clara.enums.interaction.CancelConfirmationDecisionEnum;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -17,9 +18,9 @@ public class CancelConfirmationTest {
     public void firstEscPromptsAndSecondEscCancels() {
         CancelConfirmation confirmation = new CancelConfirmation(WINDOW);
 
-        assertEquals(CancelConfirmation.Decision.PROMPT, confirmation.onKey(CancelConfirmation.ESC, 0L));
+        assertEquals(CancelConfirmationDecisionEnum.PROMPT, confirmation.onKey(CancelConfirmation.ESC, 0L));
         assertTrue(confirmation.isAwaiting());
-        assertEquals(CancelConfirmation.Decision.CANCEL, confirmation.onKey(CancelConfirmation.ESC, 1_000L));
+        assertEquals(CancelConfirmationDecisionEnum.CANCEL, confirmation.onKey(CancelConfirmation.ESC, 1_000L));
         assertFalse(confirmation.isAwaiting());
     }
 
@@ -28,7 +29,7 @@ public class CancelConfirmationTest {
         CancelConfirmation confirmation = new CancelConfirmation(WINDOW);
         confirmation.onKey(CancelConfirmation.ESC, 0L);
 
-        assertEquals(CancelConfirmation.Decision.IGNORED, confirmation.onKey('a', 100L));
+        assertEquals(CancelConfirmationDecisionEnum.IGNORED, confirmation.onKey('a', 100L));
         assertFalse("忽略后应退出待确认状态", confirmation.isAwaiting());
     }
 
@@ -37,7 +38,7 @@ public class CancelConfirmationTest {
         CancelConfirmation confirmation = new CancelConfirmation(WINDOW);
         confirmation.onKey(CancelConfirmation.ESC, 0L);
 
-        assertEquals(CancelConfirmation.Decision.CANCEL,
+        assertEquals(CancelConfirmationDecisionEnum.CANCEL,
                 confirmation.onKey(CancelConfirmation.CARRIAGE_RETURN, 100L));
     }
 
@@ -45,7 +46,7 @@ public class CancelConfirmationTest {
     public void plainKeyWithoutEscIsIgnored() {
         CancelConfirmation confirmation = new CancelConfirmation(WINDOW);
 
-        assertEquals(CancelConfirmation.Decision.IGNORED, confirmation.onKey('x', 0L));
+        assertEquals(CancelConfirmationDecisionEnum.IGNORED, confirmation.onKey('x', 0L));
         assertFalse(confirmation.isAwaiting());
     }
 

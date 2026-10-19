@@ -25,6 +25,8 @@ import java.util.List;
  */
 public final class JdbcConversationStore implements ConversationStore {
 
+    private static final String WHERE_STORE_KEY = " WHERE store_key = ?";
+
     /**
      * 默认表名。
      */
@@ -54,7 +56,7 @@ public final class JdbcConversationStore implements ConversationStore {
         if (dataSource == null) {
             throw new IllegalArgumentException("dataSource must not be null");
         }
-        if (table == null || !table.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+        if (table == null || !table.matches("[A-Za-z_]\\w*")) {
             throw new IllegalArgumentException("table must be a simple identifier");
         }
         this.dataSource = dataSource;
@@ -67,14 +69,13 @@ public final class JdbcConversationStore implements ConversationStore {
         requireKey(key);
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement statement = connection.prepareStatement(
-                        "SELECT version, payload FROM " + table + " WHERE store_key = ?")) {
+                        "SELECT payload FROM " + table + WHERE_STORE_KEY)) {
             statement.setString(1, key.value());
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
                     return new ConversationSnapshot(0L, Collections.<IContent>emptyList());
                 }
-                long version = resultSet.getLong(1);
-                byte[] payload = resultSet.getBytes(2);
+                byte[] payload = resultSet.getBytes(1);
                 return codec.decode(payload);
             }
         } catch (SQLException e) {
@@ -107,39 +108,47 @@ public final class JdbcConversationStore implements ConversationStore {
         ConversationSnapshot next = new ConversationSnapshot(expectedVersion + 1L, merged);
         byte[] payload = codec.encode(next);
         try (Connection connection = dataSource.getConnection()) {
-            boolean autoCommit = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-            try {
-                int updated;
-                try (PreparedStatement update = connection.prepareStatement(
-                        "UPDATE " + table + " SET version = ?, payload = ? WHERE store_key = ? AND version = ?")) {
-                    update.setLong(1, next.version());
-                    update.setBytes(2, payload);
-                    update.setString(3, key.value());
-                    update.setLong(4, expectedVersion);
-                    updated = update.executeUpdate();
-                }
-                if (updated == 0) {
-                    if (rowExists(connection, key.value())) {
-                        throw ConversationStoreErrors.versionConflict();
-                    }
-                    try (PreparedStatement insert = connection.prepareStatement(
-                            "INSERT INTO " + table + " (store_key, version, payload) VALUES (?, ?, ?)")) {
-                        insert.setString(1, key.value());
-                        insert.setLong(2, next.version());
-                        insert.setBytes(3, payload);
-                        insert.executeUpdate();
-                    }
-                }
-                connection.commit();
-            } catch (SQLException e) {
-                rollbackQuietly(connection);
-                throw e;
-            } finally {
-                connection.setAutoCommit(autoCommit);
-            }
+            persist(connection, key, next, payload, expectedVersion);
         } catch (SQLException e) {
             throw ConversationStoreErrors.io();
+        }
+    }
+
+    /**
+     * 在单个连接内完成乐观并发更新或插入，并负责事务提交与回滚。
+     */
+    private void persist(Connection connection, ConversationKey key, ConversationSnapshot next,
+            byte[] payload, long expectedVersion) throws SQLException {
+        boolean autoCommit = connection.getAutoCommit();
+        connection.setAutoCommit(false);
+        try {
+            int updated;
+            try (PreparedStatement update = connection.prepareStatement(
+                    "UPDATE " + table + " SET version = ?, payload = ? WHERE store_key = ? AND version = ?")) {
+                update.setLong(1, next.version());
+                update.setBytes(2, payload);
+                update.setString(3, key.value());
+                update.setLong(4, expectedVersion);
+                updated = update.executeUpdate();
+            }
+            if (updated == 0) {
+                if (rowExists(connection, key.value())) {
+                    throw ConversationStoreErrors.versionConflict();
+                }
+                try (PreparedStatement insert = connection.prepareStatement(
+                        "INSERT INTO " + table + " (store_key, version, payload) VALUES (?, ?, ?)")) {
+                    insert.setString(1, key.value());
+                    insert.setLong(2, next.version());
+                    insert.setBytes(3, payload);
+                    insert.executeUpdate();
+                }
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            rollbackQuietly(connection);
+            throw e;
+        } finally {
+            connection.setAutoCommit(autoCommit);
         }
     }
 
@@ -149,7 +158,7 @@ public final class JdbcConversationStore implements ConversationStore {
         requireKey(key);
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement statement = connection.prepareStatement(
-                        "DELETE FROM " + table + " WHERE store_key = ?")) {
+                        "DELETE FROM " + table + WHERE_STORE_KEY)) {
             statement.setString(1, key.value());
             statement.executeUpdate();
         } catch (SQLException e) {
@@ -164,7 +173,7 @@ public final class JdbcConversationStore implements ConversationStore {
 
     private boolean rowExists(Connection connection, String keyValue) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT 1 FROM " + table + " WHERE store_key = ?")) {
+                "SELECT 1 FROM " + table + WHERE_STORE_KEY)) {
             statement.setString(1, keyValue);
             try (ResultSet resultSet = statement.executeQuery()) {
                 return resultSet.next();

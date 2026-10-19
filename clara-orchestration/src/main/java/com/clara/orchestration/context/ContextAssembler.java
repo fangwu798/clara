@@ -10,7 +10,6 @@ import com.clara.enums.RoleEnum;
 import com.clara.kernel.message.delta.SystemContent;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
-import com.clara.dto.tool.ToolContext;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,8 +49,8 @@ public final class ContextAssembler {
      * @param skillMatchCoordinator        技能匹配协调器，不可为 null
      */
     public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
-            SemanticRecallCoordinator semanticRecallCoordinator,
-            SkillMatchCoordinator skillMatchCoordinator) {
+                            SemanticRecallCoordinator semanticRecallCoordinator,
+                            SkillMatchCoordinator skillMatchCoordinator) {
         this(windowCompressionCoordinator, semanticRecallCoordinator, null, skillMatchCoordinator, null);
     }
 
@@ -64,9 +63,9 @@ public final class ContextAssembler {
      * @param skillMatchCoordinator        技能匹配协调器，不可为 null
      */
     public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
-            SemanticRecallCoordinator semanticRecallCoordinator,
-            IContextSupplementProvider supplementProvider,
-            SkillMatchCoordinator skillMatchCoordinator) {
+                            SemanticRecallCoordinator semanticRecallCoordinator,
+                            IContextSupplementProvider supplementProvider,
+                            SkillMatchCoordinator skillMatchCoordinator) {
         this(windowCompressionCoordinator, semanticRecallCoordinator, supplementProvider, skillMatchCoordinator,
                 null);
     }
@@ -81,10 +80,10 @@ public final class ContextAssembler {
      * @param basePrompts                  常驻提示词（每轮原样注入，不参与检索）；可为 null（视为无）
      */
     public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
-            SemanticRecallCoordinator semanticRecallCoordinator,
-            IContextSupplementProvider supplementProvider,
-            SkillMatchCoordinator skillMatchCoordinator,
-            List<String> basePrompts) {
+                            SemanticRecallCoordinator semanticRecallCoordinator,
+                            IContextSupplementProvider supplementProvider,
+                            SkillMatchCoordinator skillMatchCoordinator,
+                            List<String> basePrompts) {
         if (windowCompressionCoordinator == null || semanticRecallCoordinator == null
                 || skillMatchCoordinator == null) {
             throw new IllegalArgumentException("context assembler dependencies are invalid");
@@ -94,7 +93,7 @@ public final class ContextAssembler {
         this.supplementProvider = supplementProvider;
         this.skillMatchCoordinator = skillMatchCoordinator;
         this.basePrompts = basePrompts == null
-                ? Collections.<String>emptyList()
+                ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(basePrompts));
     }
 
@@ -106,8 +105,7 @@ public final class ContextAssembler {
      * @param estimator    token 估算器，可为 null（仅按百分比维度限制时需要）
      * @return 装配结果，非 null
      */
-    public AssembledContext assemble(IWindowMemory windowMemory, ContextControlConfig control,
-            ITokenCountEstimator estimator) {
+    public AssembledContext assemble(IWindowMemory windowMemory, ContextControlConfig control, ITokenCountEstimator estimator) {
         if (windowMemory == null) {
             throw new IllegalArgumentException("windowMemory must not be null");
         }
@@ -133,8 +131,7 @@ public final class ContextAssembler {
         SkillMatchCoordinator.MatchedSkill matched = skillMatchCoordinator.match(userInput, effective);
         // 外部知识补充：先问一次代码知识图谱，命中就把「既有事实」直接放进 system 指令；没命中返回空，
         // 模型自然走工具查本地文件那条路（补充提供者自身兜底，失败不阻断本轮）。
-        List<String> supplement = supplementProvider == null
-                ? Collections.<String>emptyList() : supplementProvider.supplement(userInput);
+        List<String> supplement = supplementProvider == null ? Collections.emptyList() : supplementProvider.supplement(userInput);
         // 召回被窗口淘汰的历史知识：把本轮真正要下发的消息一并传进去，命中的内容若模型本来就看得到（本轮提问、
         // 刚返回的工具结果）会被丢弃，不重复塞进 system 指令。
         List<String> recall = semanticRecallCoordinator.recall(windowMemory.conversationId(), userInput,
@@ -170,8 +167,7 @@ public final class ContextAssembler {
     private static String latestUserInput(String conversationId, List<IContent> history) {
         for (int index = history.size() - 1; index >= 0; index--) {
             IContent message = history.get(index);
-            if (message != null && message.getRoleType() == RoleEnum.USER
-                    && message instanceof UserContent) {
+            if (message != null && message.getRoleType() == RoleEnum.USER && message instanceof UserContent) {
                 return ((UserContent) message).getContent();
             }
         }
@@ -181,8 +177,7 @@ public final class ContextAssembler {
     /**
      * 归一化 system 指令文本：常驻提示词、技能提示词、图谱补充信息、压缩摘要、检索知识按序拼接。
      */
-    private static String systemText(List<IContent> systemParts, List<String> basePrompts, List<String> prompts,
-            List<String> supplement, List<String> recall) {
+    private static String systemText(List<IContent> systemParts, List<String> basePrompts, List<String> prompts, List<String> supplement, List<String> recall) {
         StringBuilder text = new StringBuilder();
         for (String prompt : basePrompts) {
             append(text, prompt);
@@ -212,25 +207,4 @@ public final class ContextAssembler {
         text.append(segment);
     }
 
-    /**
-     * 装配结果：本轮请求消息（system 指令居首）与工具声明。
-     */
-    public static final class AssembledContext {
-
-        private final List<IContent> messages;
-        private final List<ToolContext> tools;
-
-        AssembledContext(List<IContent> messages, List<ToolContext> tools) {
-            this.messages = Collections.unmodifiableList(new ArrayList<>(messages));
-            this.tools = Collections.unmodifiableList(new ArrayList<>(tools));
-        }
-
-        public List<IContent> getMessages() {
-            return messages;
-        }
-
-        public List<ToolContext> getTools() {
-            return tools;
-        }
-    }
 }

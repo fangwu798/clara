@@ -19,6 +19,7 @@ public final class JsonRpcRequest {
         this.method = method;
         this.params = ImmutableValues.copyMap(params);
     }
+    @SuppressWarnings("java:S3400")
     public String getJsonRpc() { return "2.0"; }
     public String getId() { return id; }
     public String getMethod() { return method; }

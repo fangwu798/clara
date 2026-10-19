@@ -26,6 +26,7 @@ import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
 import com.clara.orchestration.capability.CapabilityDispatcher;
 import com.clara.orchestration.context.ContextAssembler;
+import com.clara.orchestration.context.AssembledContext;
 import com.clara.orchestration.record.CallRecordPublisher;
 import com.clara.orchestration.tool.StreamingToolCallObserver;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
@@ -84,92 +85,160 @@ public final class DefaultConversationOrchestrator {
      * @return 对话结果，非 null
      */
     public ConversationResult converse(ConversationRequest request) {
+        validateRequest(request);
+        CapabilityKindEnum capabilityKind = request.getCapabilityKind() == null
+                ? CapabilityKindEnum.CHAT : request.getCapabilityKind();
+        ContextControlConfig control = resolveControl(request, capabilityKind);
+        ModelProviderEnum provider = request.getProvider();
+        IStreamObserver hostObserver = request.getObserver();
+        ConvContext context = createContext(request, capabilityKind);
+        IWindowMemory windowMemory = windowMemoryFactory.create(request.getConversationId(),
+                provider == null ? null : provider.name(), request.getModel());
+        ConversationPlan plan = new ConversationPlan(request, capabilityKind, control, provider,
+                hostObserver, request.getMaxToolRoundTrips());
+        ConversationState state = new ConversationState(context, windowMemory, new StringBuilder());
+        try (ConvContext.Scope ignored = ConvContext.open(context)) {
+            appendUserTurn(plan, state);
+            return agentLoop(plan, state);
+        } catch (ClaraException failure) {
+            return failureResult(plan, state, failure);
+        }
+    }
+
+    private static void validateRequest(ConversationRequest request) {
         if (request == null || request.getConversationId() == null || request.getConversationId().trim().isEmpty()) {
             throw OrchestrationErrors.invalidArgument("conversationId must not be blank");
         }
         if (request.getModel() == null || request.getUserInput() == null) {
             throw OrchestrationErrors.invalidArgument("model and userInput are required");
         }
-        CapabilityKindEnum capabilityKind = request.getCapabilityKind() == null ? CapabilityKindEnum.CHAT : request.getCapabilityKind();
-        ContextControlConfig control = resolveControl(request, capabilityKind);
-        ModelProviderEnum provider = request.getProvider();
-        // 宿主给定观察者即按流式调用（可实时展示思考与正文），否则退回非流式。
-        IStreamObserver hostObserver = request.getObserver();
-        // 工具往返默认不设上限：仅当请求显式给出正值时才按该值限制（<=0 表示不限制）。
-        int maxToolRoundTrips = request.getMaxToolRoundTrips();
+    }
 
-        ConvContext context = createContext(request, capabilityKind);
-        IWindowMemory windowMemory = windowMemoryFactory.create(request.getConversationId(),
-                provider == null ? null : provider.name(), request.getModel());
-        // 用可嵌套的作用域绑定会话：工具往返可能再次进入本方法（如工作流 AGENT 节点经工具触发），
-        // 内层退出时必须还原外层绑定，故不能用 bind + finally clear（那会把外层会话一并清空）。
-        StringBuilder reasoning = new StringBuilder();
-        try (ConvContext.Scope ignored = ConvContext.open(context)) {
-            // 故障转移会把同一轮换个模型重发，追加前先判重：末尾已经是同一条用户消息就不再追加。
-            IContent userTurn = userContent(request, capabilityKind);
-            if (shouldAppendUserTurn(windowMemory, userTurn)) {
-                windowMemory.append(Collections.singletonList(userTurn));
+    private static void appendUserTurn(ConversationPlan plan, ConversationState state) {
+        IContent userTurn = userContent(plan.request, plan.capabilityKind);
+        if (shouldAppendUserTurn(state.windowMemory, userTurn)) {
+            state.windowMemory.append(Collections.singletonList(userTurn));
+        }
+    }
+
+    private ConversationResult agentLoop(ConversationPlan plan, ConversationState state) {
+        int toolRoundTrips = 0;
+        while (true) {
+            state.context.throwIfCancelled();
+            HttpRequest httpRequest = buildRequest(plan, state);
+            HttpResponse response = invokeModel(plan, state, httpRequest);
+            if (response == null) {
+                return missingResponse(plan, state, toolRoundTrips);
             }
-            int toolRoundTrips = 0;
-            while (true) {
-                context.throwIfCancelled();
-                HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
-                        .model(request.getModel())
-                        .stream(Boolean.valueOf(request.isStream() || hostObserver != null));
-                // 只有对话能力下发 messages 与 tools；图片 / 视频生成等非对话能力以「本轮输入」作为生成
-                // 提示词，且不得携带对话工具——如火山方舟生图接口不支持 tools，带上会被平台以
-                // InvalidParameter 直接拒绝。
-                if (capabilityKind == CapabilityKindEnum.CHAT) {
-                    ContextAssembler.AssembledContext assembled =
-                            contextAssembler.assemble(windowMemory, control, tokenCountEstimator);
-                    requestBuilder.messages(assembled.getMessages())
-                            .tools(assembled.getTools().isEmpty() ? null : assembled.getTools());
-                } else {
-                    requestBuilder.prompt(request.getUserInput());
-                }
-                // 图片生成能力把随请求下发的图片引用作为参考图（图生图）；无附件时即文生图。
-                if (capabilityKind == CapabilityKindEnum.IMAGE) {
-                    requestBuilder.image(request.getAttachments());
-                }
-                HttpRequest httpRequest = requestBuilder.build();
-                StreamingToolCallObserver streamObserver = hostObserver == null
-                        ? null : new StreamingToolCallObserver(hostObserver);
-                HttpResponse response = capabilityDispatcher.invoke(httpRequest, streamObserver);
-                mergeStreamedToolCalls(response, streamObserver);
-                callRecordPublisher.publish(httpRequest, response, provider, request.getModel());
-                appendReasoning(reasoning, response);
-                if (response == null) {
-                    if (context.isCancelled()) {
-                        return cancelled(request.getConversationId(), toolRoundTrips);
-                    }
-                    return conversationResult(request.getConversationId(), null,
-                            OrchestrationStatusEnum.FAILED, toolRoundTrips, null, null, reasoning.toString());
-                }
-                if (toolRoundTripCoordinator.hasToolCalls(response)) {
-                    if (maxToolRoundTrips > 0 && toolRoundTrips >= maxToolRoundTrips) {
-                        throw OrchestrationErrors.toolRoundTripLimitExceeded(maxToolRoundTrips);
-                    }
-                    List<IContent> toolMessages = toolRoundTripCoordinator.perform(response);
-                    windowMemory.append(toolMessages);
-                    toolRoundTrips++;
-                    continue;
-                }
-                String content = capabilityDispatcher.extract(capabilityKind, response);
-                // 只记录有正文的助手回复：正文为空且不带工具调用的 assistant 消息会被平台判为非法
-                // （Invalid assistant message: content or tool_calls must be set），因此不写入历史。
-                if (content != null && !content.trim().isEmpty()) {
-                    windowMemory.append(Collections.singletonList(new AssistantContent(content)));
-                }
-                return conversationResult(request.getConversationId(), content,
-                        OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
-                        reasoning.toString());
+            if (!toolRoundTripCoordinator.hasToolCalls(response)) {
+                return completedResult(plan, state, response, toolRoundTrips);
             }
-        } catch (ClaraException failure) {
-            if (context.isCancelled() || failure.getError().getCategory() == ErrorCategoryEnum.CANCELLED) {
-                return cancelled(request.getConversationId(), 0);
+            if (plan.maxToolRoundTrips > 0 && toolRoundTrips >= plan.maxToolRoundTrips) {
+                throw OrchestrationErrors.toolRoundTripLimitExceeded(plan.maxToolRoundTrips);
             }
-            return conversationResult(request.getConversationId(), null,
-                    OrchestrationStatusEnum.FAILED, 0, null, failure.getError(), reasoning.toString());
+            state.windowMemory.append(toolRoundTripCoordinator.perform(response));
+            toolRoundTrips++;
+        }
+    }
+
+    private HttpRequest buildRequest(ConversationPlan plan, ConversationState state) {
+        HttpRequest.HttpRequestBuilder<?, ?> requestBuilder = HttpRequest.builder()
+                .model(plan.request.getModel())
+                .stream(Boolean.valueOf(plan.request.isStream() || plan.hostObserver != null));
+        // 只有对话能力下发 messages 与 tools；图片 / 视频生成等非对话能力以「本轮输入」作为生成
+        // 提示词，且不得携带对话工具——如火山方舟生图接口不支持 tools，带上会被平台以
+        // InvalidParameter 直接拒绝。
+        if (plan.capabilityKind == CapabilityKindEnum.CHAT) {
+            AssembledContext assembled =
+                    contextAssembler.assemble(state.windowMemory, plan.control, tokenCountEstimator);
+            requestBuilder.messages(assembled.getMessages())
+                    .tools(assembled.getTools().isEmpty() ? null : assembled.getTools());
+        } else {
+            requestBuilder.prompt(plan.request.getUserInput());
+        }
+        // 图片生成能力把随请求下发的图片引用作为参考图（图生图）；无附件时即文生图。
+        if (plan.capabilityKind == CapabilityKindEnum.IMAGE) {
+            requestBuilder.image(plan.request.getAttachments());
+        }
+        return requestBuilder.build();
+    }
+
+    private HttpResponse invokeModel(ConversationPlan plan, ConversationState state, HttpRequest httpRequest) {
+        StreamingToolCallObserver streamObserver = plan.hostObserver == null
+                ? null : new StreamingToolCallObserver(plan.hostObserver);
+        HttpResponse response = capabilityDispatcher.invoke(httpRequest, streamObserver);
+        mergeStreamedToolCalls(response, streamObserver);
+        callRecordPublisher.publish(httpRequest, response, plan.provider, plan.request.getModel());
+        appendReasoning(state.reasoning, response);
+        return response;
+    }
+
+    private static ConversationResult missingResponse(ConversationPlan plan, ConversationState state,
+            int toolRoundTrips) {
+        if (state.context.isCancelled()) {
+            return cancelled(plan.request.getConversationId(), toolRoundTrips);
+        }
+        return conversationResult(plan.request.getConversationId(), null,
+                OrchestrationStatusEnum.FAILED, toolRoundTrips, null, null, state.reasoning.toString());
+    }
+
+    private ConversationResult completedResult(ConversationPlan plan, ConversationState state,
+            HttpResponse response, int toolRoundTrips) {
+        String content = capabilityDispatcher.extract(plan.capabilityKind, response);
+        // 只记录有正文的助手回复：正文为空且不带工具调用的 assistant 消息会被平台判为非法
+        // （Invalid assistant message: content or tool_calls must be set），因此不写入历史。
+        if (content != null && !content.trim().isEmpty()) {
+            state.windowMemory.append(Collections.singletonList(new AssistantContent(content)));
+        }
+        return conversationResult(plan.request.getConversationId(), content,
+                OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
+                state.reasoning.toString());
+    }
+
+    private static ConversationResult failureResult(ConversationPlan plan, ConversationState state,
+            ClaraException failure) {
+        if (state.context.isCancelled() || failure.getError().getCategory() == ErrorCategoryEnum.CANCELLED) {
+            return cancelled(plan.request.getConversationId(), 0);
+        }
+        return conversationResult(plan.request.getConversationId(), null,
+                OrchestrationStatusEnum.FAILED, 0, null, failure.getError(), state.reasoning.toString());
+    }
+
+    /**
+     * 单轮编排中不随循环变化的输入。
+     */
+    private static final class ConversationPlan {
+        private final ConversationRequest request;
+        private final CapabilityKindEnum capabilityKind;
+        private final ContextControlConfig control;
+        private final ModelProviderEnum provider;
+        private final IStreamObserver hostObserver;
+        private final int maxToolRoundTrips;
+
+        private ConversationPlan(ConversationRequest request, CapabilityKindEnum capabilityKind,
+                ContextControlConfig control, ModelProviderEnum provider, IStreamObserver hostObserver,
+                int maxToolRoundTrips) {
+            this.request = request;
+            this.capabilityKind = capabilityKind;
+            this.control = control;
+            this.provider = provider;
+            this.hostObserver = hostObserver;
+            this.maxToolRoundTrips = maxToolRoundTrips;
+        }
+    }
+
+    /**
+     * 单轮编排中随循环推进的状态。
+     */
+    private static final class ConversationState {
+        private final ConvContext context;
+        private final IWindowMemory windowMemory;
+        private final StringBuilder reasoning;
+
+        private ConversationState(ConvContext context, IWindowMemory windowMemory, StringBuilder reasoning) {
+            this.context = context;
+            this.windowMemory = windowMemory;
+            this.reasoning = reasoning;
         }
     }
 

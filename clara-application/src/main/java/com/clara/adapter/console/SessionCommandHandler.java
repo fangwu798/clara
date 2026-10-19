@@ -1,10 +1,15 @@
 package com.clara.adapter.console;
 
 import com.clara.config.ModelRegistry;
+import com.clara.core.interaction.IConversationControls;
+import com.clara.enums.interaction.SessionCommandOutcomeEnum;
 
 import java.io.BufferedReader;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * 会话内指令处理器：识别并执行交互式控制指令（退出、日志模式、颜色、切换模型）。
@@ -18,40 +23,6 @@ import java.util.List;
  * 统计 token 用量；{@code /?}（或 {@code /help}）打印命令提示。其余输入一律视为对话内容。
  */
 public final class SessionCommandHandler {
-
-    /**
-     * 指令处理结果。
-     */
-    public enum Outcome {
-        /** 结束会话。 */
-        EXIT,
-        /** 指令已处理，跳过本轮对话。 */
-        HANDLED,
-        /** 非指令，按对话输入处理。 */
-        INPUT
-    }
-
-    /**
-     * 会话级上下文控制：把「压缩上下文 / 新建对话」这类需要访问装配层与当前会话标识的操作交给宿主实现，
-     * 指令处理器只负责识别命令并回调。
-     */
-    public interface ConversationControls {
-
-        /** 压缩当前上下文（历史归纳为摘要）。 */
-        void compressContext();
-
-        /** 开始一段新对话（切换到新的会话标识，历史上下文清空）。 */
-        void newConversation();
-
-        /** 显示 token 用量统计（全部历史记录估算 + 本次进程累计调用）。 */
-        void showUsage();
-
-        /** 显示当前工作目录的代码知识图谱状态（是否已导入、怎么导入、可视化地址）。 */
-        void showCodeGraph();
-
-        /** 把当前工作目录导入代码知识图谱（同步等待索引完成，可能几分钟）。 */
-        void importCodeGraph();
-    }
 
     private static final String LOG_MODE_COMMAND = "/log";
     private static final String LOG_MODE_ALIAS = "/verbose";
@@ -71,7 +42,8 @@ public final class SessionCommandHandler {
     private final BufferedReader reader;
     private final ModelRegistry registry;
     private final List<Path> candidates;
-    private final ConversationControls controls;
+    private final IConversationControls controls;
+    private final Map<String, Runnable> commands = new HashMap<>();
 
     /**
      * 创建指令处理器。
@@ -80,14 +52,15 @@ public final class SessionCommandHandler {
      * @param reader     标准输入读取器（用于 {@code /model} 交互选择），不可为 null
      * @param registry   模型注册表（解析别名、切换会话当前模型），不可为 null
      * @param candidates 可选模型配置清单（已按可用性过滤），可为 null（此时 {@code /model} 不可用）
-     * @param controls   会话级上下文控制（压缩 / 新建对话）；可为 null（此时这两条指令不生效）
+     * @param controls   会话级上下文控制（压缩 / 新建对话 / 用量 / 代码图谱）；可为 null（此时相关指令只提示不支持）
      */
-    public SessionCommandHandler(ConsoleView view, BufferedReader reader, ModelRegistry registry, List<Path> candidates, ConversationControls controls) {
+    public SessionCommandHandler(ConsoleView view, BufferedReader reader, ModelRegistry registry, List<Path> candidates, IConversationControls controls) {
         this.view = view;
         this.reader = reader;
         this.registry = registry;
         this.candidates = candidates;
         this.controls = controls;
+        registerCommands();
     }
 
     /**
@@ -96,70 +69,82 @@ public final class SessionCommandHandler {
      * @param input 已去除首尾空白的输入，非空
      * @return 处理结果：退出 / 已处理 / 非指令（按对话输入处理）
      */
-    public Outcome handle(String input) {
-        if ("exit".equalsIgnoreCase(input) || "quit".equalsIgnoreCase(input) || "/exit".equals(input)) {
+    public SessionCommandOutcomeEnum handle(String input) {
+        if (isExitCommand(input)) {
             view.println("bye.");
-            return Outcome.EXIT;
+            return SessionCommandOutcomeEnum.EXIT;
         }
-        if (LOG_MODE_COMMAND.equals(input) || LOG_MODE_ALIAS.equals(input)) {
-            view.toggleLogMode();
-            view.emit("日志模式：" + (view.isFullLogging() ? "全量（含 HTTP 请求/响应与工具调用过程，过程日志以灰色显示）" : "精简（仅助手回复与状态行）"), ConsoleView.ANSI_GRAY);
-            return Outcome.HANDLED;
+        Runnable command = commands.get(input);
+        if (command == null) {
+            return SessionCommandOutcomeEnum.INPUT;
         }
-        if (COLOR_COMMAND.equals(input)) {
-            view.toggleColors();
-            view.println("颜色：" + (view.isColorsEnabled() ? "已开启" : "已关闭"));
-            return Outcome.HANDLED;
+        command.run();
+        return SessionCommandOutcomeEnum.HANDLED;
+    }
+
+    /**
+     * 判断是否为退出命令（{@code /exit} 区分大小写，{@code exit}/{@code quit} 不区分）。
+     */
+    private static boolean isExitCommand(String input) {
+        return "exit".equalsIgnoreCase(input) || "quit".equalsIgnoreCase(input) || "/exit".equals(input);
+    }
+
+    /**
+     * 注册命令与处理动作：别名指向同一个动作，新增命令只需追加一行。
+     */
+    private void registerCommands() {
+        Runnable logMode = this::toggleLogMode;
+        commands.put(LOG_MODE_COMMAND, logMode);
+        commands.put(LOG_MODE_ALIAS, logMode);
+
+        commands.put(COLOR_COMMAND, this::toggleColors);
+        commands.put(MODEL_COMMAND, this::switchModel);
+
+        Runnable compress = () -> runWithControls("当前运行方式不支持压缩上下文。", IConversationControls::compressContext);
+        commands.put(COMPRESS_COMMAND, compress);
+        commands.put(COMPRESS_ALIAS, compress);
+
+        commands.put(NEW_CONVERSATION_COMMAND, () -> runWithControls("当前运行方式不支持新建对话。", IConversationControls::newConversation));
+
+        Runnable usage = () -> runWithControls("当前运行方式不支持用量统计。", IConversationControls::showUsage);
+        commands.put(USAGE_COMMAND, usage);
+        commands.put(USAGE_ALIAS, usage);
+
+        commands.put(GRAPH_COMMAND, () -> runWithControls("当前运行方式不支持查看代码知识图谱。", IConversationControls::showCodeGraph));
+        commands.put(GRAPH_IMPORT_COMMAND, () -> runWithControls("当前运行方式不支持导入代码知识图谱。", IConversationControls::importCodeGraph));
+
+        Runnable help = this::printHelp;
+        commands.put(HELP_COMMAND, help);
+        commands.put(HELP_ALIAS, help);
+    }
+
+    /**
+     * 在会话级上下文控制可用时执行动作，否则输出不支持提示。
+     */
+    private void runWithControls(String unsupportedMessage, Consumer<IConversationControls> action) {
+        if (controls == null) {
+            view.println(unsupportedMessage);
+            return;
         }
-        if (MODEL_COMMAND.equals(input)) {
-            switchModel();
-            return Outcome.HANDLED;
-        }
-        if (COMPRESS_COMMAND.equals(input) || COMPRESS_ALIAS.equals(input)) {
-            if (controls == null) {
-                view.println("当前运行方式不支持压缩上下文。");
-            } else {
-                controls.compressContext();
-            }
-            return Outcome.HANDLED;
-        }
-        if (NEW_CONVERSATION_COMMAND.equals(input)) {
-            if (controls == null) {
-                view.println("当前运行方式不支持新建对话。");
-            } else {
-                controls.newConversation();
-            }
-            return Outcome.HANDLED;
-        }
-        if (USAGE_COMMAND.equals(input) || USAGE_ALIAS.equals(input)) {
-            if (controls == null) {
-                view.println("当前运行方式不支持用量统计。");
-            } else {
-                controls.showUsage();
-            }
-            return Outcome.HANDLED;
-        }
-        if (GRAPH_COMMAND.equals(input)) {
-            if (controls == null) {
-                view.println("当前运行方式不支持查看代码知识图谱。");
-            } else {
-                controls.showCodeGraph();
-            }
-            return Outcome.HANDLED;
-        }
-        if (GRAPH_IMPORT_COMMAND.equals(input)) {
-            if (controls == null) {
-                view.println("当前运行方式不支持导入代码知识图谱。");
-            } else {
-                controls.importCodeGraph();
-            }
-            return Outcome.HANDLED;
-        }
-        if (HELP_COMMAND.equals(input) || HELP_ALIAS.equals(input)) {
-            printHelp();
-            return Outcome.HANDLED;
-        }
-        return Outcome.INPUT;
+        action.accept(controls);
+    }
+
+    /**
+     * 切换日志模式并提示当前模式。
+     */
+    private void toggleLogMode() {
+        view.toggleLogMode();
+        view.emit("日志模式：" + (view.isFullLogging()
+                ? "全量（含 HTTP 请求/响应与工具调用过程，过程日志以灰色显示）"
+                : "精简（仅助手回复与状态行）"), ConsoleView.ANSI_GRAY);
+    }
+
+    /**
+     * 开关彩色输出并提示当前状态。
+     */
+    private void toggleColors() {
+        view.toggleColors();
+        view.println("颜色：" + (view.isColorsEnabled() ? "已开启" : "已关闭"));
     }
 
     /**

@@ -3,7 +3,6 @@ package com.clara.skill.registry;
 import com.clara.core.skill.IToolCatalog;
 import com.clara.core.skill.IToolDescriptionDecorator;
 import com.clara.dto.skill.ToolMethod;
-import com.clara.dto.skill.ToolMethod;
 import com.clara.dto.tool.ToolContext;
 import com.clara.dto.tool.ToolSpecification;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -112,8 +111,8 @@ public final class RegistryToolCatalog implements IToolCatalog {
         StringBuilder name = new StringBuilder();
         for (int index = 0; index < sourceId.length() && name.length() < MAX_TOOL_NAME_LENGTH; index++) {
             char value = sourceId.charAt(index);
-            boolean allowed = (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z')
-                    || (value >= '0' && value <= '9') || value == '_' || value == '-';
+            boolean allowed = value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z'
+                    || value >= '0' && value <= '9' || value == '_' || value == '-';
             name.append(allowed ? value : '_');
         }
         return name.length() == 0 ? "skill_tool" : name.toString();

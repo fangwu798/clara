@@ -68,7 +68,7 @@ public final class WorkflowProgress {
             current.notice.accept(text);
             return;
         }
-        System.out.println(text);
+        System.out.println(text); // NOSONAR CLI output by design
     }
 
     /**

@@ -1,5 +1,8 @@
 package com.clara.memory.semantic.milvus;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
+
 import com.clara.dto.memory.MemoryEntry;
 import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
@@ -60,7 +63,7 @@ public class MilvusBm25IntegrationTest {
             ids.add(weather.getId());
             // BM25 集合不存向量：这里故意传长度为 1 的占位向量，验证入库不再按维度校验
             store.upsert(Arrays.asList(pricing, referencing, weather));
-            Thread.sleep(500);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500));
 
             List<MemoryMatch> pricingHits = store.search(query("套餐算费特殊规则怎么透传"));
             assertEquals("相关文档应排第一", "bm25-pricing", pricingHits.get(0).getEntry().getId());
@@ -108,7 +111,7 @@ public class MilvusBm25IntegrationTest {
             if (store.search(query("套餐算费")).isEmpty()) {
                 return true;
             }
-            Thread.sleep(500L);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500L));
         }
         return false;
     }

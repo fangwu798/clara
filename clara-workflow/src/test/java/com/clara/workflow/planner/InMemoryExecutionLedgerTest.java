@@ -85,7 +85,8 @@ public class InMemoryExecutionLedgerTest {
         InMemoryExecutionLedger ledger = new InMemoryExecutionLedger();
         ledger.recordIntent("run:T", "goal", 1, "T");
 
-        ClaraException notRunning = assertThrows(ClaraException.class, () -> ledger.succeed("run:T", result()));
+        TaskExecutionResult finished = result();
+        ClaraException notRunning = assertThrows(ClaraException.class, () -> ledger.succeed("run:T", finished));
         assertEquals(ErrorCodes.EXECUTION_LEDGER_CONFLICT, notRunning.getError().getCode());
 
         ledger.beginAttempt("run:T");

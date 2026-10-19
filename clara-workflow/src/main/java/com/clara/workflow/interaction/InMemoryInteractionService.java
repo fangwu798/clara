@@ -20,7 +20,6 @@ import com.clara.exception.ErrorCodes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +31,8 @@ import java.util.Set;
  * 在内存中管理待处理交互，并在收到反馈后触发恢复。
  */
 public final class InMemoryInteractionService implements IInteractionService {
+
+    private static final String REASON_EXPIRED = "expired";
 
     private final IInteractionResumeCoordinator coordinator;
     private final IAnswerSchemaValidator schemaValidator;
@@ -91,14 +92,11 @@ public final class InMemoryInteractionService implements IInteractionService {
                 result.add(request);
             }
         }
-        Collections.sort(result, new Comparator<InteractionRequest>() {
-            @Override
-            public int compare(InteractionRequest one, InteractionRequest two) {
-                int time = Long.compare(one.getContext().getCreatedAtEpochMillis(),
-                        two.getContext().getCreatedAtEpochMillis());
-                return time != 0 ? time : one.getContext().getInteractionId()
-                        .compareTo(two.getContext().getInteractionId());
-            }
+        Collections.sort(result, (one, two) -> {
+            int time = Long.compare(one.getContext().getCreatedAtEpochMillis(),
+                    two.getContext().getCreatedAtEpochMillis());
+            return time != 0 ? time : one.getContext().getInteractionId()
+                    .compareTo(two.getContext().getInteractionId());
         });
         return Collections.unmodifiableList(result);
     }
@@ -124,13 +122,37 @@ public final class InMemoryInteractionService implements IInteractionService {
             throw new IllegalArgumentException("feedback must not be null");
         }
         String feedbackKey = feedback.getRunId() + ":" + feedback.getIdempotencyKey();
-        FeedbackResult replay = feedbackByKey.get(feedbackKey);
+        FeedbackResult replay = replay(feedback, feedbackKey);
         if (replay != null) {
-            if (!replay.getRequest().getContext().getInteractionId().equals(feedback.getInteractionId())) {
-                throw conflict();
-            }
-            return new FeedbackResult(replay.getRequest(), true, replay.getResumeOutcome());
+            return replay;
         }
+        long now = timeSource.currentTimeMillis();
+        InteractionRequest request = requirePending(feedback, now);
+        Map<String, Object> answer = effectiveAnswer(request.getQuestion(), feedback.getAnswer());
+        validateAnswer(request.getQuestion(), answer);
+        InteractionResponse response = new InteractionResponse(request.getContext().getInteractionId(),
+                answer, feedback.getResponderId(), feedback.getIdempotencyKey(), now);
+        InteractionRequest answered = new InteractionRequest(request.getContext(), request.getQuestion(),
+                InteractionStateEnum.ANSWERED, response, null);
+        ResumeOutcome outcome = resumeIfComplete(request, response, answer);
+        requests.put(answered.getContext().getInteractionId(), answered);
+        FeedbackResult result = new FeedbackResult(answered, false, outcome);
+        feedbackByKey.put(feedbackKey, result);
+        return result;
+    }
+
+    private FeedbackResult replay(InteractionFeedback feedback, String feedbackKey) {
+        FeedbackResult replay = feedbackByKey.get(feedbackKey);
+        if (replay == null) {
+            return null;
+        }
+        if (!replay.getRequest().getContext().getInteractionId().equals(feedback.getInteractionId())) {
+            throw conflict();
+        }
+        return new FeedbackResult(replay.getRequest(), true, replay.getResumeOutcome());
+    }
+
+    private InteractionRequest requirePending(InteractionFeedback feedback, long now) {
         InteractionRequest request = requests.get(feedback.getInteractionId());
         if (request == null) {
             throw notFound();
@@ -138,7 +160,6 @@ public final class InMemoryInteractionService implements IInteractionService {
         if (!request.getContext().getRunId().equals(feedback.getRunId())) {
             throw denied();
         }
-        long now = timeSource.currentTimeMillis();
         if (request.getState() == InteractionStateEnum.PENDING
                 && now >= request.getContext().getExpiresAtEpochMillis()) {
             request = expireRequest(request);
@@ -150,33 +171,32 @@ public final class InMemoryInteractionService implements IInteractionService {
                 || feedback.getExpectedInstanceVersion() != request.getContext().getExpectedInstanceVersion()) {
             throw conflict();
         }
-        Map<String, Object> answer = effectiveAnswer(request.getQuestion(), feedback.getAnswer());
-        validateAnswer(request.getQuestion(), answer);
-        InteractionResponse response = new InteractionResponse(request.getContext().getInteractionId(),
-                answer, feedback.getResponderId(), feedback.getIdempotencyKey(), now);
-        InteractionRequest answered = new InteractionRequest(request.getContext(), request.getQuestion(),
-                InteractionStateEnum.ANSWERED, response, null);
-        ResumeOutcome outcome = null;
-        if (!hasOtherRequiredInteraction(request)) {
-            Map<String, Object> scopeUpdates = new LinkedHashMap<>();
-            List<InteractionResponse> responses = new ArrayList<>();
-            for (InteractionRequest value : requests.values()) {
-                if (value.getContext().getRunId().equals(request.getContext().getRunId())
-                        && value.getContext().getInstanceId().equals(request.getContext().getInstanceId())
-                        && value.getState() == InteractionStateEnum.ANSWERED) {
-                    responses.add(value.getResponse());
-                    scopeUpdates.put(value.getQuestion().getScopeKey(), value.getResponse().getAnswer());
-                }
-            }
-            responses.add(response);
-            scopeUpdates.put(request.getQuestion().getScopeKey(), answer);
-            outcome = coordinator.resumeAndRecord(request, Collections.unmodifiableList(responses),
-                    Collections.unmodifiableMap(scopeUpdates));
+        return request;
+    }
+
+    private ResumeOutcome resumeIfComplete(InteractionRequest request, InteractionResponse response,
+            Map<String, Object> answer) {
+        if (hasOtherRequiredInteraction(request)) {
+            return null;
         }
-        requests.put(answered.getContext().getInteractionId(), answered);
-        FeedbackResult result = new FeedbackResult(answered, false, outcome);
-        feedbackByKey.put(feedbackKey, result);
-        return result;
+        Map<String, Object> scopeUpdates = new LinkedHashMap<>();
+        List<InteractionResponse> responses = new ArrayList<>();
+        for (InteractionRequest value : requests.values()) {
+            if (isAnsweredInSameRun(value, request)) {
+                responses.add(value.getResponse());
+                scopeUpdates.put(value.getQuestion().getScopeKey(), value.getResponse().getAnswer());
+            }
+        }
+        responses.add(response);
+        scopeUpdates.put(request.getQuestion().getScopeKey(), answer);
+        return coordinator.resumeAndRecord(request, Collections.unmodifiableList(responses),
+                Collections.unmodifiableMap(scopeUpdates));
+    }
+
+    private static boolean isAnsweredInSameRun(InteractionRequest value, InteractionRequest current) {
+        return value.getContext().getRunId().equals(current.getContext().getRunId())
+                && value.getContext().getInstanceId().equals(current.getContext().getInstanceId())
+                && value.getState() == InteractionStateEnum.ANSWERED;
     }
 
     @Override
@@ -218,9 +238,9 @@ public final class InMemoryInteractionService implements IInteractionService {
         for (InteractionRequest request : requests.values()) {
             if (request.getState() == InteractionStateEnum.PENDING
                     && now >= request.getContext().getExpiresAtEpochMillis()) {
-                coordinator.interactionCancelled(request, "expired");
+                coordinator.interactionCancelled(request, REASON_EXPIRED);
                 expired.add(new InteractionRequest(request.getContext(), request.getQuestion(),
-                        InteractionStateEnum.EXPIRED, null, "expired"));
+                        InteractionStateEnum.EXPIRED, null, REASON_EXPIRED));
             }
         }
         for (InteractionRequest request : expired) {
@@ -229,9 +249,9 @@ public final class InMemoryInteractionService implements IInteractionService {
     }
 
     private InteractionRequest expireRequest(InteractionRequest request) {
-        coordinator.interactionCancelled(request, "expired");
+        coordinator.interactionCancelled(request, REASON_EXPIRED);
         InteractionRequest expired = new InteractionRequest(request.getContext(), request.getQuestion(),
-                InteractionStateEnum.EXPIRED, null, "expired");
+                InteractionStateEnum.EXPIRED, null, REASON_EXPIRED);
         requests.put(expired.getContext().getInteractionId(), expired);
         return expired;
     }
@@ -250,6 +270,14 @@ public final class InMemoryInteractionService implements IInteractionService {
         if (question.isRequired() && answer.isEmpty()) {
             invalidAnswer();
         }
+        rejectSensitiveKeys(answer);
+        validateByType(question, answer);
+        if (!schemaValidator.isValid(question.getAnswerSchema(), answer)) {
+            invalidAnswer();
+        }
+    }
+
+    private static void rejectSensitiveKeys(Map<String, Object> answer) {
         for (String key : answer.keySet()) {
             String lower = key.toLowerCase(Locale.ROOT);
             if ((lower.contains("password") || lower.contains("token") || lower.contains("secret"))
@@ -257,27 +285,18 @@ public final class InMemoryInteractionService implements IInteractionService {
                 invalidAnswer();
             }
         }
+    }
+
+    private void validateByType(Question question, Map<String, Object> answer) {
         InteractionTypeEnum type = question.getType();
         if (type == InteractionTypeEnum.TEXT_INPUT) {
-            Object text = answer.get("text");
-            if (!(text instanceof String) || ((String) text).length() > question.getMaxTextLength()
-                    || (question.isRequired() && ((String) text).trim().isEmpty())) {
-                invalidAnswer();
-            }
+            validateTextInput(question, answer);
         } else if (type == InteractionTypeEnum.SINGLE_SELECT) {
-            if (!validOption(question, answer.get("selectedOptionId"))) {
-                invalidAnswer();
-            }
+            validateSingleSelect(question, answer);
         } else if (type == InteractionTypeEnum.MULTI_SELECT) {
-            Object selected = answer.get("selectedOptionIds");
-            if (!(selected instanceof Collection) || !validOptions(question, (Collection<?>) selected)) {
-                invalidAnswer();
-            }
+            validateMultiSelect(question, answer);
         } else if (type == InteractionTypeEnum.CONFIRMATION) {
-            Object decision = answer.get("decision");
-            if (!("CONFIRM".equals(decision) || "REJECT".equals(decision) || "REPLAN".equals(decision))) {
-                invalidAnswer();
-            }
+            validateConfirmation(answer);
         } else if (type == InteractionTypeEnum.FILE) {
             if (!text(answer.get("fileRef"))) {
                 invalidAnswer();
@@ -287,13 +306,42 @@ public final class InMemoryInteractionService implements IInteractionService {
                 invalidAnswer();
             }
         } else if (type == InteractionTypeEnum.CHANGE_APPROVAL) {
-            if (!text(answer.get("changeSetId")) || !(answer.get("revision") instanceof Number)
-                    || !text(answer.get("changeSetDigest")) || !text(answer.get("previewDigest"))
-                    || !text(answer.get("decision"))) {
-                invalidAnswer();
-            }
+            validateChangeApproval(answer);
         }
-        if (!schemaValidator.isValid(question.getAnswerSchema(), answer)) {
+    }
+
+    private void validateSingleSelect(Question question, Map<String, Object> answer) {
+        if (!validOption(question, answer.get("selectedOptionId"))) {
+            invalidAnswer();
+        }
+    }
+
+    private void validateMultiSelect(Question question, Map<String, Object> answer) {
+        Object selected = answer.get("selectedOptionIds");
+        if (!(selected instanceof Collection) || !validOptions(question, (Collection<?>) selected)) {
+            invalidAnswer();
+        }
+    }
+
+    private static void validateTextInput(Question question, Map<String, Object> answer) {
+        Object text = answer.get("text");
+        if (!(text instanceof String) || ((String) text).length() > question.getMaxTextLength()
+                || question.isRequired() && ((String) text).trim().isEmpty()) {
+            invalidAnswer();
+        }
+    }
+
+    private static void validateConfirmation(Map<String, Object> answer) {
+        Object decision = answer.get("decision");
+        if (!("CONFIRM".equals(decision) || "REJECT".equals(decision) || "REPLAN".equals(decision))) {
+            invalidAnswer();
+        }
+    }
+
+    private static void validateChangeApproval(Map<String, Object> answer) {
+        if (!text(answer.get("changeSetId")) || !(answer.get("revision") instanceof Number)
+                || !text(answer.get("changeSetDigest")) || !text(answer.get("previewDigest"))
+                || !text(answer.get("decision"))) {
             invalidAnswer();
         }
     }

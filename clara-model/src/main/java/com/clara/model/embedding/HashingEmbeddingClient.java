@@ -81,7 +81,7 @@ public final class HashingEmbeddingClient implements IEmbeddingClient {
     private static long fnv1a64(String text) {
         long hash = 0xcbf29ce484222325L;
         for (byte value : text.getBytes(StandardCharsets.UTF_8)) {
-            hash ^= (value & 0xffL);
+            hash ^= value & 0xffL;
             hash *= 0x100000001b3L;
         }
         return hash;

@@ -63,8 +63,9 @@ public class PublishWorkflowToolTest {
                 "  id: scan",
                 "  type: TOOL");
 
+        String arguments = arguments(invalid, false);
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-                () -> tool.execute(arguments(invalid, false)));
+                () -> tool.execute(arguments));
 
         assertTrue(failure.getMessage().contains("待发布的自定义工作流"));
         assertTrue(failure.getMessage().contains("节点 scan"));
@@ -95,8 +96,9 @@ public class PublishWorkflowToolTest {
         registry.reload();
         PublishWorkflowTool tool = new PublishWorkflowTool(registry);
 
+        String arguments = arguments(definition("builtin_flow"), false);
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-                () -> tool.execute(arguments(definition("builtin_flow"), false)));
+                () -> tool.execute(arguments));
 
         assertTrue(failure.getMessage().contains("已被其它工作流占用"));
     }
@@ -108,8 +110,9 @@ public class PublishWorkflowToolTest {
         registry.reload();
         PublishWorkflowTool tool = new PublishWorkflowTool(registry);
 
+        String arguments = arguments(definition("bad name"), false);
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-                () -> tool.execute(arguments(definition("bad name"), false)));
+                () -> tool.execute(arguments));
 
         assertTrue(failure.getMessage().contains("只允许字母"));
     }

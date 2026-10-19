@@ -21,6 +21,7 @@ import io.milvus.param.RpcStatus;
 import io.milvus.param.collection.CreateCollectionParam;
 import io.milvus.param.collection.DescribeCollectionParam;
 import io.milvus.param.collection.DropCollectionParam;
+import io.milvus.param.collection.CollectionSchemaParam;
 import io.milvus.param.collection.FieldType;
 import io.milvus.param.collection.HasCollectionParam;
 import io.milvus.param.collection.LoadCollectionParam;
@@ -37,6 +38,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 基于 Milvus SDK（{@code MilvusServiceClient}）的 {@link MilvusBackend} 实现，封装连接与集合操作。
@@ -48,6 +50,8 @@ import java.util.Map;
  * <p>运行期依赖外部 Milvus 实例；本类按 SDK 标准 API 编写，编译通过即可，真实检索需连接实例验证。
  */
 public final class MilvusGrpcBackend implements MilvusBackend {
+
+    private static final String EQ_QUOTE = " == \"";
 
     private static final String FIELD_ID = "id";
     private static final String FIELD_SOURCE_TYPE = "source_type";
@@ -69,7 +73,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
             FIELD_CREATED_AT, FIELD_EXPIRES_AT, FIELD_METADATA));
 
     private final MilvusServiceClient client;
-    private volatile MilvusCollectionSpec activeSpec;
+    private final AtomicReference<MilvusCollectionSpec> activeSpec = new AtomicReference<>();
 
     /**
      * 创建后端，包裹已有客户端。
@@ -98,13 +102,13 @@ public final class MilvusGrpcBackend implements MilvusBackend {
                 throw new MilvusBackendException("existing milvus collection dimension mismatch: expected "
                         + expected.getDimension() + " but found " + actualDimension, false);
             }
-            this.activeSpec = expected;
+            this.activeSpec.set(expected);
             return expected;
         }
         createCollection(expected);
         createIndex(collection, expected);
         loadCollection(collection);
-        this.activeSpec = expected;
+        this.activeSpec.set(expected);
         return expected;
     }
 
@@ -173,7 +177,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
                 .withCollectionName(collection)
                 .withVectorFieldName(FIELD_VECTOR)
                 .withMetricType(metricType(currentMetric()))
-                .withTopK(Integer.valueOf(backendQuery.getCandidateLimit()))
+                .withLimit(Long.valueOf(backendQuery.getCandidateLimit()))
                 .withOutFields(OUT_FIELDS)
                 .withConsistencyLevel(ConsistencyLevelEnum.STRONG)
                 .withFloatVectors(Collections.singletonList(toFloatList(query.getVector())));
@@ -185,9 +189,9 @@ public final class MilvusGrpcBackend implements MilvusBackend {
         SearchResultsWrapper wrapper = new SearchResultsWrapper(result.getData().getResults());
         List<QueryResultsWrapper.RowRecord> records = wrapper.getRowRecords(0);
         List<MemoryMatch> matches = new ArrayList<>();
-        for (QueryResultsWrapper.RowRecord record : records) {
-            MemoryEntry entry = toEntry(record);
-            double score = ((Number) record.get("score")).doubleValue();
+        for (QueryResultsWrapper.RowRecord rowRecord : records) {
+            MemoryEntry entry = toEntry(rowRecord);
+            double score = ((Number) rowRecord.get("score")).doubleValue();
             matches.add(new MemoryMatch(entry, score));
         }
         return matches;
@@ -211,8 +215,8 @@ public final class MilvusGrpcBackend implements MilvusBackend {
         if (collection == null || conversationId == null) {
             throw new IllegalArgumentException("collection and conversationId must not be null");
         }
-        String expr = FIELD_SOURCE_TYPE + " == \"" + MemorySourceTypeEnum.CONVERSATION.name() + "\""
-                + " and " + FIELD_CONVERSATION_ID + " == \"" + escape(conversationId) + "\"";
+        String expr = FIELD_SOURCE_TYPE + EQ_QUOTE + MemorySourceTypeEnum.CONVERSATION.name() + "\""
+                + " and " + FIELD_CONVERSATION_ID + EQ_QUOTE + escape(conversationId) + "\"";
         R<MutationResult> result = client.delete(DeleteParam.newBuilder()
                 .withCollectionName(collection)
                 .withExpr(expr)
@@ -264,7 +268,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
         R<RpcStatus> result = client.createCollection(CreateCollectionParam.newBuilder()
                 .withCollectionName(spec.getCollection())
                 .withDescription("clara semantic memory")
-                .withFieldTypes(fields)
+                .withSchema(CollectionSchemaParam.newBuilder().withFieldTypes(fields).build())
                 .build());
         checkStatus(result, "createCollection");
     }
@@ -310,22 +314,22 @@ public final class MilvusGrpcBackend implements MilvusBackend {
 
     // ------------------------------------------------------------------ 数据转换
 
-    private MemoryEntry toEntry(QueryResultsWrapper.RowRecord record) {
-        String conversationId = asString(record.get(FIELD_CONVERSATION_ID));
+    private MemoryEntry toEntry(QueryResultsWrapper.RowRecord rowRecord) {
+        String conversationId = asString(rowRecord.get(FIELD_CONVERSATION_ID));
         if (conversationId != null && conversationId.isEmpty()) {
             conversationId = null;
         }
         return MemoryEntry.builder(
-                asString(record.get(FIELD_ID)),
-                MemorySourceTypeEnum.valueOf(asString(record.get(FIELD_SOURCE_TYPE))),
-                asString(record.get(FIELD_SOURCE_ID)),
-                asString(record.get(FIELD_CONTENT)),
-                asString(record.get(FIELD_CONTENT_HASH)),
-                toFloatArray(record.get(FIELD_VECTOR)))
+                asString(rowRecord.get(FIELD_ID)),
+                MemorySourceTypeEnum.valueOf(asString(rowRecord.get(FIELD_SOURCE_TYPE))),
+                asString(rowRecord.get(FIELD_SOURCE_ID)),
+                asString(rowRecord.get(FIELD_CONTENT)),
+                asString(rowRecord.get(FIELD_CONTENT_HASH)),
+                toFloatArray(rowRecord.get(FIELD_VECTOR)))
                 .conversationId(conversationId)
-                .createdAtEpochMillis(((Number) record.get(FIELD_CREATED_AT)).longValue())
-                .expiresAtEpochMillis(((Number) record.get(FIELD_EXPIRES_AT)).longValue())
-                .metadata(toMetadata(record.get(FIELD_METADATA)))
+                .createdAtEpochMillis(((Number) rowRecord.get(FIELD_CREATED_AT)).longValue())
+                .expiresAtEpochMillis(((Number) rowRecord.get(FIELD_EXPIRES_AT)).longValue())
+                .metadata(toMetadata(rowRecord.get(FIELD_METADATA)))
                 .build();
     }
 
@@ -385,13 +389,13 @@ public final class MilvusGrpcBackend implements MilvusBackend {
     private static String buildExpr(SemanticMemoryQuery query) {
         StringBuilder expr = new StringBuilder();
         if (query.getSourceType() != null) {
-            expr.append(FIELD_SOURCE_TYPE).append(" == \"").append(query.getSourceType().name()).append("\"");
+            expr.append(FIELD_SOURCE_TYPE).append(EQ_QUOTE).append(query.getSourceType().name()).append("\"");
         }
         if (query.getConversationId() != null) {
             if (expr.length() > 0) {
                 expr.append(" and ");
             }
-            expr.append(FIELD_CONVERSATION_ID).append(" == \"").append(escape(query.getConversationId())).append("\"");
+            expr.append(FIELD_CONVERSATION_ID).append(EQ_QUOTE).append(escape(query.getConversationId())).append("\"");
         }
         return expr.toString();
     }
@@ -401,7 +405,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
     }
 
     private String currentMetric() {
-        MilvusCollectionSpec spec = activeSpec;
+        MilvusCollectionSpec spec = activeSpec.get();
         return spec == null ? MilvusCollectionSpec.COSINE : spec.getMetricType();
     }
 

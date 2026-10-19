@@ -32,7 +32,7 @@ public final class ToolOutputCompactor {
      * 省略标记模板，占位符为被省略的字符数。
      */
     private static final String OMISSION_MARKER =
-            "\n…（历史工具结果过长已压缩，省略 %d 字）…\n";
+            "%n…（历史工具结果过长已压缩，省略 %d 字）…%n";
 
     private ToolOutputCompactor() {
     }

@@ -9,6 +9,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -82,12 +83,8 @@ public class SchemaHasherTest {
 
     @Test
     public void unsupportedValueRejected() {
-        try {
-            hasher.hash(new Object());
-            fail("expected IllegalArgumentException");
-        } catch (IllegalArgumentException expected) {
-            assertTrue(true);
-        }
+        Object unsupported = new Object();
+        assertThrows(IllegalArgumentException.class, () -> hasher.hash(unsupported));
     }
 
     @Test

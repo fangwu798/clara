@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * 助手要求调用工具的消息：线格式为
- * {@code {"role":"assistant","content":null,"tool_calls":[...]}}。
+ * {@code {"role":ROLE_ASSISTANT,"content":null,"tool_calls":[...]}}。
  *
  * <p>是什么、在哪一层：契约层的消息实现（包 {@code com.clara.dto.tool}），是工具调用往返的第一轮回执——
  * 模型返回的 {@link ToolCall} 列表要原样放回 {@code ModelParameters.messages}，平台才会认可接下来那条
@@ -32,6 +32,8 @@ import java.util.Map;
  */
 @Data
 public final class ToolCallContent implements IContent {
+
+    private static final String ROLE_ASSISTANT = "assistant";
 
     /**
      * 助手同时给出的文本；纯工具调用轮通常为 null，序列化为 {@code content}。
@@ -77,7 +79,7 @@ public final class ToolCallContent implements IContent {
      */
     @JsonProperty("role")
     public String getRole() {
-        return "assistant";
+        return ROLE_ASSISTANT;
     }
 
     @Override
@@ -89,7 +91,7 @@ public final class ToolCallContent implements IContent {
     @Override
     public Map<String, Object> toCompletionMessage() {
         Map<String, Object> message = new LinkedHashMap<>();
-        message.put("role", "assistant");
+        message.put("role", ROLE_ASSISTANT);
         message.put("content", content);
         List<Map<String, Object>> calls = new ArrayList<>();
         for (ToolCall call : toolCalls) {
@@ -118,7 +120,7 @@ public final class ToolCallContent implements IContent {
             part.put("text", content);
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("type", "message");
-            item.put("role", "assistant");
+            item.put("role", ROLE_ASSISTANT);
             item.put("content", Collections.singletonList(part));
             items.add(item);
         }

@@ -19,7 +19,7 @@ import java.util.Map;
  * {@code messages} 的元素随请求体下发；与 {@link UserContent}（纯文本）并列，由调用方在需要携带图片时选用。
  *
  * <p>线格式：Chat Completions 渲染为 {@code content} 数组（{@code {"type":"text"}} 与
- * {@code {"type":"image_url","image_url":{"url":...}}}）；Responses 渲染为 input item 列表（{@code input_text} 与
+ * {@code {"type":FIELD_IMAGE_URL,FIELD_IMAGE_URL:{"url":...}}}）；Responses 渲染为 input item 列表（{@code input_text} 与
  * {@code input_image}）。协议差异由本类自行渲染，编码器无需分支。
  *
  * <p>图片引用写法：公网可访问的图片 URL，或 {@code data:image/<格式>;base64,<编码>} 形式的 base64。
@@ -28,6 +28,8 @@ import java.util.Map;
  */
 @Data
 public final class UserVisionContent implements IContent {
+
+    private static final String FIELD_IMAGE_URL = "image_url";
 
     /**
      * 本轮用户文本，可为空白（仅图片）。
@@ -76,8 +78,8 @@ public final class UserVisionContent implements IContent {
             Map<String, Object> reference = new LinkedHashMap<>();
             reference.put("url", image);
             Map<String, Object> part = new LinkedHashMap<>();
-            part.put("type", "image_url");
-            part.put("image_url", reference);
+            part.put("type", FIELD_IMAGE_URL);
+            part.put(FIELD_IMAGE_URL, reference);
             parts.add(part);
         }
         Map<String, Object> message = new LinkedHashMap<>();
@@ -98,7 +100,7 @@ public final class UserVisionContent implements IContent {
         for (String image : images) {
             Map<String, Object> part = new LinkedHashMap<>();
             part.put("type", "input_image");
-            part.put("image_url", image);
+            part.put(FIELD_IMAGE_URL, image);
             parts.add(part);
         }
         Map<String, Object> item = new LinkedHashMap<>();

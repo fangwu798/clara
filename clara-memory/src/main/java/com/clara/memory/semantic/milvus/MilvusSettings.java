@@ -35,11 +35,13 @@ import java.util.Locale;
  * {@link IllegalArgumentException}（配置错误应在启动期暴露，而不是等第一次写入才失败）。
  */
 public final class MilvusSettings {
+    /** 配置错误消息的统一前缀。 */
+    private static final String CONFIG_PREFIX = "clara.yml 的 milvus.";
 
     /**
      * 默认主机。
      */
-    public static final String DEFAULT_HOST = "127.0.0.1";
+    public static final String DEFAULT_HOST = "127.0.0.1"; // NOPMD AvoidUsingHardCodedIP: 本地默认地址，可由配置覆盖
 
     /**
      * 默认 gRPC 端口（与 deploy/docker-compose.yml 暴露的端口一致）。
@@ -235,24 +237,7 @@ public final class MilvusSettings {
     }
 
     private static String normalizeProject(String raw) {
-        String value = raw == null ? "" : raw.trim();
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            boolean allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                    || (c >= '0' && c <= '9') || c == '_';
-            builder.append(allowed ? Character.toLowerCase(c) : '_');
-        }
-        String text = builder.toString();
-        while (text.contains("__")) {
-            text = text.replace("__", "_");
-        }
-        while (text.startsWith("_")) {
-            text = text.substring(1);
-        }
-        while (text.endsWith("_")) {
-            text = text.substring(0, text.length() - 1);
-        }
+        String text = trimUnderscores(sanitizeProject(raw == null ? "" : raw.trim()));
         if (text.isEmpty()) {
             text = FALLBACK_PROJECT;
         }
@@ -260,6 +245,31 @@ public final class MilvusSettings {
             text = "p" + text;
         }
         return text.length() > MAX_PROJECT_CHARS ? text.substring(0, MAX_PROJECT_CHARS) : text;
+    }
+
+    private static String sanitizeProject(String value) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean allowed = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+                    || c >= '0' && c <= '9' || c == '_';
+            builder.append(allowed ? Character.toLowerCase(c) : '_');
+        }
+        return builder.toString();
+    }
+
+    private static String trimUnderscores(String text) {
+        String value = text;
+        while (value.contains("__")) {
+            value = value.replace("__", "_");
+        }
+        while (value.startsWith("_")) {
+            value = value.substring(1);
+        }
+        while (value.endsWith("_")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value;
     }
 
     /**
@@ -289,7 +299,7 @@ public final class MilvusSettings {
             return fallback;
         }
         if (!value.isBoolean()) {
-            throw new IllegalArgumentException("clara.yml 的 milvus." + field + " 必须是布尔值，实际：" + value);
+            throw new IllegalArgumentException(CONFIG_PREFIX + field + " 必须是布尔值，实际：" + value);
         }
         return value.booleanValue();
     }
@@ -301,12 +311,12 @@ public final class MilvusSettings {
         JsonNode value = node.get(field);
         if (value == null || value.isNull()) {
             if (fallback <= 0) {
-                throw new IllegalArgumentException("clara.yml 的 milvus." + field + " 必须为正整数");
+                throw new IllegalArgumentException(CONFIG_PREFIX + field + " 必须为正整数");
             }
             return fallback;
         }
         if (!value.canConvertToInt() || value.asInt() <= 0) {
-            throw new IllegalArgumentException("clara.yml 的 milvus." + field + " 必须为正整数，实际：" + value);
+            throw new IllegalArgumentException(CONFIG_PREFIX + field + " 必须为正整数，实际：" + value);
         }
         return value.asInt();
     }

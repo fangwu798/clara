@@ -1,6 +1,7 @@
 package com.clara;
 
 import com.clara.adapter.console.CancelKeyMonitor;
+import com.clara.adapter.console.CancelKeySession;
 import com.clara.adapter.console.ConsoleContextTrace;
 import com.clara.adapter.console.ConsoleView;
 import com.clara.adapter.console.LaunchOptions;
@@ -13,7 +14,9 @@ import com.clara.config.ModelAvailabilityManager;
 import com.clara.config.ModelFailover;
 import com.clara.config.ModelRegistry;
 import com.clara.context.CancellationToken;
+import com.clara.core.interaction.IConversationControls;
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.interaction.SessionCommandOutcomeEnum;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.delta.TokenUsage;
@@ -191,23 +194,13 @@ public final class ClaraApplication {
                 + settings.isSupplementEnabled() + " autoMount=" + settings.isAutoMountEnabled()
                 + " autoImport=" + settings.isAutoImportEnabled());
         if (settings.isAutoMountEnabled()) {
-            emitCodeGraphStep(view, "挂载检查", new CodeGraphStep() {
-                @Override
-                public String run() {
-                    return codeGraphConsole.ensureMount();
-                }
-            });
+            emitCodeGraphStep(view, "挂载检查", codeGraphConsole::ensureMount);
         } else {
             emitCodeGraph(view, "挂载检查：跳过（autoMount=false）——容器看不到本目录时读代码会退回本地文件；"
                     + "需要补挂见 deploy\\codebase-memory-mcp\\install-docker.ps1");
         }
         if (settings.isAutoImportEnabled()) {
-            emitCodeGraphStep(view, "导入检查", new CodeGraphStep() {
-                @Override
-                public String run() {
-                    return codeGraphConsole.prepare(true);
-                }
-            });
+            emitCodeGraphStep(view, "导入检查", () -> codeGraphConsole.prepare(true));
         } else {
             emitCodeGraph(view, "导入检查：跳过（autoImport=false）——图谱里没有本项目时不会被自动导入"
                     + "（用 /graph 查看、/graph import 导入）");
@@ -276,8 +269,8 @@ public final class ClaraApplication {
      * @param registry  模型注册表（取当前平台与模型），非 null
      * @return 上下文控制实现，非 null
      */
-    private static SessionCommandHandler.ConversationControls contextControls(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry) {
-        return new SessionCommandHandler.ConversationControls() {
+    private static IConversationControls contextControls(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry) {
+        return new IConversationControls() {
             @Override
             public void compressContext() {
                 try {
@@ -337,7 +330,7 @@ public final class ClaraApplication {
             return;
         }
         long total = usage.getTotalTokens() != null ? usage.getTotalTokens().longValue() : (long) usage.getInputTokens() + usage.getOutputTokens();
-        usageTrend.record(total);
+        usageTrend.addSample(total);
     }
 
     /**
@@ -367,11 +360,11 @@ public final class ClaraApplication {
             if (input.isEmpty()) {
                 continue;
             }
-            SessionCommandHandler.Outcome outcome = commands.handle(input);
-            if (outcome == SessionCommandHandler.Outcome.EXIT) {
+            SessionCommandOutcomeEnum outcome = commands.handle(input);
+            if (outcome == SessionCommandOutcomeEnum.EXIT) {
                 return;
             }
-            if (outcome == SessionCommandHandler.Outcome.INPUT) {
+            if (outcome == SessionCommandOutcomeEnum.INPUT) {
                 view.logUserInput(input);
                 converse(view, bootstrap, registry, candidates, input, monitor);
             }
@@ -393,12 +386,11 @@ public final class ClaraApplication {
         }
         String defaultModel = ConfigLocator.defaultModel();
         List<String> enabled = ConfigLocator.enabledProviders();
-        Path configPath = Paths.get("");
         if (defaultModel != null && !enabled.isEmpty() && !containsIgnoreCase(enabled, defaultModel)) {
             view.println("启动失败：config/clara.yml 的 defaultModel=" + defaultModel + " 不在 enabledProviders 启用列表内 " + enabled + "。");
             view.println("请把主模型加入 enabledProviders，或把 defaultModel 改为已启用的模型。");
             System.exit(1);
-            return new ModelChoice(configPath, "配置错误");
+            return new ModelChoice(Paths.get(""), "配置错误");
         }
         Path preferred = defaultModel == null ? null : ConfigLocator.resolveModel(candidates, defaultModel);
         if (preferred != null) {
@@ -410,7 +402,7 @@ public final class ClaraApplication {
         if (candidates.isEmpty()) {
             view.println("未找到模型配置：请确认工作目录为仓库根，且 " + ConfigLocator.modelDirectory().toAbsolutePath() + " 下存在 *.yml / *.yaml（examples 样例会被忽略）。");
             System.exit(1);
-            return new ModelChoice(configPath, "无可用模型配置");
+            return new ModelChoice(Paths.get(""), "无可用模型配置");
         }
         return new ModelChoice(view.chooseModel(candidates, reader), "交互选择");
     }
@@ -483,7 +475,7 @@ public final class ClaraApplication {
             // 极端情况：候选清单为空且当前模型没解析出别名——仍然要跑一轮，别把用户输入吞掉（此时不换模型）。
             plan = Collections.singletonList(registry.currentConfigPath());
         }
-        try (CancelKeyMonitor.Session ignored = monitor.watch(cancellationToken)) {
+        try (CancelKeySession ignored = monitor.watch(cancellationToken)) {
             for (int index = 0; index < plan.size(); index++) {
                 Path configPath = plan.get(index);
                 if (index > 0) {

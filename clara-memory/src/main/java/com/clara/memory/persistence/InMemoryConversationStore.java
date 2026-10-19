@@ -34,25 +34,22 @@ public final class InMemoryConversationStore implements ConversationStore {
         if (messages == null) {
             throw new IllegalArgumentException("messages must not be null");
         }
-        snapshots.compute(key.value(), new java.util.function.BiFunction<String, ConversationSnapshot, ConversationSnapshot>() {
-            @Override
-            public ConversationSnapshot apply(String ignored, ConversationSnapshot current) {
-                long currentVersion = current == null ? 0L : current.version();
-                if (currentVersion != expectedVersion) {
-                    throw ConversationStoreErrors.versionConflict();
-                }
-                List<IContent> merged = new ArrayList<>();
-                if (current != null) {
-                    merged.addAll(current.messages());
-                }
-                for (IContent message : messages) {
-                    if (message == null) {
-                        throw new IllegalArgumentException("messages must not contain null");
-                    }
-                    merged.add(message);
-                }
-                return new ConversationSnapshot(expectedVersion + 1L, merged);
+        snapshots.compute(key.value(), (ignored, current) -> {
+            long currentVersion = current == null ? 0L : current.version();
+            if (currentVersion != expectedVersion) {
+                throw ConversationStoreErrors.versionConflict();
             }
+            List<IContent> merged = new ArrayList<>();
+            if (current != null) {
+                merged.addAll(current.messages());
+            }
+            for (IContent message : messages) {
+                if (message == null) {
+                    throw new IllegalArgumentException("messages must not contain null");
+                }
+                merged.add(message);
+            }
+            return new ConversationSnapshot(expectedVersion + 1L, merged);
         });
     }
 

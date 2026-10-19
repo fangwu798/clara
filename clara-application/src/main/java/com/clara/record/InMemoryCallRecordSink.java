@@ -48,14 +48,14 @@ public final class InMemoryCallRecordSink implements ICallRecordSink {
     }
 
     @Override
-    public synchronized void accept(CallRecord record) {
-        if (record == null) {
+    public synchronized void accept(CallRecord callRecord) {
+        if (callRecord == null) {
             return;
         }
         if (records.size() >= capacity) {
             records.pollFirst();
         }
-        records.addLast(record);
+        records.addLast(callRecord);
     }
 
     /**

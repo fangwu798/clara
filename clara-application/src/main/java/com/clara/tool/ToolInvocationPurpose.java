@@ -36,21 +36,37 @@ public final class ToolInvocationPurpose {
             return explicit.textValue().trim();
         }
         if (RUN_COMMAND.equals(toolName)) {
-            String command = command(root);
-            if (!StringUtils.isBlank(command)) {
-                String purpose = COMMAND_PURPOSES.get(commandKey(command));
-                return purpose == null ? commandLine(root) : purpose;
+            String purpose = commandPurpose(root);
+            if (purpose != null) {
+                return purpose;
             }
         }
         if (RUN_WORKFLOW.equals(toolName)) {
-            JsonNode workflow = root == null ? null : root.get("workflow");
-            if (workflow != null && workflow.isTextual() && !StringUtils.isBlank(workflow.textValue())) {
-                String id = workflow.textValue().trim();
-                String description = WorkflowCatalog.describe(id);
-                return description == null ? "运行工作流 " + id : "运行工作流 " + id + "：" + description;
+            String purpose = workflowPurpose(root);
+            if (purpose != null) {
+                return purpose;
             }
         }
         return declaredDescription;
+    }
+
+    private static String commandPurpose(JsonNode root) {
+        String command = command(root);
+        if (StringUtils.isBlank(command)) {
+            return null;
+        }
+        String purpose = COMMAND_PURPOSES.get(commandKey(command));
+        return purpose == null ? commandLine(root) : purpose;
+    }
+
+    private static String workflowPurpose(JsonNode root) {
+        JsonNode workflow = root == null ? null : root.get("workflow");
+        if (workflow == null || !workflow.isTextual() || StringUtils.isBlank(workflow.textValue())) {
+            return null;
+        }
+        String id = workflow.textValue().trim();
+        String description = WorkflowCatalog.describe(id);
+        return description == null ? "运行工作流 " + id : "运行工作流 " + id + "：" + description;
     }
 
     private static String command(JsonNode root) {
@@ -86,16 +102,27 @@ public final class ToolInvocationPurpose {
 
     private static String commandLine(JsonNode root) {
         JsonNode argv = root == null ? null : root.get("argv");
-        if (argv != null && argv.isArray()) {
-            StringBuilder line = new StringBuilder();
-            for (JsonNode item : argv) {
-                if (item != null && item.isTextual()) {
-                    if (line.length() > 0) line.append(' ');
-                    line.append(item.textValue());
-                }
-            }
-            return line.toString();
+        return argv != null && argv.isArray() ? joinArguments(argv) : textValue(root);
+    }
+
+    private static String joinArguments(JsonNode argv) {
+        StringBuilder line = new StringBuilder();
+        for (JsonNode item : argv) {
+            appendArgument(line, item);
         }
+        return line.toString();
+    }
+
+    private static void appendArgument(StringBuilder line, JsonNode item) {
+        if (item != null && item.isTextual()) {
+            if (line.length() > 0) {
+                line.append(' ');
+            }
+            line.append(item.textValue());
+        }
+    }
+
+    private static String textValue(JsonNode root) {
         JsonNode command = root == null ? null : root.get("command");
         return command != null && command.isTextual() ? command.textValue() : null;
     }

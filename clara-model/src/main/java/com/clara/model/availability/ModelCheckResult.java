@@ -1,7 +1,6 @@
 package com.clara.model.availability;
 
 import lombok.Data;
-import lombok.Getter;
 
 import java.nio.file.Path;
 
@@ -73,6 +72,7 @@ public final class ModelCheckResult {
      * @param detail               不可用或跳过原因，可为 null
      * @param skipped              是否跳过了真实模型请求
      */
+    @SuppressWarnings("java:S107")
     private ModelCheckResult(Path path, String alias, String provider, String model, boolean available, long firstCharacterMillis, String detail, boolean skipped) {
         this.path = path;
         this.alias = alias;

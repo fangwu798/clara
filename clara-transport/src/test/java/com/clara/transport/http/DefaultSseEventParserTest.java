@@ -14,6 +14,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -134,12 +135,10 @@ public class DefaultSseEventParserTest {
     @Test
     public void invalidUtf8Rejected() {
         byte[] bytes = new byte[] {'d', 'a', 't', 'a', ':', ' ', (byte) 0xC3, 0x28, '\n', '\n'};
-        try {
-            parse(bytes, config(false));
-            fail("expected protocol error");
-        } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.PROTOCOL_ERROR, expected.getKind());
-        }
+        SseParserConfig parserConfig = config(false);
+        HttpTransportException expected = assertThrows(HttpTransportException.class,
+                () -> parse(bytes, parserConfig));
+        assertEquals(HttpTransportException.Kind.PROTOCOL_ERROR, expected.getKind());
     }
 
     @Test
@@ -153,13 +152,12 @@ public class DefaultSseEventParserTest {
                 return 1000L;
             }
         };
-        try {
-            new DefaultSseEventParser(config(false)).parse(
-                    input("data: x\n\n"), cancelled, collectingListener(new ArrayList<>()));
-            fail("expected cancellation");
-        } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.CANCELLED, expected.getKind());
-        }
+        DefaultSseEventParser parser = new DefaultSseEventParser(config(false));
+        ByteArrayInputStream stream = input("data: x\n\n");
+        ISseEventListener listener = collectingListener(new ArrayList<>());
+        HttpTransportException expected = assertThrows(HttpTransportException.class,
+                () -> parser.parse(stream, cancelled, listener));
+        assertEquals(HttpTransportException.Kind.CANCELLED, expected.getKind());
     }
 
     @Test

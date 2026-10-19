@@ -164,6 +164,17 @@ public final class ClaraError implements Serializable {
             return this;
         }
 
+        /**
+         * 设置平台建议的重试等待时间。
+         *
+         * @param retryAfterMillis 等待毫秒数，可为 null
+         * @return 当前构建器
+         */
+        public Builder retryAfterMillis(Long retryAfterMillis) {
+            this.retryAfterMillis = retryAfterMillis;
+            return this;
+        }
+
         public Builder safeDetails(Map<String, String> safeDetails) {
             this.safeDetails = safeDetails;
             return this;

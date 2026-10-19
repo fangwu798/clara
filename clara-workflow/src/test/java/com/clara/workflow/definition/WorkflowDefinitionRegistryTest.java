@@ -95,8 +95,8 @@ public class WorkflowDefinitionRegistryTest {
 
         assertEquals("candidate_flow", definition.getWorkflowId());
         assertTrue(registry.ids().isEmpty());
-        assertThrows(IllegalArgumentException.class,
-                () -> registry.parseDefinition(write(directory, "invalid.yml", "workflowId: x\n")));
+        Path invalid = write(directory, "invalid.yml", "workflowId: x\n");
+        assertThrows(IllegalArgumentException.class, () -> registry.parseDefinition(invalid));
     }
 
     private static WorkflowDefinitionRegistry registry(Path directory) {

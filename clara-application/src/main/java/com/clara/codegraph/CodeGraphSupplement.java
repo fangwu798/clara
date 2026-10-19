@@ -36,6 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class CodeGraphSupplement implements IContextSupplementProvider {
 
+    private static final String TRACE_PATTERN_PREFIX = "pattern=";
+    private static final String FIELD_ERROR = "error";
+
     /**
      * 补充信息块的首行标记：模型据此确认这份信息来自图谱、可直接当事实用。
      */
@@ -109,7 +112,7 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
         }
         List<String> cached = cache.get(pattern);
         if (cached != null) {
-            trace(cached.isEmpty() ? 0 : 1, 0L, "pattern=" + pattern + "（命中本进程缓存，未重新检索）");
+            trace(cached.isEmpty() ? 0 : 1, 0L, TRACE_PATTERN_PREFIX + pattern + "（命中本进程缓存，未重新检索）");
             return cached;
         }
         List<String> knowledge = query(pattern);
@@ -141,22 +144,22 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
             String failure = errorMessage(payload);
             if (failure != null) {
                 // 图谱「报错」和「零命中」是两件事：报错时把原因打出来，否则观察者会以为只是没索引到
-                trace(0, started, "pattern=" + pattern + "（图谱返回错误：" + preview(failure) + "）");
+                trace(0, started, TRACE_PATTERN_PREFIX + pattern + "（图谱返回错误：" + preview(failure) + "）");
                 return Collections.emptyList();
             }
             String body = extract(payload);
             if (body.isEmpty()) {
-                trace(0, started, "pattern=" + pattern + "（图谱没有匹配到内容）");
+                trace(0, started, TRACE_PATTERN_PREFIX + pattern + "（图谱没有匹配到内容）");
                 return Collections.emptyList();
             }
-            trace(1, started, "pattern=" + pattern, preview(body));
+            trace(1, started, TRACE_PATTERN_PREFIX + pattern, preview(body));
             List<String> knowledge = new ArrayList<>();
             knowledge.add(HEADER + "以下内容来自本机代码知识图谱（索引自当前工作目录，可直接作为事实使用，"
                     + "token 开销远小于读整份文件）：\n" + body + "\n" + FOOTER);
             return Collections.unmodifiableList(knowledge);
         } catch (RuntimeException failure) {
             // 图谱是增强能力：任何失败都只是「这次没有补充信息」，不能影响对话本身。
-            trace(0, started, "pattern=" + pattern + "（调用失败：" + failure.getMessage() + "）");
+            trace(0, started, TRACE_PATTERN_PREFIX + pattern + "（调用失败：" + failure.getMessage() + "）");
             return Collections.emptyList();
         }
     }
@@ -208,10 +211,10 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
             return null;
         }
         if (root.path("ok").isBoolean() && !root.path("ok").asBoolean()) {
-            String reason = root.path("error").asText("");
+            String reason = root.path(FIELD_ERROR).asText("");
             return reason.isEmpty() ? "图谱返回失败，但没带原因" : reason;
         }
-        return root.path("error").isTextual() ? root.path("error").asText() : null;
+        return root.path(FIELD_ERROR).isTextual() ? root.path(FIELD_ERROR).asText() : null;
     }
 
     /**
@@ -345,15 +348,13 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
             char current = candidate.charAt(index);
             if (current == '_') {
                 codeLike = true;
-                continue;
-            }
-            if (current >= '0' && current <= '9') {
+            } else if (current >= '0' && current <= '9') {
                 hasDigit = true;
-                continue;
-            }
-            hasLetter = true;
-            if (index > 0 && current >= 'A' && current <= 'Z') {
-                codeLike = true;
+            } else {
+                hasLetter = true;
+                if (index > 0 && current >= 'A' && current <= 'Z') {
+                    codeLike = true;
+                }
             }
         }
         return hasLetter && (codeLike || hasDigit);
@@ -372,9 +373,7 @@ public final class CodeGraphSupplement implements IContextSupplementProvider {
         }
         long elapsedMillis = startedNanos == 0L ? 0L : (System.nanoTime() - startedNanos) / 1000000L;
         List<String> lines = new ArrayList<>();
-        for (String detail : details) {
-            lines.add(detail);
-        }
+        Collections.addAll(lines, details);
         try {
             traceSink.onTrace(SOURCE, hits, elapsedMillis, lines);
         } catch (RuntimeException ignored) {

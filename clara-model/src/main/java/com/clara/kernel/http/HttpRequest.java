@@ -8,6 +8,7 @@ import com.clara.kernel.message.BasicParameters;
 import com.clara.kernel.message.ImageParameters;
 import com.clara.kernel.message.provider.ProviderRequestEncoder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.experimental.SuperBuilder;
 
 /**
@@ -36,6 +37,7 @@ import lombok.experimental.SuperBuilder;
  * 未绑定时无法定位编解码规则，编码失败会抛出领域异常。
  */
 @Data
+@EqualsAndHashCode(callSuper = false)
 @SuperBuilder
 public class HttpRequest extends ImageParameters {
 

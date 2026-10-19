@@ -41,25 +41,29 @@ public abstract class AbstractResponseDecoder implements IResponseDecoder {
         }
         JsonNode root = ResponseDecoderSupport.parse(new String(raw.getBody(), StandardCharsets.UTF_8), provider);
         for (Field field : ResponseDecoderSupport.fields(responseType)) {
-            ResponseAdapter adapter = ResponseDecoderSupport.match(field, provider, capability);
-            if (adapter == null) {
-                continue;
-            }
-            ProtocolResponse protocolResponse = protocolResponse(field);
-            String path = protocolResponse == null || protocolResponse.path().isEmpty() ? adapter.path() : protocolResponse.path();
-            if (path.isEmpty()) {
-                continue;
-            }
-            JsonNode node = ResponseDecoderSupport.valueAt(root, path);
-            if (!ResponseDecoderSupport.present(node)) {
-                if (adapter.required()) {
-                    throw ExceptionUtils.protocolError(provider);
-                }
-                continue;
-            }
-            ResponseDecoderSupport.write(field, target, convertField(field, node, provider));
+            decodeField(field, root, target, provider, capability);
         }
         return target;
+    }
+
+    private <R extends IResponse> void decodeField(Field field, JsonNode root, R target,
+            ModelProviderEnum provider, CapabilityKindEnum capability) {
+        ResponseAdapter adapter = ResponseDecoderSupport.match(field, provider, capability);
+        if (adapter == null) {
+            return;
+        }
+        ProtocolResponse protocolResponse = protocolResponse(field);
+        String path = protocolResponse == null || protocolResponse.path().isEmpty()
+                ? adapter.path() : protocolResponse.path();
+        if (path.isEmpty()) {
+            return;
+        }
+        JsonNode node = ResponseDecoderSupport.valueAt(root, path);
+        if (ResponseDecoderSupport.present(node)) {
+            ResponseDecoderSupport.write(field, target, convertField(field, node, provider));
+        } else if (adapter.required()) {
+            throw ExceptionUtils.protocolError(provider);
+        }
     }
 
     @Override
@@ -74,27 +78,43 @@ public abstract class AbstractResponseDecoder implements IResponseDecoder {
         List<StreamAssembler.Rule> terminals = new ArrayList<>();
         for (Field field : ResponseDecoderSupport.fields(responseType)) {
             ResponseAdapter adapter = ResponseDecoderSupport.match(field, provider, capability);
-            if (adapter == null) {
-                continue;
-            }
-            ProtocolResponse protocolResponse = protocolResponse(field);
-            String path = protocolResponse == null || protocolResponse.path().isEmpty() ? adapter.path() : protocolResponse.path();
-            String streamPath = protocolResponse != null && protocolResponse.streamDisabled()
-                    ? ""
-                    : protocolResponse == null || protocolResponse.streamPath().isEmpty() ? adapter.streamPath() : protocolResponse.streamPath();
-            String streamEvent = protocolResponse == null ? "" : protocolResponse.streamEvent();
-            String terminalPath = protocolResponse == null || protocolResponse.terminalPath().isEmpty() ? adapter.terminalPath() : protocolResponse.terminalPath();
-            StreamAssembler.Rule rule = new StreamAssembler.Rule(field, adapter, path, streamPath, streamEvent, terminalPath);
-            if (!streamPath.isEmpty()) {
-                deltas.add(rule);
-            } else if (!path.isEmpty()) {
-                singles.add(rule);
-            }
-            if (!terminalPath.isEmpty()) {
-                terminals.add(rule);
+            if (adapter != null) {
+                addRule(field, adapter, deltas, singles, terminals);
             }
         }
         return createStreamAssembler(ResponseDecoderSupport.newInstance(responseType), deltas, singles, terminals, provider);
+    }
+
+    private void addRule(Field field, ResponseAdapter adapter, List<StreamAssembler.Rule> deltas,
+            List<StreamAssembler.Rule> singles, List<StreamAssembler.Rule> terminals) {
+        ProtocolResponse protocolResponse = protocolResponse(field);
+        String path = pathOf(adapter, protocolResponse);
+        String streamPath = streamPathOf(adapter, protocolResponse);
+        String streamEvent = protocolResponse == null ? "" : protocolResponse.streamEvent();
+        String terminalPath = protocolResponse == null || protocolResponse.terminalPath().isEmpty()
+                ? adapter.terminalPath() : protocolResponse.terminalPath();
+        StreamAssembler.Rule rule = new StreamAssembler.Rule(field, adapter, path, streamPath, streamEvent, terminalPath);
+        if (!streamPath.isEmpty()) {
+            deltas.add(rule);
+        } else if (!path.isEmpty()) {
+            singles.add(rule);
+        }
+        if (!terminalPath.isEmpty()) {
+            terminals.add(rule);
+        }
+    }
+
+    private static String pathOf(ResponseAdapter adapter, ProtocolResponse protocolResponse) {
+        return protocolResponse == null || protocolResponse.path().isEmpty()
+                ? adapter.path() : protocolResponse.path();
+    }
+
+    private static String streamPathOf(ResponseAdapter adapter, ProtocolResponse protocolResponse) {
+        if (protocolResponse != null && protocolResponse.streamDisabled()) {
+            return "";
+        }
+        return protocolResponse == null || protocolResponse.streamPath().isEmpty()
+                ? adapter.streamPath() : protocolResponse.streamPath();
     }
 
     /**

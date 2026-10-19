@@ -53,7 +53,7 @@ public class ContextAssemblerTest {
                 new SemanticRecallCoordinator(null, null),
                 skill);
 
-        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(false), null);
+        AssembledContext assembled = assembler.assemble(window, control(false), null);
 
         List<IContent> messages = assembled.getMessages();
         assertEquals(2, messages.size());
@@ -81,7 +81,7 @@ public class ContextAssemblerTest {
                 new SemanticRecallCoordinator(null, null),
                 new SkillMatchCoordinator(null, null, null));
 
-        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(true), null);
+        AssembledContext assembled = assembler.assemble(window, control(true), null);
 
         assertEquals(Arrays.<IContent>asList(u1, u2), evicted);
         List<IContent> messages = assembled.getMessages();
@@ -101,7 +101,7 @@ public class ContextAssemblerTest {
                 new SemanticRecallCoordinator(null, null),
                 new SkillMatchCoordinator(null, null, null));
 
-        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(false), null);
+        AssembledContext assembled = assembler.assemble(window, control(false), null);
 
         List<IContent> messages = assembled.getMessages();
         assertEquals(1, messages.size());
@@ -122,7 +122,7 @@ public class ContextAssemblerTest {
                 new SemanticRecallCoordinator(null, null),
                 new SkillMatchCoordinator(null, null, null));
 
-        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(false), null);
+        AssembledContext assembled = assembler.assemble(window, control(false), null);
 
         List<IContent> messages = assembled.getMessages();
         assertEquals(1, messages.size());
@@ -135,8 +135,9 @@ public class ContextAssemblerTest {
                 new WindowCompressionCoordinator(null),
                 new SemanticRecallCoordinator(null, null),
                 new SkillMatchCoordinator(null, null, null));
+        ContextControlConfig config = control(false);
         org.junit.Assert.assertThrows(IllegalArgumentException.class,
-                () -> assembler.assemble(null, control(false), null));
+                () -> assembler.assemble(null, config, null));
     }
 
     @Test
@@ -151,7 +152,7 @@ public class ContextAssemblerTest {
                 new SkillMatchCoordinator(null, null, null),
                 Collections.singletonList("BASE-PROMPT"));
 
-        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(false), null);
+        AssembledContext assembled = assembler.assemble(window, control(false), null);
 
         List<IContent> messages = assembled.getMessages();
         assertEquals(2, messages.size());
@@ -178,7 +179,7 @@ public class ContextAssemblerTest {
                 skill,
                 Collections.singletonList("BASE-PROMPT"));
 
-        ContextAssembler.AssembledContext assembled = assembler.assemble(window, control(false), null);
+        AssembledContext assembled = assembler.assemble(window, control(false), null);
 
         assertEquals("BASE-PROMPT\nSYS-PROMPT",
                 ((SystemContent) assembled.getMessages().get(0)).instructionText());

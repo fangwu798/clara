@@ -1,11 +1,12 @@
 package com.clara.model.configuration;
 
 import com.clara.kernel.config.ProviderConfiguration;
-import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
@@ -84,12 +85,14 @@ public final class StrictYamlBinder {
         if (maxFileBytes <= 0L) {
             throw new IllegalArgumentException("maxFileBytes must be positive");
         }
-        YAMLFactory factory = new YAMLFactory();
-        factory.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
-        ObjectMapper configured = new ObjectMapper(factory);
-        configured.enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS);
-        configured.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        configured.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+        YAMLFactory factory = YAMLFactory.builder()
+                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                .build();
+        ObjectMapper configured = JsonMapper.builder(factory)
+                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .build();
         this.mapper = configured;
         this.maxFileBytes = maxFileBytes;
     }
@@ -148,8 +151,8 @@ public final class StrictYamlBinder {
         if (file == null) {
             throw new IllegalArgumentException("配置文件路径不能为空");
         }
-        String name = file.getFileName() == null ? ""
-                : file.getFileName().toString().toLowerCase(Locale.ROOT);
+        Path fileName = file.getFileName();
+        String name = fileName == null ? "" : fileName.toString().toLowerCase(Locale.ROOT);
         if (!name.endsWith(".yml") && !name.endsWith(".yaml")) {
             throw new IllegalArgumentException("配置文件必须使用 .yml 或 .yaml 后缀：" + describe(file));
         }

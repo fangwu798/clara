@@ -66,8 +66,8 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
     private final AtomicReference<String> lastEventId = new AtomicReference<>();
     private final AtomicLong retryMillis = new AtomicLong(5000L);
     private volatile String protocolVersion;
-    private volatile IMcpTransportListener listener;
-    private volatile IHttpCall eventStreamCall;
+    private final AtomicReference<IMcpTransportListener> listener = new AtomicReference<>();
+    private final AtomicReference<IHttpCall> eventStreamCall = new AtomicReference<>();
 
     private StreamableHttpMcpTransport(Builder builder) {
         IEndpointPolicy endpointPolicy = new HostEndpointPolicy(builder.allowedHosts, builder.allowHttp);
@@ -79,11 +79,9 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
             throw new IllegalArgumentException("transport limits must be positive");
         }
         this.codec = builder.codec;
-        this.headersProvider = builder.headersProvider == null ? new IMcpHeadersProvider() {
-            public Map<String, String> getHeaders() {
-                return Collections.emptyMap();
-            }
-        } : builder.headersProvider;
+        this.headersProvider = builder.headersProvider == null
+                ? Collections::emptyMap
+                : builder.headersProvider;
         int maxResponseBytes = builder.maxResponseBytes;
         SseParserConfig sse = new SseParserConfig(
                 Math.min(SseParserConfig.DEFAULT_MAX_LINE_BYTES, maxResponseBytes),
@@ -129,7 +127,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
         if (!started.compareAndSet(false, true)) {
             throw new IllegalStateException("transport is already started");
         }
-        this.listener = listener;
+        this.listener.set(listener);
     }
 
     public CompletableFuture<JsonRpcResponse> sendRequest(final JsonRpcRequest request,
@@ -147,48 +145,8 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
                     ErrorCategoryEnum.CONFLICT, false));
         }
         final DeadlineGuard guard = DeadlineGuard.after(timeoutMillis);
-        call.guard = guard;
-        executor.execute(new Runnable() {
-            public void run() {
-                IHttpCall httpCall = null;
-                try {
-                    if (call.future.isCancelled()) {
-                        return;
-                    }
-                    httpCall = httpTransport.newCall(
-                            postRequest(codec.encode(request)), policy, guard);
-                    call.httpCall = httpCall;
-                    if (call.future.isCancelled()) {
-                        return;
-                    }
-                    RawHttpResponse response = httpCall.execute(
-                            new RequestSseListener(request.getId(), call.future));
-                    if (!response.isSuccessful()) {
-                        throw ioError();
-                    }
-                    if (response.getBody().length > 0) {
-                        McpDecodedMessage message = codec.decode(
-                                new String(response.getBody(), StandardCharsets.UTF_8));
-                        if (message.getType() != McpDecodedMessage.Type.RESPONSE
-                                || !request.getId().equals(message.getResponse().getId())) {
-                            throw invalidMessage();
-                        }
-                        call.future.complete(message.getResponse());
-                    } else if (!call.future.isDone()) {
-                        throw isEventStream(response) ? ioError() : invalidMessage();
-                    }
-                } catch (HttpTransportException exception) {
-                    call.future.completeExceptionally(map(exception));
-                } catch (Throwable failure) {
-                    call.future.completeExceptionally(failure);
-                } finally {
-                    active.remove(request.getId(), call);
-                    if (httpCall != null) {
-                        httpCall.close();
-                    }
-                }
-            }
-        });
+        call.guard.set(guard);
+        executor.execute(() -> executeRequest(request, call, guard));
         call.future.whenComplete((result, failure) -> {
             if (call.future.isCancelled()) {
                 call.cancel();
@@ -197,28 +155,70 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
         return call.future;
     }
 
+    private void executeRequest(JsonRpcRequest request, ActiveCall call, DeadlineGuard guard) {
+        IHttpCall httpCall = null;
+        try {
+            if (call.future.isCancelled()) {
+                return;
+            }
+            httpCall = httpTransport.newCall(postRequest(codec.encode(request)), policy, guard);
+            call.httpCall.set(httpCall);
+            if (call.future.isCancelled()) {
+                return;
+            }
+            handleResponse(request, call, httpCall.execute(new RequestSseListener(request.getId(), call.future)));
+        } catch (HttpTransportException exception) {
+            call.future.completeExceptionally(map(exception));
+        } catch (Throwable failure) { // NOSONAR 必须兜住 Error，否则 future 永远不会完成
+            call.future.completeExceptionally(failure);
+        } finally {
+            active.remove(request.getId(), call);
+            if (httpCall != null) {
+                httpCall.close();
+            }
+        }
+    }
+
+    private void handleResponse(JsonRpcRequest request, ActiveCall call, RawHttpResponse response) {
+        if (!response.isSuccessful()) {
+            throw ioError();
+        }
+        if (response.getBody().length > 0) {
+            completeFromBody(request, call, response);
+        } else if (!call.future.isDone()) {
+            throw isEventStream(response) ? ioError() : invalidMessage();
+        }
+    }
+
+    private void completeFromBody(JsonRpcRequest request, ActiveCall call, RawHttpResponse response) {
+        McpDecodedMessage message = codec.decode(new String(response.getBody(), StandardCharsets.UTF_8));
+        if (message.getType() != McpDecodedMessage.Type.RESPONSE
+                || !request.getId().equals(message.getResponse().getId())) {
+            throw invalidMessage();
+        }
+        call.future.complete(message.getResponse());
+    }
+
     public void sendNotification(final JsonRpcNotification notification) {
         if (notification == null) {
             throw new IllegalArgumentException("notification must not be null");
         }
         ensureStarted();
-        executor.execute(new Runnable() {
-            public void run() {
-                IHttpCall call = httpTransport.newCall(postRequest(codec.encode(notification)),
-                        policy, DeadlineGuard.after(policy.getConnectTimeoutMillis()));
-                try {
-                    RawHttpResponse response = call.execute();
-                    captureSession(response);
-                    if (!response.isSuccessful()) {
-                        throw ioError();
-                    }
-                } catch (HttpTransportException exception) {
-                    reportFailure(map(exception));
-                } catch (RuntimeException exception) {
-                    reportFailure(exception);
-                } finally {
-                    call.close();
+        executor.execute(() -> {
+            IHttpCall call = httpTransport.newCall(postRequest(codec.encode(notification)),
+                    policy, DeadlineGuard.after(policy.getConnectTimeoutMillis()));
+            try {
+                RawHttpResponse response = call.execute();
+                captureSession(response);
+                if (!response.isSuccessful()) {
+                    throw ioError();
                 }
+            } catch (HttpTransportException exception) {
+                reportFailure(map(exception));
+            } catch (RuntimeException exception) {
+                reportFailure(exception);
+            } finally {
+                call.close();
             }
         });
     }
@@ -240,11 +240,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
         if (!eventStreamStarted.compareAndSet(false, true)) {
             return;
         }
-        executor.execute(new Runnable() {
-            public void run() {
-                eventStreamLoop();
-            }
-        });
+        executor.execute(this::eventStreamLoop);
     }
 
     public void checkHealth() {
@@ -255,7 +251,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        IHttpCall stream = eventStreamCall;
+        IHttpCall stream = eventStreamCall.get();
         if (stream != null) {
             stream.cancel();
         }
@@ -268,54 +264,74 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
 
     private void eventStreamLoop() {
         while (!closed.get()) {
-            IHttpCall call = null;
-            try {
-                call = httpTransport.newCall(eventStreamRequest(), eventStreamPolicy,
-                        DeadlineGuard.withoutDeadline());
-                eventStreamCall = call;
-                RawHttpResponse response = call.execute(new ISseEventListener() {
-                    public void onStart(int status, Map<String, List<String>> headers) {
-                        captureSession(headers);
-                    }
+            openEventStream();
+            if (!sleepBeforeReconnect()) {
+                return;
+            }
+        }
+    }
 
-                    public boolean onEvent(SseEvent event) {
-                        if (event.getId() != null) {
-                            lastEventId.set(event.getId());
-                        }
-                        if (event.getRetryMillis() != null) {
-                            retryMillis.set(event.getRetryMillis().longValue());
-                        }
-                        if (event.getData() != null && !event.getData().isEmpty()) {
-                            dispatch(codec.decode(event.getData()));
-                        }
-                        return !closed.get();
-                    }
-                });
-                if (!response.isSuccessful() || response.getBody().length > 0) {
-                    throw ioError();
+    private void openEventStream() {
+        IHttpCall call = null;
+        try {
+            call = httpTransport.newCall(eventStreamRequest(), eventStreamPolicy,
+                    DeadlineGuard.withoutDeadline());
+            eventStreamCall.set(call);
+            RawHttpResponse response = call.execute(new ISseEventListener() {
+                @Override
+                public void onStart(int status, Map<String, List<String>> headers) {
+                    captureSession(headers);
                 }
-            } catch (HttpTransportException exception) {
-                if (!closed.get()) {
-                    reportFailure(map(exception));
+
+                @Override
+                public boolean onEvent(SseEvent event) {
+                    return handleEvent(event);
                 }
-            } catch (RuntimeException exception) {
-                if (!closed.get()) {
-                    reportFailure(exception);
-                }
-            } finally {
-                eventStreamCall = null;
-                if (call != null) {
-                    call.close();
-                }
+            });
+            if (!response.isSuccessful() || response.getBody().length > 0) {
+                throw ioError();
             }
-            if (!closed.get()) {
-                try {
-                    Thread.sleep(Math.min(retryMillis.get(), 60000L));
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+        } catch (HttpTransportException exception) {
+            reportIfOpen(map(exception));
+        } catch (RuntimeException exception) {
+            reportIfOpen(exception);
+        } finally {
+            eventStreamCall.set(null);
+            if (call != null) {
+                call.close();
             }
+        }
+    }
+
+    private boolean handleEvent(SseEvent event) {
+        if (event.getId() != null) {
+            lastEventId.set(event.getId());
+        }
+        if (event.getRetryMillis() != null) {
+            retryMillis.set(event.getRetryMillis().longValue());
+        }
+        if (event.getData() != null && !event.getData().isEmpty()) {
+            dispatch(codec.decode(event.getData()));
+        }
+        return !closed.get();
+    }
+
+    private void reportIfOpen(RuntimeException failure) {
+        if (!closed.get()) {
+            reportFailure(failure);
+        }
+    }
+
+    private boolean sleepBeforeReconnect() {
+        if (closed.get()) {
+            return true;
+        }
+        try {
+            Thread.sleep(Math.min(retryMillis.get(), 60000L));
+            return true;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 
@@ -388,11 +404,15 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
     }
 
     private void dispatch(McpDecodedMessage message) {
+        IMcpTransportListener current = listener.get();
+        if (current == null) {
+            return;
+        }
         try {
             if (message.getType() == McpDecodedMessage.Type.NOTIFICATION) {
-                listener.onNotification(message.getNotification());
+                current.onNotification(message.getNotification());
             } else if (message.getType() == McpDecodedMessage.Type.SERVER_REQUEST) {
-                listener.onServerRequest(message.getRequest());
+                current.onServerRequest(message.getRequest());
             }
         } catch (RuntimeException failure) {
             reportFailure(failure);
@@ -400,9 +420,14 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
     }
 
     private void reportFailure(Throwable failure) {
+        IMcpTransportListener current = listener.get();
+        if (current == null) {
+            return;
+        }
         try {
-            listener.onFailure(failure);
+            current.onFailure(failure);
         } catch (RuntimeException ignored) {
+            // listener 自身抛出的异常不能反过来影响传输层的事件循环。
         }
     }
 
@@ -480,15 +505,15 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
     private static final class ActiveCall {
         private final CompletableFuture<JsonRpcResponse> future =
                 new CompletableFuture<>();
-        private volatile DeadlineGuard guard;
-        private volatile IHttpCall httpCall;
+        private final AtomicReference<DeadlineGuard> guard = new AtomicReference<>();
+        private final AtomicReference<IHttpCall> httpCall = new AtomicReference<>();
 
         private void cancel() {
-            DeadlineGuard currentGuard = guard;
+            DeadlineGuard currentGuard = guard.get();
             if (currentGuard != null) {
                 currentGuard.cancel();
             }
-            IHttpCall currentCall = httpCall;
+            IHttpCall currentCall = httpCall.get();
             if (currentCall != null) {
                 currentCall.cancel();
             }
@@ -508,6 +533,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
             this.future = future;
         }
 
+        @Override
         public void onStart(int status, Map<String, List<String>> headers) {
             captureSession(headers);
         }

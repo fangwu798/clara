@@ -2,7 +2,6 @@ package com.clara.model.token;
 
 import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.message.IContent;
-import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.RoleEnum;
 import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.SystemContent;
@@ -76,17 +75,6 @@ public final class TiktokenTokenCountEstimator implements ITokenCountEstimator {
             throw new IllegalArgumentException("encodingType must not be null");
         }
         this.encoding = REGISTRY.getEncoding(encodingType);
-    }
-
-    /**
-     * 按模型平台选择编码创建估算器。OpenAI 兼容家族（OpenAI / 火山方舟 / DeepSeek / 通义 / Kimi）
-     * 统一使用 {@code cl100k_base}；其余平台同样回退到 {@code cl100k_base}（jtokkit 不含 Anthropic 词表）。
-     *
-     * @param provider 模型平台，可为 null（null 时使用默认编码）
-     * @return 按平台选好编码的估算器，非 null
-     */
-    public static TiktokenTokenCountEstimator forProvider(ModelProviderEnum provider) {
-        return new TiktokenTokenCountEstimator(DEFAULT_ENCODING);
     }
 
     /**

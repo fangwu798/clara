@@ -87,7 +87,7 @@ clara-orchestration/src/main/java/com/clara/orchestration/
 - 使用范围：每轮模型调用前。
 - 为什么需要：把「历史恢复、窗口、压缩、检索注入、技能装配」组合成一份请求消息，是编排链路的核心装配点。
 - 业务细节：输入为窗口记忆实例、当前用户输入与 control 配置；依次执行「窗口裁剪（只读，不改底层存储）→ 超限压缩融合摘要 → 技能提示词注入 → 对话知识找回注入」；system 指令始终归一化到消息首位；输出消息列表供 `CapabilityDispatcher` 使用。
-- 技术细节：构造注入 3 个协作者（`WindowCompressionCoordinator` / `SemanticRecallCoordinator` / `SkillMatchCoordinator`）；方法 `AssembledContext assemble(IWindowMemory, ContextControlConfig, ITokenCountEstimator)`；把 control 转为 `WindowPolicy`，用 `windowMemory.messages()`（全量）与 `windowMemory.window(policy, estimator)`（裁剪）的差集求被淘汰消息（`IdentityHashMap` 身份集合，避免 equals 误判）；取历史中最后一条 `UserContent` 文本作为检索/匹配查询；system 文本按「技能提示词 → 压缩摘要 → 检索知识」拼接，非空才构造 `SystemContent` 并置于首位；返回内嵌不可变 `AssembledContext`（`messages` + `tools`(`ToolContext`)）。
+- 技术细节：构造注入 3 个协作者（`WindowCompressionCoordinator` / `SemanticRecallCoordinator` / `SkillMatchCoordinator`）；方法 `AssembledContext assemble(IWindowMemory, ContextControlConfig, ITokenCountEstimator)`；把 control 转为 `WindowPolicy`，用 `windowMemory.messages()`（全量）与 `windowMemory.window(policy, estimator)`（裁剪）的差集求被淘汰消息（`IdentityHashMap` 身份集合，避免 equals 误判）；取历史中最后一条 `UserContent` 文本作为检索/匹配查询；system 文本按「技能提示词 → 压缩摘要 → 检索知识」拼接，非空才构造 `SystemContent` 并置于首位；返回独立不可变 `AssembledContext`（`messages` + `tools`(`ToolContext`)）。
 
 **`WindowCompressionCoordinator`（`com.clara.orchestration.context`）**
 - 作用：历史命中窗口上限时，取出被淘汰消息组、触发压缩、把返回的摘要并入 system 指令。

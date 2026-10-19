@@ -21,8 +21,6 @@ import java.util.List;
 public final class DefaultWindowMemory implements IWindowMemory {
 
     private final String conversationId;
-    private final String provider;
-    private final String model;
     private final ConversationStore store;
     private final ConversationKey key;
 
@@ -54,8 +52,6 @@ public final class DefaultWindowMemory implements IWindowMemory {
             throw new IllegalArgumentException("store must not be null");
         }
         this.conversationId = conversationId;
-        this.provider = provider;
-        this.model = model;
         this.store = store;
         this.key = new ConversationKey(conversationId, provider, model);
     }

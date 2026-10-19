@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * Responses 协议工具调用的转换工具：把 {@code output[]} 里的 {@code function_call} 过滤并反序列化为独立类型
@@ -38,7 +39,7 @@ public final class ResponseToolCallSupport {
 
     public static List<ResponsesToolCall> convertResponsesToolCalls(JsonNode node) {
         if (node == null || !node.isArray()) {
-            return null;
+            return Collections.emptyList();
         }
         List<ResponsesToolCall> result = new ArrayList<>();
         for (JsonNode item : node) {

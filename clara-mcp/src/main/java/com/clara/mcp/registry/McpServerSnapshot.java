@@ -29,6 +29,7 @@ public final class McpServerSnapshot {
     private final List<McpPromptDescriptor> prompts;
     private final McpHealthStatus healthStatus;
 
+    @SuppressWarnings("java:S107")
     public McpServerSnapshot(String snapshotId, String tenantId, String serverKey,
             long discoveredAtEpochMillis, String protocolVersion, McpServerIdentity identity,
             McpServerCapabilities capabilities, List<McpToolDescriptor> tools,

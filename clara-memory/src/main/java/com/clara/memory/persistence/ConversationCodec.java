@@ -26,6 +26,8 @@ import java.util.Map;
  */
 public final class ConversationCodec {
 
+    private static final String FIELD_CONTENT = "content";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP_TYPE =
             new TypeReference<Map<String, Object>>() {
@@ -98,21 +100,21 @@ public final class ConversationCodec {
         }
         String role = (String) roleValue;
         if ("system".equals(role)) {
-            return new SystemContent(text(message.get("content")));
+            return new SystemContent(text(message.get(FIELD_CONTENT)));
         }
         if ("user".equals(role)) {
-            return new UserContent(text(message.get("content")));
+            return new UserContent(text(message.get(FIELD_CONTENT)));
         }
         if ("tool".equals(role)) {
-            return new ToolContent(text(message.get("tool_call_id")), text(message.get("content")));
+            return new ToolContent(text(message.get("tool_call_id")), text(message.get(FIELD_CONTENT)));
         }
         if ("assistant".equals(role)) {
             Object toolCalls = message.get("tool_calls");
             if (toolCalls instanceof List && !((List<Object>) toolCalls).isEmpty()) {
-                return new ToolCallContent(text(message.get("content")),
+                return new ToolCallContent(text(message.get(FIELD_CONTENT)),
                         decodeToolCalls((List<Object>) toolCalls));
             }
-            return new AssistantContent(text(message.get("content")));
+            return new AssistantContent(text(message.get(FIELD_CONTENT)));
         }
         throw ConversationStoreErrors.corrupted();
     }

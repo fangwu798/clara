@@ -11,6 +11,7 @@ import com.clara.dto.tool.ToolCallFunction;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -299,7 +300,7 @@ public final class RecordingObserver<R extends IResponse> implements IStreamObse
         JsonNode root;
         try {
             root = MAPPER.readTree(payload);
-        } catch (Exception exception) {
+        } catch (IOException exception) {
             print("忽略无法解析的工具参数片段: " + payload);
             return;
         }
@@ -307,25 +308,37 @@ public final class RecordingObserver<R extends IResponse> implements IStreamObse
             return;
         }
         for (JsonNode element : root) {
-            int index = element.has("index") ? element.get("index").asInt() : 0;
-            String[] call = toolCalls.get(Integer.valueOf(index));
-            if (call == null) {
-                call = new String[3];
-                toolCalls.put(Integer.valueOf(index), call);
-            }
-            if (element.hasNonNull("id")) {
-                call[0] = element.get("id").asText();
-            }
-            JsonNode function = element.get("function");
-            if (function == null) {
-                continue;
-            }
-            if (function.hasNonNull("name")) {
-                call[1] = function.get("name").asText();
-            }
-            if (function.hasNonNull("arguments")) {
-                call[2] = (call[2] == null ? "" : call[2]) + function.get("arguments").asText();
-            }
+            mergeToolCall(element);
+        }
+    }
+
+    private void mergeToolCall(JsonNode element) {
+        int index = element.has("index") ? element.get("index").asInt() : 0;
+        String[] call = toolCall(index);
+        if (element.hasNonNull("id")) {
+            call[0] = element.get("id").asText();
+        }
+        JsonNode function = element.get("function");
+        if (function != null) {
+            mergeFunction(call, function);
+        }
+    }
+
+    private String[] toolCall(int index) {
+        String[] call = toolCalls.get(Integer.valueOf(index));
+        if (call == null) {
+            call = new String[3];
+            toolCalls.put(Integer.valueOf(index), call);
+        }
+        return call;
+    }
+
+    private static void mergeFunction(String[] call, JsonNode function) {
+        if (function.hasNonNull("name")) {
+            call[1] = function.get("name").asText();
+        }
+        if (function.hasNonNull("arguments")) {
+            call[2] = (call[2] == null ? "" : call[2]) + function.get("arguments").asText();
         }
     }
 

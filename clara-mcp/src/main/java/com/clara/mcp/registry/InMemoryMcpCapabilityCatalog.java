@@ -14,6 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * 提供MCP能力目录的内存实现。
  */
 public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog {
+
+    private static final String FIELD_EXPECTED_SCHEMA_HASH = "expectedSchemaHash";
     private final Map<String, McpServerSnapshot> snapshots =
             new ConcurrentHashMap<>();
     private final Map<String, McpServerSnapshot> latest =
@@ -44,7 +46,7 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
     }
     public McpToolDescriptor resolveTool(String tenantId, String serverKey, String snapshotId,
             String toolName, String expectedSchemaHash) {
-        require(toolName, "toolName"); require(expectedSchemaHash, "expectedSchemaHash");
+        require(toolName, "toolName"); require(expectedSchemaHash, FIELD_EXPECTED_SCHEMA_HASH);
         McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
         for (McpToolDescriptor tool : snapshot.getTools()) {
             if (toolName.equals(tool.getName())) {
@@ -55,7 +57,7 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
     }
     public McpResourceDescriptor resolveResource(String tenantId, String serverKey, String snapshotId,
             String uri, String expectedSchemaHash) {
-        require(uri, "uri"); require(expectedSchemaHash, "expectedSchemaHash");
+        require(uri, "uri"); require(expectedSchemaHash, FIELD_EXPECTED_SCHEMA_HASH);
         McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
         for (McpResourceDescriptor resource : snapshot.getResources()) {
             if (uri.equals(resource.getUri())) {
@@ -66,7 +68,7 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
     }
     public McpPromptDescriptor resolvePrompt(String tenantId, String serverKey, String snapshotId,
             String promptName, String expectedSchemaHash) {
-        require(promptName, "promptName"); require(expectedSchemaHash, "expectedSchemaHash");
+        require(promptName, "promptName"); require(expectedSchemaHash, FIELD_EXPECTED_SCHEMA_HASH);
         McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
         for (McpPromptDescriptor prompt : snapshot.getPrompts()) {
             if (promptName.equals(prompt.getName())) {

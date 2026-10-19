@@ -255,7 +255,11 @@ public final class WorkflowCatalog {
     }
 
     private static boolean isWorkflowFile(Path file) {
-        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        Path fileName = file.getFileName();
+        if (fileName == null) {
+            return false;
+        }
+        String name = fileName.toString().toLowerCase(Locale.ROOT);
         return name.endsWith(".yml") || name.endsWith(".yaml");
     }
 

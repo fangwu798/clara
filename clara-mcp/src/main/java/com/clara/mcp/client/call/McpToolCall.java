@@ -33,6 +33,7 @@ public final class McpToolCall {
     private final ConvContext conversation;
     private final CallContext call;
 
+    @SuppressWarnings("java:S107")
     public McpToolCall(String tenantId, String serverKey, String snapshotId, String toolName, String schemaHash,
                        Map<String, Object> arguments, ConvContext conversation, CallContext call) {
         require(tenantId, "tenantId");

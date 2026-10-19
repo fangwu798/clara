@@ -71,7 +71,8 @@ public class CapabilityDispatcherTest {
     @Test
     public void extractRejectsNullKind() {
         CapabilityDispatcher dispatcher = new CapabilityDispatcher(new FakeStreamModel(null, null));
-        assertThrows(ClaraException.class, () -> dispatcher.extract(null, contentResponse("x")));
+        HttpResponse content = contentResponse("x");
+        assertThrows(ClaraException.class, () -> dispatcher.extract(null, content));
     }
 
     @Test

@@ -38,6 +38,14 @@ public final class PlanValidator {
                 || plan.getTasks().size() > limits.getMaxPlanSteps()) {
             throw PlannerErrors.error(ErrorCodes.PLAN_LIMIT_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
         }
+        Map<String, TaskNode> tasks = validateTasks(plan);
+        validateDependencies(plan, tasks);
+        validateAcyclic(plan, tasks);
+        return new TaskPlan(plan.getGoal(), plan.getVersion(), plan.getTasks(),
+                plan.getLimits(), PlanStatusEnum.VALIDATED);
+    }
+
+    private Map<String, TaskNode> validateTasks(TaskPlan plan) {
         Map<String, TaskNode> tasks = new HashMap<>();
         Set<String> outputs = new HashSet<>();
         BudgetAmount maximum = BudgetAmount.ZERO;
@@ -53,6 +61,10 @@ public final class PlanValidator {
         if (limits.getTotalBudget().isExceededBy(maximum)) {
             throw PlannerErrors.error(ErrorCodes.BUDGET_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
         }
+        return tasks;
+    }
+
+    private static void validateDependencies(TaskPlan plan, Map<String, TaskNode> tasks) {
         for (TaskNode task : plan.getTasks()) {
             for (String dependency : task.getDependencies()) {
                 if (!tasks.containsKey(dependency) || dependency.equals(task.getTaskId())) {
@@ -60,12 +72,13 @@ public final class PlanValidator {
                 }
             }
         }
+    }
+
+    private static void validateAcyclic(TaskPlan plan, Map<String, TaskNode> tasks) {
         Map<String, Integer> colors = new HashMap<>();
         for (TaskNode task : plan.getTasks()) {
             visit(task, tasks, colors);
         }
-        return new TaskPlan(plan.getGoal(), plan.getVersion(), plan.getTasks(),
-                plan.getLimits(), PlanStatusEnum.VALIDATED);
     }
 
     public PlanLimits getLimits() {

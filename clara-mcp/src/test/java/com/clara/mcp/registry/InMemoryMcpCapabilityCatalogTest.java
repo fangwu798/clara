@@ -19,6 +19,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -71,12 +72,8 @@ public class InMemoryMcpCapabilityCatalogTest {
     public void publishDuplicateSnapshotIdRejected() {
         catalog.publish(snapshot("s1", TENANT, SERVER, 1L, tool("echo")));
 
-        try {
-            catalog.publish(snapshot("s1", TENANT, SERVER, 2L, tool("echo")));
-            fail("expected IllegalArgumentException");
-        } catch (IllegalArgumentException expected) {
-            assertTrue(true);
-        }
+        McpServerSnapshot duplicate = snapshot("s1", TENANT, SERVER, 2L, tool("echo"));
+        assertThrows(IllegalArgumentException.class, () -> catalog.publish(duplicate));
     }
 
     @Test

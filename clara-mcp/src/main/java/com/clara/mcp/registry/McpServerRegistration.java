@@ -1,7 +1,6 @@
 package com.clara.mcp.registry;
 
 import com.clara.utils.StringUtils;
-import com.clara.mcp.api.IMcpServerRegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -35,6 +34,7 @@ public final class McpServerRegistration {
     /**
      * 创建注册项（不含结构化连接参数，向后兼容既有调用方）。
      */
+    @SuppressWarnings("java:S107")
     public McpServerRegistration(String tenantId, String serverKey,
             McpTransportProfile transportProfile, String address, String authRef,
             String approvedIdentityName, String approvedIdentityVersion,
@@ -50,6 +50,7 @@ public final class McpServerRegistration {
      * @param env     stdio 环境变量，可为 null
      * @param headers http 附加请求头，可为 null
      */
+    @SuppressWarnings("java:S107")
     public McpServerRegistration(String tenantId, String serverKey,
             McpTransportProfile transportProfile, String address, String authRef,
             String approvedIdentityName, String approvedIdentityVersion,

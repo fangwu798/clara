@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Assume;
 import org.junit.Test;
@@ -107,7 +108,7 @@ public class StdioMcpTransportTest {
     private static void awaitContains(StringBuilder buffer, String expected) throws InterruptedException {
         long deadline = System.currentTimeMillis() + 2000L;
         while (System.currentTimeMillis() < deadline && buffer.indexOf(expected) < 0) {
-            Thread.sleep(20L);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(20L));
         }
         assertTrue("stderr should contain " + expected + " but was: " + buffer, buffer.indexOf(expected) >= 0);
     }

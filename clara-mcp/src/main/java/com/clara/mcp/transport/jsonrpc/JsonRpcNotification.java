@@ -15,6 +15,7 @@ public final class JsonRpcNotification {
         }
         this.method = method; this.params = ImmutableValues.copyMap(params);
     }
+    @SuppressWarnings("java:S3400")
     public String getJsonRpc() { return "2.0"; }
     public String getMethod() { return method; }
     public Map<String, Object> getParams() { return params; }

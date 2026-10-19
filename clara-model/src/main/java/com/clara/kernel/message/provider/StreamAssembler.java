@@ -83,43 +83,59 @@ public abstract class StreamAssembler<R extends IResponse> {
             return Collections.emptyList();
         }
         JsonNode container = container(root);
+        applySingleRules(container);
+        applyTerminalRules(container);
+        List<StreamEvent> events = collectDeltas(sseEvent, root);
+        handleTerminal(sseEvent, root);
+        return events;
+    }
+
+    private void applySingleRules(JsonNode container) {
         for (Rule rule : singles) {
             JsonNode node = ResponseDecoderSupport.valueAt(container, rule.path);
             if (ResponseDecoderSupport.present(node)) {
                 ResponseDecoderSupport.write(rule.field, target, convertField(rule.field, node, provider));
             }
         }
+    }
+
+    private void applyTerminalRules(JsonNode container) {
         for (Rule rule : terminals) {
             JsonNode node = ResponseDecoderSupport.valueAt(container, rule.terminalPath);
             if (ResponseDecoderSupport.present(node)) {
-                ResponseDecoderSupport.write(rule.field, target, ResponseDecoderSupport.convert(rule.field.getGenericType(), node, provider));
+                ResponseDecoderSupport.write(rule.field, target,
+                        ResponseDecoderSupport.convert(rule.field.getGenericType(), node, provider));
             }
         }
+    }
+
+    private List<StreamEvent> collectDeltas(String sseEvent, JsonNode root) {
         List<StreamEvent> events = new ArrayList<>();
         for (Rule rule : deltas) {
-            if (!rule.streamEvent.isEmpty() && !rule.streamEvent.equals(sseEvent)) {
-                continue;
-            }
-            JsonNode node = ResponseDecoderSupport.valueAt(root, rule.streamPath);
-            if (!ResponseDecoderSupport.present(node)) {
-                continue;
-            }
-            if (node.isTextual()) {
-                String text = node.textValue();
-                if (text.isEmpty()) {
-                    continue;
-                }
-                ResponseDecoderSupport.appendText(rule.field, target, text);
-                events.add(new StreamEvent(rule.adapter.event(), nextSequence(), text));
-            } else {
-                StreamEvent event = nonTextDelta(rule, node);
+            if (rule.streamEvent.isEmpty() || rule.streamEvent.equals(sseEvent)) {
+                StreamEvent event = deltaEvent(rule, root);
                 if (event != null) {
                     events.add(event);
                 }
             }
         }
-        handleTerminal(sseEvent, root);
         return events;
+    }
+
+    private StreamEvent deltaEvent(Rule rule, JsonNode root) {
+        JsonNode node = ResponseDecoderSupport.valueAt(root, rule.streamPath);
+        if (!ResponseDecoderSupport.present(node)) {
+            return null;
+        }
+        if (!node.isTextual()) {
+            return nonTextDelta(rule, node);
+        }
+        String text = node.textValue();
+        if (text.isEmpty()) {
+            return null;
+        }
+        ResponseDecoderSupport.appendText(rule.field, target, text);
+        return new StreamEvent(rule.adapter.event(), nextSequence(), text);
     }
 
     /**
@@ -186,10 +202,10 @@ public abstract class StreamAssembler<R extends IResponse> {
     public static final class Rule {
         public final Field field;
         public final ResponseAdapter adapter;
-        protected final String path;
-        protected final String streamPath;
-        protected final String streamEvent;
-        protected final String terminalPath;
+        private final String path;
+        private final String streamPath;
+        private final String streamEvent;
+        private final String terminalPath;
 
         Rule(Field field, ResponseAdapter adapter, String path, String streamPath, String streamEvent, String terminalPath) {
             this.field = field;

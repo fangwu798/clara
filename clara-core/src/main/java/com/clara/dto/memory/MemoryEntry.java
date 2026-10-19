@@ -78,7 +78,8 @@ public final class MemoryEntry {
                 || !builder.contentHash.matches("[0-9a-f]{64}")
                 || builder.vector == null || builder.vector.length == 0
                 || builder.createdAtEpochMillis < 0 || builder.expiresAtEpochMillis < 0
-                || (builder.expiresAtEpochMillis > 0 && builder.expiresAtEpochMillis <= builder.createdAtEpochMillis)) {
+                || builder.expiresAtEpochMillis > 0
+                && builder.expiresAtEpochMillis <= builder.createdAtEpochMillis) {
             throw new IllegalArgumentException("memory entry is invalid");
         }
         validateVector(builder.vector);

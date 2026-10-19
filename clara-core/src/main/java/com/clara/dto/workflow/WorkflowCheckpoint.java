@@ -4,6 +4,8 @@ import com.clara.utils.StringUtils;
 import com.clara.enums.workflow.WorkflowInstanceStatusEnum;
 import lombok.Data;
 
+import java.util.Objects;
+
 /**
  * 工作流检查点：工作流实例的可恢复状态快照，含实例标识、工作流标识与版本、状态、作用域与版本号。
  */
@@ -44,5 +46,27 @@ public final class WorkflowCheckpoint {
 
     public ExecutionScope getScope() {
         return scope.copy();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof WorkflowCheckpoint)) {
+            return false;
+        }
+        WorkflowCheckpoint that = (WorkflowCheckpoint) other;
+        return version == that.version
+                && status == that.status
+                && Objects.equals(instanceId, that.instanceId)
+                && Objects.equals(workflowId, that.workflowId)
+                && Objects.equals(workflowVersion, that.workflowVersion)
+                && Objects.equals(scope, that.scope);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(instanceId, workflowId, workflowVersion, status, scope, version);
     }
 }

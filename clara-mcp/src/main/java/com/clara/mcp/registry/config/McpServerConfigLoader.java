@@ -12,7 +12,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,16 +30,17 @@ import java.util.regex.Pattern;
  * 以避免把未解析的占位符当作真实密钥发送出去。
  */
 public final class McpServerConfigLoader {
-    private static final Pattern VARIABLE = Pattern.compile("\\$\\{([A-Za-z_][A-Za-z0-9_]*)}");
+
+    private static final String FIELD_PREFIX = "field '";
+    private static final String SERVER_SEPARATOR = "' of server '";
+    private static final Pattern VARIABLE = Pattern.compile("\\$\\{([A-Za-z_]\\w*)}");
 
     private final ObjectMapper mapper;
-    private final Function<String, String> variableResolver;
+    private final UnaryOperator<String> variableResolver;
 
     /** 创建使用默认 {@link ObjectMapper} 与系统环境变量的加载器。 */
     public McpServerConfigLoader() {
-        this(new ObjectMapper(), new Function<String, String>() {
-            public String apply(String name) { return System.getenv(name); }
-        });
+        this(new ObjectMapper(), System::getenv);
     }
 
     /**
@@ -48,7 +49,7 @@ public final class McpServerConfigLoader {
      * @param mapper           解析 JSON 的 Jackson 映射器，不可为 null
      * @param variableResolver {@code ${VAR}} 的解析函数，不可为 null；返回 null 视为未定义
      */
-    public McpServerConfigLoader(ObjectMapper mapper, Function<String, String> variableResolver) {
+    public McpServerConfigLoader(ObjectMapper mapper, UnaryOperator<String> variableResolver) {
         if (mapper == null) { throw new IllegalArgumentException("mapper must not be null"); }
         if (variableResolver == null) { throw new IllegalArgumentException("variableResolver must not be null"); }
         this.mapper = mapper;
@@ -118,47 +119,70 @@ public final class McpServerConfigLoader {
     }
 
     private static List<String> command(JsonNode commandNode, JsonNode argsNode, String serverKey) {
+        List<String> parts = commandParts(commandNode, serverKey);
+        appendArguments(parts, argsNode, serverKey);
+        return parts;
+    }
+
+    private static List<String> commandParts(JsonNode commandNode, String serverKey) {
         List<String> parts = new ArrayList<>();
-        if (commandNode != null && !commandNode.isNull()) {
-            if (commandNode.isArray()) {
-                for (JsonNode element : commandNode) { parts.add(requireText(element, "command", serverKey)); }
-            } else if (commandNode.isTextual()) {
-                String value = commandNode.asText();
-                if (!value.trim().isEmpty()) { parts.add(value); }
-            } else {
-                throw new IllegalArgumentException("field 'command' of server '" + serverKey
-                        + "' must be a string or an array of strings");
-            }
+        if (commandNode == null || commandNode.isNull()) {
+            return parts;
         }
-        if (argsNode != null && !argsNode.isNull()) {
-            if (!argsNode.isArray()) {
-                throw new IllegalArgumentException("field 'args' of server '" + serverKey + "' must be an array");
+        if (commandNode.isArray()) {
+            for (JsonNode element : commandNode) {
+                parts.add(requireText(element, "command", serverKey));
             }
-            for (JsonNode element : argsNode) { parts.add(requireText(element, "args", serverKey)); }
+        } else if (commandNode.isTextual()) {
+            String value = commandNode.asText();
+            if (!value.trim().isEmpty()) {
+                parts.add(value);
+            }
+        } else {
+            throw new IllegalArgumentException("field 'command' of server '" + serverKey
+                    + "' must be a string or an array of strings");
         }
         return parts;
+    }
+
+    private static void appendArguments(List<String> parts, JsonNode argsNode, String serverKey) {
+        if (argsNode == null || argsNode.isNull()) {
+            return;
+        }
+        if (!argsNode.isArray()) {
+            throw new IllegalArgumentException("field 'args' of server '" + serverKey + "' must be an array");
+        }
+        for (JsonNode element : argsNode) {
+            parts.add(requireText(element, "args", serverKey));
+        }
     }
 
     private Map<String, String> interpolatedMap(JsonNode node, String field, String serverKey) {
         Map<String, String> result = new LinkedHashMap<>();
         if (node == null || node.isNull()) { return result; }
         if (!node.isObject()) {
-            throw new IllegalArgumentException("field '" + field + "' of server '" + serverKey + "' must be a json object");
+            throw new IllegalArgumentException(FIELD_PREFIX + field + SERVER_SEPARATOR + serverKey + "' must be a json object");
         }
         Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
         while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> entry = fields.next();
-            if (entry.getKey() == null || entry.getKey().trim().isEmpty()) {
-                throw new IllegalArgumentException("field '" + field + "' of server '" + serverKey
-                        + "' must not contain blank keys");
-            }
-            if (entry.getValue() == null || !entry.getValue().isTextual()) {
-                throw new IllegalArgumentException("value of '" + field + "." + entry.getKey() + "' of server '"
-                        + serverKey + "' must be a string");
-            }
-            result.put(entry.getKey(), interpolate(entry.getValue().asText(), field, entry.getKey(), serverKey));
+            putInterpolated(result, fields.next(), field, serverKey);
         }
         return result;
+    }
+
+    private void putInterpolated(Map<String, String> result, Map.Entry<String, JsonNode> entry,
+            String field, String serverKey) {
+        String key = entry.getKey();
+        if (key == null || key.trim().isEmpty()) {
+            throw new IllegalArgumentException(FIELD_PREFIX + field + SERVER_SEPARATOR + serverKey
+                    + "' must not contain blank keys");
+        }
+        JsonNode value = entry.getValue();
+        if (value == null || !value.isTextual()) {
+            throw new IllegalArgumentException("value of '" + field + "." + key + SERVER_SEPARATOR
+                    + serverKey + "' must be a string");
+        }
+        result.put(key, interpolate(value.asText(), field, key, serverKey));
     }
 
     private String interpolate(String raw, String field, String key, String serverKey) {
@@ -169,7 +193,7 @@ public final class McpServerConfigLoader {
             String value = variableResolver.apply(name);
             if (value == null) {
                 throw new IllegalArgumentException("environment variable '" + name + "' used by '" + field + "."
-                        + key + "' of server '" + serverKey + "' is not defined");
+                        + key + SERVER_SEPARATOR + serverKey + "' is not defined");
             }
             matcher.appendReplacement(buffer, Matcher.quoteReplacement(value));
         }
@@ -179,7 +203,7 @@ public final class McpServerConfigLoader {
 
     private static String requireText(JsonNode node, String field, String serverKey) {
         if (node == null || !node.isTextual()) {
-            throw new IllegalArgumentException("field '" + field + "' of server '" + serverKey
+            throw new IllegalArgumentException(FIELD_PREFIX + field + SERVER_SEPARATOR + serverKey
                     + "' must contain strings only");
         }
         return node.asText();

@@ -23,7 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -197,13 +196,10 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         final ExecutionScope base = run.scope.copy();
         List<Future<ExecutionScope>> futures = new ArrayList<>();
         for (final IWorkflowNode child : node.getChildren()) {
-            futures.add(parallelExecutor.submit(new Callable<ExecutionScope>() {
-                @Override
-                public ExecutionScope call() {
-                    Run branch = run.branch(base.copy());
-                    executeNode(child, branch, key + "/", false);
-                    return branch.scope;
-                }
+            futures.add(parallelExecutor.submit(() -> {
+                Run branch = run.branch(base.copy());
+                executeNode(child, branch, key + "/", false);
+                return branch.scope;
             }));
         }
         RuntimeException deferred = null;

@@ -16,6 +16,7 @@ import com.clara.mcp.transport.jsonrpc.JsonRpcRequest;
 import com.clara.mcp.transport.jsonrpc.JsonRpcResponse;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -35,7 +36,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * 管理本地 MCP 子进程，并通过逐行 JSON-RPC 在标准输入输出上发送请求、通知和取消消息。
@@ -47,6 +51,8 @@ import java.util.function.Consumer;
  * 设置正超时。关闭、子进程退出或协议读取失败会使全部待处理 Future 失败，stderr 消费器不得阻塞读取线程。
  */
 public final class StdioMcpTransport implements IMcpTransport {
+
+    private static final Logger LOGGER = Logger.getLogger(StdioMcpTransport.class.getName());
     private final List<String> command;
     private final Path workingDirectory;
     private final Map<String, String> environment;
@@ -61,9 +67,9 @@ public final class StdioMcpTransport implements IMcpTransport {
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Object writeLock = new Object();
-    private volatile Process process;
-    private volatile BufferedWriter writer;
-    private volatile IMcpTransportListener listener;
+    private final AtomicReference<Process> process = new AtomicReference<>();
+    private final AtomicReference<BufferedWriter> writer = new AtomicReference<>();
+    private final AtomicReference<IMcpTransportListener> listener = new AtomicReference<>();
 
     private StdioMcpTransport(Builder builder) {
         this.command = validateCommand(builder.command, builder.allowedExecutables);
@@ -89,14 +95,15 @@ public final class StdioMcpTransport implements IMcpTransport {
         if (listener == null) { throw new IllegalArgumentException("listener must not be null"); }
         if (closed.get()) { throw closedError(); }
         if (!started.compareAndSet(false, true)) { throw new IllegalStateException("transport is already started"); }
-        this.listener = listener;
+        this.listener.set(listener);
         try {
-            process = processFactory.start(command, workingDirectory, environment);
-            writer = new BufferedWriter(new OutputStreamWriter(
-                    process.getOutputStream(), StandardCharsets.UTF_8));
-            executor.execute(new Runnable() { public void run() { readStdout(); } });
-            executor.execute(new Runnable() { public void run() { readStderr(); } });
-            executor.execute(new Runnable() { public void run() { waitForExit(); } });
+            Process startedProcess = processFactory.start(command, workingDirectory, environment);
+            process.set(startedProcess);
+            writer.set(new BufferedWriter(new OutputStreamWriter(
+                    startedProcess.getOutputStream(), StandardCharsets.UTF_8)));
+            executor.execute(this::readStdout);
+            executor.execute(this::readStderr);
+            executor.execute(this::waitForExit);
         } catch (IOException exception) {
             started.set(false);
             throw ioError();
@@ -115,15 +122,13 @@ public final class StdioMcpTransport implements IMcpTransport {
                     ErrorCategoryEnum.CONFLICT, false));
             return future;
         }
-        item.timeout = executor.schedule(new Runnable() {
-            public void run() {
-                if (pending.remove(request.getId(), item)) {
-                    future.completeExceptionally(McpErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT,
-                            ErrorCategoryEnum.TIMEOUT, true));
-                    writeCancellation(request.getId(), "timeout");
-                }
+        item.timeout.set(executor.schedule(() -> {
+            if (pending.remove(request.getId(), item)) {
+                future.completeExceptionally(McpErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT,
+                        ErrorCategoryEnum.TIMEOUT, true));
+                writeCancellation(request.getId(), "timeout");
             }
-        }, timeoutMillis, TimeUnit.MILLISECONDS);
+        }, timeoutMillis, TimeUnit.MILLISECONDS));
         future.whenComplete((response, failure) -> {
             if (future.isCancelled() && pending.remove(request.getId(), item)) {
                 item.cancelTimeout(); writeCancellation(request.getId(), "cancelled");
@@ -157,18 +162,17 @@ public final class StdioMcpTransport implements IMcpTransport {
 
     public void checkHealth() {
         ensureRunning();
-        if (!process.isAlive()) { throw ioError(); }
+        if (!process.get().isAlive()) { throw ioError(); }
     }
 
     public synchronized void close() {
         if (!closed.compareAndSet(false, true)) return;
         failPending(closedError());
-        BufferedWriter currentWriter = writer;
-        if (currentWriter != null) try { currentWriter.close(); } catch (IOException ignored) { }
-        Process current = process;
+        closeQuietly(writer.get());
+        Process current = process.get();
         if (current != null) {
-            try { current.getInputStream().close(); } catch (IOException ignored) { }
-            try { current.getErrorStream().close(); } catch (IOException ignored) { }
+            closeQuietly(current.getInputStream());
+            closeQuietly(current.getErrorStream());
             current.destroy();
             try {
                 if (!current.waitFor(2L, TimeUnit.SECONDS)) current.destroyForcibly();
@@ -179,24 +183,56 @@ public final class StdioMcpTransport implements IMcpTransport {
         executor.shutdownNow();
     }
 
+    private static void closeQuietly(Closeable closeable) {
+        if (closeable == null) {
+            return;
+        }
+        try {
+            closeable.close();
+        } catch (IOException exception) {
+            LOGGER.log(Level.FINEST, "关闭 MCP 子进程资源失败（进程即将销毁，忽略）", exception);
+        }
+    }
+
     private void readStdout() {
         try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(
-                    process.getInputStream(), StandardCharsets.UTF_8));
-            String line;
-            while (!closed.get()
-                    && (line = BoundedStreams.readBoundedLine(reader, maxMessageBytes)) != null) {
-                if (line.trim().isEmpty()) continue;
-                try { handle(line); }
-                catch (RuntimeException exception) { listener.onFailure(exception); }
-            }
+            readLines();
             if (!closed.get()) signalFailure(ioError());
         } catch (IOException exception) {
-            if (!closed.get()) signalFailure(ioError());
+            fail(ioError());
         } catch (HttpTransportException exception) {
-            if (!closed.get()) signalFailure(messageTooLarge());
+            fail(messageTooLarge());
         } catch (RuntimeException exception) {
-            if (!closed.get()) signalFailure(exception);
+            fail(exception);
+        }
+    }
+
+    private void readLines() throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(
+                process.get().getInputStream(), StandardCharsets.UTF_8));
+        String line;
+        while (!closed.get()
+                && (line = BoundedStreams.readBoundedLine(reader, maxMessageBytes)) != null) {
+            if (!line.trim().isEmpty()) {
+                handleLine(line);
+            }
+        }
+    }
+
+    private void fail(RuntimeException failure) {
+        if (!closed.get()) {
+            signalFailure(failure);
+        }
+    }
+
+    /**
+     * 处理一行 stdout；单行处理失败只通知监听器，不中断读取循环。
+     */
+    private void handleLine(String line) {
+        try {
+            handle(line);
+        } catch (RuntimeException exception) {
+            listener.get().onFailure(exception);
         }
     }
 
@@ -207,18 +243,17 @@ public final class StdioMcpTransport implements IMcpTransport {
             PendingRequest item = pending.remove(response.getId());
             if (item != null) { item.cancelTimeout(); item.future.complete(response); }
         } else if (message.getType() == McpDecodedMessage.Type.NOTIFICATION) {
-            listener.onNotification(message.getNotification());
+            listener.get().onNotification(message.getNotification());
         } else {
-            listener.onServerRequest(message.getRequest());
+            listener.get().onServerRequest(message.getRequest());
         }
     }
 
     private void readStderr() {
-        if (process == null) return;
+        if (process.get() == null) return;
         int remaining = maxStderrBytes;
         char[] buffer = new char[2048];
-        try {
-            InputStreamReader reader = new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8);
+        try (InputStreamReader reader = new InputStreamReader(process.get().getErrorStream(), StandardCharsets.UTF_8)) {
             int count;
             while ((count = reader.read(buffer)) >= 0) {
                 if (remaining > 0 && stderrConsumer != null) {
@@ -227,12 +262,14 @@ public final class StdioMcpTransport implements IMcpTransport {
                     remaining -= accepted;
                 }
             }
-        } catch (IOException ignored) { }
+        } catch (IOException ignored) {
+            // 进程结束时错误流关闭属于正常情况。
+        }
     }
 
     private void waitForExit() {
         try {
-            int exitCode = process.waitFor();
+            int exitCode = process.get().waitFor();
             if (!closed.get()) signalFailure(new IllegalStateException("MCP process exited: " + exitCode));
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -241,7 +278,7 @@ public final class StdioMcpTransport implements IMcpTransport {
 
     private void signalFailure(RuntimeException failure) {
         failPending(failure);
-        IMcpTransportListener current = listener;
+        IMcpTransportListener current = listener.get();
         if (current != null) current.onFailure(failure);
     }
 
@@ -258,7 +295,9 @@ public final class StdioMcpTransport implements IMcpTransport {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("requestId", requestId); params.put("reason", reason);
         try { write(codec.encode(new JsonRpcNotification("notifications/cancelled", params))); }
-        catch (RuntimeException ignored) { }
+        catch (RuntimeException ignored) {
+            // 取消通知只是尽力而为，写失败时连接通常已经不可用。
+        }
     }
 
     private void write(String message) {
@@ -269,7 +308,8 @@ public final class StdioMcpTransport implements IMcpTransport {
         }
         try {
             synchronized (writeLock) {
-                writer.write(message); writer.newLine(); writer.flush();
+                BufferedWriter currentWriter = writer.get();
+                currentWriter.write(message); currentWriter.newLine(); currentWriter.flush();
             }
         } catch (IOException exception) {
             throw ioError();
@@ -278,7 +318,7 @@ public final class StdioMcpTransport implements IMcpTransport {
 
     private void ensureRunning() {
         if (closed.get()) { throw closedError(); }
-        if (!started.get() || process == null) { throw new IllegalStateException("transport is not started"); }
+        if (!started.get() || process.get() == null) { throw new IllegalStateException("transport is not started"); }
     }
 
     private static List<String> validateCommand(List<String> command, List<Path> allowed) {
@@ -339,9 +379,9 @@ public final class StdioMcpTransport implements IMcpTransport {
      */
     private static final class PendingRequest {
         private final CompletableFuture<JsonRpcResponse> future;
-        private volatile ScheduledFuture<?> timeout;
+        private final AtomicReference<ScheduledFuture<?>> timeout = new AtomicReference<>();
         private PendingRequest(CompletableFuture<JsonRpcResponse> future) { this.future = future; }
-        private void cancelTimeout() { if (timeout != null) timeout.cancel(false); }
+        private void cancelTimeout() { ScheduledFuture<?> current = timeout.get(); if (current != null) current.cancel(false); }
     }
 
     /**

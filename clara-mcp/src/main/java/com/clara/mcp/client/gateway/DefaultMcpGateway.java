@@ -113,7 +113,7 @@ public final class DefaultMcpGateway implements IMcpGateway {
      */
     private <T> T execute(Prepared prepared, Function<IMcpClient, T> operation) {
         IMcpClient client = clientFactory.create(prepared.registration);
-        RuntimeException failure = null;
+        T result;
         try {
             McpInitialization initialization = client.initialize(
                     Collections.singletonList(prepared.snapshot.getProtocolVersion()));
@@ -121,19 +121,24 @@ public final class DefaultMcpGateway implements IMcpGateway {
                     || !prepared.snapshot.getIdentity().equals(initialization.getIdentity())) {
                 throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_CHANGED, ErrorCategoryEnum.CAPABILITY);
             }
-            return operation.apply(client);
+            result = operation.apply(client);
         } catch (RuntimeException exception) {
-            failure = exception;
+            closeQuietly(client);
             throw exception;
-        } finally {
-            try {
-                client.close();
-            } catch (IOException exception) {
-                if (failure == null) {
-                    throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED,
-                            ErrorCategoryEnum.EXTERNAL_SERVICE);
-                }
-            }
+        }
+        try {
+            client.close();
+        } catch (IOException exception) {
+            throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE);
+        }
+        return result;
+    }
+
+    private static void closeQuietly(IMcpClient client) {
+        try {
+            client.close();
+        } catch (IOException exception) {
+            // 主流程已经失败，关闭异常不再覆盖原始原因。
         }
     }
 

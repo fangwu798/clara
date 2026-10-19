@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -57,12 +58,8 @@ public class LocalConversationStoreTest {
     @Test
     public void appendWithStaleVersionThrowsConflict() {
         store.append(key, messages(), 0L);
-        try {
-            store.append(key, Collections.singletonList(new UserContent("late")), 0L);
-            fail("expected version conflict");
-        } catch (ClaraException expected) {
-            // 预期：乐观并发版本冲突
-        }
+        List<IContent> late = Collections.singletonList(new UserContent("late"));
+        assertThrows(ClaraException.class, () -> store.append(key, late, 0L));
     }
 
     @Test

@@ -70,14 +70,6 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
      */
     private final String apiKey;
     /**
-     * 连接超时毫秒数。
-     */
-    private final int connectTimeoutMillis;
-    /**
-     * 读取超时毫秒数。
-     */
-    private final int readTimeoutMillis;
-    /**
      * 请求 / 响应体 JSON 解析器。
      */
     private final ObjectMapper json;
@@ -129,8 +121,6 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
         this.endpoint = endpoint;
         this.modelId = modelId;
         this.apiKey = apiKey;
-        this.connectTimeoutMillis = connectTimeoutMillis;
-        this.readTimeoutMillis = readTimeoutMillis;
         this.json = new ObjectMapper();
         boolean allowHttp = "http".equalsIgnoreCase(endpoint.getScheme());
         this.httpTransport = new JdkHttpTransport();
@@ -264,40 +254,40 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
             }
             return new HttpEmbeddingClient(resolvedEndpoint, model, key, connectTimeoutMillis, readTimeoutMillis);
         }
-    }
 
-    /**
-     * 返回首个非空白字符串。
-     *
-     * @param values 候选值，可为 null
-     * @return 首个非空白字符串；均为空白或 null 时返回 null
-     */
-    private static String firstNonBlank(String... values) {
-        if (values != null) {
-            for (String value : values) {
-                if (value != null && !value.trim().isEmpty()) {
-                    return value;
+        /**
+         * 返回首个非空白字符串。
+         *
+         * @param values 候选值，可为 null
+         * @return 首个非空白字符串；均为空白或 null 时返回 null
+         */
+        private static String firstNonBlank(String... values) {
+            if (values != null) {
+                for (String value : values) {
+                    if (value != null && !value.trim().isEmpty()) {
+                        return value;
+                    }
                 }
             }
+            return null;
         }
-        return null;
-    }
 
-    /**
-     * 把平台基础地址规整为嵌入接口端点。
-     *
-     * @param baseUrl 平台基础地址
-     * @return {@code /embeddings} 端点
-     */
-    private static URI toEmbeddingsEndpoint(String baseUrl) {
-        String value = baseUrl.trim();
-        if (value.endsWith("/embeddings")) {
-            return URI.create(value);
+        /**
+         * 把平台基础地址规整为嵌入接口端点。
+         *
+         * @param baseUrl 平台基础地址
+         * @return {@code /embeddings} 端点
+         */
+        private static URI toEmbeddingsEndpoint(String baseUrl) {
+            String value = baseUrl.trim();
+            if (value.endsWith("/embeddings")) {
+                return URI.create(value);
+            }
+            if (value.endsWith("/")) {
+                return URI.create(value + "embeddings");
+            }
+            return URI.create(value + "/embeddings");
         }
-        if (value.endsWith("/")) {
-            return URI.create(value + "embeddings");
-        }
-        return URI.create(value + "/embeddings");
     }
 
     /**

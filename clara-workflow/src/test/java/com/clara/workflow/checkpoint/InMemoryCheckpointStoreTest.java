@@ -63,8 +63,8 @@ public class InMemoryCheckpointStoreTest {
         InMemoryCheckpointStore store = new InMemoryCheckpointStore();
         store.save(checkpoint("i", 0L, WorkflowInstanceStatusEnum.RUNNING), -1L);
 
-        ClaraException conflict = assertThrows(ClaraException.class,
-                () -> store.save(checkpoint("i", 1L, WorkflowInstanceStatusEnum.RUNNING), -1L));
+        WorkflowCheckpoint next = checkpoint("i", 1L, WorkflowInstanceStatusEnum.RUNNING);
+        ClaraException conflict = assertThrows(ClaraException.class, () -> store.save(next, -1L));
         assertEquals(ErrorCodes.WORKFLOW_VERSION_CONFLICT, conflict.getError().getCode());
     }
 
@@ -72,8 +72,8 @@ public class InMemoryCheckpointStoreTest {
     public void rejectsNonConsecutiveVersion() {
         InMemoryCheckpointStore store = new InMemoryCheckpointStore();
 
-        ClaraException conflict = assertThrows(ClaraException.class,
-                () -> store.save(checkpoint("i", 5L, WorkflowInstanceStatusEnum.RUNNING), -1L));
+        WorkflowCheckpoint skipped = checkpoint("i", 5L, WorkflowInstanceStatusEnum.RUNNING);
+        ClaraException conflict = assertThrows(ClaraException.class, () -> store.save(skipped, -1L));
         assertEquals(ErrorCodes.WORKFLOW_VERSION_CONFLICT, conflict.getError().getCode());
     }
 

@@ -1,5 +1,6 @@
 package com.clara.utils;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,6 +42,8 @@ public class CodexTuiGenerator {
     private static final String SANDBOX_MODE = "workspace-write";
     private static final String REQUEST_KIND = "turn";
     private static final String THREAD_SOURCE = "user";
+    private static final String HEADER_WINDOW_ID = "x-codex-window-id";
+    private static final String HEADER_TURN_METADATA = "x-codex-turn-metadata";
 
 
     /**
@@ -67,30 +70,30 @@ public class CodexTuiGenerator {
         long turnStartedAtUnixMs = System.currentTimeMillis();
 
         TurnMetadata meta = new TurnMetadata();
-        meta.setInstallation_id(installationId);
-        meta.setSession_id(sessionId);
-        meta.setThread_id(threadId);
-        meta.setAgent_name(AGENT_NAME);
-        meta.setTurn_id(turnId);
-        meta.setWindow_id(windowId);
-        meta.setWindow_number(WINDOW_NUMBER);
-        meta.setContext_window_id(contextWindowId);
-        meta.setRequest_kind(REQUEST_KIND);
-        meta.setRoot_turn_id(rootTurnId);
-        meta.setThread_source(THREAD_SOURCE);
+        meta.setInstallationId(installationId);
+        meta.setSessionId(sessionId);
+        meta.setThreadId(threadId);
+        meta.setAgentName(AGENT_NAME);
+        meta.setTurnId(turnId);
+        meta.setWindowId(windowId);
+        meta.setWindowNumber(WINDOW_NUMBER);
+        meta.setContextWindowId(contextWindowId);
+        meta.setRequestKind(REQUEST_KIND);
+        meta.setRootTurnId(rootTurnId);
+        meta.setThreadSource(THREAD_SOURCE);
         meta.setSandbox(SANDBOX);
-        meta.setSandbox_mode(SANDBOX_MODE);
-        meta.setAuto_review_enabled(false);
-        meta.setNode_repl_auto_review_required(false);
-        meta.setNode_repl_disabled(false);
-        meta.setTurn_started_at_unix_ms(turnStartedAtUnixMs);
+        meta.setSandboxMode(SANDBOX_MODE);
+        meta.setAutoReviewEnabled(false);
+        meta.setNodeReplAutoReviewRequired(false);
+        meta.setNodeReplDisabled(false);
+        meta.setTurnStartedAtUnixMs(turnStartedAtUnixMs);
 
         String turnMetadataJson = objectMapper.writeValueAsString(meta);
 
         Map<String, String> headers = new HashMap<>();
         headers.put("x-codex-beta-features", BETA_FEATURES);
-        headers.put("x-codex-window-id", windowId);
-        headers.put("x-codex-turn-metadata", turnMetadataJson);
+        headers.put(HEADER_WINDOW_ID, windowId);
+        headers.put(HEADER_TURN_METADATA, turnMetadataJson);
         headers.put("x-openai-internal-codex-responses-lite", String.valueOf(INTERNAL_LITE));
         headers.put("x-client-request-id", clientRequestId);
 
@@ -114,7 +117,7 @@ public class CodexTuiGenerator {
      * @return client_metadata 映射；未启用 codex 模拟时为空映射
      */
     public static Map<String, String> buildClientMetadata(Map<String, String> headers) {
-        String turnMetadata = headers == null ? null : headers.get("x-codex-turn-metadata");
+        String turnMetadata = headers == null ? null : headers.get(HEADER_TURN_METADATA);
         if (turnMetadata == null || turnMetadata.isEmpty()) {
             return Collections.emptyMap();
         }
@@ -131,8 +134,8 @@ public class CodexTuiGenerator {
             // 解析失败时仅缺失安装 / 轮次标识，其余字段仍可用
         }
         putIfPresent(meta, "x-codex-installation-id", installationId);
-        putIfPresent(meta, "x-codex-window-id", headers.get("x-codex-window-id"));
-        putIfPresent(meta, "x-codex-turn-metadata", turnMetadata);
+        putIfPresent(meta, HEADER_WINDOW_ID, headers.get(HEADER_WINDOW_ID));
+        putIfPresent(meta, HEADER_TURN_METADATA, turnMetadata);
         putIfPresent(meta, "thread_id", headers.get("thread-id"));
         putIfPresent(meta, "session_id", headers.get("session-id"));
         putIfPresent(meta, "turn_id", turnId);
@@ -157,161 +160,43 @@ public class CodexTuiGenerator {
     }
 
     /**
-     * turn‑metadata JSON实体，无lombok，手写get/set
+     * turn-metadata JSON 实体：字段名保持 Codex 线格式的 snake_case。
      */
+    @Data
     public static class TurnMetadata {
-        private String installation_id;
-        private String session_id;
-        private String thread_id;
-        private String agent_name;
-        private String turn_id;
-        private String window_id;
-        private Integer window_number;
-        private String context_window_id;
-        private String request_kind;
-        private String root_turn_id;
-        private String thread_source;
+        @JsonProperty("installation_id")
+        private String installationId;
+        @JsonProperty("session_id")
+        private String sessionId;
+        @JsonProperty("thread_id")
+        private String threadId;
+        @JsonProperty("agent_name")
+        private String agentName;
+        @JsonProperty("turn_id")
+        private String turnId;
+        @JsonProperty("window_id")
+        private String windowId;
+        @JsonProperty("window_number")
+        private Integer windowNumber;
+        @JsonProperty("context_window_id")
+        private String contextWindowId;
+        @JsonProperty("request_kind")
+        private String requestKind;
+        @JsonProperty("root_turn_id")
+        private String rootTurnId;
+        @JsonProperty("thread_source")
+        private String threadSource;
+        @JsonProperty("sandbox")
         private String sandbox;
-        private String sandbox_mode;
-        private Boolean auto_review_enabled;
-        private Boolean node_repl_auto_review_required;
-        private Boolean node_repl_disabled;
-        private Long turn_started_at_unix_ms;
-
-        public String getInstallation_id() {
-            return installation_id;
-        }
-
-        public void setInstallation_id(String installation_id) {
-            this.installation_id = installation_id;
-        }
-
-        public String getSession_id() {
-            return session_id;
-        }
-
-        public void setSession_id(String session_id) {
-            this.session_id = session_id;
-        }
-
-        public String getThread_id() {
-            return thread_id;
-        }
-
-        public void setThread_id(String thread_id) {
-            this.thread_id = thread_id;
-        }
-
-        public String getAgent_name() {
-            return agent_name;
-        }
-
-        public void setAgent_name(String agent_name) {
-            this.agent_name = agent_name;
-        }
-
-        public String getTurn_id() {
-            return turn_id;
-        }
-
-        public void setTurn_id(String turn_id) {
-            this.turn_id = turn_id;
-        }
-
-        public String getWindow_id() {
-            return window_id;
-        }
-
-        public void setWindow_id(String window_id) {
-            this.window_id = window_id;
-        }
-
-        public Integer getWindow_number() {
-            return window_number;
-        }
-
-        public void setWindow_number(Integer window_number) {
-            this.window_number = window_number;
-        }
-
-        public String getContext_window_id() {
-            return context_window_id;
-        }
-
-        public void setContext_window_id(String context_window_id) {
-            this.context_window_id = context_window_id;
-        }
-
-        public String getRequest_kind() {
-            return request_kind;
-        }
-
-        public void setRequest_kind(String request_kind) {
-            this.request_kind = request_kind;
-        }
-
-        public String getRoot_turn_id() {
-            return root_turn_id;
-        }
-
-        public void setRoot_turn_id(String root_turn_id) {
-            this.root_turn_id = root_turn_id;
-        }
-
-        public String getThread_source() {
-            return thread_source;
-        }
-
-        public void setThread_source(String thread_source) {
-            this.thread_source = thread_source;
-        }
-
-        public String getSandbox() {
-            return sandbox;
-        }
-
-        public void setSandbox(String sandbox) {
-            this.sandbox = sandbox;
-        }
-
-        public String getSandbox_mode() {
-            return sandbox_mode;
-        }
-
-        public void setSandbox_mode(String sandbox_mode) {
-            this.sandbox_mode = sandbox_mode;
-        }
-
-        public Boolean getAuto_review_enabled() {
-            return auto_review_enabled;
-        }
-
-        public void setAuto_review_enabled(Boolean auto_review_enabled) {
-            this.auto_review_enabled = auto_review_enabled;
-        }
-
-        public Boolean getNode_repl_auto_review_required() {
-            return node_repl_auto_review_required;
-        }
-
-        public void setNode_repl_auto_review_required(Boolean node_repl_auto_review_required) {
-            this.node_repl_auto_review_required = node_repl_auto_review_required;
-        }
-
-        public Boolean getNode_repl_disabled() {
-            return node_repl_disabled;
-        }
-
-        public void setNode_repl_disabled(Boolean node_repl_disabled) {
-            this.node_repl_disabled = node_repl_disabled;
-        }
-
-        public Long getTurn_started_at_unix_ms() {
-            return turn_started_at_unix_ms;
-        }
-
-        public void setTurn_started_at_unix_ms(Long turn_started_at_unix_ms) {
-            this.turn_started_at_unix_ms = turn_started_at_unix_ms;
-        }
+        @JsonProperty("sandbox_mode")
+        private String sandboxMode;
+        @JsonProperty("auto_review_enabled")
+        private Boolean autoReviewEnabled;
+        @JsonProperty("node_repl_auto_review_required")
+        private Boolean nodeReplAutoReviewRequired;
+        @JsonProperty("node_repl_disabled")
+        private Boolean nodeReplDisabled;
+        @JsonProperty("turn_started_at_unix_ms")
+        private Long turnStartedAtUnixMs;
     }
 }

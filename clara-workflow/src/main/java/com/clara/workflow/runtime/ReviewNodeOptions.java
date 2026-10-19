@@ -18,6 +18,8 @@ import java.util.List;
  * {@code rounds}（轮次，缺省 1，须为正整数）。
  */
 public final class ReviewNodeOptions {
+    /** REVIEW 节点错误消息的统一前缀。 */
+    private static final String NODE_PREFIX = "REVIEW 节点 ";
 
     private static final String ATTRIBUTE_PROMPT = "prompt";
     private static final String ATTRIBUTE_ROLES = "roles";
@@ -108,7 +110,7 @@ public final class ReviewNodeOptions {
     private static List<String> roles(WorkflowActionSpec spec) {
         Object raw = spec.getAttribute(ATTRIBUTE_ROLES);
         if (!(raw instanceof List)) {
-            throw new IllegalArgumentException("REVIEW 节点 " + ATTRIBUTE_ROLES + " 必须是数组："
+            throw new IllegalArgumentException(NODE_PREFIX + ATTRIBUTE_ROLES + " 必须是数组："
                     + spec.getNodeId());
         }
         List<String> roles = new ArrayList<>();
@@ -119,7 +121,7 @@ public final class ReviewNodeOptions {
             }
         }
         if (roles.isEmpty()) {
-            throw new IllegalArgumentException("REVIEW 节点 " + ATTRIBUTE_ROLES + " 不能为空："
+            throw new IllegalArgumentException(NODE_PREFIX + ATTRIBUTE_ROLES + " 不能为空："
                     + spec.getNodeId());
         }
         return Collections.unmodifiableList(roles);
@@ -137,12 +139,12 @@ public final class ReviewNodeOptions {
             try {
                 value = Integer.parseInt(String.valueOf(raw).trim());
             } catch (NumberFormatException failure) {
-                throw new IllegalArgumentException("REVIEW 节点 " + ATTRIBUTE_ROUNDS + " 必须是整数："
+                throw new IllegalArgumentException(NODE_PREFIX + ATTRIBUTE_ROUNDS + " 必须是整数："
                         + spec.getNodeId());
             }
         }
         if (value <= 0) {
-            throw new IllegalArgumentException("REVIEW 节点 " + ATTRIBUTE_ROUNDS + " 必须为正整数："
+            throw new IllegalArgumentException(NODE_PREFIX + ATTRIBUTE_ROUNDS + " 必须为正整数："
                     + spec.getNodeId());
         }
         return value;

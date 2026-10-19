@@ -222,24 +222,24 @@ public final class StreamingModelProbe implements IModelProbe {
         private long elapsed() {
             return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
         }
-    }
 
-    /**
-     * 把流错误事件转成适合写入检查结果的失败原因，并附上平台返回的错误提示。
-     *
-     * <p>为什么要附平台提示：状态码只能说明「403」，而「余额不足 / 参数非法」这类真实原因在
-     * {@link ClaraError#getSafeDetails()} 的 {@code providerMessage} 里，附上后启动检查即可直接定位问题。
-     *
-     * @param error 错误事件携带的领域错误，可为 null
-     * @return 面向使用者的单行失败原因
-     */
-    private static String describe(ClaraError error) {
-        if (error == null) {
-            return "模型返回错误";
+        /**
+         * 把流错误事件转成适合写入检查结果的失败原因，并附上平台返回的错误提示。
+         *
+         * <p>为什么要附平台提示：状态码只能说明「403」，而「余额不足 / 参数非法」这类真实原因在
+         * {@link ClaraError#getSafeDetails()} 的 {@code providerMessage} 里，附上后启动检查即可直接定位问题。
+         *
+         * @param error 错误事件携带的领域错误，可为 null
+         * @return 面向使用者的单行失败原因
+         */
+        private static String describe(ClaraError error) {
+            if (error == null) {
+                return "模型返回错误";
+            }
+            String message = error.getSafeMessage();
+            String providerMessage = error.getSafeDetails().get("providerMessage");
+            return StringUtils.isBlank(providerMessage) ? message : message + "：" + providerMessage;
         }
-        String message = error.getSafeMessage();
-        String providerMessage = error.getSafeDetails().get("providerMessage");
-        return StringUtils.isBlank(providerMessage) ? message : message + "：" + providerMessage;
     }
 
     /**

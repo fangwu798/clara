@@ -24,6 +24,7 @@ import java.util.Map;
 import org.junit.After;
 import org.junit.Test;
 
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -123,23 +124,19 @@ public class JdkHttpTransportTest {
     @Test
     public void oversizedRequestRejectedBeforeSending() throws Exception {
         URI endpoint = serve(200, "text/plain", "hello");
-        try {
-            call(endpoint, "abc", null, policy(2, 1024));
-            fail("expected request too large");
-        } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.REQUEST_TOO_LARGE, expected.getKind());
-        }
+        HttpTransportPolicy limit = policy(2, 1024);
+        HttpTransportException expected = assertThrows(HttpTransportException.class,
+                () -> call(endpoint, "abc", null, limit));
+        assertEquals(HttpTransportException.Kind.REQUEST_TOO_LARGE, expected.getKind());
     }
 
     @Test
     public void oversizedResponseRejected() throws Exception {
         URI endpoint = serve(200, "text/plain", "0123456789");
-        try {
-            call(endpoint, null, null, policy(1024, 4));
-            fail("expected response too large");
-        } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.RESPONSE_TOO_LARGE, expected.getKind());
-        }
+        HttpTransportPolicy limit = policy(1024, 4);
+        HttpTransportException expected = assertThrows(HttpTransportException.class,
+                () -> call(endpoint, null, null, limit));
+        assertEquals(HttpTransportException.Kind.RESPONSE_TOO_LARGE, expected.getKind());
     }
 
     @Test
@@ -154,13 +151,12 @@ public class JdkHttpTransportTest {
                 return 1000L;
             }
         };
-        try {
-            new JdkHttpTransport().newCall(request(endpoint, null), policy(1024, 1024), cancelled)
-                    .execute();
-            fail("expected cancellation");
-        } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.CANCELLED, expected.getKind());
-        }
+        JdkHttpTransport transport = new JdkHttpTransport();
+        RawHttpRequest rawRequest = request(endpoint, null);
+        HttpTransportPolicy limit = policy(1024, 1024);
+        IHttpCall httpCall = transport.newCall(rawRequest, limit, cancelled);
+        HttpTransportException expected = assertThrows(HttpTransportException.class, httpCall::execute);
+        assertEquals(HttpTransportException.Kind.CANCELLED, expected.getKind());
     }
 
     private RawHttpResponse call(URI endpoint, String body, ISseEventListener listener,

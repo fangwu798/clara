@@ -56,6 +56,9 @@ import java.util.function.Supplier;
  */
 public final class MilvusBm25Backend implements MilvusBackend {
 
+    private static final String EQ_QUOTE = " == \"";
+    private static final String COLLECTION_PREFIX = "milvus collection ";
+
     private static final String FIELD_ID = "id";
     private static final String FIELD_SOURCE_TYPE = "source_type";
     private static final String FIELD_SOURCE_ID = "source_id";
@@ -166,7 +169,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
                 .collectionName(collection)
                 .annsField(FIELD_SPARSE)
                 .metricType(IndexParam.MetricType.BM25)
-                .topK(backendQuery.getCandidateLimit())
+                .limit(backendQuery.getCandidateLimit())
                 .outputFields(OUT_FIELDS)
                 .data(Collections.<BaseVector>singletonList(new EmbeddedText(text)));
         String expr = buildExpr(query);
@@ -200,8 +203,8 @@ public final class MilvusBm25Backend implements MilvusBackend {
         if (collection == null || conversationId == null) {
             throw new IllegalArgumentException("collection and conversationId must not be null");
         }
-        delete(collection, FIELD_SOURCE_TYPE + " == \"" + MemorySourceTypeEnum.CONVERSATION.name()
-                + "\" and " + FIELD_CONVERSATION_ID + " == \"" + escape(conversationId) + "\"");
+        delete(collection, FIELD_SOURCE_TYPE + EQ_QUOTE + MemorySourceTypeEnum.CONVERSATION.name()
+                + "\" and " + FIELD_CONVERSATION_ID + EQ_QUOTE + escape(conversationId) + "\"");
     }
 
     @Override
@@ -295,7 +298,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
         if (schema != null) {
             for (CreateCollectionReq.FieldSchema field : schema.getFieldSchemaList()) {
                 if (FIELD_VECTOR.equals(field.getName())) {
-                    throw new MilvusBackendException("milvus collection " + collection
+                    throw new MilvusBackendException(COLLECTION_PREFIX + collection
                             + " is a dense-vector collection but milvus.mode=bm25; "
                             + "\u5207\u6362\u6a21\u5f0f\u9700\u91cd\u5efa\u96c6\u5408\uff08milvus.recreateOnSchemaMismatch: true\uff09", false);
                 }
@@ -308,7 +311,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
             }
         }
         if (!sparse) {
-            throw new MilvusBackendException("milvus collection " + collection
+            throw new MilvusBackendException(COLLECTION_PREFIX + collection
                     + " has no sparse vector field, it is not a bm25 full-text collection; "
                     + "\u9700\u91cd\u5efa\u96c6\u5408\uff08milvus.recreateOnSchemaMismatch: true\uff09", false);
         }
@@ -333,7 +336,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
         }
         String actual = String.valueOf(params.get("type"));
         if (!expected.getAnalyzer().equals(actual)) {
-            throw new MilvusBackendException("milvus collection " + collection + " uses analyzer " + actual
+            throw new MilvusBackendException(COLLECTION_PREFIX + collection + " uses analyzer " + actual
                     + " but milvus.analyzer=" + expected.getAnalyzer()
                     + "; \u5207\u6362\u5206\u8bcd\u5668\u9700\u91cd\u5efa\u96c6\u5408\uff08milvus.recreateOnSchemaMismatch: true\uff09", false);
         }
@@ -412,13 +415,13 @@ public final class MilvusBm25Backend implements MilvusBackend {
     private static String buildExpr(SemanticMemoryQuery query) {
         StringBuilder expr = new StringBuilder();
         if (query.getSourceType() != null) {
-            expr.append(FIELD_SOURCE_TYPE).append(" == \"").append(query.getSourceType().name()).append("\"");
+            expr.append(FIELD_SOURCE_TYPE).append(EQ_QUOTE).append(query.getSourceType().name()).append("\"");
         }
         if (query.getConversationId() != null) {
             if (expr.length() > 0) {
                 expr.append(" and ");
             }
-            expr.append(FIELD_CONVERSATION_ID).append(" == \"").append(escape(query.getConversationId())).append("\"");
+            expr.append(FIELD_CONVERSATION_ID).append(EQ_QUOTE).append(escape(query.getConversationId())).append("\"");
         }
         return expr.toString();
     }

@@ -51,37 +51,44 @@ public class ReviewNodeOptionsTest {
     public void rejectsMissingRequiredAttributes() {
         Map<String, Object> withoutPrompt = validAttributes();
         withoutPrompt.remove("prompt");
-        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(spec(withoutPrompt)));
+        WorkflowActionSpec nodeSpec1 = spec(withoutPrompt);
+        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(nodeSpec1));
 
         Map<String, Object> withoutModerator = validAttributes();
         withoutModerator.remove("moderator");
-        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(spec(withoutModerator)));
+        WorkflowActionSpec nodeSpec2 = spec(withoutModerator);
+        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(nodeSpec2));
 
         Map<String, Object> withoutRoles = validAttributes();
         withoutRoles.remove("roles");
-        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(spec(withoutRoles)));
+        WorkflowActionSpec nodeSpec3 = spec(withoutRoles);
+        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(nodeSpec3));
     }
 
     @Test
     public void rejectsEmptyOrWrongTypedRoles() {
         Map<String, Object> emptyRoles = validAttributes();
         emptyRoles.put("roles", Arrays.asList("  ", ""));
-        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(spec(emptyRoles)));
+        WorkflowActionSpec nodeSpec4 = spec(emptyRoles);
+        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(nodeSpec4));
 
         Map<String, Object> wrongType = validAttributes();
         wrongType.put("roles", "architect");
-        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(spec(wrongType)));
+        WorkflowActionSpec nodeSpec5 = spec(wrongType);
+        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(nodeSpec5));
     }
 
     @Test
     public void rejectsNonPositiveRounds() {
         Map<String, Object> zero = validAttributes();
         zero.put("rounds", Integer.valueOf(0));
-        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(spec(zero)));
+        WorkflowActionSpec nodeSpec6 = spec(zero);
+        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(nodeSpec6));
 
         Map<String, Object> notNumber = validAttributes();
         notNumber.put("rounds", "many");
-        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(spec(notNumber)));
+        WorkflowActionSpec nodeSpec7 = spec(notNumber);
+        assertThrows(IllegalArgumentException.class, () -> ReviewNodeOptions.fromSpec(nodeSpec7));
     }
 
     private static WorkflowActionSpec spec(Map<String, Object> attributes) {

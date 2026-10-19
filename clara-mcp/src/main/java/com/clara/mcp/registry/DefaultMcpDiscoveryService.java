@@ -46,7 +46,7 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
     private final LongSupplier clock;
 
     public DefaultMcpDiscoveryService(IMcpServerRegistry registry, IMcpCapabilityCatalog catalog, IMcpClientFactory clientFactory, List<String> supportedVersions, int maxPages) {
-        this(registry, catalog, clientFactory, supportedVersions, maxPages, () -> UUID.randomUUID().toString(), () -> System.currentTimeMillis());
+        this(registry, catalog, clientFactory, supportedVersions, maxPages, () -> UUID.randomUUID().toString(), System::currentTimeMillis);
     }
 
     DefaultMcpDiscoveryService(IMcpServerRegistry registry, IMcpCapabilityCatalog catalog, IMcpClientFactory clientFactory, List<String> supportedVersions, int maxPages, Supplier<String> snapshotIds, LongSupplier clock) {
@@ -73,18 +73,15 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
             throw new IllegalArgumentException("registration must not be null");
         }
         IMcpClient client = clientFactory.create(registration);
-        if (client == null) {
-            throw new IllegalStateException("clientFactory returned null");
-        }
-        RuntimeException failure = null;
+        McpServerSnapshot snapshot;
         try {
             McpInitialization initialization = client.initialize(supportedVersions);
             validateInitialization(registration, initialization);
-            List<McpToolDescriptor> tools = initialization.getCapabilities().supportsTools() ? collect((value, cursor) -> value.listTools(cursor), client) : Collections.<McpToolDescriptor>emptyList();
-            List<McpResourceDescriptor> resources = initialization.getCapabilities().supportsResources() ? collect((value, cursor) -> value.listResources(cursor), client) : Collections.<McpResourceDescriptor>emptyList();
-            List<McpResourceTemplateDescriptor> resourceTemplates = initialization.getCapabilities().supportsResources() ? collect((value, cursor) -> value.listResourceTemplates(cursor), client) : Collections.<McpResourceTemplateDescriptor>emptyList();
-            List<McpPromptDescriptor> prompts = initialization.getCapabilities().supportsPrompts() ? collect((value, cursor) -> value.listPrompts(cursor), client) : Collections.<McpPromptDescriptor>emptyList();
-            return new McpServerSnapshot(
+            List<McpToolDescriptor> tools = initialization.getCapabilities().supportsTools() ? collect(IMcpClient::listTools, client) : Collections.<McpToolDescriptor>emptyList();
+            List<McpResourceDescriptor> resources = initialization.getCapabilities().supportsResources() ? collect(IMcpClient::listResources, client) : Collections.<McpResourceDescriptor>emptyList();
+            List<McpResourceTemplateDescriptor> resourceTemplates = initialization.getCapabilities().supportsResources() ? collect(IMcpClient::listResourceTemplates, client) : Collections.<McpResourceTemplateDescriptor>emptyList();
+            List<McpPromptDescriptor> prompts = initialization.getCapabilities().supportsPrompts() ? collect(IMcpClient::listPrompts, client) : Collections.<McpPromptDescriptor>emptyList();
+            snapshot = new McpServerSnapshot(
                     snapshotIds.get(),
                     registration.getTenantId(),
                     registration.getServerKey(),
@@ -97,16 +94,22 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
                     prompts,
                     McpHealthStatus.HEALTHY);
         } catch (RuntimeException exception) {
-            failure = exception;
+            closeQuietly(client);
             throw exception;
-        } finally {
-            try {
-                client.close();
-            } catch (IOException exception) {
-                if (failure == null) {
-                    throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE);
-                }
-            }
+        }
+        try {
+            client.close();
+        } catch (IOException exception) {
+            throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE);
+        }
+        return snapshot;
+    }
+
+    private static void closeQuietly(IMcpClient client) {
+        try {
+            client.close();
+        } catch (IOException exception) {
+            // 主流程已经失败，关闭异常不再覆盖原始原因。
         }
     }
 

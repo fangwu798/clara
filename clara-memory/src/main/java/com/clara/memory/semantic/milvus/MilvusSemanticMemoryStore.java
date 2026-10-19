@@ -8,7 +8,6 @@ import com.clara.memory.semantic.SemanticMemoryErrors;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -80,6 +79,20 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
     @Override
     public List<MemoryMatch> search(SemanticMemoryQuery query) {
         open();
+        validateQuery(query);
+        List<MemoryMatch> matches = searchBackend(query);
+        if (matches == null) {
+            return Collections.emptyList();
+        }
+        List<MemoryMatch> filtered = filterMatches(matches, query.getMinScore());
+        Collections.sort(filtered, MilvusSemanticMemoryStore::compareMatches);
+        if (filtered.size() > query.getTopK()) {
+            filtered = new ArrayList<>(filtered.subList(0, query.getTopK()));
+        }
+        return Collections.unmodifiableList(filtered);
+    }
+
+    private void validateQuery(SemanticMemoryQuery query) {
         if (query == null) {
             throw new IllegalArgumentException("query must not be null");
         }
@@ -91,41 +104,34 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
         } else if (query.getVector().length != spec.getDimension()) {
             throw SemanticMemoryErrors.configMismatch();
         }
-        List<MemoryMatch> matches;
+    }
+
+    private List<MemoryMatch> searchBackend(SemanticMemoryQuery query) {
         try {
-            matches = backend.search(spec.getCollection(),
-                    new MilvusBackendQuery(query, query.getTopK()));
+            return backend.search(spec.getCollection(), new MilvusBackendQuery(query, query.getTopK()));
         } catch (MilvusBackendException e) {
             throw SemanticMemoryErrors.backendFailed(e.isRetryable());
         }
-        if (matches == null) {
-            return Collections.emptyList();
-        }
+    }
+
+    private static List<MemoryMatch> filterMatches(List<MemoryMatch> matches, double minScore) {
         List<MemoryMatch> filtered = new ArrayList<>();
         for (MemoryMatch match : matches) {
-            if (match != null && match.getScore() >= query.getMinScore()) {
+            if (match != null && match.getScore() >= minScore) {
                 filtered.add(match);
             }
         }
-        Collections.sort(filtered, new Comparator<MemoryMatch>() {
-            @Override
-            public int compare(MemoryMatch left, MemoryMatch right) {
-                int byScore = Double.compare(right.getScore(), left.getScore());
-                if (byScore != 0) {
-                    return byScore;
-                }
-                int byTime = Long.compare(right.getEntry().getCreatedAtEpochMillis(),
-                        left.getEntry().getCreatedAtEpochMillis());
-                if (byTime != 0) {
-                    return byTime;
-                }
-                return left.getEntry().getId().compareTo(right.getEntry().getId());
-            }
-        });
-        if (filtered.size() > query.getTopK()) {
-            filtered = new ArrayList<>(filtered.subList(0, query.getTopK()));
+        return filtered;
+    }
+
+    private static int compareMatches(MemoryMatch left, MemoryMatch right) {
+        int byScore = Double.compare(right.getScore(), left.getScore());
+        if (byScore != 0) {
+            return byScore;
         }
-        return Collections.unmodifiableList(filtered);
+        int byTime = Long.compare(right.getEntry().getCreatedAtEpochMillis(),
+                left.getEntry().getCreatedAtEpochMillis());
+        return byTime != 0 ? byTime : left.getEntry().getId().compareTo(right.getEntry().getId());
     }
 
     @Override

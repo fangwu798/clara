@@ -53,11 +53,13 @@ public class MilvusSemanticMemoryStoreBm25Test {
     @Test
     public void blankQueryTextIsTreatedAsMissing() {
         MilvusCollectionSpec spec = new MilvusCollectionSpec("clara_conversations", "chinese");
-        MilvusSemanticMemoryStore store = new MilvusSemanticMemoryStore(spec, new RecordingBackend(spec));
+        RecordingBackend backend = new RecordingBackend(spec);
+        MilvusSemanticMemoryStore store = new MilvusSemanticMemoryStore(spec, backend);
         try {
             store.search(query("   "));
             throw new AssertionError("blank query text should be treated as missing");
         } catch (IllegalArgumentException expected) {
+            assertTrue("blank text must be rejected before querying the backend", backend.queries.isEmpty());
             // 期望：空白文本被归一成 null，仍按「缺正文」拒绝
         }
     }

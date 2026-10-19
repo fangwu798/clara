@@ -58,6 +58,12 @@ import java.util.function.Function;
  * {@code MCP_DISCOVERY_FAILED}，传输层异常原样上抛。
  */
 public final class DefaultMcpClient implements IMcpClient {
+
+    private static final String FIELD_TOOLS = "tools";
+    private static final String FIELD_DESCRIPTION = "description";
+    private static final String FIELD_RESOURCES = "resources";
+    private static final String FIELD_PROMPTS = "prompts";
+    private static final String FIELD_ARGUMENTS = "arguments";
     private static final String CLIENT_NAME = "clara-mcp";
     private static final String CLIENT_VERSION = "0.1.0";
     private static final String INITIALIZE = "initialize";
@@ -81,11 +87,7 @@ public final class DefaultMcpClient implements IMcpClient {
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Object startLock = new Object();
-    private final IMcpTransportListener listener = new IMcpTransportListener() {
-        public void onNotification(JsonRpcNotification notification) { }
-        public void onServerRequest(JsonRpcRequest request) { }
-        public void onFailure(Throwable failure) { }
-    };
+    private final IMcpTransportListener listener = new NoopTransportListener();
 
     /**
      * 创建绑定到给定传输的客户端。
@@ -127,47 +129,51 @@ public final class DefaultMcpClient implements IMcpClient {
     }
 
     public McpPage<McpToolDescriptor> listTools(String cursor) {
-        return listPage(LIST_TOOLS, "tools", cursor, new Function<Map<String, Object>, McpToolDescriptor>() {
-            public McpToolDescriptor apply(Map<String, Object> item) {
-                return new McpToolDescriptor(requiredString(item, "name"), string(item, "description"),
-                        map(item, "inputSchema"));
-            }
-        });
+        return listPage(LIST_TOOLS, FIELD_TOOLS, cursor,
+                item -> new McpToolDescriptor(requiredString(item, "name"), string(item, FIELD_DESCRIPTION),
+                        map(item, "inputSchema")));
     }
 
     public McpPage<McpResourceDescriptor> listResources(String cursor) {
-        return listPage(LIST_RESOURCES, "resources", cursor,
-                new Function<Map<String, Object>, McpResourceDescriptor>() {
-                    public McpResourceDescriptor apply(Map<String, Object> item) {
-                        return new McpResourceDescriptor(requiredString(item, "uri"), string(item, "name"),
-                                string(item, "mimeType"));
-                    }
-                });
+        return listPage(LIST_RESOURCES, FIELD_RESOURCES, cursor,
+                item -> new McpResourceDescriptor(requiredString(item, "uri"), string(item, "name"),
+                        string(item, "mimeType")));
     }
 
     public McpPage<McpResourceTemplateDescriptor> listResourceTemplates(String cursor) {
         return listPage(LIST_RESOURCE_TEMPLATES, "resourceTemplates", cursor,
-                new Function<Map<String, Object>, McpResourceTemplateDescriptor>() {
-                    public McpResourceTemplateDescriptor apply(Map<String, Object> item) {
-                        return new McpResourceTemplateDescriptor(requiredString(item, "uriTemplate"),
-                                string(item, "name"), string(item, "mimeType"));
-                    }
-                });
+                item -> new McpResourceTemplateDescriptor(requiredString(item, "uriTemplate"),
+                        string(item, "name"), string(item, "mimeType")));
     }
 
     public McpPage<McpPromptDescriptor> listPrompts(String cursor) {
-        return listPage(LIST_PROMPTS, "prompts", cursor,
-                new Function<Map<String, Object>, McpPromptDescriptor>() {
-                    public McpPromptDescriptor apply(Map<String, Object> item) {
-                        List<McpPromptArgument> arguments = new ArrayList<>();
-                        for (Map<String, Object> argument : mapList(item.get("arguments"))) {
-                            arguments.add(new McpPromptArgument(requiredString(argument, "name"),
-                                    string(argument, "description"), booleanValue(argument.get("required"))));
-                        }
-                        return new McpPromptDescriptor(requiredString(item, "name"),
-                                string(item, "description"), arguments);
+        return listPage(LIST_PROMPTS, FIELD_PROMPTS, cursor,
+                item -> {
+                    List<McpPromptArgument> arguments = new ArrayList<>();
+                    for (Map<String, Object> argument : mapList(item.get(FIELD_ARGUMENTS))) {
+                        arguments.add(new McpPromptArgument(requiredString(argument, "name"),
+                                string(argument, FIELD_DESCRIPTION), booleanValue(argument.get("required"))));
                     }
+                    return new McpPromptDescriptor(requiredString(item, "name"),
+                            string(item, FIELD_DESCRIPTION), arguments);
                 });
+    }
+
+    private static final class NoopTransportListener implements IMcpTransportListener {
+        @Override
+        public void onNotification(JsonRpcNotification notification) {
+            // 客户端不消费服务端通知
+        }
+
+        @Override
+        public void onServerRequest(JsonRpcRequest request) {
+            // 客户端不支持服务端反向请求
+        }
+
+        @Override
+        public void onFailure(Throwable failure) {
+            // 同步调用路径由请求超时与异常返回处理传输故障
+        }
     }
 
     private <T> McpPage<T> listPage(String method, String itemsKey, String cursor,
@@ -184,7 +190,7 @@ public final class DefaultMcpClient implements IMcpClient {
         if (call == null) { throw new IllegalArgumentException("call must not be null"); }
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("name", call.getToolName());
-        params.put("arguments", call.getArguments());
+        params.put(FIELD_ARGUMENTS, call.getArguments());
         Map<String, Object> result = send(CALL_TOOL, params);
         return new McpToolResult(mapList(result.get("content")), booleanValue(result.get("isError")));
     }
@@ -202,9 +208,9 @@ public final class DefaultMcpClient implements IMcpClient {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("name", request.getPromptName());
-        params.put("arguments", request.getArguments());
+        params.put(FIELD_ARGUMENTS, request.getArguments());
         Map<String, Object> result = send(GET_PROMPT, params);
-        return new McpPromptResult(string(result, "description"), mapList(result.get("messages")), false);
+        return new McpPromptResult(string(result, FIELD_DESCRIPTION), mapList(result.get("messages")), false);
     }
 
     public void close() throws IOException {
@@ -273,9 +279,9 @@ public final class DefaultMcpClient implements IMcpClient {
 
     private static McpServerCapabilities capabilities(Map<String, Object> value) {
         Map<String, Object> caps = value == null ? Collections.<String, Object>emptyMap() : value;
-        return new McpServerCapabilities(caps.containsKey("tools"), caps.containsKey("resources"),
-                caps.containsKey("prompts"), listChanged(caps, "tools"), listChanged(caps, "resources"),
-                listChanged(caps, "prompts"));
+        return new McpServerCapabilities(caps.containsKey(FIELD_TOOLS), caps.containsKey(FIELD_RESOURCES),
+                caps.containsKey(FIELD_PROMPTS), listChanged(caps, FIELD_TOOLS), listChanged(caps, FIELD_RESOURCES),
+                listChanged(caps, FIELD_PROMPTS));
     }
 
     private static boolean listChanged(Map<String, Object> caps, String key) {

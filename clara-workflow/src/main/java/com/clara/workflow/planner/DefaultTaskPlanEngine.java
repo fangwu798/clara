@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -63,10 +62,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         Map<String, Object> values = inputs == null
                 ? new LinkedHashMap<>()
                 : new LinkedHashMap<>(inputs);
-        Map<String, TaskNodeStatusEnum> statuses = new LinkedHashMap<>();
-        for (TaskNode task : plan.getTasks()) {
-            statuses.put(task.getTaskId(), TaskNodeStatusEnum.PENDING);
-        }
+        Map<String, TaskNodeStatusEnum> statuses = initialStatuses(plan);
         AtomicInteger steps = new AtomicInteger();
         long deadline = deadline(validator.getLimits().getTotalTimeoutMillis());
         while (!allSucceeded(statuses)) {
@@ -75,54 +71,9 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
                 throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.VALIDATION);
             }
             final Map<String, Object> batchValues = new LinkedHashMap<>(values);
-            List<Future<TaskOutcome>> futures = new ArrayList<>();
-            List<BudgetReservation> reservations = new ArrayList<>();
-            try {
-                for (TaskNode task : ready) {
-                    statuses.put(task.getTaskId(), TaskNodeStatusEnum.READY);
-                    reservations.add(budgets.reserve(runId, task.getTaskId(), task.getBudget()));
-                }
-            } catch (RuntimeException failure) {
-                for (BudgetReservation reservation : reservations) {
-                    if (reservation.getStatus() == BudgetReservationStatusEnum.RESERVED) {
-                        budgets.release(reservation.getReservationId());
-                    }
-                }
-                throw failure;
-            }
-            for (int index = 0; index < ready.size(); index++) {
-                final TaskNode task = ready.get(index);
-                final BudgetReservation reservation = reservations.get(index);
-                futures.add(schedulers.submit(new Callable<TaskOutcome>() {
-                    @Override
-                    public TaskOutcome call() {
-                        return executeTask(plan, runId, task, reservation, batchValues, deadline, steps);
-                    }
-                }));
-            }
-            RuntimeException deferred = null;
-            for (int index = 0; index < futures.size(); index++) {
-                TaskNode task = ready.get(index);
-                try {
-                    TaskOutcome outcome = futures.get(index).get();
-                    applyResult(task, outcome.result, values);
-                    statuses.put(task.getTaskId(), TaskNodeStatusEnum.SUCCEEDED);
-                } catch (InterruptedException failure) {
-                    Thread.currentThread().interrupt();
-                    statuses.put(task.getTaskId(), TaskNodeStatusEnum.FAILED);
-                    if (deferred == null) {
-                        deferred = unknown();
-                    }
-                } catch (ExecutionException failure) {
-                    statuses.put(task.getTaskId(), TaskNodeStatusEnum.FAILED);
-                    Throwable cause = failure.getCause();
-                    if (deferred == null) {
-                        deferred = cause instanceof RuntimeException
-                                ? (RuntimeException) cause
-                                : PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.INTERNAL);
-                    }
-                }
-            }
+            List<BudgetReservation> reservations = reserve(runId, ready, statuses);
+            List<Future<TaskOutcome>> futures = submit(plan, runId, ready, reservations, batchValues, deadline, steps);
+            RuntimeException deferred = collect(ready, futures, values, statuses);
             if (deferred != null) {
                 throw deferred;
             }
@@ -130,6 +81,82 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         TaskPlan completed = new TaskPlan(plan.getGoal(), plan.getVersion(), plan.getTasks(),
                 plan.getLimits(), PlanStatusEnum.SUCCEEDED);
         return new TaskPlanResult(completed, PlanStatusEnum.SUCCEEDED, statuses, values, steps.get());
+    }
+
+    private static Map<String, TaskNodeStatusEnum> initialStatuses(TaskPlan plan) {
+        Map<String, TaskNodeStatusEnum> statuses = new LinkedHashMap<>();
+        for (TaskNode task : plan.getTasks()) {
+            statuses.put(task.getTaskId(), TaskNodeStatusEnum.PENDING);
+        }
+        return statuses;
+    }
+
+    private List<BudgetReservation> reserve(String runId, List<TaskNode> ready,
+            Map<String, TaskNodeStatusEnum> statuses) {
+        List<BudgetReservation> reservations = new ArrayList<>();
+        try {
+            for (TaskNode task : ready) {
+                statuses.put(task.getTaskId(), TaskNodeStatusEnum.READY);
+                reservations.add(budgets.reserve(runId, task.getTaskId(), task.getBudget()));
+            }
+        } catch (RuntimeException failure) {
+            releaseReserved(reservations);
+            throw failure;
+        }
+        return reservations;
+    }
+
+    private void releaseReserved(List<BudgetReservation> reservations) {
+        for (BudgetReservation reservation : reservations) {
+            if (reservation.getStatus() == BudgetReservationStatusEnum.RESERVED) {
+                budgets.release(reservation.getReservationId());
+            }
+        }
+    }
+
+    private List<Future<TaskOutcome>> submit(TaskPlan plan, String runId, List<TaskNode> ready,
+            List<BudgetReservation> reservations, Map<String, Object> batchValues, long deadline,
+            AtomicInteger steps) {
+        List<Future<TaskOutcome>> futures = new ArrayList<>();
+        for (int index = 0; index < ready.size(); index++) {
+            final TaskNode task = ready.get(index);
+            final BudgetReservation reservation = reservations.get(index);
+            futures.add(schedulers.submit(
+                    () -> executeTask(plan, runId, task, reservation, batchValues, deadline, steps)));
+        }
+        return futures;
+    }
+
+    private static RuntimeException collect(List<TaskNode> ready, List<Future<TaskOutcome>> futures,
+            Map<String, Object> values, Map<String, TaskNodeStatusEnum> statuses) {
+        RuntimeException deferred = null;
+        for (int index = 0; index < futures.size(); index++) {
+            TaskNode task = ready.get(index);
+            try {
+                TaskOutcome outcome = futures.get(index).get();
+                applyResult(task, outcome.result, values);
+                statuses.put(task.getTaskId(), TaskNodeStatusEnum.SUCCEEDED);
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                statuses.put(task.getTaskId(), TaskNodeStatusEnum.FAILED);
+                if (deferred == null) {
+                    deferred = unknown();
+                }
+            } catch (ExecutionException failure) {
+                statuses.put(task.getTaskId(), TaskNodeStatusEnum.FAILED);
+                if (deferred == null) {
+                    deferred = failureCause(failure);
+                }
+            }
+        }
+        return deferred;
+    }
+
+    private static RuntimeException failureCause(ExecutionException failure) {
+        Throwable cause = failure.getCause();
+        return cause instanceof RuntimeException
+                ? (RuntimeException) cause
+                : PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.INTERNAL);
     }
 
     @Override
@@ -142,20 +169,33 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
             BudgetReservation reservation, Map<String, Object> values, long deadline,
             AtomicInteger steps) {
         String executionKey = runId + ":" + task.getTaskId();
-        ExecutionRecord record = executions.recordIntent(executionKey, plan.getGoal(),
+        ExecutionRecord executionRecord = executions.recordIntent(executionKey, plan.getGoal(),
                 plan.getVersion(), task.getTaskId());
-        if (record.getStatus() == ExecutionRecordStatusEnum.SUCCEEDED) {
-            if (reservation.getStatus() == BudgetReservationStatusEnum.RESERVED) {
-                budgets.settle(reservation.getReservationId(), record.getResult().getActualBudget());
-            }
-            return new TaskOutcome(record.getResult());
+        if (executionRecord.getStatus() == ExecutionRecordStatusEnum.SUCCEEDED) {
+            return replaySucceeded(executionRecord, reservation);
         }
-        if (record.getStatus() == ExecutionRecordStatusEnum.UNKNOWN) {
-            if (reservation.getStatus() == BudgetReservationStatusEnum.RESERVED) {
-                budgets.markUnknown(reservation.getReservationId());
-            }
+        if (executionRecord.getStatus() == ExecutionRecordStatusEnum.UNKNOWN) {
+            markUnknown(reservation);
             throw unknown();
         }
+        return executeWithRetries(plan, task, reservation, values, deadline, steps, executionKey);
+    }
+
+    private TaskOutcome replaySucceeded(ExecutionRecord executionRecord, BudgetReservation reservation) {
+        if (reservation.getStatus() == BudgetReservationStatusEnum.RESERVED) {
+            budgets.settle(reservation.getReservationId(), executionRecord.getResult().getActualBudget());
+        }
+        return new TaskOutcome(executionRecord.getResult());
+    }
+
+    private void markUnknown(BudgetReservation reservation) {
+        if (reservation.getStatus() == BudgetReservationStatusEnum.RESERVED) {
+            budgets.markUnknown(reservation.getReservationId());
+        }
+    }
+
+    private TaskOutcome executeWithRetries(TaskPlan plan, TaskNode task, BudgetReservation reservation,
+            Map<String, Object> values, long deadline, AtomicInteger steps, String executionKey) {
         Throwable lastFailure = null;
         for (int attempt = 1; attempt <= task.getRetryPolicy().getMaxAttempts(); attempt++) {
             if (steps.incrementAndGet() > validator.getLimits().getMaxPlanSteps()) {
@@ -163,9 +203,8 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
                 throw PlannerErrors.error(ErrorCodes.PLAN_LIMIT_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
             }
             executions.beginAttempt(executionKey);
-            TaskExecutionResult result;
             try {
-                result = invoke(task, plan, attempt, executionKey, values, deadline);
+                return attemptOnce(plan, task, reservation, values, deadline, executionKey, attempt);
             } catch (UnknownSideEffectException failure) {
                 executions.markUnknown(executionKey, failure);
                 budgets.markUnknown(reservation.getReservationId());
@@ -176,23 +215,24 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
                 if (attempt < task.getRetryPolicy().getMaxAttempts()) {
                     delay(task.getRetryPolicy().getDelayMillis());
                 }
-                continue;
             }
-            if (result == null || !result.getOutputs().containsKey(task.getOutputKey())) {
-                UnknownSideEffectException failure = new UnknownSideEffectException("task result is invalid");
-                executions.markUnknown(executionKey, failure);
-                budgets.markUnknown(reservation.getReservationId());
-                throw unknown();
-            }
-            executions.succeed(executionKey, result);
-            budgets.settle(reservation.getReservationId(), result.getActualBudget());
-            return new TaskOutcome(result);
         }
         budgets.release(reservation.getReservationId());
         if (lastFailure instanceof RuntimeException) {
             throw (RuntimeException) lastFailure;
         }
         throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.INTERNAL);
+    }
+
+    private TaskOutcome attemptOnce(TaskPlan plan, TaskNode task, BudgetReservation reservation,
+            Map<String, Object> values, long deadline, String executionKey, int attempt) throws Exception {
+        TaskExecutionResult result = invoke(task, plan, attempt, executionKey, values, deadline);
+        if (result == null || !result.getOutputs().containsKey(task.getOutputKey())) {
+            throw new UnknownSideEffectException("task result is invalid");
+        }
+        executions.succeed(executionKey, result);
+        budgets.settle(reservation.getReservationId(), result.getActualBudget());
+        return new TaskOutcome(result);
     }
 
     private TaskExecutionResult invoke(final TaskNode task, final TaskPlan plan, final int attempt,
@@ -203,13 +243,8 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         if (timeout <= 0L) {
             throw new UnknownSideEffectException("plan timeout");
         }
-        Future<TaskExecutionResult> future = calls.submit(new Callable<TaskExecutionResult>() {
-            @Override
-            public TaskExecutionResult call() throws Exception {
-                return task.getHandler().execute(
-                        new TaskExecutionContext(plan, attempt, executionKey, values));
-            }
-        });
+        Future<TaskExecutionResult> future = calls.submit(() -> task.getHandler().execute(
+                new TaskExecutionContext(plan, attempt, executionKey, values)));
         try {
             return future.get(timeout, TimeUnit.MILLISECONDS);
         } catch (TimeoutException failure) {
@@ -227,7 +262,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
             if (cause instanceof Exception) {
                 throw (Exception) cause;
             }
-            throw new RuntimeException(cause);
+            throw new IllegalStateException("task execution failed", cause);
         }
     }
 
@@ -242,17 +277,9 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
             int maximum) {
         List<TaskNode> result = new ArrayList<>();
         for (TaskNode task : plan.getTasks()) {
-            if (statuses.get(task.getTaskId()) != TaskNodeStatusEnum.PENDING) {
-                continue;
-            }
-            boolean ready = true;
-            for (String dependency : task.getDependencies()) {
-                if (statuses.get(dependency) != TaskNodeStatusEnum.SUCCEEDED) {
-                    ready = false;
-                    break;
-                }
-            }
-            if (ready) {
+            if (statuses.get(task.getTaskId()) == TaskNodeStatusEnum.PENDING
+                    && task.getDependencies().stream()
+                            .allMatch(dependency -> statuses.get(dependency) == TaskNodeStatusEnum.SUCCEEDED)) {
                 result.add(task);
                 if (result.size() == maximum) {
                     break;

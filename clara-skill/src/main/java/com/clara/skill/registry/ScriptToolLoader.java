@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.Collections;
 
 /**
  * 脚本工具加载器：执行 {@code python <script> --describe}，从脚本输出解析工具声明。
@@ -79,9 +80,7 @@ public final class ScriptToolLoader {
         }
         try {
             return toTool(MAPPER.readTree(stdout), script);
-        } catch (IOException e) {
-            return null;
-        } catch (IllegalArgumentException e) {
+        } catch (IOException | IllegalArgumentException e) {
             return null;
         }
     }
@@ -148,7 +147,7 @@ public final class ScriptToolLoader {
             return;
         }
         pythonMissingWarned = true;
-        System.err.println("[skill] 无法执行 Python 以加载脚本工具（" + script.getName() + "）："
+        System.err.println("[skill] 无法执行 Python 以加载脚本工具（" + script.getName() + "）：" // NOSONAR CLI output by design
                 + cause.getMessage() + "；请确认已安装 Python 并加入 PATH（或设置 PYTHON_PATH）。");
     }
 
@@ -197,7 +196,7 @@ public final class ScriptToolLoader {
 
     private static Map<String, String> metadata(JsonNode node) {
         if (node == null || !node.isObject()) {
-            return null;
+            return Collections.emptyMap();
         }
         Map<String, String> result = new LinkedHashMap<>();
         Iterator<Map.Entry<String, JsonNode>> fields = node.fields();

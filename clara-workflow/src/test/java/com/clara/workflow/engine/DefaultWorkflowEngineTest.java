@@ -211,9 +211,9 @@ public class DefaultWorkflowEngineTest {
         DefaultWorkflowEngine engine = engine(2);
         engine.start(definition, "inst-v", Collections.emptyMap());
 
+        Map<String, Object> answers = Collections.<String, Object>singletonMap("answer", "yes");
         ClaraException conflict = assertThrows(ClaraException.class,
-                () -> engine.resume(definition, "inst-v",
-                        Collections.<String, Object>singletonMap("answer", "yes"), 99L));
+                () -> engine.resume(definition, "inst-v", answers, 99L));
         assertEquals(ErrorCodes.WORKFLOW_VERSION_CONFLICT, conflict.getError().getCode());
 
         WorkflowResult resumed = engine.resume(definition, "inst-v",
@@ -252,8 +252,9 @@ public class DefaultWorkflowEngineTest {
         DefaultWorkflowEngine engine = engine(2);
         engine.start(definition, "inst-dup", Collections.emptyMap());
 
+        Map<String, Object> empty = Collections.emptyMap();
         ClaraException conflict = assertThrows(ClaraException.class,
-                () -> engine.start(definition, "inst-dup", Collections.emptyMap()));
+                () -> engine.start(definition, "inst-dup", empty));
         assertEquals(ErrorCodes.WORKFLOW_INVALID_STATE, conflict.getError().getCode());
     }
 
@@ -261,8 +262,10 @@ public class DefaultWorkflowEngineTest {
     public void resumeUnknownInstanceFails() {
         WorkflowDefinition definition = definition(WorkflowNodes.human("h", "answer"));
 
+        DefaultWorkflowEngine unknown = engine(2);
+        Map<String, Object> empty = Collections.emptyMap();
         ClaraException failure = assertThrows(ClaraException.class,
-                () -> engine(2).resume(definition, "missing", Collections.emptyMap()));
+                () -> unknown.resume(definition, "missing", empty));
         assertEquals(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, failure.getError().getCode());
     }
 
@@ -277,7 +280,8 @@ public class DefaultWorkflowEngineTest {
 
         engine.close();
 
+        Map<String, Object> empty = Collections.emptyMap();
         assertThrows(RejectedExecutionException.class,
-                () -> engine.start(definition, "inst-closed", Collections.emptyMap()));
+                () -> engine.start(definition, "inst-closed", empty));
     }
 }

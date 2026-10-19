@@ -14,6 +14,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 
 /**
  * {@link LocalSemanticMemoryStore} 的单元测试：余弦相似度排序、topK/minScore 过滤与按条目 / 会话删除。
@@ -101,7 +102,7 @@ public class LocalSemanticMemoryStoreTest {
         List<MemoryMatch> matches = store.search(query(new float[] {1, 1}, 10, 0.0));
         assertEquals(2, matches.size());
         for (MemoryMatch match : matches) {
-            assertFalse("conv1".equals(match.getEntry().getId()));
+            assertNotEquals("conv1", match.getEntry().getId());
         }
     }
 }

@@ -132,8 +132,8 @@ public class InMemoryInteractionServiceTest {
         InMemoryInteractionService service = service(coordinator, 5);
         service.request(context("i1", "r1"), textQuestion("answer"));
 
-        ClaraException error = assertThrows(ClaraException.class,
-                () -> service.submit(feedback("i1", 9L, "idem-1")));
+        InteractionFeedback stale = feedback("i1", 9L, "idem-1");
+        ClaraException error = assertThrows(ClaraException.class, () -> service.submit(stale));
 
         assertEquals(ErrorCodes.INTERACTION_CONFLICT, error.getError().getCode());
     }
@@ -156,8 +156,9 @@ public class InMemoryInteractionServiceTest {
         InMemoryInteractionService service = service(coordinator, 1);
         service.request(context("i1", "r1"), textQuestion("answer"));
 
-        ClaraException error = assertThrows(ClaraException.class,
-                () -> service.request(context("i2", "r1"), textQuestion("answer")));
+        InteractionContext second = context("i2", "r1");
+        Question question = textQuestion("answer");
+        ClaraException error = assertThrows(ClaraException.class, () -> service.request(second, question));
 
         assertEquals(ErrorCodes.INTERACTION_LIMIT_EXCEEDED, error.getError().getCode());
     }

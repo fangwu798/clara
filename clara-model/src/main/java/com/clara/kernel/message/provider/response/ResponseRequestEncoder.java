@@ -43,7 +43,7 @@ public final class ResponseRequestEncoder extends AbstractRequestEncoder {
     @Override
     @SuppressWarnings("unchecked")
     protected Object protocolValue(Field field, Object value) {
-        if (value == null || !(value instanceof List)) {
+        if (!(value instanceof List)) {
             return value;
         }
         List<?> list = (List<?>) value;

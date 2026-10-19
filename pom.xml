@@ -204,6 +204,17 @@
                     <artifactId>maven-resources-plugin</artifactId>
                     <version>${maven.resources.version}</version>
                 </plugin>
+                <plugin>
+                    <groupId>com.github.spotbugs</groupId>
+                    <artifactId>spotbugs-maven-plugin</artifactId>
+                    <version>4.7.3.6</version>
+                    <configuration>
+                        <effort>Max</effort>
+                        <threshold>Low</threshold>
+                        <excludeFilterFile>${maven.multiModuleProjectDirectory}/config/static-analysis/spotbugs-exclude.xml</excludeFilterFile>
+                        <failOnError>true</failOnError>
+                    </configuration>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>

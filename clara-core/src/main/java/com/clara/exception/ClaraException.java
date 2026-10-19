@@ -1,6 +1,7 @@
 package com.clara.exception;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * Clara 领域错误的运行时载体：把 {@link ClaraError} 抛出给上层。
@@ -13,6 +14,7 @@ import lombok.Data;
  * 是否可重试由 {@link ClaraError#isRetryable()} 表达。
  */
 @Data
+@EqualsAndHashCode(callSuper = false)
 public class ClaraException extends RuntimeException {
 
     /**

@@ -42,11 +42,7 @@ public final class InMemoryMcpServerRegistry implements IMcpServerRegistry {
                 result.add(registration);
             }
         }
-        Collections.sort(result, new Comparator<McpServerRegistration>() {
-            public int compare(McpServerRegistration left, McpServerRegistration right) {
-                return left.getServerKey().compareTo(right.getServerKey());
-            }
-        });
+        Collections.sort(result, Comparator.comparing(McpServerRegistration::getServerKey));
         return Collections.unmodifiableList(result);
     }
     public McpServerRegistration get(String tenantId, String serverKey) {

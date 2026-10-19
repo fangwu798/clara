@@ -37,6 +37,8 @@ import java.util.Map;
  */
 public abstract class AbstractRequestEncoder implements IRequestEncoder {
 
+    private static final String FIELD_PREFIX = "field ";
+
     /**
      * 请求体的媒体类型。
      */
@@ -167,25 +169,25 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
             String actual = stringify(value);
             if (actual != null && !contains(allowed, actual)) {
                 throw new IllegalArgumentException(
-                        "field " + field.getName() + " value \"" + actual + "\" is not allowed, expected " + Arrays.toString(allowed));
+                        FIELD_PREFIX + field.getName() + " value \"" + actual + "\" is not allowed, expected " + Arrays.toString(allowed));
             }
         }
         if (value instanceof Number) {
             double number = ((Number) value).doubleValue();
             if (adapter.min() != Double.NEGATIVE_INFINITY && number < adapter.min()) {
                 throw new IllegalArgumentException(
-                        "field " + field.getName() + " value " + number + " is below minimum " + adapter.min());
+                        FIELD_PREFIX + field.getName() + " value " + number + " is below minimum " + adapter.min());
             }
             if (adapter.max() != Double.POSITIVE_INFINITY && number > adapter.max()) {
                 throw new IllegalArgumentException(
-                        "field " + field.getName() + " value " + number + " is above maximum " + adapter.max());
+                        FIELD_PREFIX + field.getName() + " value " + number + " is above maximum " + adapter.max());
             }
         }
         if (adapter.maxCount() > 0 && value instanceof Collection) {
             int size = ((Collection<?>) value).size();
             if (size > adapter.maxCount()) {
                 throw new IllegalArgumentException(
-                        "field " + field.getName() + " has " + size + " elements, exceeds maximum " + adapter.maxCount());
+                        FIELD_PREFIX + field.getName() + " has " + size + " elements, exceeds maximum " + adapter.maxCount());
             }
         }
     }
@@ -261,8 +263,10 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
     /**
      * 读取字段值。
      */
+    @SuppressWarnings("java:S3011")
     private static Object read(Field field, IRequest request) {
         try {
+            // 请求 DTO 的字段由注解驱动编码，保持私有并在此统一放开访问。
             field.setAccessible(true);
             return field.get(request);
         } catch (IllegalAccessException exception) {
@@ -283,13 +287,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
             return literal;
         }
         if (type == Boolean.class || type == Boolean.TYPE) {
-            if ("true".equalsIgnoreCase(literal)) {
-                return Boolean.TRUE;
-            }
-            if ("false".equalsIgnoreCase(literal)) {
-                return Boolean.FALSE;
-            }
-            throw invalidDefault(field, literal, "boolean");
+            return booleanValue(field, literal);
         }
         if (type == Integer.class || type == Integer.TYPE) {
             return integerValue(field, literal);
@@ -307,6 +305,16 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
             return enumValue(field, literal, type);
         }
         return null;
+    }
+
+    private static Object booleanValue(Field field, String literal) {
+        if ("true".equalsIgnoreCase(literal)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equalsIgnoreCase(literal)) {
+            return Boolean.FALSE;
+        }
+        throw invalidDefault(field, literal, "boolean");
     }
 
     private static Object integerValue(Field field, String literal) {

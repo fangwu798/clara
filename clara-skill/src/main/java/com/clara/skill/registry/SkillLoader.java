@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * 技能 / 提示词文件解析器：把 JSON 文件解析为 {@link ToolMethod} 与 {@link PromptDefinition}。
@@ -113,7 +114,7 @@ public final class SkillLoader {
 
     private Map<String, String> metadata(JsonNode node) {
         if (node == null || node.isNull() || !node.isObject()) {
-            return null;
+            return Collections.emptyMap();
         }
         Map<String, String> result = new LinkedHashMap<>();
         Iterator<Map.Entry<String, JsonNode>> fields = node.fields();

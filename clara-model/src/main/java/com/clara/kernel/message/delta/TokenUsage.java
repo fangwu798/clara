@@ -1,7 +1,6 @@
 package com.clara.kernel.message.delta;
 
 import lombok.Data;
-import lombok.Getter;
 
 /**
  * 表示一次模型调用返回的 token 用量。

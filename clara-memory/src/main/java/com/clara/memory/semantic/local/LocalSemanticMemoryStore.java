@@ -9,7 +9,6 @@ import com.clara.memory.semantic.SemanticMemoryErrors;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -87,20 +86,17 @@ public final class LocalSemanticMemoryStore implements ISemanticMemoryStore {
                 matches.add(new MemoryMatch(entry, score));
             }
         }
-        Collections.sort(matches, new Comparator<MemoryMatch>() {
-            @Override
-            public int compare(MemoryMatch left, MemoryMatch right) {
-                int byScore = Double.compare(right.getScore(), left.getScore());
-                if (byScore != 0) {
-                    return byScore;
-                }
-                int byTime = Long.compare(right.getEntry().getCreatedAtEpochMillis(),
-                        left.getEntry().getCreatedAtEpochMillis());
-                if (byTime != 0) {
-                    return byTime;
-                }
-                return left.getEntry().getId().compareTo(right.getEntry().getId());
+        Collections.sort(matches, (left, right) -> {
+            int byScore = Double.compare(right.getScore(), left.getScore());
+            if (byScore != 0) {
+                return byScore;
             }
+            int byTime = Long.compare(right.getEntry().getCreatedAtEpochMillis(),
+                    left.getEntry().getCreatedAtEpochMillis());
+            if (byTime != 0) {
+                return byTime;
+            }
+            return left.getEntry().getId().compareTo(right.getEntry().getId());
         });
         if (matches.size() > query.getTopK()) {
             matches = new ArrayList<>(matches.subList(0, query.getTopK()));

@@ -161,12 +161,12 @@ public final class StringUtils {
      * @return 按两列显示时返回 true
      */
     private static boolean isFullWidth(char value) {
-        return (value >= 0x1100 && value <= 0x115F)
-                || (value >= 0x2E80 && value <= 0xA4CF)
-                || (value >= 0xAC00 && value <= 0xD7A3)
-                || (value >= 0xF900 && value <= 0xFAFF)
-                || (value >= 0xFE30 && value <= 0xFE6F)
-                || (value >= 0xFF00 && value <= 0xFF60)
-                || (value >= 0xFFE0 && value <= 0xFFE6);
+        return value >= 0x1100 && value <= 0x115F
+                || value >= 0x2E80 && value <= 0xA4CF
+                || value >= 0xAC00 && value <= 0xD7A3
+                || value >= 0xF900 && value <= 0xFAFF
+                || value >= 0xFE30 && value <= 0xFE6F
+                || value >= 0xFF00 && value <= 0xFF60
+                || value >= 0xFFE0 && value <= 0xFFE6;
     }
 }

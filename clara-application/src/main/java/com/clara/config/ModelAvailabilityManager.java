@@ -21,7 +21,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * 模型可用性启动管理器：扫描模型配置、检查凭据与模型响应，并把可用模型清单写回 {@code clara.yml}。
@@ -43,7 +43,7 @@ public final class ModelAvailabilityManager {
     /**
      * 根据环境变量名读取当前进程环境变量值的函数，生产环境使用 {@link System#getenv(String)}。
      */
-    private final Function<String, String> environment;
+    private final UnaryOperator<String> environment;
 
     /**
      * 执行真实模型流式请求并测量首字符响应时间的探测器。
@@ -69,7 +69,7 @@ public final class ModelAvailabilityManager {
      * @param probe         模型可用性探测器
      * @param timeoutMillis 单个模型的探测超时时间，单位为毫秒
      */
-    ModelAvailabilityManager(Function<String, String> environment, IModelProbe probe, long timeoutMillis) {
+    ModelAvailabilityManager(UnaryOperator<String> environment, IModelProbe probe, long timeoutMillis) {
         this.environment = environment;
         this.probe = probe;
         this.timeoutMillis = timeoutMillis;
@@ -156,17 +156,17 @@ public final class ModelAvailabilityManager {
                 configuration = loader.load(path);
                 if (!configuration.getCapabilities().containsKey(CapabilityKindEnum.CHAT)) {
                     pending.add(PendingCheck.decided(ModelCheckResult.skipped(path, alias, "未配置 CHAT 能力")));
-                    continue;
+                } else {
+                    String variable = configuration.getCredential().getEnvironmentVariable();
+                    if (variable != null && StringUtils.isBlank(environment.apply(variable))) {
+                        pending.add(PendingCheck.decided(ModelCheckResult.missingCredential(path, alias, variable)));
+                    } else {
+                        ModelConfig chat = configuration.toConfig(CapabilityKindEnum.CHAT);
+                        pending.add(PendingCheck.ready(path, alias, configuration, chat));
+                        // 平台配置的所有权移交给待检查项，由它在检查结束后关闭；置空以免这里重复关闭。
+                        configuration = null;
+                    }
                 }
-                String variable = configuration.getCredential().getEnvironmentVariable();
-                if (variable != null && StringUtils.isBlank(environment.apply(variable))) {
-                    pending.add(PendingCheck.decided(ModelCheckResult.missingCredential(path, alias, variable)));
-                    continue;
-                }
-                ModelConfig chat = configuration.toConfig(CapabilityKindEnum.CHAT);
-                pending.add(PendingCheck.ready(path, alias, configuration, chat));
-                // 平台配置的所有权移交给待检查项，由它在检查结束后关闭；置空以免这里重复关闭。
-                configuration = null;
             } catch (RuntimeException failure) {
                 pending.add(PendingCheck.decided(ModelCheckResult.unavailable(path, alias, null, null, concise(failure))));
             } finally {
@@ -233,10 +233,13 @@ public final class ModelAvailabilityManager {
         List<String> updated = replaceTopLevel(original, "defaultModel", defaultLine);
         updated = replaceTopLevel(updated, "enabledProviders", enabledLine.toString());
         Path parent = file.toAbsolutePath().getParent();
-        if (parent != null) {
+        Path temporary;
+        if (parent == null) {
+            temporary = Files.createTempFile("clara-", ".yml.tmp");
+        } else {
             Files.createDirectories(parent);
+            temporary = Files.createTempFile(parent, "clara-", ".yml.tmp");
         }
-        Path temporary = Files.createTempFile(parent, "clara-", ".yml.tmp");
         Files.write(temporary, updated, StandardCharsets.UTF_8);
         try {
             Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -258,17 +261,20 @@ public final class ModelAvailabilityManager {
     private static List<String> replaceTopLevel(List<String> lines, String key, String replacement) {
         List<String> result = new ArrayList<>();
         boolean replaced = false;
-        for (int index = 0; index < lines.size(); index++) {
+        int index = 0;
+        while (index < lines.size()) {
             String line = lines.get(index);
             if (!isTopLevelKey(line, key)) {
                 result.add(line);
+                index++;
                 continue;
             }
             if (!replaced) {
                 result.add(replacement);
                 replaced = true;
             }
-            while (index + 1 < lines.size() && isIndented(lines.get(index + 1))) {
+            index++;
+            while (index < lines.size() && isIndented(lines.get(index))) {
                 index++;
             }
         }

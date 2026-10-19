@@ -35,6 +35,7 @@ public final class McpPromptRequest {
     private final ConvContext conversation;
     private final CallContext call;
 
+    @SuppressWarnings("java:S107")
     public McpPromptRequest(String tenantId, String serverKey, String snapshotId, String promptName,
             String schemaHash, Map<String, Object> arguments, ConvContext conversation,
             CallContext call) {

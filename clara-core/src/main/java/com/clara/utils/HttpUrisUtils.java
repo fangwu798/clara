@@ -44,7 +44,10 @@ public final class HttpUrisUtils {
         String scheme = safe.getScheme().toLowerCase(Locale.ROOT);
         String host = safe.getHost().toLowerCase(Locale.ROOT);
         int port = safe.getPort();
-        int effectivePort = port < 0 ? ("https".equals(scheme) ? 443 : 80) : port;
+        int effectivePort = port;
+        if (port < 0) {
+            effectivePort = "https".equals(scheme) ? 443 : 80;
+        }
         String authorityHost = host.indexOf(':') >= 0 ? "[" + host + "]" : host;
         return scheme + "://" + authorityHost + ":" + effectivePort;
     }

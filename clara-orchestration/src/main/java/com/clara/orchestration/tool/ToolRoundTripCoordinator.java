@@ -53,9 +53,9 @@ public final class ToolRoundTripCoordinator {
         if (response == null) {
             return false;
         }
-        return (response.getToolCalls() != null && !response.getToolCalls().isEmpty())
-                || (response.getResponsesToolCalls() != null
-                        && !response.getResponsesToolCalls().isEmpty());
+        return response.getToolCalls() != null && !response.getToolCalls().isEmpty()
+                || response.getResponsesToolCalls() != null
+                        && !response.getResponsesToolCalls().isEmpty();
     }
 
     /**

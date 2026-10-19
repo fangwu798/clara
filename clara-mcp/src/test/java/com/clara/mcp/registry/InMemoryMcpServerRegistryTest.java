@@ -15,6 +15,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -107,12 +108,9 @@ public class InMemoryMcpServerRegistryTest {
     public void listEnabledReturnsReadOnlyList() {
         registry.register(registration(TENANT, "a", McpRegistrationStatus.ACTIVE));
 
-        try {
-            registry.listEnabled(TENANT).add(registration(TENANT, "x", McpRegistrationStatus.ACTIVE));
-            fail("list must be read-only");
-        } catch (UnsupportedOperationException expected) {
-            assertTrue(true);
-        }
+        List<McpServerRegistration> enabled = registry.listEnabled(TENANT);
+        McpServerRegistration extra = registration(TENANT, "x", McpRegistrationStatus.ACTIVE);
+        assertThrows(UnsupportedOperationException.class, () -> enabled.add(extra));
     }
 
     @Test

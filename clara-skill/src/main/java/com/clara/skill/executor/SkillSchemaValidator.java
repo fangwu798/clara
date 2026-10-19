@@ -114,76 +114,105 @@ public final class SkillSchemaValidator {
         if (schema == null || instance == null) {
             return false;
         }
+        return matchesEnum(schema, instance)
+                && matchesDeclaredType(schema, instance)
+                && matchesObject(schema, instance)
+                && matchesArray(schema, instance);
+    }
+
+    private static boolean matchesEnum(JsonNode schema, JsonNode instance) {
         JsonNode enumNode = schema.get("enum");
-        if (enumNode != null && enumNode.isArray()) {
-            boolean found = false;
-            for (JsonNode option : enumNode) {
-                if (option.equals(instance)) {
-                    found = true;
-                    break;
-                }
+        if (enumNode == null || !enumNode.isArray()) {
+            return true;
+        }
+        for (JsonNode option : enumNode) {
+            if (option.equals(instance)) {
+                return true;
             }
-            if (!found) {
+        }
+        return false;
+    }
+
+    private boolean matchesDeclaredType(JsonNode schema, JsonNode instance) {
+        JsonNode typeNode = schema.get("type");
+        if (typeNode == null) {
+            return true;
+        }
+        if (typeNode.isTextual()) {
+            return matchesType(typeNode.textValue(), instance);
+        }
+        return !typeNode.isArray() || matchesAnyType(typeNode, instance);
+    }
+
+    private boolean matchesAnyType(JsonNode typeNode, JsonNode instance) {
+        for (JsonNode candidate : typeNode) {
+            if (candidate.isTextual() && matchesType(candidate.textValue(), instance)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesObject(JsonNode schema, JsonNode instance) {
+        if (!instance.isObject()) {
+            return true;
+        }
+        JsonNode properties = schema.get("properties");
+        if (properties == null || !properties.isObject()) {
+            return true;
+        }
+        return matchesProperties(instance, properties)
+                && matchesRequired(schema, instance)
+                && matchesAdditional(schema, instance, properties);
+    }
+
+    private boolean matchesProperties(JsonNode instance, JsonNode properties) {
+        for (String name : fieldNames(instance)) {
+            JsonNode childSchema = properties.get(name);
+            if (childSchema != null && !matches(childSchema, instance.get(name))) {
                 return false;
             }
         }
+        return true;
+    }
 
-        JsonNode typeNode = schema.get("type");
-        if (typeNode != null) {
-            if (typeNode.isTextual()) {
-                if (!matchesType(typeNode.textValue(), instance)) {
-                    return false;
-                }
-            } else if (typeNode.isArray()) {
-                boolean any = false;
-                for (JsonNode candidate : typeNode) {
-                    if (candidate.isTextual() && matchesType(candidate.textValue(), instance)) {
-                        any = true;
-                        break;
-                    }
-                }
-                if (!any) {
-                    return false;
-                }
+    private static boolean matchesRequired(JsonNode schema, JsonNode instance) {
+        JsonNode required = schema.get("required");
+        if (required == null || !required.isArray()) {
+            return true;
+        }
+        for (JsonNode field : required) {
+            if (field.isTextual() && !instance.has(field.textValue())) {
+                return false;
             }
         }
+        return true;
+    }
 
-        if (instance.isObject()) {
-            JsonNode properties = schema.get("properties");
-            if (properties != null && properties.isObject()) {
-                for (String name : fieldNames(instance)) {
-                    JsonNode childSchema = properties.get(name);
-                    if (childSchema != null && !matches(childSchema, instance.get(name))) {
-                        return false;
-                    }
-                }
-                JsonNode required = schema.get("required");
-                if (required != null && required.isArray()) {
-                    for (JsonNode field : required) {
-                        if (field.isTextual() && !instance.has(field.textValue())) {
-                            return false;
-                        }
-                    }
-                }
-                JsonNode additional = schema.get("additionalProperties");
-                if (additional != null && additional.isBoolean() && !additional.booleanValue()) {
-                    for (String name : fieldNames(instance)) {
-                        if (!properties.has(name)) {
-                            return false;
-                        }
-                    }
-                }
+    private boolean matchesAdditional(JsonNode schema, JsonNode instance, JsonNode properties) {
+        JsonNode additional = schema.get("additionalProperties");
+        if (additional == null || !additional.isBoolean() || additional.booleanValue()) {
+            return true;
+        }
+        for (String name : fieldNames(instance)) {
+            if (!properties.has(name)) {
+                return false;
             }
         }
+        return true;
+    }
 
-        if (instance.isArray()) {
-            JsonNode items = schema.get("items");
-            if (items != null) {
-                for (JsonNode item : instance) {
-                    if (!matches(items, item)) {
-                        return false;
-                    }
-                }
+    private boolean matchesArray(JsonNode schema, JsonNode instance) {
+        if (!instance.isArray()) {
+            return true;
+        }
+        JsonNode items = schema.get("items");
+        if (items == null) {
+            return true;
+        }
+        for (JsonNode item : instance) {
+            if (!matches(items, item)) {
+                return false;
             }
         }
         return true;

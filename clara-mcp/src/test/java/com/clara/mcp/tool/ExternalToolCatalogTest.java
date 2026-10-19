@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -56,12 +57,8 @@ public class ExternalToolCatalogTest {
         ExternalToolCatalog catalog = new ExternalToolCatalog();
         catalog.register("remote.tool", new ExternalToolBinding("t", "s", "snap", "hash"));
         Map<String, ExternalToolBinding> snapshot = catalog.snapshot();
-        try {
-            snapshot.put("x", new ExternalToolBinding("t", "s", "snap", "hash"));
-            fail("expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException expected) {
-            assertTrue(true);
-        }
+        ExternalToolBinding extra = new ExternalToolBinding("t", "s", "snap", "hash");
+        assertThrows(UnsupportedOperationException.class, () -> snapshot.put("x", extra));
     }
 
     @Test

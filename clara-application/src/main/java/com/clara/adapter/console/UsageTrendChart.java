@@ -56,7 +56,7 @@ public final class UsageTrendChart {
      *
      * @param turnTokens 本轮 token 消耗，负数按 0 处理
      */
-    public synchronized void record(long turnTokens) {
+    public synchronized void addSample(long turnTokens) {
         cumulative += Math.max(0L, turnTokens);
         samples.add(new long[] {System.currentTimeMillis(), cumulative});
     }
@@ -104,7 +104,14 @@ public final class UsageTrendChart {
         StringBuilder out = new StringBuilder();
         out.append("累计 token 趋势（横轴=时间，纵轴=累计用量）\n");
         for (int row = 0; row < HEIGHT; row++) {
-            String label = row == 0 ? Long.toString(maxY) : (row == HEIGHT - 1 ? "0" : "");
+            String label;
+            if (row == 0) {
+                label = Long.toString(maxY);
+            } else if (row == HEIGHT - 1) {
+                label = "0";
+            } else {
+                label = "";
+            }
             out.append(padLeft(label, gutter)).append(" |");
             out.append(grid[row], 0, WIDTH).append('\n');
         }

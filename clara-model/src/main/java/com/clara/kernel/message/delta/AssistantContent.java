@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 助手消息：线格式为 {@code {"role":"assistant","content":"..."}}。
+ * 助手消息：线格式为 {@code {"role":ROLE_ASSISTANT,"content":"..."}}。
  *
  * <p>是什么、在哪一层：契约层的消息实现，作为 {@code ModelParameters.messages} 的元素随请求体下发，
  * 用于把模型上一轮的回答放回对话历史。带工具调用的助手消息请用
@@ -25,6 +25,8 @@ import java.util.Map;
  */
 @Data
 public final class AssistantContent implements IContent {
+
+    private static final String ROLE_ASSISTANT = "assistant";
     /**
      * 正文文本，序列化为 {@code content}。
      */
@@ -46,7 +48,7 @@ public final class AssistantContent implements IContent {
      */
     @JsonProperty("role")
     public String getRole() {
-        return "assistant";
+        return ROLE_ASSISTANT;
     }
 
     @Override
@@ -58,7 +60,7 @@ public final class AssistantContent implements IContent {
     @Override
     public Map<String, Object> toCompletionMessage() {
         Map<String, Object> message = new LinkedHashMap<>();
-        message.put("role", "assistant");
+        message.put("role", ROLE_ASSISTANT);
         message.put("content", content);
         return message;
     }
@@ -70,7 +72,7 @@ public final class AssistantContent implements IContent {
         part.put("text", content);
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("type", "message");
-        item.put("role", "assistant");
+        item.put("role", ROLE_ASSISTANT);
         item.put("content", Collections.singletonList(part));
         return Collections.singletonList(item);
     }

@@ -1,5 +1,8 @@
 package com.clara.workflow.planner;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
+
 import com.clara.core.planner.ICapabilityAuthorizer;
 import com.clara.core.planner.ITaskHandler;
 import com.clara.dto.planner.BudgetAmount;
@@ -142,8 +145,9 @@ public class DefaultTaskPlanEngineTest {
             throw new UnknownSideEffectException("uncertain side effect");
         });
 
+        TaskPlan taskPlan = plan(task);
         ClaraException failure = assertThrows(ClaraException.class,
-                () -> engine.execute(plan(task), "run-unknown", null));
+                () -> engine.execute(taskPlan, "run-unknown", null));
 
         assertEquals(ErrorCodes.EXECUTION_SIDE_EFFECT_UNKNOWN, failure.getError().getCode());
         assertEquals(1, attempts.get());
@@ -152,13 +156,14 @@ public class DefaultTaskPlanEngineTest {
     @Test
     public void timeoutIsTreatedAsUnknownSideEffect() {
         TaskNode task = node("T", null, "outT", new RetryPolicy(3, 0L), 50L, context -> {
-            Thread.sleep(500L);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500L));
             return new TaskExecutionResult(Collections.<String, Object>singletonMap("outT", "late"),
                     BudgetAmount.ZERO);
         });
 
+        TaskPlan taskPlan = plan(task);
         ClaraException failure = assertThrows(ClaraException.class,
-                () -> engine.execute(plan(task), "run-timeout", null));
+                () -> engine.execute(taskPlan, "run-timeout", null));
 
         assertEquals(ErrorCodes.EXECUTION_SIDE_EFFECT_UNKNOWN, failure.getError().getCode());
     }

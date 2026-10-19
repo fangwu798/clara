@@ -172,14 +172,14 @@ public final class ApplicationBootstrap implements Closeable {
     private static final String DEFAULT_PROVIDER = "default";
 
     /**
-     * 本地工作区标识：媒体资产与任务存储在本地单机部署下的工作区维度标识。
-     */
-    private static final String WORKSPACE_ID = "local";
-
-    /**
      * MCP 客户端单次请求超时（毫秒）：装配期给出的默认值，随宿主登记服务端后生效。
      */
     private static final long MCP_REQUEST_TIMEOUT_MILLIS = 30_000L;
+
+    /**
+     * Milvus SDK 的 JUL 日志器：必须由本类强引用持有，否则 LogManager 的弱引用会让层级设置失效。
+     */
+    private static final Logger MILVUS_SDK_LOGGER = Logger.getLogger("io.milvus");
 
     /**
      * MCP 发现支持的协议版本列表：当前仅支持 {@code 2024-11-05}，服务端协商出其它版本将标记为不兼容。
@@ -225,7 +225,6 @@ public final class ApplicationBootstrap implements Closeable {
     private final SkillRegistry skillRegistry;
     private final IMcpServerRegistry mcpServerRegistry;
     private final IMcpCapabilityCatalog mcpCapabilityCatalog;
-    private final IMcpClientFactory mcpClientFactory;
     private final IMcpDiscoveryService mcpDiscoveryService;
     private final IMcpGateway mcpGateway;
     private final ExternalToolCatalog externalToolCatalog;
@@ -307,7 +306,6 @@ public final class ApplicationBootstrap implements Closeable {
             throw new IllegalArgumentException("mcpClientFactory must not be null");
         }
         this.embeddingClient = embeddingClient;
-        this.mcpClientFactory = mcpClientFactory;
 
         // 语义记忆：clara.yml 配了 milvus 就用 Milvus（对话记录写入并召回），否则维持进程内实现、行为不变。
         MilvusSettings milvus = MilvusSettings.load(ConfigLocator.claraConfigFile(), embeddingDimension,
@@ -475,23 +473,14 @@ public final class ApplicationBootstrap implements Closeable {
             String model) {
         StringBuilder report = new StringBuilder();
         report.append("会话：").append(conversationId);
-        if (providerConfiguration != null && model != null && !model.trim().isEmpty()) {
-            ModelProviderEnum provider = providerConfiguration.getProvider();
-            IWindowMemory memory = windowMemoryFactory.create(conversationId, provider.name(), model);
-            List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(memory.messages());
-            long tokens = tokenCountEstimator == null ? 0L : tokenCountEstimator.estimate(history);
-            report.append('\n').append("历史记录：").append(history.size()).append(" 条")
-                    .append("，估算 token：").append(tokens);
-        } else {
-            report.append('\n').append("历史记录：未知（未绑定模型配置）");
-        }
+        appendHistorySummary(report, conversationId, providerConfiguration, model);
 
         long input = 0L;
         long output = 0L;
         long total = 0L;
         int calls = 0;
-        for (CallRecord record : callRecordSink.snapshot()) {
-            IResponse response = record.getResponse();
+        for (CallRecord callRecord : callRecordSink.snapshot()) {
+            IResponse response = callRecord.getResponse();
             if (!(response instanceof HttpResponse)) {
                 continue;
             }
@@ -509,6 +498,20 @@ public final class ApplicationBootstrap implements Closeable {
                 .append("（输入 ").append(input).append(" / 输出 ").append(output)
                 .append(" / 合计 ").append(total).append(" tokens）");
         return report.toString();
+    }
+
+    private void appendHistorySummary(StringBuilder report, String conversationId,
+            ProviderConfiguration providerConfiguration, String model) {
+        if (providerConfiguration == null || model == null || model.trim().isEmpty()) {
+            report.append('\n').append("历史记录：未知（未绑定模型配置）");
+            return;
+        }
+        ModelProviderEnum provider = providerConfiguration.getProvider();
+        IWindowMemory memory = windowMemoryFactory.create(conversationId, provider.name(), model);
+        List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(memory.messages());
+        long tokens = tokenCountEstimator == null ? 0L : tokenCountEstimator.estimate(history);
+        report.append('\n').append("历史记录：").append(history.size()).append(" 条")
+                .append("，估算 token：").append(tokens);
     }
 
     /**
@@ -615,19 +618,25 @@ public final class ApplicationBootstrap implements Closeable {
             boolean codeGraphEnabled) {
         List<String> prompts = new ArrayList<>();
         for (String id : settings.getIds()) {
-            if (AlwaysPromptSettings.CODE_GRAPH_GUIDE.equals(id) && !codeGraphEnabled) {
-                continue;
-            }
-            try {
-                String prompt = promptProvider.prompt(id);
-                if (prompt != null && !prompt.trim().isEmpty()) {
-                    prompts.add(prompt);
-                }
-            } catch (RuntimeException unavailable) {
-                // 标识写错或提示词文件缺失：跳过这一条，其余常驻提示词照常生效。
+            if (!AlwaysPromptSettings.CODE_GRAPH_GUIDE.equals(id) || codeGraphEnabled) {
+                addPrompt(prompts, promptProvider, id);
             }
         }
         return prompts;
+    }
+
+    /**
+     * 读取一条常驻提示词并追加到结果；单条不可用时跳过，不影响其余提示词。
+     */
+    private static void addPrompt(List<String> prompts, IPromptProvider promptProvider, String id) {
+        try {
+            String prompt = promptProvider.prompt(id);
+            if (prompt != null && !prompt.trim().isEmpty()) {
+                prompts.add(prompt);
+            }
+        } catch (RuntimeException unavailable) {
+            // 标识写错或提示词文件缺失：跳过这一条，其余常驻提示词照常生效。
+        }
     }
 
     /**
@@ -838,30 +847,40 @@ public final class ApplicationBootstrap implements Closeable {
         if (direct.isAbsolute()) {
             return realFile(direct);
         }
+        String pathValue = System.getenv("PATH");
+        if (pathValue == null) {
+            return null;
+        }
+        return searchPath(pathValue, executableCandidates(token));
+    }
+
+    private static List<String> executableCandidates(String token) {
+        List<String> names = new ArrayList<>();
         // Windows 上先按 PATHEXT 补全、裸名字放最后：nodejs 目录里同时存在无扩展名的 npx（Unix shell 脚本）
         // 与可执行的 npx.cmd，先试裸名字会选中那个脚本，最终以「不是有效的 Win32 应用程序」启动失败。
-        List<String> names = new ArrayList<>();
         if (token.indexOf('.') < 0) {
             String pathExt = System.getenv("PATHEXT");
             if (pathExt != null) {
                 for (String ext : pathExt.split(";")) {
-                    if (!ext.trim().isEmpty()) {
-                        names.add(token + ext.trim());
+                    String trimmed = ext.trim();
+                    if (!trimmed.isEmpty()) {
+                        names.add(token + trimmed);
                     }
                 }
             }
         }
         names.add(token);
-        String pathValue = System.getenv("PATH");
-        if (pathValue == null) {
-            return null;
-        }
+        return names;
+    }
+
+    private static Path searchPath(String pathValue, List<String> names) {
         for (String directory : pathValue.split(File.pathSeparator)) {
-            if (directory.trim().isEmpty()) {
+            String trimmed = directory.trim();
+            if (trimmed.isEmpty()) {
                 continue;
             }
             for (String name : names) {
-                Path found = realFile(Paths.get(directory.trim(), name));
+                Path found = realFile(Paths.get(trimmed, name));
                 if (found != null) {
                     return found;
                 }
@@ -908,7 +927,7 @@ public final class ApplicationBootstrap implements Closeable {
         try {
             return new LocalConversationStore(ConfigLocator.workspaceRoot());
         } catch (RuntimeException unavailable) {
-            System.err.println("[memory] 本地对话历史不可用，本次运行的历史不会保留："
+            System.err.println("[memory] 本地对话历史不可用，本次运行的历史不会保留：" // NOSONAR CLI output by design
                     + unavailable.getMessage());
             return new InMemoryConversationStore();
         }
@@ -926,28 +945,49 @@ public final class ApplicationBootstrap implements Closeable {
     private static MilvusSemanticMemoryStore connectMilvus(MilvusSettings settings) {
         quietMilvusLogging();
         warnOnBm25NonUtf8Charset(settings);
+        MilvusBackend backend = null;
+        boolean handedOff = false;
         try {
             MilvusCollectionSpec spec = collectionSpec(settings);
-            MilvusBackend backend = MilvusBackendFactory.create(new MilvusBackendConfig(
+            backend = MilvusBackendFactory.create(new MilvusBackendConfig(
                     settings.getHost(), settings.getPort(), settings.getUsername(), settings.getPassword(),
                     MilvusBackendConfig.DEFAULT_DATABASE,
                     MilvusBackendConfig.DEFAULT_CONNECT_TIMEOUT_MILLIS,
                     MilvusBackendConfig.DEFAULT_IDLE_TIMEOUT_MILLIS), spec);
-            try {
-                return new MilvusSemanticMemoryStore(spec, backend);
-            } catch (RuntimeException mismatch) {
-                if (!settings.isRecreateOnSchemaMismatch()) {
-                    throw mismatch;
-                }
-                // 旧集合结构与当前配置不一致（切了检索模式 / 换了嵌入维度）：旧向量与新查询不可比，重建是唯一选项。
-                // 只在配置里显式开了重建才动手（删集合会丢旧记录）；重建失败会被外层兜回进程内实现。
-                System.err.println("[memory] Milvus 集合结构与配置不匹配，按配置重建：" + mismatch.getMessage());
-                backend.dropCollection(spec.getCollection());
-                return new MilvusSemanticMemoryStore(spec, backend);
-            }
+            MilvusSemanticMemoryStore store = createMilvusStore(spec, backend, settings);
+            handedOff = true;
+            return store;
         } catch (RuntimeException unavailable) {
-            System.err.println("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）：" + unavailable.getMessage());
+            System.err.println("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）：" + unavailable.getMessage()); // NOSONAR CLI output by design
             return null;
+        } finally {
+            if (!handedOff && backend != null) {
+                closeQuietly(backend);
+            }
+        }
+    }
+
+    private static MilvusSemanticMemoryStore createMilvusStore(MilvusCollectionSpec spec, MilvusBackend backend,
+            MilvusSettings settings) {
+        try {
+            return new MilvusSemanticMemoryStore(spec, backend);
+        } catch (RuntimeException mismatch) {
+            if (!settings.isRecreateOnSchemaMismatch()) {
+                throw mismatch;
+            }
+            // 旧集合结构与当前配置不一致（切了检索模式 / 换了嵌入维度）：旧向量与新查询不可比，重建是唯一选项。
+                // 只在配置里显式开了重建才动手（删集合会丢旧记录）；重建失败会被外层兜回进程内实现。
+            System.err.println("[memory] Milvus 集合结构与配置不匹配，按配置重建：" + mismatch.getMessage()); // NOSONAR CLI output by design
+            backend.dropCollection(spec.getCollection());
+            return new MilvusSemanticMemoryStore(spec, backend);
+        }
+    }
+
+    private static void closeQuietly(MilvusBackend backend) {
+        try {
+            backend.close();
+        } catch (RuntimeException closeFailure) {
+            // 关闭失败不应覆盖原始的连接失败原因，调用方已经回退到进程内实现。
         }
     }
 
@@ -967,7 +1007,7 @@ public final class ApplicationBootstrap implements Closeable {
         }
         Charset charset = Charset.defaultCharset();
         if (!StandardCharsets.UTF_8.equals(charset)) {
-            System.err.println("[memory] 警告：JVM 默认字符集是 " + charset.name()
+            System.err.println("[memory] 警告：JVM 默认字符集是 " + charset.name() // NOSONAR CLI output by design
                     + "，Milvus 全文检索的正文会按它编码，可能让 Milvus 服务端 abort；"
                     + "请用 clara.bat / clara.sh 启动（已带 -Dfile.encoding=UTF-8）。");
         }
@@ -1003,7 +1043,7 @@ public final class ApplicationBootstrap implements Closeable {
      * 不影响功能。这里把 {@code io.milvus} 日志层级抬到 {@code SEVERE}，只保留严重错误，避免控制台刷屏。
      */
     private static void quietMilvusLogging() {
-        Logger.getLogger("io.milvus").setLevel(Level.SEVERE);
+        MILVUS_SDK_LOGGER.setLevel(Level.SEVERE);
     }
 
     @Override

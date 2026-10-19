@@ -16,13 +16,15 @@ import java.util.Map;
  */
 public final class InMemoryBudgetLedger implements IBudgetLedger {
 
+    private static final String FIELD_RUN_ID = "runId";
+
     private final Map<String, RunAccount> runs = new LinkedHashMap<>();
     private final Map<String, BudgetReservation> reservations =
             new LinkedHashMap<>();
 
     @Override
     public synchronized void openRun(String runId, BudgetAmount limit) {
-        requireId(runId, "runId");
+        requireId(runId, FIELD_RUN_ID);
         if (limit == null) {
             throw new IllegalArgumentException("limit must not be null");
         }
@@ -37,7 +39,7 @@ public final class InMemoryBudgetLedger implements IBudgetLedger {
 
     @Override
     public synchronized BudgetReservation reserve(String runId, String taskId, BudgetAmount maximum) {
-        requireId(runId, "runId");
+        requireId(runId, FIELD_RUN_ID);
         requireId(taskId, "taskId");
         if (maximum == null) {
             throw new IllegalArgumentException("maximum must not be null");
@@ -117,7 +119,7 @@ public final class InMemoryBudgetLedger implements IBudgetLedger {
 
     @Override
     public synchronized BudgetSnapshot runSnapshot(String runId) {
-        requireId(runId, "runId");
+        requireId(runId, FIELD_RUN_ID);
         RunAccount run = runs.get(runId);
         if (run == null) {
             invalid();

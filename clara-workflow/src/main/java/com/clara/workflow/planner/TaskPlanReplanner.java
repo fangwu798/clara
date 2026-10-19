@@ -30,8 +30,8 @@ public final class TaskPlanReplanner {
         if (current == null || replacement == null || priorReplans < 0 || completedTaskIds == null) {
             invalid();
         }
-        if ((current.getStatus() != PlanStatusEnum.RUNNING
-                && current.getStatus() != PlanStatusEnum.REPLANNING)
+        if (current.getStatus() != PlanStatusEnum.RUNNING
+                && current.getStatus() != PlanStatusEnum.REPLANNING
                 || !current.getGoal().equals(replacement.getGoal())
                 || replacement.getVersion() != current.getVersion() + 1
                 || priorReplans >= validator.getLimits().getMaxRePlans()) {
@@ -44,7 +44,7 @@ public final class TaskPlanReplanner {
             TaskNode newTask = newTasks.get(taskId);
             if (oldTask == null || newTask == null
                     || !oldTask.getOutputKey().equals(newTask.getOutputKey())
-                    || !ObjectUtils.equal(oldTask.getCapability(), newTask.getCapability())) {
+                    || !ObjectUtils.areEqual(oldTask.getCapability(), newTask.getCapability())) {
                 invalid();
             }
         }

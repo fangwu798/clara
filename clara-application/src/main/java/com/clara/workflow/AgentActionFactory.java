@@ -58,7 +58,8 @@ public final class AgentActionFactory implements IWorkflowActionFactory {
         }
         Map<String, Object> promptVars = asMap(spec.getAttribute("promptVars"), spec.getNodeId(), "promptVars");
         AgentNodeOptions options = AgentNodeOptions.fromSpec(spec);
-        return new AgentWorkflowAction(context, spec.getNodeId(), StringUtils.isBlank(prompt) ? null : prompt.trim(),
+        String trimmedPrompt = prompt == null || prompt.trim().isEmpty() ? null : prompt.trim();
+        return new AgentWorkflowAction(context, spec.getNodeId(), trimmedPrompt,
                 promptText, promptVars, options);
     }
 

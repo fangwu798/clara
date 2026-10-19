@@ -20,6 +20,9 @@ import java.util.Map;
  * 负责JacksonMCPJSON数据的编码与解码。
  */
 public final class JacksonMcpJsonCodec implements IMcpJsonCodec {
+
+    private static final String FIELD_METHOD = "method";
+    private static final String FIELD_PARAMS = "params";
     private static final TypeReference<Map<String, Object>> MAP =
             new TypeReference<Map<String, Object>>() { };
     private final ObjectMapper mapper;
@@ -31,39 +34,50 @@ public final class JacksonMcpJsonCodec implements IMcpJsonCodec {
     public String encode(JsonRpcRequest request) {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
         Map<String, Object> value = envelope(); value.put("id", request.getId());
-        value.put("method", request.getMethod()); value.put("params", request.getParams());
+        value.put(FIELD_METHOD, request.getMethod()); value.put(FIELD_PARAMS, request.getParams());
         return write(value);
     }
     public String encode(JsonRpcNotification notification) {
         if (notification == null) { throw new IllegalArgumentException("notification must not be null"); }
-        Map<String, Object> value = envelope(); value.put("method", notification.getMethod());
-        value.put("params", notification.getParams()); return write(value);
+        Map<String, Object> value = envelope(); value.put(FIELD_METHOD, notification.getMethod());
+        value.put(FIELD_PARAMS, notification.getParams()); return write(value);
     }
     public McpDecodedMessage decode(String json) {
         if (json == null || json.trim().isEmpty()) { throw invalid(); }
         try {
             JsonNode root = mapper.readTree(json);
             if (!root.isObject() || !"2.0".equals(text(root.get("jsonrpc")))) { throw invalid(); }
-            JsonNode method = root.get("method"); JsonNode id = root.get("id");
-            if (method != null && method.isTextual()) {
-                Map<String, Object> params = map(root.get("params"));
-                return id == null || id.isNull()
-                        ? McpDecodedMessage.notification(new JsonRpcNotification(method.textValue(), params))
-                        : McpDecodedMessage.serverRequest(new JsonRpcRequest(id.asText(), method.textValue(), params));
-            }
-            if (id == null || id.isNull()) { throw invalid(); }
-            JsonNode result = root.get("result"); JsonNode error = root.get("error");
-            if ((result == null) == (error == null)) { throw invalid(); }
-            if (error != null) {
-                if (!error.isObject() || !error.has("code") || !error.has("message")) { throw invalid(); }
-                JsonRpcError decodedError = new JsonRpcError(error.get("code").intValue(),
-                        error.get("message").asText(), map(error.get("data")));
-                return McpDecodedMessage.response(new JsonRpcResponse(id.asText(), null, decodedError));
-            }
-            return McpDecodedMessage.response(new JsonRpcResponse(id.asText(), map(result), null));
+            JsonNode method = root.get(FIELD_METHOD);
+            return method != null && method.isTextual() ? decodeMethod(root, method) : decodeResponse(root);
         } catch (JsonProcessingException exception) {
             throw invalid();
         }
+    }
+
+    private McpDecodedMessage decodeMethod(JsonNode root, JsonNode method) {
+        JsonNode id = root.get("id");
+        Map<String, Object> params = map(root.get(FIELD_PARAMS));
+        if (id == null || id.isNull()) {
+            return McpDecodedMessage.notification(new JsonRpcNotification(method.textValue(), params));
+        }
+        return McpDecodedMessage.serverRequest(new JsonRpcRequest(id.asText(), method.textValue(), params));
+    }
+
+    private McpDecodedMessage decodeResponse(JsonNode root) {
+        JsonNode id = root.get("id");
+        if (id == null || id.isNull()) { throw invalid(); }
+        JsonNode result = root.get("result");
+        JsonNode error = root.get("error");
+        if ((result == null) == (error == null)) { throw invalid(); }
+        return error == null
+                ? McpDecodedMessage.response(new JsonRpcResponse(id.asText(), map(result), null))
+                : McpDecodedMessage.response(new JsonRpcResponse(id.asText(), null, decodeError(error)));
+    }
+
+    private JsonRpcError decodeError(JsonNode error) {
+        if (!error.isObject() || !error.has("code") || !error.has("message")) { throw invalid(); }
+        return new JsonRpcError(error.get("code").intValue(), error.get("message").asText(),
+                map(error.get("data")));
     }
     private String write(Map<String, Object> value) {
         try { return mapper.writeValueAsString(value); }

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 工作流定义注册表：递归加载目录下的 YAML 工作流定义，并按工作流标识建立只读索引。
@@ -29,10 +30,12 @@ public final class WorkflowDefinitionRegistry {
 
     private final Path directory;
     private final WorkflowDefinitionLoader loader;
-    private volatile Map<String, LoadedWorkflow> workflows = Collections.emptyMap();
+    private final AtomicReference<Map<String, LoadedWorkflow>> workflows =
+            new AtomicReference<>(Collections.emptyMap());
 
     /** 定义文件签名（路径 → 修改时间:大小），用于发现运行期新增 / 修改 / 删除的定义文件。 */
-    private volatile Map<String, String> sourceStamps = Collections.emptyMap();
+    private final AtomicReference<Map<String, String>> sourceStamps =
+            new AtomicReference<>(Collections.emptyMap());
 
     /** 最近一次刷新失败的说明（成功时为 null）：既有索引保留可用，失败原因透出给调用方。 */
     private volatile String lastError;
@@ -58,9 +61,9 @@ public final class WorkflowDefinitionRegistry {
      * @throws IllegalArgumentException 定义非法或标识重复时
      */
     public synchronized void reload() {
-        workflows = loadAll();
+        workflows.set(loadAll());
         lastError = null;
-        sourceStamps = scanStamps();
+        sourceStamps.set(scanStamps());
     }
 
     /**
@@ -76,19 +79,19 @@ public final class WorkflowDefinitionRegistry {
      * @return true 表示索引有效且无解析错误；false 表示本次刷新遇到了非法的定义文件
      */
     public synchronized boolean refresh() {
-        if (scanStamps().equals(sourceStamps)) {
+        if (scanStamps().equals(sourceStamps.get())) {
             return lastError == null;
         }
-        Map<String, LoadedWorkflow> previous = workflows;
+        Map<String, LoadedWorkflow> previous = workflows.get();
         try {
-            workflows = loadAll();
+            workflows.set(loadAll());
         } catch (RuntimeException e) {
-            workflows = previous;
+            workflows.set(previous);
             lastError = e.getMessage();
             return false;
         }
         lastError = null;
-        sourceStamps = scanStamps();
+        sourceStamps.set(scanStamps());
         return true;
     }
 
@@ -188,7 +191,7 @@ public final class WorkflowDefinitionRegistry {
      * @throws IllegalArgumentException 未命中时（消息含可用标识列表）
      */
     public WorkflowDefinition require(String workflowId) {
-        LoadedWorkflow workflow = workflows.get(workflowId);
+        LoadedWorkflow workflow = workflows.get().get(workflowId);
         if (workflow == null) {
             throw new IllegalArgumentException("工作流不存在：" + workflowId + "，可用：" + ids());
         }
@@ -202,7 +205,7 @@ public final class WorkflowDefinitionRegistry {
      * @return 输出键列表，非 null，可为空（未声明或标识不存在时）
      */
     public List<String> outputs(String workflowId) {
-        LoadedWorkflow workflow = workflows.get(workflowId);
+        LoadedWorkflow workflow = workflows.get().get(workflowId);
         return workflow == null ? Collections.<String>emptyList() : workflow.getOutputs();
     }
 
@@ -212,13 +215,17 @@ public final class WorkflowDefinitionRegistry {
      * @return 标识列表，非 null，可为空
      */
     public List<String> ids() {
-        List<String> ids = new ArrayList<>(workflows.keySet());
+        List<String> ids = new ArrayList<>(workflows.get().keySet());
         Collections.sort(ids);
         return ids;
     }
 
     private static boolean isWorkflowFile(Path file) {
-        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        Path fileName = file.getFileName();
+        if (fileName == null) {
+            return false;
+        }
+        String name = fileName.toString().toLowerCase(Locale.ROOT);
         return name.endsWith(".yml") || name.endsWith(".yaml");
     }
 }

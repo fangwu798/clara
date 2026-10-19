@@ -38,34 +38,42 @@ public final class ResponseDecoderSupport {
     public static JsonNode valueAt(JsonNode root, String path) {
         JsonNode current = root;
         for (String segment : path.split("\\.")) {
+            current = childAt(current, segment);
             if (current == null) {
-                return null;
-            }
-            int bracket = segment.indexOf('[');
-            if (bracket < 0) {
-                current = current.get(segment);
-                continue;
-            }
-            if (!segment.endsWith("]")) {
-                return null;
-            }
-            String name = segment.substring(0, bracket);
-            JsonNode array = name.isEmpty() ? current : current.get(name);
-            if (array == null || !array.isArray()) {
-                return null;
-            }
-            String index = segment.substring(bracket + 1, segment.length() - 1);
-            if (index.startsWith("type=")) {
-                current = findByType(array, index.substring("type=".length()));
-                continue;
-            }
-            try {
-                current = array.get(Integer.parseInt(index));
-            } catch (NumberFormatException exception) {
                 return null;
             }
         }
         return current;
+    }
+
+    private static JsonNode childAt(JsonNode current, String segment) {
+        if (current == null) {
+            return null;
+        }
+        int bracket = segment.indexOf('[');
+        if (bracket < 0) {
+            return current.get(segment);
+        }
+        if (!segment.endsWith("]")) {
+            return null;
+        }
+        String name = segment.substring(0, bracket);
+        JsonNode array = name.isEmpty() ? current : current.get(name);
+        if (array == null || !array.isArray()) {
+            return null;
+        }
+        String index = segment.substring(bracket + 1, segment.length() - 1);
+        return index.startsWith("type=")
+                ? findByType(array, index.substring("type=".length()))
+                : indexed(array, index);
+    }
+
+    private static JsonNode indexed(JsonNode array, String index) {
+        try {
+            return array.get(Integer.parseInt(index));
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     /**
@@ -105,12 +113,13 @@ public final class ResponseDecoderSupport {
     /**
      * 写入字段值。
      */
+    @SuppressWarnings("java:S3011")
     public static void write(Field field, Object target, Object value) {
         if (value == null) {
             return;
         }
         try {
-            field.setAccessible(true);
+            makeAccessible(field);
             field.set(target, value);
         } catch (ReflectiveOperationException exception) {
             throw new IllegalArgumentException("cannot write response field: " + field.getName(), exception);
@@ -122,7 +131,7 @@ public final class ResponseDecoderSupport {
      */
     static Object read(Field field, Object target) {
         try {
-            field.setAccessible(true);
+            makeAccessible(field);
             return field.get(target);
         } catch (ReflectiveOperationException exception) {
             throw new IllegalArgumentException("cannot read response field: " + field.getName(), exception);
@@ -137,6 +146,12 @@ public final class ResponseDecoderSupport {
         write(field, target, current == null ? text : ((String) current) + text);
     }
 
+    @SuppressWarnings("java:S3011")
+    private static void makeAccessible(final Field field) {
+        // 响应 DTO 由本模块按注解声明解码，字段默认私有；统一在此处开放访问，避免调用方重复处理。
+        field.setAccessible(true);
+    }
+
     /**
      * 按目标类型转换节点值。
      */
@@ -146,41 +161,64 @@ public final class ResponseDecoderSupport {
             return node.isTextual() ? node.textValue() : node.asText();
         }
         if (raw == Integer.class || raw == Integer.TYPE) {
-            if (!node.isIntegralNumber() || !node.canConvertToInt()) {
-                throw ExceptionUtils.protocolError(provider);
-            }
-            return Integer.valueOf(node.intValue());
+            return integerValue(node, provider);
         }
         if (raw == Long.class || raw == Long.TYPE) {
-            if (!node.isIntegralNumber()) {
-                throw ExceptionUtils.protocolError(provider);
-            }
-            return Long.valueOf(node.longValue());
+            return longValue(node, provider);
         }
         if (raw == Double.class || raw == Double.TYPE) {
-            if (!node.isNumber()) {
-                throw ExceptionUtils.protocolError(provider);
-            }
-            return Double.valueOf(node.doubleValue());
+            return doubleValue(node, provider);
         }
         if (raw == Boolean.class || raw == Boolean.TYPE) {
-            if (!node.isBoolean()) {
-                throw ExceptionUtils.protocolError(provider);
-            }
-            return Boolean.valueOf(node.booleanValue());
+            return booleanValue(node, provider);
         }
         if (raw == FinishReasonEnum.class) {
             return FinishReasonUtils.of(JsonNodeUtils.textOrNull(node));
         }
-        if (raw != null && raw.isEnum()) {
-            String literal = JsonNodeUtils.textOrNull(node);
-            for (Object constant : raw.getEnumConstants()) {
-                if (((Enum<?>) constant).name().equalsIgnoreCase(literal)) {
-                    return constant;
-                }
-            }
+        return raw != null && raw.isEnum()
+                ? enumValue(raw, node, provider)
+                : mappedValue(type, node, provider);
+    }
+
+    private static Object integerValue(JsonNode node, ModelProviderEnum provider) {
+        if (!node.isIntegralNumber() || !node.canConvertToInt()) {
             throw ExceptionUtils.protocolError(provider);
         }
+        return Integer.valueOf(node.intValue());
+    }
+
+    private static Object longValue(JsonNode node, ModelProviderEnum provider) {
+        if (!node.isIntegralNumber()) {
+            throw ExceptionUtils.protocolError(provider);
+        }
+        return Long.valueOf(node.longValue());
+    }
+
+    private static Object doubleValue(JsonNode node, ModelProviderEnum provider) {
+        if (!node.isNumber()) {
+            throw ExceptionUtils.protocolError(provider);
+        }
+        return Double.valueOf(node.doubleValue());
+    }
+
+    private static Object booleanValue(JsonNode node, ModelProviderEnum provider) {
+        if (!node.isBoolean()) {
+            throw ExceptionUtils.protocolError(provider);
+        }
+        return Boolean.valueOf(node.booleanValue());
+    }
+
+    private static Object enumValue(Class<?> raw, JsonNode node, ModelProviderEnum provider) {
+        String literal = JsonNodeUtils.textOrNull(node);
+        for (Object constant : raw.getEnumConstants()) {
+            if (((Enum<?>) constant).name().equalsIgnoreCase(literal)) {
+                return constant;
+            }
+        }
+        throw ExceptionUtils.protocolError(provider);
+    }
+
+    private static Object mappedValue(Type type, JsonNode node, ModelProviderEnum provider) {
         try {
             return MAPPER.convertValue(node, MAPPER.getTypeFactory().constructType(type));
         } catch (IllegalArgumentException exception) {
@@ -191,6 +229,7 @@ public final class ResponseDecoderSupport {
     /**
      * 创建响应对象。
      */
+    @SuppressWarnings("java:S3011")
     public static <R extends IResponse> R newInstance(Class<R> responseType) {
         try {
             Constructor<R> constructor = responseType.getDeclaredConstructor();

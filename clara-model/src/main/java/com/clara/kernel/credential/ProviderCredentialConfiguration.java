@@ -68,6 +68,15 @@ public final class ProviderCredentialConfiguration implements Closeable {
         this.apiKey = hasApiKey ? apiKey.clone() : null;
     }
 
+    /**
+     * 读取内联密钥副本；每次调用都返回新数组，调用方修改或清零不会影响本对象。
+     *
+     * @return 内联密钥副本；使用环境变量时返回 null
+     */
+    public char[] getApiKey() {
+        return apiKey == null ? null : apiKey.clone();
+    }
+
 
     /**
      * 创建凭据解析器。
@@ -77,7 +86,7 @@ public final class ProviderCredentialConfiguration implements Closeable {
      * @return 仅在引用名匹配时返回密钥的解析器，非 null
      */
     public ICredentialResolver resolver() {
-        return (requestedSecretRef) -> resolveSecret(requestedSecretRef);
+        return this::resolveSecret;
     }
 
     /**
@@ -98,7 +107,7 @@ public final class ProviderCredentialConfiguration implements Closeable {
      * 按引用名解析密钥。
      *
      * @param requestedSecretRef 请求的凭据引用名
-     * @return 密钥副本，引用不匹配或环境变量为空时返回 null
+     * @return 密钥副本；引用不匹配或环境变量为空时返回零长度数组
      * @throws IllegalStateException 配置已关闭时
      */
     private synchronized char[] resolveSecret(String requestedSecretRef) {
@@ -106,13 +115,13 @@ public final class ProviderCredentialConfiguration implements Closeable {
             throw new IllegalStateException("credential configuration is closed");
         }
         if (!secretRef.equals(requestedSecretRef)) {
-            return null;
+            return new char[0];
         }
         if (apiKey != null) {
             return apiKey.clone();
         }
         String value = System.getenv(environmentVariable);
-        return StringUtils.isBlank(value) ? null : value.toCharArray();
+        return StringUtils.isBlank(value) ? new char[0] : value.toCharArray();
     }
 
 }

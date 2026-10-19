@@ -1,5 +1,7 @@
 package com.clara.adapter.console;
 
+import com.clara.enums.interaction.CancelConfirmationDecisionEnum;
+
 /**
  * ESC 取消的确认状态机：把控制台的单键输入翻译为「提示确认 / 确认取消 / 忽略」三种决策。
  *
@@ -10,18 +12,6 @@ package com.clara.adapter.console;
  * 真正取消；确认窗口内按其他键，或超时未再按，都放弃取消并回到继续执行。
  */
 final class CancelConfirmation {
-
-    /**
-     * 一次按键或超时后的决策结果。
-     */
-    enum Decision {
-        /** 与本状态机无关，继续执行。 */
-        IGNORED,
-        /** 已进入待确认状态，应提示用户「再按一次确认」。 */
-        PROMPT,
-        /** 用户已确认取消。 */
-        CANCEL
-    }
 
     /** ESC 键值。 */
     static final int ESC = 27;
@@ -70,23 +60,24 @@ final class CancelConfirmation {
      *
      * @param key 键值
      * @param now 当前时间（Unix epoch 毫秒）
-     * @return 决策：首次 ESC 返回 {@link Decision#PROMPT}，确认键返回 {@link Decision#CANCEL}，
-     *         其余返回 {@link Decision#IGNORED}
+     * @return 决策：首次 ESC 返回 {@link CancelConfirmationDecisionEnum#PROMPT}，
+     *         确认键返回 {@link CancelConfirmationDecisionEnum#CANCEL}，其余返回
+     *         {@link CancelConfirmationDecisionEnum#IGNORED}
      */
-    Decision onKey(int key, long now) {
+    CancelConfirmationDecisionEnum onKey(int key, long now) {
         if (!awaiting) {
             if (key != ESC) {
-                return Decision.IGNORED;
+                return CancelConfirmationDecisionEnum.IGNORED;
             }
             awaiting = true;
             deadline = now + confirmWindowMillis;
-            return Decision.PROMPT;
+            return CancelConfirmationDecisionEnum.PROMPT;
         }
         awaiting = false;
         if (key == ESC || key == CARRIAGE_RETURN || key == LINE_FEED || key == 'y' || key == 'Y') {
-            return Decision.CANCEL;
+            return CancelConfirmationDecisionEnum.CANCEL;
         }
-        return Decision.IGNORED;
+        return CancelConfirmationDecisionEnum.IGNORED;
     }
 
     /**

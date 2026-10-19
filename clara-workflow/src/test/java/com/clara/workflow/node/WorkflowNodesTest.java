@@ -1,10 +1,13 @@
 package com.clara.workflow.node;
 
+import com.clara.core.workflow.IWorkflowAction;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
@@ -81,23 +84,29 @@ public class WorkflowNodesTest {
 
     @Test
     public void rejectsInvalidFactoryInputs() {
+        Set<String> outputs = Collections.singleton("out");
+        IWorkflowAction handler = scope -> Collections.emptyMap();
         assertThrows(IllegalArgumentException.class,
-                () -> WorkflowNodes.action("a", WorkflowNodeTypeEnum.SEQUENCE,
-                        Collections.singleton("out"), "idem", scope -> Collections.emptyMap()));
+                () -> WorkflowNodes.action("a", WorkflowNodeTypeEnum.SEQUENCE, outputs, "idem", handler));
+        IWorkflowNode conditionChild = action("t", "out");
         assertThrows(IllegalArgumentException.class,
-                () -> WorkflowNodes.condition("c", null, action("t", "out"), null));
+                () -> WorkflowNodes.condition("c", null, conditionChild, null));
+        IWorkflowNode loopBody = action("body", "out");
         assertThrows(IllegalArgumentException.class,
-                () -> WorkflowNodes.loop("l", action("body", "out"), 0, null));
+                () -> WorkflowNodes.loop("l", loopBody, 0, null));
+        List<IWorkflowNode> emptyChildren = Collections.emptyList();
         assertThrows(IllegalArgumentException.class,
-                () -> WorkflowNodes.parallel("par", Collections.<IWorkflowNode>emptyList()));
+                () -> WorkflowNodes.parallel("par", emptyChildren));
         assertThrows(IllegalArgumentException.class,
                 () -> WorkflowNodes.human("h", " "));
     }
 
     @Test
     public void rejectsDuplicateParallelOutputs() {
+        IWorkflowNode first = action("a", "out");
+        IWorkflowNode second = action("b", "out");
+        List<IWorkflowNode> duplicates = Arrays.asList(first, second);
         assertThrows(IllegalArgumentException.class,
-                () -> WorkflowNodes.parallel("par",
-                        Arrays.asList(action("a", "out"), action("b", "out"))));
+                () -> WorkflowNodes.parallel("par", duplicates));
     }
 }

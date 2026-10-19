@@ -29,6 +29,8 @@ import java.util.Map;
  */
 public final class WorkflowRunner {
 
+    private static final String FIELD_INSTANCE_ID = "instanceId";
+
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final TypeReference<LinkedHashMap<String, Object>> INPUTS_TYPE =
             new TypeReference<LinkedHashMap<String, Object>>() { };
@@ -66,14 +68,14 @@ public final class WorkflowRunner {
         WorkflowDefinition definition = require(workflowId);
         String instanceId = workflowId + "-" + System.currentTimeMillis();
         LinkedHashMap<String, Object> inputs = parseInputs(inputsJson);
-        if (!inputs.containsKey("instanceId")) {
-            inputs.put("instanceId", instanceId);
+        if (!inputs.containsKey(FIELD_INSTANCE_ID)) {
+            inputs.put(FIELD_INSTANCE_ID, instanceId);
         }
         WorkflowResult result = engine.start(definition, instanceId, inputs);
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("workflowId", workflowId);
-        payload.put("instanceId", instanceId);
+        payload.put(FIELD_INSTANCE_ID, instanceId);
         payload.put("status", result.getStatus() == null ? null : result.getStatus().name());
         payload.put("waitingNodeId", result.getWaitingNodeId());
         payload.put("waitingInputKey", result.getWaitingInputKey());
@@ -83,13 +85,11 @@ public final class WorkflowRunner {
         ExecutionScope scope = result.getScope();
         if (scope != null) {
             for (Map.Entry<String, Object> entry : scope.getVariables().entrySet()) {
-                if ("instanceId".equals(entry.getKey())) {
-                    continue;
+                boolean instanceField = FIELD_INSTANCE_ID.equals(entry.getKey());
+                boolean declared = declaredOutputs.isEmpty() || declaredOutputs.contains(entry.getKey());
+                if (!instanceField && declared) {
+                    outputs.put(entry.getKey(), sanitize(entry.getValue()));
                 }
-                if (!declaredOutputs.isEmpty() && !declaredOutputs.contains(entry.getKey())) {
-                    continue;
-                }
-                outputs.put(entry.getKey(), sanitize(entry.getValue()));
             }
         }
         payload.put("outputs", outputs);

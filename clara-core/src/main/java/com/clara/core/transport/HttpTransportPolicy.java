@@ -3,6 +3,8 @@ package com.clara.core.transport;
 import com.clara.core.transport.sse.SseParserConfig;
 import lombok.Data;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -72,7 +74,8 @@ public final class HttpTransportPolicy {
         this.readTimeoutMillis = readTimeoutMillis;
         this.maxRequestBytes = maxRequestBytes;
         this.maxResponseBytes = maxResponseBytes;
-        this.defaultHeaders = HttpHeaders.validate(defaultHeaders);
+        this.defaultHeaders = Collections.unmodifiableMap(
+                new LinkedHashMap<>(HttpHeaders.validate(defaultHeaders)));
         this.sseParserConfig = sseParserConfig;
     }
 

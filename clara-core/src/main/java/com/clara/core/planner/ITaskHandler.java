@@ -15,5 +15,6 @@ public interface ITaskHandler {
      * @return 执行结果，非 null
      * @throws Exception 执行失败时
      */
+    @SuppressWarnings("java:S112")
     TaskExecutionResult execute(TaskExecutionContext context) throws Exception;
 }

@@ -10,6 +10,7 @@ import java.util.Map;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -64,12 +65,8 @@ public class McpValueObjectsTest {
         source.put("text", "changed");
 
         assertEquals("hi", call.getArguments().get("text"));
-        try {
-            call.getArguments().put("x", "y");
-            fail("arguments must be read-only");
-        } catch (UnsupportedOperationException expected) {
-            assertTrue(true);
-        }
+        Map<String, Object> arguments = call.getArguments();
+        assertThrows(UnsupportedOperationException.class, () -> arguments.put("x", "y"));
     }
 
     @Test

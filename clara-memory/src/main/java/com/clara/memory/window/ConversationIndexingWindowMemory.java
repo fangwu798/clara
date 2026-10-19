@@ -142,6 +142,6 @@ public final class ConversationIndexingWindowMemory implements IWindowMemory {
     }
 
     private void warn(RuntimeException failure) {
-        System.err.println("[memory] 对话记录写入语义记忆失败（本轮继续）：" + failure.getMessage());
+        System.err.println("[memory] 对话记录写入语义记忆失败（本轮继续）：" + failure.getMessage()); // NOSONAR CLI output by design
     }
 }

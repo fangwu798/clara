@@ -14,5 +14,5 @@ public interface ICallRecordSink {
      *
      * @param record 调用记录，非 null
      */
-    void accept(CallRecord record);
+    void accept(CallRecord callRecord);
 }

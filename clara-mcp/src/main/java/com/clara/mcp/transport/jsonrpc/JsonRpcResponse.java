@@ -20,6 +20,7 @@ public final class JsonRpcResponse {
         this.result = result == null ? null : ImmutableValues.copyMap(result);
         this.error = error;
     }
+    @SuppressWarnings("java:S3400")
     public String getJsonRpc() { return "2.0"; }
     public String getId() { return id; }
     public Map<String, Object> getResult() { return result; }

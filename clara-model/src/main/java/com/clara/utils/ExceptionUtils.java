@@ -46,7 +46,7 @@ public final class ExceptionUtils {
      * 留在面向使用者的失败原因里既冗长，又容易被误读成本地信息。展示层只保留平台错误信息与 HTTP 状态码。
      */
     private static final Pattern REQUEST_ID = Pattern.compile(
-            "\\s*\\brequest[ _-]?id\\b\\s*[:：]?\\s*[A-Za-z0-9][A-Za-z0-9._-]*", Pattern.CASE_INSENSITIVE);
+            "\\s*+\\brequest[\\s_-]?+id\\b\\s*+[:：]?+\\s*+\\w[\\w.-]*+", Pattern.CASE_INSENSITIVE);
 
     private ExceptionUtils() {
     }
@@ -194,7 +194,16 @@ public final class ExceptionUtils {
      * @return 映射后的异常
      */
     public static ClaraException providerFailure(ModelProviderEnum provider, int status, String providerMessage) {
-        ErrorCategoryEnum category = status == 401 ? ErrorCategoryEnum.AUTHENTICATION : status == 403 ? ErrorCategoryEnum.AUTHORIZATION : status == 429 ? ErrorCategoryEnum.RATE_LIMIT : ErrorCategoryEnum.EXTERNAL_SERVICE;
+        ErrorCategoryEnum category;
+        if (status == 401) {
+            category = ErrorCategoryEnum.AUTHENTICATION;
+        } else if (status == 403) {
+            category = ErrorCategoryEnum.AUTHORIZATION;
+        } else if (status == 429) {
+            category = ErrorCategoryEnum.RATE_LIMIT;
+        } else {
+            category = ErrorCategoryEnum.EXTERNAL_SERVICE;
+        }
         Map<String, String> details = new LinkedHashMap<>();
         String detail = withoutRequestId(providerMessage);
         if (detail != null) {

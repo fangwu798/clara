@@ -157,7 +157,7 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      * @return 本句柄，非 null
      */
     public StreamHandle start() {
-        executor.submit(() -> {
+        executor.execute(() -> {
             if (context == null) {
                 read();
                 return;
@@ -176,7 +176,7 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      */
     private void read() {
         try {
-            RawHttpResponse response = transport.execute(request, StreamHandle.this);
+            RawHttpResponse response = transport.execute(request, this);
             if (response != null && !isSuccess(response.getStatusCode())) {
                 fail(ExceptionUtils.providerFailure(provider(), response.getStatusCode(), providerErrorMessage(response)));
                 return;

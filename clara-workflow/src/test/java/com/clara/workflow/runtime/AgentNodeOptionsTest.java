@@ -58,7 +58,8 @@ public class AgentNodeOptionsTest {
         Map<String, Object> attributes = attributes();
         attributes.put("capability", "vision");
 
-        assertThrows(IllegalArgumentException.class, () -> AgentNodeOptions.fromSpec(spec(attributes)));
+        WorkflowActionSpec nodeSpec = spec(attributes);
+        assertThrows(IllegalArgumentException.class, () -> AgentNodeOptions.fromSpec(nodeSpec));
     }
 
     @Test
@@ -66,7 +67,8 @@ public class AgentNodeOptionsTest {
         Map<String, Object> attributes = attributes();
         attributes.put("capability", 3);
 
-        assertThrows(IllegalArgumentException.class, () -> AgentNodeOptions.fromSpec(spec(attributes)));
+        WorkflowActionSpec nodeSpec = spec(attributes);
+        assertThrows(IllegalArgumentException.class, () -> AgentNodeOptions.fromSpec(nodeSpec));
     }
 
     @Test
@@ -89,7 +91,8 @@ public class AgentNodeOptionsTest {
         Map<String, Object> attributes = attributes();
         attributes.put("attachments", "https://example.com/a.png");
 
-        assertThrows(IllegalArgumentException.class, () -> AgentNodeOptions.fromSpec(spec(attributes)));
+        WorkflowActionSpec nodeSpec = spec(attributes);
+        assertThrows(IllegalArgumentException.class, () -> AgentNodeOptions.fromSpec(nodeSpec));
     }
 
     private static WorkflowActionSpec spec(Map<String, Object> attributes) {

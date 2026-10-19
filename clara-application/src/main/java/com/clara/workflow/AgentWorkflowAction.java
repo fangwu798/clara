@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * AGENT 工作流动作：用提示词与变量调用模型，并把回复（或图片产物）作为输出。
@@ -89,7 +90,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         if (context == null || options == null) {
             throw new IllegalArgumentException("agent action dependencies must not be null");
         }
-        if (StringUtils.isBlank(nodeId) || (StringUtils.isBlank(promptId) && StringUtils.isBlank(promptText))) {
+        if (StringUtils.isBlank(nodeId) || StringUtils.isBlank(promptId) && StringUtils.isBlank(promptText)) {
             throw new IllegalArgumentException("nodeId and prompt (promptId or promptText) are required");
         }
         this.context = context;
@@ -230,7 +231,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
             return ingestMediaReferences(content, capability);
         }
         Object output = parse(content);
-        if (output == null || (output instanceof String && ((String) output).trim().isEmpty())) {
+        if (output == null || output instanceof String && ((String) output).trim().isEmpty()) {
             throw new IllegalStateException("工作流 AGENT 节点回复为空（节点 " + nodeId + "）");
         }
         return output;
@@ -264,7 +265,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
      */
     private List<String> attachments(ExecutionScope scope) {
         if (options.attachments().isEmpty()) {
-            return null;
+            return Collections.emptyList();
         }
         List<String> resolved = new ArrayList<>();
         for (String template : options.attachments()) {

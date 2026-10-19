@@ -7,6 +7,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -67,12 +68,8 @@ public class McpToolDescriptorTest {
         source.put("type", "changed");
         assertEquals("object", descriptor.getInputSchema().get("type"));
 
-        try {
-            descriptor.getInputSchema().put("x", "y");
-            fail("schema must be read-only");
-        } catch (UnsupportedOperationException expected) {
-            assertTrue(true);
-        }
+        Map<String, Object> schema = descriptor.getInputSchema();
+        assertThrows(UnsupportedOperationException.class, () -> schema.put("x", "y"));
         @SuppressWarnings("unchecked")
         Map<String, Object> nestedView = (Map<String, Object>) descriptor.getInputSchema().get("properties");
         try {

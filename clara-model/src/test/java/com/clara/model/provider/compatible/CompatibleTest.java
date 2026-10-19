@@ -37,6 +37,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Collectors;
 
 import org.junit.Assume;
@@ -47,6 +48,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assert.assertNotEquals;
 
 /**
  * 加载真实平台配置、直接调用真实接口的用例（不使用任何模拟）。
@@ -323,7 +325,7 @@ public class CompatibleTest {
 
                 ImageItem first = images.get(0);
                 System.out.println("[火山 生图] 首图尺寸=" + first.getSize() + " url=" + first.getUrl());
-                assertFalse("图片内容为空", download(first.getUrl()) == 0);
+                assertNotEquals("图片内容为空", 0, download(first.getUrl()));
             }
         }
     }
@@ -684,7 +686,7 @@ public class CompatibleTest {
     private static void assertFinished(IStreamHandle handle) throws InterruptedException {
         long deadline = System.currentTimeMillis() + 5000L;
         while (!handle.isDone() && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10L);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10L));
         }
         assertTrue("流式任务未结束", handle.isDone());
     }

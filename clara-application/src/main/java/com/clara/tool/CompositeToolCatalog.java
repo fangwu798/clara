@@ -61,15 +61,12 @@ public final class CompositeToolCatalog implements IToolCatalog {
             return;
         }
         for (ToolContext tool : tools) {
-            if (tool == null) {
-                continue;
-            }
-            ToolSpecification function = tool.getFunction();
-            if (function == null || function.getName() == null || function.getName().trim().isEmpty()) {
-                continue;
-            }
-            if (!merged.containsKey(function.getName())) {
-                merged.put(function.getName(), tool);
+            if (tool != null) {
+                ToolSpecification function = tool.getFunction();
+                if (function != null && function.getName() != null && !function.getName().trim().isEmpty()
+                        && !merged.containsKey(function.getName())) {
+                    merged.put(function.getName(), tool);
+                }
             }
         }
     }

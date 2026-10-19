@@ -4,7 +4,6 @@ import com.clara.utils.StringUtils;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.kernel.http.TransportConfig;
 import lombok.Getter;
 
 import java.util.LinkedHashMap;
@@ -351,23 +350,6 @@ public final class ConvContext {
             historyCall.put(call.getTraceId(), call);
         }
         return call;
-    }
-
-    /**
-     * 按本会话的传输配置推导一次调用的截止时间。
-     *
-     * <p>当前没有调用方：传输层直接用传输配置里的读取超时调 {@link #newCall(long)}，因此本方法不影响实际
-     * 生效的调用超时。
-     *
-     * @return 建连超时与读取超时之和，单位毫秒
-     * @throws IllegalStateException 会话未携带平台配置时
-     */
-    private long defaultTimeoutMillis() {
-        if (providerConfiguration == null) {
-            throw new IllegalStateException("provider configuration is required to derive call timeout");
-        }
-        TransportConfig transport = providerConfiguration.getTransport();
-        return (long) transport.getConnectTimeoutMillis() + transport.getReadTimeoutMillis();
     }
 
     /**

@@ -175,7 +175,11 @@ public final class LocalConversationStore implements ConversationStore {
     }
 
     private void writeAtomic(Path target, byte[] bytes) {
-        Path temp = target.resolveSibling(target.getFileName().toString() + ".tmp");
+        Path fileName = target.getFileName();
+        if (fileName == null) {
+            throw new IllegalArgumentException("target must have a file name");
+        }
+        Path temp = target.resolveSibling(fileName.toString() + ".tmp");
         FileChannel channel = null;
         try {
             channel = FileChannel.open(temp, StandardOpenOption.CREATE,

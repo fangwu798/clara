@@ -51,8 +51,9 @@ public class TaskPlanReplannerTest {
 
     private void assertReplanRejected(TaskPlan current, TaskPlan replacement, int priorReplans,
             Set<String> completed) {
+        TaskPlanReplanner replanner = replanner();
         ClaraException error = assertThrows(ClaraException.class,
-                () -> replanner().replan(current, replacement, priorReplans, completed));
+                () -> replanner.replan(current, replacement, priorReplans, completed));
         assertEquals(ErrorCodes.PLAN_RE_PLAN_INVALID, error.getError().getCode());
     }
 

@@ -13,6 +13,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -36,25 +37,27 @@ import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombi
  */
 public final class ConfigLocator {
 
+    private static final String CONFIG_DIR = "config";
+
     /**
      * 模型配置目录（相对运行目录）。
      */
-    private static final Path MODEL_DIRECTORY = Paths.get("config", "model-providers");
+    private static final Path MODEL_DIRECTORY = Paths.get(CONFIG_DIR, "model-providers");
 
     /**
      * 本地运行配置文件（相对运行目录）：其 {@code defaultModel} 指定主（默认）模型。
      */
-    private static final Path CLARA_CONFIG = Paths.get("config", "clara.yml");
+    private static final Path CLARA_CONFIG = Paths.get(CONFIG_DIR, "clara.yml");
 
     /**
      * 配置根目录（相对运行目录），用于推导仓库根与日志目录。
      */
-    private static final Path CONFIG_DIRECTORY = Paths.get("config");
+    private static final Path CONFIG_DIRECTORY = Paths.get(CONFIG_DIR);
 
     /**
      * 角色 → 模型别名映射文件（相对运行目录），可选。
      */
-    private static final Path MODEL_ROLES = Paths.get("config", "model-roles.yml");
+    private static final Path MODEL_ROLES = Paths.get(CONFIG_DIR, "model-roles.yml");
 
     /**
      * 拼音输出格式：无声调、小写、{@code ü} 写作 {@code v}，保证转写结果仅含 ASCII 字母 / 数字。
@@ -210,7 +213,7 @@ public final class ConfigLocator {
      */
     private static List<Path> scanModelConfigs() {
         Path directory = modelDirectory();
-        if (directory == null || !Files.isDirectory(directory)) {
+        if (!Files.isDirectory(directory)) {
             return Collections.emptyList();
         }
         List<Path> result = new ArrayList<>();
@@ -250,18 +253,19 @@ public final class ConfigLocator {
             return null;
         }
         try {
-            for (String raw : Files.readAllLines(configFile, StandardCharsets.UTF_8)) {
-                String line = raw.trim();
+            Iterator<String> lines = Files.readAllLines(configFile, StandardCharsets.UTF_8).iterator();
+            String model = null;
+            while (lines.hasNext() && model == null) {
+                String line = lines.next().trim();
                 if (line.isEmpty() || line.startsWith("#")) {
                     continue;
                 }
                 int colon = line.indexOf(':');
-                if (colon <= 0 || !DEFAULT_MODEL_KEY.equals(line.substring(0, colon).trim())) {
-                    continue;
+                if (colon > 0 && DEFAULT_MODEL_KEY.equals(line.substring(0, colon).trim())) {
+                    model = unquote(line.substring(colon + 1).trim());
                 }
-                String value = unquote(line.substring(colon + 1).trim());
-                return value.isEmpty() ? null : value;
             }
+            return model == null || model.isEmpty() ? null : model;
         } catch (IOException ignored) {
             // 读取失败视为未配置
         }
@@ -277,7 +281,11 @@ public final class ConfigLocator {
      */
     public static Path resolveModel(List<Path> candidates, String name) {
         for (Path candidate : candidates) {
-            String fileName = candidate.getFileName().toString();
+            Path fileNamePath = candidate.getFileName();
+            if (fileNamePath == null) {
+                continue;
+            }
+            String fileName = fileNamePath.toString();
             if (fileName.equalsIgnoreCase(name) || stem(fileName).equalsIgnoreCase(name)) {
                 return candidate;
             }
@@ -398,7 +406,7 @@ public final class ConfigLocator {
         StringBuilder builder = new StringBuilder();
         for (int index = 0; index < raw.length(); index++) {
             char c = raw.charAt(index);
-            if (isAsciiLetter(c) || (c >= '0' && c <= '9')) {
+            if (isAsciiLetter(c) || c >= '0' && c <= '9') {
                 builder.append(Character.toLowerCase(c));
             } else if (c == '_') {
                 builder.append('_');
@@ -406,7 +414,7 @@ public final class ConfigLocator {
                 builder.append(pinyinOf(c));
             }
         }
-        String normalized = builder.toString().replaceAll("_+", "_").replaceAll("^_+|_+$", "");
+        String normalized = collapseAndTrim(builder.toString());
         if (!normalized.isEmpty() && normalized.charAt(0) >= '0' && normalized.charAt(0) <= '9') {
             normalized = "p" + normalized;
         }
@@ -414,10 +422,39 @@ public final class ConfigLocator {
     }
 
     /**
+     * 折叠连续下划线并去掉首尾下划线，避免正则回溯。
+     */
+    private static String collapseAndTrim(String text) {
+        StringBuilder builder = new StringBuilder(text.length());
+        boolean lastUnderscore = false;
+        for (int index = 0; index < text.length(); index++) {
+            char current = text.charAt(index);
+            if (current == '_') {
+                if (!lastUnderscore) {
+                    builder.append(current);
+                }
+                lastUnderscore = true;
+            } else {
+                builder.append(current);
+                lastUnderscore = false;
+            }
+        }
+        int start = 0;
+        int end = builder.length();
+        while (start < end && builder.charAt(start) == '_') {
+            start++;
+        }
+        while (end > start && builder.charAt(end - 1) == '_') {
+            end--;
+        }
+        return builder.substring(start, end);
+    }
+
+    /**
      * 是否为 ASCII 字母（大小写）。
      */
     private static boolean isAsciiLetter(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
     }
 
     /**
@@ -476,17 +513,15 @@ public final class ConfigLocator {
         try {
             for (String raw : Files.readAllLines(file, StandardCharsets.UTF_8)) {
                 String line = raw.trim();
-                if (line.isEmpty() || line.startsWith("#")) {
-                    continue;
-                }
-                int colon = line.indexOf(':');
-                if (colon <= 0) {
-                    continue;
-                }
-                String role = line.substring(0, colon).trim();
-                String alias = unquote(line.substring(colon + 1).trim());
-                if (!role.isEmpty() && !alias.isEmpty()) {
-                    bindings.put(role, alias);
+                if (!line.isEmpty() && !line.startsWith("#")) {
+                    int colon = line.indexOf(':');
+                    if (colon > 0) {
+                        String role = line.substring(0, colon).trim();
+                        String alias = unquote(line.substring(colon + 1).trim());
+                        if (!role.isEmpty() && !alias.isEmpty()) {
+                            bindings.put(role, alias);
+                        }
+                    }
                 }
             }
         } catch (IOException ignored) {
@@ -502,10 +537,11 @@ public final class ConfigLocator {
      * @return 模型别名；入参为 null 时返回 null
      */
     public static String aliasOf(Path configPath) {
-        if (configPath == null || configPath.getFileName() == null) {
+        if (configPath == null) {
             return null;
         }
-        return stem(configPath.getFileName().toString());
+        Path fileName = configPath.getFileName();
+        return fileName == null ? null : stem(fileName.toString());
     }
 
     /**
@@ -513,8 +549,8 @@ public final class ConfigLocator {
      */
     private static String unquote(String value) {
         if (value.length() >= 2
-                && ((value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"')
-                || (value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\''))) {
+                && (value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"'
+                || value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\'')) {
             return value.substring(1, value.length() - 1).trim();
         }
         return value;
@@ -524,7 +560,11 @@ public final class ConfigLocator {
      * 判断是否为可用的模型配置：扩展名为 yml/yaml，且不在 examples 目录、文件名不含 {@code .example.}。
      */
     private static boolean isModelConfig(Path path) {
-        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        Path fileName = path.getFileName();
+        if (fileName == null) {
+            return false;
+        }
+        String name = fileName.toString().toLowerCase(Locale.ROOT);
         if (!name.endsWith(".yml") && !name.endsWith(".yaml")) {
             return false;
         }
