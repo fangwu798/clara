@@ -4,7 +4,7 @@ package com.clara.enums;
  * 结束原因：一次模型往返为什么停止生成。
  *
  * <p>是什么、在哪一层：内核共享枚举包（{@code com.clara.enums}）中的值类型，是响应对象
- * （{@link com.clara.kernel.http.HttpResponse#getFinishReason()}）与流式终态事件共用的结束原因词汇。
+ * （ com.clara.kernel.http.HttpResponse#getFinishReason()）与流式终态事件共用的结束原因词汇。
  *
  * <p>取值来源：{@link #STOP} / {@link #LENGTH} / {@link #TOOL_CALLS} / {@link #CONTENT_FILTER} 由平台的
  * {@code finish_reason} 文本映射而来（见 {@code FinishReasonUtils}），{@link #ERROR} 兼作映射不出已知

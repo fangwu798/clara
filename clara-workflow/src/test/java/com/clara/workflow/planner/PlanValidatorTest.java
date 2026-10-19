@@ -32,8 +32,14 @@ public class PlanValidatorTest {
     }
 
     private static TaskNode task(String id, List<String> dependencies, String outputKey, BudgetAmount budget) {
-        return new TaskNode(id, dependencies, "cap." + id, outputKey, RetryPolicy.NONE, 1000L, budget,
-                context -> new TaskExecutionResult(Collections.singletonMap(outputKey, "v"), BudgetAmount.ZERO));
+        return TaskNode.builder(id, "cap." + id, outputKey)
+                .dependencies(dependencies)
+                .retryPolicy(RetryPolicy.NONE)
+                .timeoutMillis(1000L)
+                .budget(budget)
+                .handler(context -> new TaskExecutionResult(Collections.singletonMap(outputKey, "v"),
+                        BudgetAmount.ZERO))
+                .build();
     }
 
     private static TaskPlan plan(List<TaskNode> tasks, PlanLimits limits) {

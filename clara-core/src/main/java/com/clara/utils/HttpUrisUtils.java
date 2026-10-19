@@ -9,6 +9,9 @@ import java.util.Locale;
  */
 public final class HttpUrisUtils {
 
+    private HttpUrisUtils(){
+
+    }
     /**
      * 校验端点是否为安全的绝对 HTTP(S) 地址。
      *

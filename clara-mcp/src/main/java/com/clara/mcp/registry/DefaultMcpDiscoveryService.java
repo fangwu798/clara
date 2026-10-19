@@ -1,7 +1,7 @@
 package com.clara.mcp.registry;
 
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.McpErrors;
 import com.clara.mcp.api.IMcpCapabilityCatalog;
@@ -104,7 +104,7 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
                 client.close();
             } catch (IOException exception) {
                 if (failure == null) {
-                    throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategory.EXTERNAL_SERVICE);
+                    throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE);
                 }
             }
         }
@@ -113,7 +113,7 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
     public void refresh(String tenantId, String serverKey) {
         McpServerRegistration registration = registry.get(tenantId, serverKey);
         if (registration == null) {
-            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_FOUND, ErrorCategory.VALIDATION);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_FOUND, ErrorCategoryEnum.VALIDATION);
         }
         try {
             McpServerSnapshot snapshot = discover(registration);
@@ -131,14 +131,14 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
 
     private void validateInitialization(McpServerRegistration registration, McpInitialization initialization) {
         if (initialization == null || !supportedVersions.contains(initialization.getProtocolVersion())) {
-            throw McpErrors.error(ErrorCodes.MCP_PROTOCOL_INCOMPATIBLE, ErrorCategory.CAPABILITY);
+            throw McpErrors.error(ErrorCodes.MCP_PROTOCOL_INCOMPATIBLE, ErrorCategoryEnum.CAPABILITY);
         }
         McpServerIdentity identity = initialization.getIdentity();
         if (registration.getApprovedIdentityName() != null && !registration.getApprovedIdentityName().equals(identity.getName())) {
-            throw McpErrors.error(ErrorCodes.MCP_SERVER_IDENTITY_CHANGED, ErrorCategory.AUTHORIZATION);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_IDENTITY_CHANGED, ErrorCategoryEnum.AUTHORIZATION);
         }
         if (registration.getApprovedIdentityVersion() != null && !registration.getApprovedIdentityVersion().equals(identity.getVersion())) {
-            throw McpErrors.error(ErrorCodes.MCP_SERVER_IDENTITY_CHANGED, ErrorCategory.AUTHORIZATION);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_IDENTITY_CHANGED, ErrorCategoryEnum.AUTHORIZATION);
         }
     }
 
@@ -149,16 +149,16 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
         int pages = 0;
         do {
             if (++pages > maxPages) {
-                throw McpErrors.error(ErrorCodes.MCP_PAGINATION_LIMIT_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
+                throw McpErrors.error(ErrorCodes.MCP_PAGINATION_LIMIT_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
             }
             McpPage<T> page = loader.apply(client, cursor);
             if (page == null) {
-                throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategory.EXTERNAL_SERVICE);
+                throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE);
             }
             result.addAll(page.getItems());
             cursor = page.getNextCursor();
             if (cursor != null && !cursors.add(cursor)) {
-                throw McpErrors.error(ErrorCodes.MCP_PAGINATION_CURSOR_REPEATED, ErrorCategory.EXTERNAL_SERVICE);
+                throw McpErrors.error(ErrorCodes.MCP_PAGINATION_CURSOR_REPEATED, ErrorCategoryEnum.EXTERNAL_SERVICE);
             }
         } while (cursor != null);
         return Collections.unmodifiableList(result);

@@ -1,5 +1,6 @@
 package com.clara.workflow.node;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
 
@@ -20,7 +21,7 @@ public final class CompositeNode implements IWorkflowNode {
     private final Set<String> outputKeys;
 
     CompositeNode(String id, WorkflowNodeTypeEnum type, List<IWorkflowNode> children) {
-        if (blank(id)) {
+        if (StringUtils.isBlank(id)) {
             throw new IllegalArgumentException("node id must not be blank");
         }
         List<IWorkflowNode> copied = requireChildren(children);
@@ -69,7 +70,4 @@ public final class CompositeNode implements IWorkflowNode {
         return Collections.unmodifiableSet(values);
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

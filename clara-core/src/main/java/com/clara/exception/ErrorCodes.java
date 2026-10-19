@@ -191,7 +191,7 @@ public final class ErrorCodes {
     /**
      * 重新规划请求非法：当前状态或参数不允许重规划。
      */
-    public static final String PLAN_REPLAN_INVALID = "PLAN_REPLAN_INVALID";
+    public static final String PLAN_RE_PLAN_INVALID = "PLAN_REPLAN_INVALID";
     /**
      * 预算已耗尽：本次调用或任务超出可用预算额度。
      */
@@ -385,7 +385,7 @@ public final class ErrorCodes {
      */
     public static final String MEDIA_METADATA_UNSUPPORTED = "MEDIA_METADATA_UNSUPPORTED";
     /**
-     * 媒体内容被拒：内容安全校验判定为不可接受。
+     * 媒体内容：内容安全校验判定为不可接受。
      */
     public static final String MEDIA_CONTENT_REJECTED = "MEDIA_CONTENT_REJECTED";
     /**

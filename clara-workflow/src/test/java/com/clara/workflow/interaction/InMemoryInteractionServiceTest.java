@@ -73,8 +73,8 @@ public class InMemoryInteractionServiceTest {
     }
 
     private static Question textQuestion(String scopeKey) {
-        return new Question(InteractionTypeEnum.TEXT_INPUT, "Your answer?", null, null, null, true,
-                scopeKey, 100);
+        return Question.builder(InteractionTypeEnum.TEXT_INPUT, "Your answer?")
+                .required(true).scopeKey(scopeKey).maxTextLength(100).build();
     }
 
     private static InteractionFeedback feedback(String interactionId, long expectedVersion,

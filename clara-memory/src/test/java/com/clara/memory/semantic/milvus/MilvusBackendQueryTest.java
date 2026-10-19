@@ -15,9 +15,10 @@ public class MilvusBackendQueryTest {
 
     @Test
     public void holdsQueryAndCandidateLimit() {
-        SemanticMemoryQuery query = new SemanticMemoryQuery(
-                MemorySourceTypeEnum.CONVERSATION, "conv-1", new float[] {1.0f, 0.0f},
-                3, 0.7d, 1234L, null);
+        SemanticMemoryQuery query = SemanticMemoryQuery.builder(new float[] {1.0f, 0.0f}, 3, 0.7d, 1234L)
+                .sourceType(MemorySourceTypeEnum.CONVERSATION)
+                .conversationId("conv-1")
+                .build();
         MilvusBackendQuery backendQuery = new MilvusBackendQuery(query, 5);
         assertNotNull(backendQuery.getQuery());
         assertEquals(query, backendQuery.getQuery());
@@ -26,9 +27,9 @@ public class MilvusBackendQueryTest {
 
     @Test
     public void rejectsInvalidCandidateLimit() {
-        SemanticMemoryQuery query = new SemanticMemoryQuery(
-                MemorySourceTypeEnum.PROMPT, null, new float[] {0.0f, 1.0f},
-                1, 0.5d, 1234L, null);
+        SemanticMemoryQuery query = SemanticMemoryQuery.builder(new float[] {0.0f, 1.0f}, 1, 0.5d, 1234L)
+                .sourceType(MemorySourceTypeEnum.PROMPT)
+                .build();
         try {
             new MilvusBackendQuery(query, 0);
             fail("candidateLimit <= 0 should be rejected");

@@ -1,5 +1,6 @@
 package com.clara.model.availability;
 
+import com.clara.utils.StringUtils;
 import com.clara.context.ConvContext;
 import com.clara.core.model.IStreamHandle;
 import com.clara.dto.model.StreamEvent;
@@ -156,12 +157,12 @@ public final class StreamingModelProbe implements IModelProbe {
         void accept(StreamEvent event) {
             StreamEventEnum type = event.getType();
             if (type == StreamEventEnum.TEXT_DELTA) {
-                if (!isBlank(event.getPayload())) {
+                if (!StringUtils.isBlank(event.getPayload())) {
                     firstContent.compareAndSet(-1L, elapsed());
                     finished.countDown();
                 }
             } else if (type == StreamEventEnum.REASONING_DELTA) {
-                if (!isBlank(event.getPayload())) {
+                if (!StringUtils.isBlank(event.getPayload())) {
                     firstReasoning.compareAndSet(-1L, elapsed());
                 }
             } else if (type == StreamEventEnum.ERROR) {
@@ -238,7 +239,7 @@ public final class StreamingModelProbe implements IModelProbe {
         }
         String message = error.getSafeMessage();
         String providerMessage = error.getSafeDetails().get("providerMessage");
-        return isBlank(providerMessage) ? message : message + "：" + providerMessage;
+        return StringUtils.isBlank(providerMessage) ? message : message + "：" + providerMessage;
     }
 
     /**
@@ -249,7 +250,7 @@ public final class StreamingModelProbe implements IModelProbe {
      */
     private static String concise(Throwable failure) {
         String message = failure.getMessage();
-        return failure.getClass().getSimpleName() + (isBlank(message) ? "" : ": " + message);
+        return failure.getClass().getSimpleName() + (StringUtils.isBlank(message) ? "" : ": " + message);
     }
 
     /**
@@ -258,7 +259,4 @@ public final class StreamingModelProbe implements IModelProbe {
      * @param value 待检查字符串
      * @return 字符串没有有效内容时返回 true
      */
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

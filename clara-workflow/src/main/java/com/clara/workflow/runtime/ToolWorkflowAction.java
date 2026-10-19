@@ -1,5 +1,6 @@
 package com.clara.workflow.runtime;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.dto.tool.ToolCall;
@@ -48,7 +49,7 @@ public final class ToolWorkflowAction implements IWorkflowAction {
         if (toolInvoker == null) {
             throw new IllegalArgumentException("toolInvoker must not be null");
         }
-        if (blank(nodeId) || blank(toolName)) {
+        if (StringUtils.isBlank(nodeId) || StringUtils.isBlank(toolName)) {
             throw new IllegalArgumentException("nodeId and toolName are required");
         }
         this.toolInvoker = toolInvoker;
@@ -89,7 +90,4 @@ public final class ToolWorkflowAction implements IWorkflowAction {
         return output;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

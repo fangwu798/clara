@@ -1,5 +1,6 @@
 package com.clara.dto.interaction;
 
+import com.clara.utils.StringUtils;
 import lombok.Data;
 
 /**
@@ -19,14 +20,11 @@ public final class InteractionOption {
      * @throws IllegalArgumentException optionId 或 label 为空白时
      */
     public InteractionOption(String optionId, String label) {
-        if (blank(optionId) || blank(label)) {
+        if (StringUtils.isBlank(optionId) || StringUtils.isBlank(label)) {
             throw new IllegalArgumentException("option fields must not be blank");
         }
         this.optionId = optionId;
         this.label = label;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

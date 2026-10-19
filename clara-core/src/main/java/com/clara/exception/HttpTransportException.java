@@ -1,5 +1,6 @@
 package com.clara.exception;
 
+
 /**
  * 通用 HTTP 传输异常：只表达传输层失败类别，不绑定模型或 MCP 的错误码。
  *
@@ -21,6 +22,7 @@ public final class HttpTransportException extends RuntimeException {
         CANCELLED,
         CLOSED
     }
+
 
     private final Kind kind;
 

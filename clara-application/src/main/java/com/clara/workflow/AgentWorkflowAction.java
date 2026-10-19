@@ -1,5 +1,6 @@
 package com.clara.workflow;
 
+import com.clara.utils.StringUtils;
 import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.core.workflow.IWorkflowAction;
@@ -88,13 +89,13 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         if (context == null || options == null) {
             throw new IllegalArgumentException("agent action dependencies must not be null");
         }
-        if (blank(nodeId) || (blank(promptId) && blank(promptText))) {
+        if (StringUtils.isBlank(nodeId) || (StringUtils.isBlank(promptId) && StringUtils.isBlank(promptText))) {
             throw new IllegalArgumentException("nodeId and prompt (promptId or promptText) are required");
         }
         this.context = context;
         this.nodeId = nodeId;
         this.promptId = promptId;
-        this.promptText = blank(promptText) ? null : promptText;
+        this.promptText = StringUtils.isBlank(promptText) ? null : promptText;
         this.promptVars = promptVars == null
                 ? new LinkedHashMap<>()
                 : new LinkedHashMap<>(promptVars);
@@ -190,7 +191,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
     private String inputPreview(Map<String, String> resolved) {
         List<String> parts = new ArrayList<>();
         for (Map.Entry<String, String> entry : resolved.entrySet()) {
-            if (blank(entry.getValue())) {
+            if (StringUtils.isBlank(entry.getValue())) {
                 continue;
             }
             parts.add(resolved.size() > 1 ? entry.getKey() + "=" + entry.getValue() : entry.getValue());
@@ -203,7 +204,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
      * 压缩空白并截断为单行摘要，用于进度明细行。
      */
     private static String summarize(String text) {
-        if (blank(text)) {
+        if (StringUtils.isBlank(text)) {
             return "";
         }
         String single = text.replaceAll("\\s+", " ").trim();
@@ -239,12 +240,12 @@ public final class AgentWorkflowAction implements IWorkflowAction {
      * 把图片生成结果（换行分隔的 URL / base64 引用）逐项落成媒体资产，返回资产描述列表。
      */
     private Object ingestMediaReferences(String content, CapabilityKindEnum capability) {
-        if (blank(content)) {
+        if (StringUtils.isBlank(content)) {
             throw new IllegalStateException("工作流 AGENT 节点图片生成结果为空（节点 " + nodeId + "）");
         }
         List<String> references = new ArrayList<>();
         for (String reference : content.split("\\r?\\n")) {
-            if (blank(reference)) {
+            if (StringUtils.isBlank(reference)) {
                 continue;
             }
             references.add(reference.trim());
@@ -269,7 +270,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         for (String template : options.attachments()) {
             String reference = WorkflowVariableResolver.stringify(
                     WorkflowVariableResolver.resolveValue(template, scope, nodeId));
-            if (!blank(reference)) {
+            if (!StringUtils.isBlank(reference)) {
                 resolved.add(reference.trim());
             }
         }
@@ -314,7 +315,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
      * 组装会话标识：有角色时纳入角色，使同实例不同角色的窗口记忆互不污染。
      */
     private String conversationId(String instanceId) {
-        return blank(options.role())
+        return StringUtils.isBlank(options.role())
                 ? "wf:" + instanceId + ":" + nodeId
                 : "wf:" + instanceId + ":" + options.role() + ":" + nodeId;
     }
@@ -349,10 +350,6 @@ public final class AgentWorkflowAction implements IWorkflowAction {
             }
         }
         return text.trim();
-    }
-
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
     }
 
     /**

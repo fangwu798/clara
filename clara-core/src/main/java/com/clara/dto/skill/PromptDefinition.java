@@ -1,5 +1,6 @@
 package com.clara.dto.skill;
 
+import com.clara.utils.StringUtils;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -27,7 +28,7 @@ public final class PromptDefinition {
      * @throws IllegalArgumentException id 为空白、segments 为 null / 空或含 null 元素时
      */
     public PromptDefinition(String id, String description, List<PromptSegment> segments) {
-        if (blank(id) || segments == null || segments.isEmpty()) {
+        if (StringUtils.isBlank(id) || segments == null || segments.isEmpty()) {
             throw new IllegalArgumentException("prompt definition is invalid");
         }
         List<PromptSegment> copied = new ArrayList<>(segments.size());
@@ -42,7 +43,4 @@ public final class PromptDefinition {
         this.segments = Collections.unmodifiableList(copied);
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

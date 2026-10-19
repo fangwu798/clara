@@ -78,19 +78,26 @@ public class MilvusSemanticMemoryStoreBm25Test {
 
     @Test
     public void entryWithoutQueryTextKeepsNull() {
-        assertNull(new SemanticMemoryQuery(MemorySourceTypeEnum.CONVERSATION, "conv-1", new float[] {1f},
-                3, -1.0d, System.currentTimeMillis(), null, null).getQueryText());
+        assertNull(SemanticMemoryQuery.builder(new float[] {1f}, 3, -1.0d, System.currentTimeMillis())
+                .sourceType(MemorySourceTypeEnum.CONVERSATION)
+                .conversationId("conv-1")
+                .build().getQueryText());
     }
 
     private static SemanticMemoryQuery query(String queryText) {
-        return new SemanticMemoryQuery(MemorySourceTypeEnum.CONVERSATION, "conv-1", new float[] {1f},
-                3, -1.0d, System.currentTimeMillis(), null, queryText);
+        return SemanticMemoryQuery.builder(new float[] {1f}, 3, -1.0d, System.currentTimeMillis())
+                .sourceType(MemorySourceTypeEnum.CONVERSATION)
+                .conversationId("conv-1")
+                .queryText(queryText)
+                .build();
     }
 
     private static MemoryEntry entry(String id, float[] vector) {
-        return new MemoryEntry(id, MemorySourceTypeEnum.CONVERSATION, "conv-1", "conv-1",
-                "content-" + id, HASH, vector, System.currentTimeMillis(), 0L,
-                Collections.<String, String>emptyMap());
+        return MemoryEntry.builder(id, MemorySourceTypeEnum.CONVERSATION, "conv-1", "content-" + id, HASH, vector)
+                .conversationId("conv-1")
+                .createdAtEpochMillis(System.currentTimeMillis())
+                .metadata(Collections.<String, String>emptyMap())
+                .build();
     }
 
     /**

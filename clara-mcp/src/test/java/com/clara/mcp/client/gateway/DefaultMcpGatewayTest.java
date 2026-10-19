@@ -5,7 +5,7 @@ import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.api.IMcpCapabilityCatalog;
 import com.clara.mcp.api.IMcpClient;
@@ -241,9 +241,7 @@ public class DefaultMcpGatewayTest {
     }
 
     private static ClaraException error(String code) {
-        return new ClaraException(new ClaraError(code,
-                ErrorCategory.EXTERNAL_SERVICE, null, false, null, null, null,
-                null, null));
+        return new ClaraException(ClaraError.builder(code, ErrorCategoryEnum.EXTERNAL_SERVICE).build());
     }
 
     private static void assertCode(String expectedCode, Runnable action) {

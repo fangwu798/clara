@@ -1,5 +1,8 @@
 package com.clara.dto.workflow;
 
+import com.clara.utils.MapUtils;
+import com.clara.utils.ObjectUtils;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -25,8 +28,7 @@ public final class ExecutionScope {
      * 以初始输入创建作用域。
      */
     public ExecutionScope(Map<String, Object> inputs) {
-        this(copyMap(inputs), new LinkedHashMap<>(),
-                new LinkedHashSet<>(), new LinkedHashMap<>(), 0L);
+        this(MapUtils.copyMap(inputs), new LinkedHashMap<>(), new LinkedHashSet<>(), new LinkedHashMap<>(), 0L);
     }
 
     private ExecutionScope(Map<String, Object> variables,
@@ -62,8 +64,7 @@ public final class ExecutionScope {
     public synchronized Map<String, Map<String, Object>> getNodeResults() {
         Map<String, Map<String, Object>> copy = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Object>> entry : nodeResults.entrySet()) {
-            copy.put(entry.getKey(),
-                    Collections.unmodifiableMap(new LinkedHashMap<>(entry.getValue())));
+            copy.put(entry.getKey(), Collections.unmodifiableMap(new LinkedHashMap<>(entry.getValue())));
         }
         return Collections.unmodifiableMap(copy);
     }
@@ -83,7 +84,7 @@ public final class ExecutionScope {
     }
 
     public synchronized void complete(String executionKey, String nodeId, Map<String, Object> outputs) {
-        Map<String, Object> values = copyMap(outputs);
+        Map<String, Object> values = MapUtils.copyMap(outputs);
         variables.putAll(values);
         nodeResults.put(nodeId, values);
         completedExecutions.add(executionKey);
@@ -100,14 +101,14 @@ public final class ExecutionScope {
     }
 
     public synchronized void addInputs(Map<String, Object> values) {
-        variables.putAll(copyMap(values));
+        variables.putAll(MapUtils.copyMap(values));
         version++;
     }
 
     public synchronized void merge(ExecutionScope base, ExecutionScope branch) {
         for (Map.Entry<String, Object> entry : branch.variables.entrySet()) {
             if (!base.variables.containsKey(entry.getKey())
-                    || !equal(base.variables.get(entry.getKey()), entry.getValue())) {
+                    || !ObjectUtils.equal(base.variables.get(entry.getKey()), entry.getValue())) {
                 variables.put(entry.getKey(), entry.getValue());
             }
         }
@@ -117,12 +118,4 @@ public final class ExecutionScope {
         version++;
     }
 
-    private static Map<String, Object> copyMap(Map<String, Object> values) {
-        return values == null ? new LinkedHashMap<>()
-                : new LinkedHashMap<>(values);
-    }
-
-    private static boolean equal(Object left, Object right) {
-        return left == null ? right == null : left.equals(right);
-    }
 }

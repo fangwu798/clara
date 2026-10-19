@@ -5,7 +5,7 @@ import com.clara.dto.planner.BudgetAmount;
 import com.clara.dto.planner.BudgetReservation;
 import com.clara.dto.planner.BudgetSnapshot;
 import com.clara.enums.planner.BudgetReservationStatusEnum;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
 import java.util.LinkedHashMap;
@@ -79,8 +79,8 @@ public final class InMemoryBudgetLedger implements IBudgetLedger {
         run.used = run.used.plus(actual);
         BudgetReservation settled = replacement(current, actual, BudgetReservationStatusEnum.SETTLED);
         reservations.put(reservationId, settled);
-        if (!run.limit.covers(run.used.plus(run.reserved))) {
-            throw PlannerErrors.error(ErrorCodes.BUDGET_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
+        if (run.limit.isExceededBy(run.used.plus(run.reserved))) {
+            throw PlannerErrors.error(ErrorCodes.BUDGET_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
         }
         return settled;
     }
@@ -142,13 +142,13 @@ public final class InMemoryBudgetLedger implements IBudgetLedger {
 
     private static void ensureCapacity(BudgetAmount limit, BudgetAmount used,
             BudgetAmount reserved, BudgetAmount requested) {
-        if (!limit.covers(used.plus(reserved).plus(requested))) {
-            throw PlannerErrors.error(ErrorCodes.BUDGET_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
+        if (limit.isExceededBy(used.plus(reserved).plus(requested))) {
+            throw PlannerErrors.error(ErrorCodes.BUDGET_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
         }
     }
 
     private static void invalid() {
-        throw PlannerErrors.error(ErrorCodes.BUDGET_RESERVATION_INVALID, ErrorCategory.CONFLICT);
+        throw PlannerErrors.error(ErrorCodes.BUDGET_RESERVATION_INVALID, ErrorCategoryEnum.CONFLICT);
     }
 
     private static void requireId(String value, String name) {

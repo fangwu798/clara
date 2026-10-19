@@ -131,8 +131,16 @@ public final class ContextControlConfiguration {
      * @return 与字段一一对应的上下文控制配置 DTO，非 null
      */
     public ContextControlConfig toContextControlConfig() {
-        return new ContextControlConfig(contextWindowTokens, windowMaxMessages, windowMaxSizeBytes,
-                windowMaxTokensPercent, compressEnabled, vectorizeEnabled, retrievalCount, similarityThreshold,
-                toolOutputMaxChars);
+        return ContextControlConfig.builder()
+                .contextWindowTokens(contextWindowTokens)
+                .windowMaxMessages(windowMaxMessages)
+                .windowMaxSizeBytes(windowMaxSizeBytes)
+                .windowMaxTokensPercent(windowMaxTokensPercent)
+                .compressEnabled(compressEnabled)
+                .vectorizeEnabled(vectorizeEnabled)
+                .retrievalCount(retrievalCount)
+                .similarityThreshold(similarityThreshold)
+                .toolOutputMaxChars(toolOutputMaxChars)
+                .build();
     }
 }

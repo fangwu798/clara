@@ -1,5 +1,6 @@
 package com.clara.workflow.node;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
 
@@ -18,10 +19,10 @@ public final class HumanNode implements IWorkflowNode {
     private final Set<String> outputKeys;
 
     HumanNode(String id, String inputKey) {
-        if (blank(id)) {
+        if (StringUtils.isBlank(id)) {
             throw new IllegalArgumentException("node id must not be blank");
         }
-        if (blank(inputKey)) {
+        if (StringUtils.isBlank(inputKey)) {
             throw new IllegalArgumentException("inputKey must not be blank");
         }
         this.id = id;
@@ -55,7 +56,4 @@ public final class HumanNode implements IWorkflowNode {
         return inputKey;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

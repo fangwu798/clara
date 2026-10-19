@@ -1,5 +1,6 @@
 package com.clara.config;
 
+import com.clara.utils.StringUtils;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
@@ -158,7 +159,7 @@ public final class ModelAvailabilityManager {
                     continue;
                 }
                 String variable = configuration.getCredential().getEnvironmentVariable();
-                if (variable != null && isBlank(environment.apply(variable))) {
+                if (variable != null && StringUtils.isBlank(environment.apply(variable))) {
                     pending.add(PendingCheck.decided(ModelCheckResult.missingCredential(path, alias, variable)));
                     continue;
                 }
@@ -308,9 +309,6 @@ public final class ModelAvailabilityManager {
      * @param value 待检查字符串
      * @return 字符串无有效内容时返回 true
      */
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 
     /**
      * 把异常压缩为适合控制台展示的单行说明，不包含堆栈信息。
@@ -320,7 +318,7 @@ public final class ModelAvailabilityManager {
      */
     private static String concise(Throwable failure) {
         String message = failure.getMessage();
-        return failure.getClass().getSimpleName() + (isBlank(message) ? "" : ": " + message);
+        return failure.getClass().getSimpleName() + (StringUtils.isBlank(message) ? "" : ": " + message);
     }
 
     /**

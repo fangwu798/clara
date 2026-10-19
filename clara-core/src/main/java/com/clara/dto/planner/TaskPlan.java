@@ -1,5 +1,6 @@
 package com.clara.dto.planner;
 
+import com.clara.utils.StringUtils;
 import com.clara.enums.planner.PlanStatusEnum;
 import lombok.Data;
 
@@ -31,12 +32,10 @@ public final class TaskPlan {
      * @param tasks   任务列表，不可为 null 或空
      * @param limits  计划约束，不可为 null
      * @param status  计划状态，不可为 null
-     * @throws IllegalArgumentException 任一字段不合法或任务 ID 重复时
+     * @throws IllegalArgumentException 任意字段不合法或任务 ID 重复时
      */
-    public TaskPlan(String goal, int version, List<TaskNode> tasks, PlanLimits limits,
-            PlanStatusEnum status) {
-        if (blank(goal) || version < 0 || tasks == null || tasks.isEmpty()
-                || limits == null || status == null) {
+    public TaskPlan(String goal, int version, List<TaskNode> tasks, PlanLimits limits, PlanStatusEnum status) {
+        if (StringUtils.isBlank(goal) || version < 0 || tasks == null || tasks.isEmpty() || limits == null || status == null) {
             throw new IllegalArgumentException("task plan is invalid");
         }
         List<TaskNode> copied = new ArrayList<>(tasks.size());
@@ -54,7 +53,4 @@ public final class TaskPlan {
         this.status = status;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

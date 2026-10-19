@@ -1,5 +1,6 @@
 package com.clara.workflow;
 
+import com.clara.utils.StringUtils;
 import com.clara.config.ModelRegistry;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.workflow.IWorkflowAction;
@@ -56,7 +57,7 @@ public final class ReviewWorkflowAction implements IWorkflowAction {
         if (orchestrator == null || promptProvider == null || modelRegistry == null || options == null) {
             throw new IllegalArgumentException("review action dependencies must not be null");
         }
-        if (blank(nodeId)) {
+        if (StringUtils.isBlank(nodeId)) {
             throw new IllegalArgumentException("nodeId is required");
         }
         this.orchestrator = orchestrator;
@@ -143,7 +144,4 @@ public final class ReviewWorkflowAction implements IWorkflowAction {
         builder.append('\n').append("## ").append(name).append('\n').append(value);
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

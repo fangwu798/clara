@@ -36,7 +36,7 @@ public final class ErrorMessages {
      * @throws IllegalArgumentException 错误码为 null 或空白时
      */
     public static String of(String code) {
-        return of(code, Collections.<String, String>emptyMap());
+        return of(code, Collections.emptyMap());
     }
 
     /**
@@ -65,16 +65,6 @@ public final class ErrorMessages {
     }
 
     /**
-     * 判断错误码是否已登记中文提示。
-     *
-     * @param code 错误码，可为 null
-     * @return 已登记时为 true
-     */
-    public static boolean isRegistered(String code) {
-        return code != null && TEMPLATES.containsKey(code);
-    }
-
-    /**
      * 按占位符替换模板内容。
      *
      * @param template 提示模板，非 null
@@ -86,12 +76,8 @@ public final class ErrorMessages {
         int index = 0;
         while (index < template.length()) {
             int open = template.indexOf('{', index);
-            if (open < 0) {
-                result.append(template, index, template.length());
-                break;
-            }
-            int close = template.indexOf('}', open + 1);
-            if (close < 0) {
+            int close = open < 0 ? -1 : template.indexOf('}', open + 1);
+            if (open < 0 || close < 0) {
                 result.append(template, index, template.length());
                 break;
             }
@@ -158,7 +144,7 @@ public final class ErrorMessages {
         messages.put(ErrorCodes.PLAN_INVALID, "计划非法：结构、步骤或依赖不满足契约");
         messages.put(ErrorCodes.PLAN_LIMIT_EXCEEDED, "计划规模超限：步骤数、深度或并行度超过允许上限");
         messages.put(ErrorCodes.PLAN_CAPABILITY_DENIED, "计划能力被拒：计划要求的能力不在允许范围内");
-        messages.put(ErrorCodes.PLAN_REPLAN_INVALID, "重新规划请求非法：当前状态或参数不允许重规划");
+        messages.put(ErrorCodes.PLAN_RE_PLAN_INVALID, "重新规划请求非法：当前状态或参数不允许重规划");
         messages.put(ErrorCodes.BUDGET_EXCEEDED, "预算已耗尽：本次调用或任务超出可用预算额度");
         messages.put(ErrorCodes.BUDGET_RESERVATION_INVALID, "预算预留非法：预留金额、标识或状态不符合账本规则");
         messages.put(ErrorCodes.EXECUTION_LEDGER_CONFLICT, "执行账本冲突：并发写入或重复记录导致账本状态不一致");

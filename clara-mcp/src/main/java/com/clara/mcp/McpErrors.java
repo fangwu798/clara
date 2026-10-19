@@ -2,8 +2,7 @@ package com.clara.mcp;
 
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
-import java.util.Collections;
+import com.clara.enums.ErrorCategoryEnum;
 
 /**
  * 集中创建 clara-mcp 的领域错误。
@@ -24,7 +23,7 @@ public final class McpErrors {
      * @param category 错误分类，不可为 null
      * @return 领域异常，非 null
      */
-    public static ClaraException error(String code, ErrorCategory category) {
+    public static ClaraException error(String code, ErrorCategoryEnum category) {
         return error(code, category, false);
     }
 
@@ -36,8 +35,9 @@ public final class McpErrors {
      * @param retryable 是否可重试
      * @return 领域异常，非 null
      */
-    public static ClaraException error(String code, ErrorCategory category, boolean retryable) {
-        return new ClaraException(new ClaraError(code, category, code, retryable,
-                null, null, null, null, Collections.<String, String>emptyMap()));
+    public static ClaraException error(String code, ErrorCategoryEnum category, boolean retryable) {
+        return new ClaraException(ClaraError.builder(code, category)
+                .retryable(retryable)
+                .build());
     }
 }

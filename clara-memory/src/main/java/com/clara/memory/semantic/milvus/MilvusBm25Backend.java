@@ -389,17 +389,18 @@ public final class MilvusBm25Backend implements MilvusBackend {
         if (conversationId != null && conversationId.isEmpty()) {
             conversationId = null;
         }
-        return new MemoryEntry(
+        return MemoryEntry.builder(
                 asString(entity.get(FIELD_ID)),
                 MemorySourceTypeEnum.valueOf(asString(entity.get(FIELD_SOURCE_TYPE))),
                 asString(entity.get(FIELD_SOURCE_ID)),
-                conversationId,
                 asString(entity.get(FIELD_CONTENT)),
                 asString(entity.get(FIELD_CONTENT_HASH)),
-                PLACEHOLDER_VECTOR,
-                asLong(entity.get(FIELD_CREATED_AT)),
-                asLong(entity.get(FIELD_EXPIRES_AT)),
-                toMetadata(entity.get(FIELD_METADATA)));
+                PLACEHOLDER_VECTOR)
+                .conversationId(conversationId)
+                .createdAtEpochMillis(asLong(entity.get(FIELD_CREATED_AT)))
+                .expiresAtEpochMillis(asLong(entity.get(FIELD_EXPIRES_AT)))
+                .metadata(toMetadata(entity.get(FIELD_METADATA)))
+                .build();
     }
 
     /**

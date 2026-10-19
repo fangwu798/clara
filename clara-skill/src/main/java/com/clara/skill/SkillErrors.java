@@ -3,10 +3,9 @@ package com.clara.skill;
 import com.clara.enums.skill.ScriptTypeEnum;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
-import java.util.Collections;
 
 /**
  * 集中创建技能领域的错误。
@@ -29,7 +28,7 @@ public final class SkillErrors {
      * @return 入参校验类、不可重试的异常
      */
     public static ClaraException skillNotFound(String id) {
-        return error(ErrorCodes.SKILL_NOT_FOUND, ErrorCategory.VALIDATION, false, "技能不存在：" + id);
+        return error(ErrorCodes.SKILL_NOT_FOUND, ErrorCategoryEnum.VALIDATION, false, "技能不存在：" + id);
     }
 
     /**
@@ -39,7 +38,7 @@ public final class SkillErrors {
      * @return 授权类、不可重试的异常
      */
     public static ClaraException permissionDenied(String id) {
-        return error(ErrorCodes.SKILL_PERMISSION_DENIED, ErrorCategory.AUTHORIZATION, false, "技能权限被拒：" + id);
+        return error(ErrorCodes.SKILL_PERMISSION_DENIED, ErrorCategoryEnum.AUTHORIZATION, false, "技能权限被拒：" + id);
     }
 
     /**
@@ -49,7 +48,7 @@ public final class SkillErrors {
      * @return 入参校验类、不可重试的异常
      */
     public static ClaraException schemaInvalid(String detail) {
-        return error(ErrorCodes.SKILL_SCHEMA_INVALID, ErrorCategory.VALIDATION, false, detail);
+        return error(ErrorCodes.SKILL_SCHEMA_INVALID, ErrorCategoryEnum.VALIDATION, false, detail);
     }
 
     /**
@@ -59,7 +58,7 @@ public final class SkillErrors {
      * @return 超时类、可重试的异常
      */
     public static ClaraException timeout(String id) {
-        return error(ErrorCodes.SKILL_TIMEOUT, ErrorCategory.TIMEOUT, true, "技能执行超时：" + id);
+        return error(ErrorCodes.SKILL_TIMEOUT, ErrorCategoryEnum.TIMEOUT, true, "技能执行超时：" + id);
     }
 
     /**
@@ -69,7 +68,7 @@ public final class SkillErrors {
      * @return 能力类、不可重试的异常
      */
     public static ClaraException handlerNotFound(ScriptTypeEnum type) {
-        return error(ErrorCodes.SKILL_HANDLER_NOT_FOUND, ErrorCategory.CAPABILITY, false,
+        return error(ErrorCodes.SKILL_HANDLER_NOT_FOUND, ErrorCategoryEnum.CAPABILITY, false,
                 "技能处理入口不存在：" + (type == null ? "null" : type.name()));
     }
 
@@ -80,7 +79,7 @@ public final class SkillErrors {
      * @return 外部服务类、不可重试的异常
      */
     public static ClaraException executionFailed(String detail) {
-        return error(ErrorCodes.SKILL_UNAVAILABLE, ErrorCategory.EXTERNAL_SERVICE, false, detail);
+        return error(ErrorCodes.SKILL_UNAVAILABLE, ErrorCategoryEnum.EXTERNAL_SERVICE, false, detail);
     }
 
     /**
@@ -90,7 +89,7 @@ public final class SkillErrors {
      * @return 入参校验类、不可重试的异常
      */
     public static ClaraException invalidArgument(String detail) {
-        return error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION, false, detail);
+        return error(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION, false, detail);
     }
 
     /**
@@ -111,8 +110,10 @@ public final class SkillErrors {
      * @param message   面向使用者的安全文案
      * @return 技能异常，非 null
      */
-    private static ClaraException error(String code, ErrorCategory category, boolean retryable, String message) {
-        return new ClaraException(new ClaraError(code, category, message, retryable,
-                null, null, null, null, Collections.<String, String>emptyMap()));
+    private static ClaraException error(String code, ErrorCategoryEnum category, boolean retryable, String message) {
+        return new ClaraException(ClaraError.builder(code, category)
+                .safeMessage(message)
+                .retryable(retryable)
+                .build());
     }
 }

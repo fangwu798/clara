@@ -1,5 +1,6 @@
 package com.clara.mcp.client.call;
 
+import com.clara.utils.StringUtils;
 import com.clara.context.CallContext;
 import com.clara.context.ConvContext;
 import com.clara.mcp.registry.ImmutableValues;
@@ -37,8 +38,8 @@ public final class McpPromptRequest {
     public McpPromptRequest(String tenantId, String serverKey, String snapshotId, String promptName,
             String schemaHash, Map<String, Object> arguments, ConvContext conversation,
             CallContext call) {
-        if (isBlank(tenantId) || isBlank(serverKey) || isBlank(snapshotId) || isBlank(promptName)
-                || isBlank(schemaHash)) {
+        if (StringUtils.isBlank(tenantId) || StringUtils.isBlank(serverKey) || StringUtils.isBlank(snapshotId) || StringUtils.isBlank(promptName)
+                || StringUtils.isBlank(schemaHash)) {
             throw new IllegalArgumentException("prompt request identifiers must not be blank");
         }
         if (conversation == null) { throw new IllegalArgumentException("conversation must not be null"); }
@@ -67,5 +68,4 @@ public final class McpPromptRequest {
     public ConvContext getConversation() { return conversation; }
     public CallContext getCall() { return call; }
 
-    private static boolean isBlank(String value) { return value == null || value.trim().isEmpty(); }
 }

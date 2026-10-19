@@ -25,8 +25,7 @@ public final class InteractionRequest {
      * @param terminalReason 终止原因，可为 null
      * @throws IllegalArgumentException context、question 或 state 为 null 时
      */
-    public InteractionRequest(InteractionContext context, Question question, InteractionStateEnum state,
-            InteractionResponse response, String terminalReason) {
+    public InteractionRequest(InteractionContext context, Question question, InteractionStateEnum state, InteractionResponse response, String terminalReason) {
         if (context == null || question == null || state == null) {
             throw new IllegalArgumentException("request fields are invalid");
         }

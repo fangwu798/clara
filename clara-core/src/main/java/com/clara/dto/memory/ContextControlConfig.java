@@ -33,81 +33,135 @@ public final class ContextControlConfig {
     public static final int DEFAULT_TOOL_OUTPUT_MAX_CHARS = 4000;
 
     /**
-     * 创建上下文控制配置（历史工具结果压缩取默认值）。
+     * 通过构建器创建上下文控制配置，并完成字段校验。
      *
-     * @param contextWindowTokens   平台上下文窗口 token 上限，-1 表示未知
-     * @param windowMaxMessages     历史最大条数，-1 表示不限
-     * @param windowMaxSizeBytes    历史最大字节数，-1 表示不限
-     * @param windowMaxTokensPercent 历史占上下文窗口最大百分比（0-100），0 表示不按百分比
-     * @param compressEnabled       是否启用超限压缩
-     * @param vectorizeEnabled      是否启用向量化入库
-     * @param retrievalCount        每次检索返回的知识条数，须非负，0 表示不检索
-     * @param similarityThreshold   检索相似度阈值，须在 {@code [0, 1]} 区间
-     * @throws IllegalArgumentException 任一字段不合法时
+     * @param builder 已填充的构建器，不能为 null
+     * @throws IllegalArgumentException 任意字段超出允许范围时
      */
-    public ContextControlConfig(long contextWindowTokens, int windowMaxMessages, long windowMaxSizeBytes,
-            int windowMaxTokensPercent, boolean compressEnabled, boolean vectorizeEnabled,
-            int retrievalCount, double similarityThreshold) {
-        this(contextWindowTokens, windowMaxMessages, windowMaxSizeBytes, windowMaxTokensPercent,
-                compressEnabled, vectorizeEnabled, retrievalCount, similarityThreshold,
-                DEFAULT_TOOL_OUTPUT_MAX_CHARS);
-    }
-
-    /**
-     * 创建上下文控制配置。
-     *
-     * @param contextWindowTokens   平台上下文窗口 token 上限，-1 表示未知
-     * @param windowMaxMessages     历史最大条数，-1 表示不限
-     * @param windowMaxSizeBytes    历史最大字节数，-1 表示不限
-     * @param windowMaxTokensPercent 历史占上下文窗口最大百分比（0-100），0 表示不按百分比
-     * @param compressEnabled       是否启用超限压缩
-     * @param vectorizeEnabled      是否启用向量化入库
-     * @param retrievalCount        每次检索返回的知识条数，须非负，0 表示不检索
-     * @param similarityThreshold   检索相似度阈值，须在 {@code [0, 1]} 区间
-     * @param toolOutputMaxChars    历史工具结果单条最大保留字符数，-1 表示不限
-     * @throws IllegalArgumentException 任一字段不合法时
-     */
-    public ContextControlConfig(long contextWindowTokens, int windowMaxMessages, long windowMaxSizeBytes,
-            int windowMaxTokensPercent, boolean compressEnabled, boolean vectorizeEnabled,
-            int retrievalCount, double similarityThreshold, int toolOutputMaxChars) {
-        if (contextWindowTokens == 0 || contextWindowTokens < -1) {
+    private ContextControlConfig(Builder builder) {
+        if (builder.contextWindowTokens == 0 || builder.contextWindowTokens < -1) {
             throw new IllegalArgumentException("contextWindowTokens must be -1 or positive");
         }
-        if (windowMaxMessages == 0 || windowMaxMessages < -1) {
+        if (builder.windowMaxMessages == 0 || builder.windowMaxMessages < -1) {
             throw new IllegalArgumentException("windowMaxMessages must be -1 or positive");
         }
-        if (windowMaxSizeBytes < -1) {
+        if (builder.windowMaxSizeBytes < -1) {
             throw new IllegalArgumentException("windowMaxSizeBytes must be -1 or non-negative");
         }
-        if (windowMaxTokensPercent < 0 || windowMaxTokensPercent > 100) {
+        if (builder.windowMaxTokensPercent < 0 || builder.windowMaxTokensPercent > 100) {
             throw new IllegalArgumentException("windowMaxTokensPercent must be within [0, 100]");
         }
-        if (retrievalCount < 0) {
+        if (builder.retrievalCount < 0) {
             throw new IllegalArgumentException("retrievalCount must not be negative");
         }
-        if (Double.isNaN(similarityThreshold) || similarityThreshold < 0.0 || similarityThreshold > 1.0) {
+        if (Double.isNaN(builder.similarityThreshold)
+                || builder.similarityThreshold < 0.0 || builder.similarityThreshold > 1.0) {
             throw new IllegalArgumentException("similarityThreshold must be within [0, 1]");
         }
-        if (toolOutputMaxChars == 0 || toolOutputMaxChars < -1) {
+        if (builder.toolOutputMaxChars == 0 || builder.toolOutputMaxChars < -1) {
             throw new IllegalArgumentException("toolOutputMaxChars must be -1 or positive");
         }
-        this.contextWindowTokens = contextWindowTokens;
-        this.windowMaxMessages = windowMaxMessages;
-        this.windowMaxSizeBytes = windowMaxSizeBytes;
-        this.windowMaxTokensPercent = windowMaxTokensPercent;
-        this.compressEnabled = compressEnabled;
-        this.vectorizeEnabled = vectorizeEnabled;
-        this.retrievalCount = retrievalCount;
-        this.similarityThreshold = similarityThreshold;
-        this.toolOutputMaxChars = toolOutputMaxChars;
+        this.contextWindowTokens = builder.contextWindowTokens;
+        this.windowMaxMessages = builder.windowMaxMessages;
+        this.windowMaxSizeBytes = builder.windowMaxSizeBytes;
+        this.windowMaxTokensPercent = builder.windowMaxTokensPercent;
+        this.compressEnabled = builder.compressEnabled;
+        this.vectorizeEnabled = builder.vectorizeEnabled;
+        this.retrievalCount = builder.retrievalCount;
+        this.similarityThreshold = builder.similarityThreshold;
+        this.toolOutputMaxChars = builder.toolOutputMaxChars;
     }
 
     /**
-     * 默认配置：按百分比 80% 限定、不限制条数与大小、关闭压缩与向量化、检索 3 条、阈值 0.7。
+     * 创建上下文控制配置构建器。
+     *
+     * @return 构建器，非 null
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * 默认配置：按百分比 80% 限定上下文窗口，不启用压缩与向量化，检索 3 条，相似度阈值 0.7。
      *
      * @return 默认上下文控制配置，非 null
      */
     public static ContextControlConfig defaults() {
-        return new ContextControlConfig(-1L, -1, -1L, 80, false, false, 3, 0.7);
+        return builder()
+                .contextWindowTokens(-1L)
+                .windowMaxMessages(-1)
+                .windowMaxSizeBytes(-1L)
+                .windowMaxTokensPercent(80)
+                .retrievalCount(3)
+                .similarityThreshold(0.7)
+                .build();
+    }
+
+    /**
+     * 上下文控制配置构建器；数值字段未设置时为 0，工具输出截断默认 4000 字符。
+     */
+    public static final class Builder {
+
+        private long contextWindowTokens;
+        private int windowMaxMessages;
+        private long windowMaxSizeBytes;
+        private int windowMaxTokensPercent;
+        private boolean compressEnabled;
+        private boolean vectorizeEnabled;
+        private int retrievalCount;
+        private double similarityThreshold;
+        private int toolOutputMaxChars = DEFAULT_TOOL_OUTPUT_MAX_CHARS;
+
+        private Builder() {
+        }
+
+        public Builder contextWindowTokens(long contextWindowTokens) {
+            this.contextWindowTokens = contextWindowTokens;
+            return this;
+        }
+
+        public Builder windowMaxMessages(int windowMaxMessages) {
+            this.windowMaxMessages = windowMaxMessages;
+            return this;
+        }
+
+        public Builder windowMaxSizeBytes(long windowMaxSizeBytes) {
+            this.windowMaxSizeBytes = windowMaxSizeBytes;
+            return this;
+        }
+
+        public Builder windowMaxTokensPercent(int windowMaxTokensPercent) {
+            this.windowMaxTokensPercent = windowMaxTokensPercent;
+            return this;
+        }
+
+        public Builder compressEnabled(boolean compressEnabled) {
+            this.compressEnabled = compressEnabled;
+            return this;
+        }
+
+        public Builder vectorizeEnabled(boolean vectorizeEnabled) {
+            this.vectorizeEnabled = vectorizeEnabled;
+            return this;
+        }
+
+        public Builder retrievalCount(int retrievalCount) {
+            this.retrievalCount = retrievalCount;
+            return this;
+        }
+
+        public Builder similarityThreshold(double similarityThreshold) {
+            this.similarityThreshold = similarityThreshold;
+            return this;
+        }
+
+        public Builder toolOutputMaxChars(int toolOutputMaxChars) {
+            this.toolOutputMaxChars = toolOutputMaxChars;
+            return this;
+        }
+
+        public ContextControlConfig build() {
+            return new ContextControlConfig(this);
+        }
     }
 }

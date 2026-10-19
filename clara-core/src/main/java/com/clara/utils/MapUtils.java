@@ -5,27 +5,43 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Map 的通用校验与拼装工具。
+ * Map 的通用复制、校验与拼装工具。
  *
  * <p>定位：无状态的纯函数集合，服务于「请求体 / 响应元数据」的组装与元数据固化两处场景。
  *
  * <p>使用方法：
  * <ul>
  *   <li>无需实例化——构造器私有，全部方法为 {@code static}；</li>
+ *   <li>需要可变快照时用 {@link #copyMap(Map)}；</li>
  *   <li>把外部传入的元数据固化为只读快照（并校验键非空白、值为标量）用
  *       {@link #unmodifiableScalarMap(Map)}；</li>
  *   <li>拼装请求体 / 元数据时用 {@link #putIfNotNull(Map, String, Object)} 代替手写 if 判空。</li>
  * </ul>
  *
  * <p>线程安全：无状态；返回的映射除 {@link #unmodifiableScalarMap(Map)} 明确只读外，
- * 其余方法操作的 {@code target} 由调用方自行保证不并发写。
+ * 其余方法返回或操作的映射由调用方自行保证不并发写。
  *
  * <p>失败语义：{@link #unmodifiableScalarMap(Map)} 在键为空白或值非标量时抛
- * {@link IllegalArgumentException}；{@link #putIfNotNull(Map, String, Object)} 不抛异常。
+ * {@link IllegalArgumentException}；{@link #copyMap(Map)} 与
+ * {@link #putIfNotNull(Map, String, Object)} 不抛异常。
  */
 public final class MapUtils {
 
     private MapUtils() {
+    }
+
+    /**
+     * 复制映射为可变快照。
+     *
+     * <p>浅拷贝而非包装：调用方后续修改原始映射不会影响返回值；返回值可继续增删条目。
+     *
+     * @param source 原始映射，可为 null
+     * @param <K>    键类型
+     * @param <V>    值类型
+     * @return 可变副本；输入为 null 时返回空的可变映射，非 null
+     */
+    public static <K, V> Map<K, V> copyMap(Map<K, V> source) {
+        return source == null ? new LinkedHashMap<>() : new LinkedHashMap<>(source);
     }
 
     /**

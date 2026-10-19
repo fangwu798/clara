@@ -1,5 +1,6 @@
 package com.clara.mcp.registry;
 
+import com.clara.utils.StringUtils;
 import com.clara.mcp.api.IMcpServerRegistry;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,12 +55,12 @@ public final class McpServerRegistration {
             String approvedIdentityName, String approvedIdentityVersion,
             McpRegistrationStatus status, List<String> command, Map<String, String> env,
             Map<String, String> headers) {
-        if (isBlank(tenantId)) { throw new IllegalArgumentException("tenantId must not be blank"); }
-        if (isBlank(serverKey) || !serverKey.matches("[A-Za-z0-9][A-Za-z0-9_.-]*")) {
+        if (StringUtils.isBlank(tenantId)) { throw new IllegalArgumentException("tenantId must not be blank"); }
+        if (StringUtils.isBlank(serverKey) || !serverKey.matches("[A-Za-z0-9][A-Za-z0-9_.-]*")) {
             throw new IllegalArgumentException("serverKey is invalid");
         }
         if (transportProfile == null) { throw new IllegalArgumentException("transportProfile must not be null"); }
-        if (isBlank(address)) { throw new IllegalArgumentException("address must not be blank"); }
+        if (StringUtils.isBlank(address)) { throw new IllegalArgumentException("address must not be blank"); }
         if (status == null) { throw new IllegalArgumentException("status must not be null"); }
         this.tenantId = tenantId; this.serverKey = serverKey;
         this.transportProfile = transportProfile; this.address = address; this.authRef = authRef;
@@ -93,5 +94,4 @@ public final class McpServerRegistration {
         if (source == null || source.isEmpty()) { return Collections.emptyMap(); }
         return Collections.unmodifiableMap(new LinkedHashMap<>(source));
     }
-    private static boolean isBlank(String value) { return value == null || value.trim().isEmpty(); }
 }

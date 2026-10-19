@@ -1,5 +1,6 @@
 package com.clara.dto.skill;
 
+import com.clara.utils.StringUtils;
 import com.clara.enums.skill.ScriptTypeEnum;
 import lombok.Data;
 
@@ -36,9 +37,8 @@ public final class ToolMethod {
      * @param metadata    元数据，可为 null
      * @throws IllegalArgumentException 任一字段不合法时
      */
-    public ToolMethod(String id, String name, ScriptTypeEnum type, String description,
-            String parameters, String script, Map<String, String> metadata) {
-        if (blank(id) || blank(name) || type == null || blank(description) || blank(script)) {
+    public ToolMethod(String id, String name, ScriptTypeEnum type, String description, String parameters, String script, Map<String, String> metadata) {
+        if (StringUtils.isBlank(id) || StringUtils.isBlank(name) || type == null || StringUtils.isBlank(description) || StringUtils.isBlank(script)) {
             throw new IllegalArgumentException("tool method is invalid");
         }
         this.id = id;
@@ -50,7 +50,7 @@ public final class ToolMethod {
         LinkedHashMap<String, String> copied = new LinkedHashMap<>();
         if (metadata != null) {
             for (Map.Entry<String, String> value : metadata.entrySet()) {
-                if (blank(value.getKey()) || value.getValue() == null) {
+                if (StringUtils.isBlank(value.getKey()) || value.getValue() == null) {
                     throw new IllegalArgumentException("metadata is invalid");
                 }
                 copied.put(value.getKey(), value.getValue());
@@ -59,7 +59,4 @@ public final class ToolMethod {
         this.metadata = Collections.unmodifiableMap(copied);
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

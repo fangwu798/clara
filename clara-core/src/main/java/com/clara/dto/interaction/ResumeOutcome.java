@@ -16,7 +16,7 @@ public final class ResumeOutcome {
      *
      * @param instanceStatus  恢复后的实例状态，不可为空白
      * @param instanceVersion 恢复后的实例版本，不可为负
-     * @throws IllegalArgumentException 任一字段不合法时
+     * @throws IllegalArgumentException 任意字段不合法时
      */
     public ResumeOutcome(String instanceStatus, long instanceVersion) {
         if (instanceStatus == null || instanceStatus.trim().isEmpty() || instanceVersion < 0L) {

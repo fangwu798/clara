@@ -1,13 +1,13 @@
 package com.clara.workflow.checkpoint;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.workflow.ICheckpointStore;
 import com.clara.dto.workflow.WorkflowCheckpoint;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
-import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -24,7 +24,7 @@ public final class InMemoryCheckpointStore implements ICheckpointStore {
 
     @Override
     public Optional<WorkflowCheckpoint> load(String instanceId) {
-        if (blank(instanceId)) {
+        if (StringUtils.isBlank(instanceId)) {
             throw new IllegalArgumentException("instanceId must not be blank");
         }
         return Optional.ofNullable(checkpoints.get(instanceId));
@@ -32,7 +32,7 @@ public final class InMemoryCheckpointStore implements ICheckpointStore {
 
     @Override
     public Optional<WorkflowCheckpoint> load(String instanceId, long version) {
-        if (blank(instanceId) || version < 0L) {
+        if (StringUtils.isBlank(instanceId) || version < 0L) {
             throw new IllegalArgumentException("instanceId and version are invalid");
         }
         ConcurrentMap<Long, WorkflowCheckpoint> versions = history.get(instanceId);
@@ -66,12 +66,9 @@ public final class InMemoryCheckpointStore implements ICheckpointStore {
     }
 
     private static ClaraException conflict() {
-        return new ClaraException(new ClaraError(ErrorCodes.WORKFLOW_VERSION_CONFLICT,
-                ErrorCategory.CONFLICT, ErrorCodes.WORKFLOW_VERSION_CONFLICT, true,
-                null, null, null, null, Collections.<String, String>emptyMap()));
+        return new ClaraException(ClaraError.builder(ErrorCodes.WORKFLOW_VERSION_CONFLICT, ErrorCategoryEnum.CONFLICT)
+                .retryable(true)
+                .build());
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

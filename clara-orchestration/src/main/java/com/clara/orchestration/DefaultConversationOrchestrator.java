@@ -10,7 +10,7 @@ import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.RoleEnum;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.config.ProviderConfiguration;
@@ -165,7 +165,7 @@ public final class DefaultConversationOrchestrator {
                         reasoning.toString());
             }
         } catch (ClaraException failure) {
-            if (context.isCancelled() || failure.getError().getCategory() == ErrorCategory.CANCELLED) {
+            if (context.isCancelled() || failure.getError().getCategory() == ErrorCategoryEnum.CANCELLED) {
                 return cancelled(request.getConversationId(), 0);
             }
             return conversationResult(request.getConversationId(), null,

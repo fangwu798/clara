@@ -1,6 +1,6 @@
 package com.clara.mcp.transport;
 
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.McpErrors;
 import com.clara.mcp.api.IMcpJsonCodec;
@@ -79,6 +79,6 @@ public final class JacksonMcpJsonCodec implements IMcpJsonCodec {
     }
     private static String text(JsonNode value) { return value == null ? null : value.asText(null); }
     private static RuntimeException invalid() {
-        return McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.VALIDATION, false);
+        return McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategoryEnum.VALIDATION, false);
     }
 }

@@ -187,12 +187,15 @@ public class ContextAssemblerTest {
     // ---- helpers -----------------------------------------------------------
 
     private static ContextControlConfig control(boolean compressEnabled) {
-        return new ContextControlConfig(-1L, -1, -1L, 80, compressEnabled, false, 3, 0.5);
+        return ContextControlConfig.builder()
+                .contextWindowTokens(-1L).windowMaxMessages(-1).windowMaxSizeBytes(-1L)
+                .windowMaxTokensPercent(80).compressEnabled(compressEnabled)
+                .retrievalCount(3).similarityThreshold(0.5).build();
     }
 
     private static MemoryEntry entry(MemorySourceTypeEnum sourceType, String sourceId) {
-        return new MemoryEntry("id-" + sourceId, sourceType, sourceId, null, "desc-" + sourceId, HASH,
-                new float[] {1f, 0f}, 0L, 0L, null);
+        return MemoryEntry.builder("id-" + sourceId, sourceType, sourceId, "desc-" + sourceId, HASH,
+                new float[] {1f, 0f}).build();
     }
 
     private static IPromptProvider constantPromptProvider(final String text) {

@@ -1,7 +1,7 @@
 package com.clara.mcp.client;
 
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.McpErrors;
 import com.clara.mcp.api.IMcpClient;
@@ -223,18 +223,18 @@ public final class DefaultMcpClient implements IMcpClient {
             response = future.get(requestTimeoutMillis, TimeUnit.MILLISECONDS);
         } catch (TimeoutException exception) {
             transport.cancel(request.getId());
-            throw McpErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT, ErrorCategory.TIMEOUT);
+            throw McpErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT, ErrorCategoryEnum.TIMEOUT);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw McpErrors.error(ErrorCodes.INVOCATION_CANCELLED, ErrorCategory.CANCELLED);
+            throw McpErrors.error(ErrorCodes.INVOCATION_CANCELLED, ErrorCategoryEnum.CANCELLED);
         } catch (ExecutionException exception) {
             throw unwrap(exception.getCause());
         }
         if (response == null) {
-            throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.EXTERNAL_SERVICE);
+            throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategoryEnum.EXTERNAL_SERVICE);
         }
         if (response.getError() != null) {
-            throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategory.EXTERNAL_SERVICE);
+            throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE);
         }
         Map<String, Object> result = response.getResult();
         return result == null ? Collections.<String, Object>emptyMap() : result;
@@ -242,7 +242,7 @@ public final class DefaultMcpClient implements IMcpClient {
 
     private void ensureOpen() {
         if (closed.get()) {
-            throw McpErrors.error(ErrorCodes.MCP_TRANSPORT_CLOSED, ErrorCategory.CANCELLED);
+            throw McpErrors.error(ErrorCodes.MCP_TRANSPORT_CLOSED, ErrorCategoryEnum.CANCELLED);
         }
     }
 
@@ -261,7 +261,7 @@ public final class DefaultMcpClient implements IMcpClient {
     private static RuntimeException unwrap(Throwable cause) {
         if (cause instanceof ClaraException) { return (ClaraException) cause; }
         if (cause instanceof RuntimeException) { return (RuntimeException) cause; }
-        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_IO_ERROR, ErrorCategory.EXTERNAL_SERVICE);
+        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_IO_ERROR, ErrorCategoryEnum.EXTERNAL_SERVICE);
     }
 
     private static Map<String, Object> cursorParams(String cursor) {
@@ -293,7 +293,7 @@ public final class DefaultMcpClient implements IMcpClient {
     private static String requiredString(Map<String, Object> source, String key) {
         String value = string(source, key);
         if (value == null || value.trim().isEmpty()) {
-            throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.EXTERNAL_SERVICE);
+            throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategoryEnum.EXTERNAL_SERVICE);
         }
         return value;
     }
@@ -305,7 +305,7 @@ public final class DefaultMcpClient implements IMcpClient {
 
     private Map<String, Object> requiredMap(Map<String, Object> source, String key) {
         if (source == null || !(source.get(key) instanceof Map)) {
-            throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.EXTERNAL_SERVICE);
+            throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategoryEnum.EXTERNAL_SERVICE);
         }
         return mapper.convertValue(source.get(key), MAP_TYPE);
     }

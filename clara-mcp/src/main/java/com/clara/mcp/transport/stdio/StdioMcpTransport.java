@@ -1,6 +1,6 @@
 package com.clara.mcp.transport.stdio;
 
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.exception.HttpTransportException;
 import com.clara.mcp.McpErrors;
@@ -112,14 +112,14 @@ public final class StdioMcpTransport implements IMcpTransport {
         final PendingRequest item = new PendingRequest(future);
         if (pending.putIfAbsent(request.getId(), item) != null) {
             future.completeExceptionally(McpErrors.error(ErrorCodes.MCP_DUPLICATE_REQUEST_ID,
-                    ErrorCategory.CONFLICT, false));
+                    ErrorCategoryEnum.CONFLICT, false));
             return future;
         }
         item.timeout = executor.schedule(new Runnable() {
             public void run() {
                 if (pending.remove(request.getId(), item)) {
                     future.completeExceptionally(McpErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT,
-                            ErrorCategory.TIMEOUT, true));
+                            ErrorCategoryEnum.TIMEOUT, true));
                     writeCancellation(request.getId(), "timeout");
                 }
             }
@@ -265,7 +265,7 @@ public final class StdioMcpTransport implements IMcpTransport {
         byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
         if (bytes.length > maxMessageBytes) {
             throw McpErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE,
-                    ErrorCategory.RESOURCE_LIMIT, false);
+                    ErrorCategoryEnum.RESOURCE_LIMIT, false);
         }
         try {
             synchronized (writeLock) {
@@ -325,13 +325,13 @@ public final class StdioMcpTransport implements IMcpTransport {
     }
 
     private static RuntimeException closedError() {
-        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_CLOSED, ErrorCategory.CANCELLED, false);
+        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_CLOSED, ErrorCategoryEnum.CANCELLED, false);
     }
     private static RuntimeException ioError() {
-        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_IO_ERROR, ErrorCategory.EXTERNAL_SERVICE, true);
+        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_IO_ERROR, ErrorCategoryEnum.EXTERNAL_SERVICE, true);
     }
     private static RuntimeException messageTooLarge() {
-        return McpErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false);
+        return McpErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE, ErrorCategoryEnum.RESOURCE_LIMIT, false);
     }
 
     /**

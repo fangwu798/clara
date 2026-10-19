@@ -1,8 +1,11 @@
 package com.clara.dto.planner;
 
+import lombok.Data;
+
 /**
  * 预算快照：保存预算在特定时刻的限额、预留与已用额度。
  */
+@Data
 public final class BudgetSnapshot {
 
     private final BudgetAmount limit;
@@ -16,17 +19,5 @@ public final class BudgetSnapshot {
         this.limit = limit;
         this.reserved = reserved;
         this.used = used;
-    }
-
-    public BudgetAmount getLimit() {
-        return limit;
-    }
-
-    public BudgetAmount getReserved() {
-        return reserved;
-    }
-
-    public BudgetAmount getUsed() {
-        return used;
     }
 }

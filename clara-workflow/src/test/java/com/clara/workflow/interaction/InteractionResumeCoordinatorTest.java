@@ -73,7 +73,8 @@ public class InteractionResumeCoordinatorTest {
     }
 
     private static Question question() {
-        return new Question(InteractionTypeEnum.TEXT_INPUT, "Q", null, null, null, true, "answer", 50);
+        return Question.builder(InteractionTypeEnum.TEXT_INPUT, "Q")
+                .required(true).scopeKey("answer").maxTextLength(50).build();
     }
 
     private static InteractionRequest trigger(String instanceId, long expectedVersion) {

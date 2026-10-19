@@ -54,8 +54,13 @@ public class DefaultTaskPlanEngineTest {
 
     private static TaskNode node(String id, List<String> dependencies, String outputKey,
             RetryPolicy retryPolicy, long timeoutMillis, ITaskHandler handler) {
-        return new TaskNode(id, dependencies, "cap." + id, outputKey, retryPolicy, timeoutMillis,
-                new BudgetAmount(10L, 10L, 10L), handler);
+        return TaskNode.builder(id, "cap." + id, outputKey)
+                .dependencies(dependencies)
+                .retryPolicy(retryPolicy)
+                .timeoutMillis(timeoutMillis)
+                .budget(new BudgetAmount(10L, 10L, 10L))
+                .handler(handler)
+                .build();
     }
 
     private static ITaskHandler returning(final String outputKey, final Object value,

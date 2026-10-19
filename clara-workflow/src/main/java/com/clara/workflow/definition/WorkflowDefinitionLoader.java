@@ -1,5 +1,6 @@
 package com.clara.workflow.definition;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowNode;
@@ -87,11 +88,11 @@ public final class WorkflowDefinitionLoader {
             throw invalid(file, null, "工作流定义根必须是对象");
         }
         String workflowId = text(root, "workflowId");
-        if (blank(workflowId)) {
+        if (StringUtils.isBlank(workflowId)) {
             throw invalid(file, null, "缺少 workflowId");
         }
         String version = text(root, "version");
-        if (blank(version)) {
+        if (StringUtils.isBlank(version)) {
             version = DEFAULT_VERSION;
         }
         String inputSchema = schema(root.get("inputSchema"));
@@ -128,7 +129,7 @@ public final class WorkflowDefinitionLoader {
 
     private IWorkflowNode buildNode(JsonNode node, Path file) {
         String id = text(node, "id");
-        if (blank(id)) {
+        if (StringUtils.isBlank(id)) {
             throw invalid(file, null, "存在缺少 id 的节点");
         }
         WorkflowNodeTypeEnum type = resolveType(text(node, "type"));
@@ -146,7 +147,7 @@ public final class WorkflowDefinitionLoader {
                 return buildActionNode(node, file, id, type);
             case HUMAN:
                 String inputKey = text(node, "inputKey");
-                if (blank(inputKey)) {
+                if (StringUtils.isBlank(inputKey)) {
                     throw invalid(file, id, "HUMAN 节点缺少 inputKey");
                 }
                 return WorkflowNodes.human(id, inputKey);
@@ -165,7 +166,7 @@ public final class WorkflowDefinitionLoader {
             throw invalid(file, id, "CONDITION 节点缺少 condition 对象");
         }
         String key = text(condition, "key");
-        if (blank(key)) {
+        if (StringUtils.isBlank(key)) {
             throw invalid(file, id, "CONDITION 节点缺少 condition.key");
         }
         String operator = text(condition, "operator");
@@ -190,7 +191,7 @@ public final class WorkflowDefinitionLoader {
         }
         String outputKey = outputKeys.iterator().next();
         String idempotencyKey = text(node, "idempotencyKey");
-        if (blank(idempotencyKey)) {
+        if (StringUtils.isBlank(idempotencyKey)) {
             idempotencyKey = id;
         }
         WorkflowActionSpec spec = new WorkflowActionSpec(id, type.name(), attributes(node));
@@ -266,7 +267,7 @@ public final class WorkflowDefinitionLoader {
     }
 
     private WorkflowNodeTypeEnum resolveType(String value) {
-        if (blank(value)) {
+        if (StringUtils.isBlank(value)) {
             return null;
         }
         for (WorkflowNodeTypeEnum candidate : WorkflowNodeTypeEnum.values()) {
@@ -295,10 +296,6 @@ public final class WorkflowDefinitionLoader {
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isTextual() ? value.textValue() : null;
-    }
-
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
     }
 
     private static IllegalArgumentException invalid(Path file, String nodeId, String message) {

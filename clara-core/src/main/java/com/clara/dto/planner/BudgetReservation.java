@@ -1,10 +1,12 @@
 package com.clara.dto.planner;
 
 import com.clara.enums.planner.BudgetReservationStatusEnum;
+import lombok.Data;
 
 /**
  * 预算预留：记录一次任务执行的预算预留、实际使用与状态。
  */
+@Data
 public final class BudgetReservation {
 
     private final String reservationId;
@@ -25,29 +27,5 @@ public final class BudgetReservation {
         this.maximum = maximum;
         this.actual = actual;
         this.status = status;
-    }
-
-    public String getReservationId() {
-        return reservationId;
-    }
-
-    public String getRunId() {
-        return runId;
-    }
-
-    public String getTaskId() {
-        return taskId;
-    }
-
-    public BudgetAmount getMaximum() {
-        return maximum;
-    }
-
-    public BudgetAmount getActual() {
-        return actual;
-    }
-
-    public BudgetReservationStatusEnum getStatus() {
-        return status;
     }
 }

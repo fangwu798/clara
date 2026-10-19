@@ -1,5 +1,6 @@
 package com.clara.config;
 
+import com.clara.utils.StringUtils;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 
@@ -78,7 +79,7 @@ public final class ModelRegistry implements Closeable {
         if (configFiles != null) {
             for (Path file : configFiles) {
                 String alias = ConfigLocator.aliasOf(file);
-                if (notBlank(alias)) {
+                if (StringUtils.isNotBlank(alias)) {
                     index.put(normalize(alias), file);
                 }
             }
@@ -87,7 +88,7 @@ public final class ModelRegistry implements Closeable {
         Map<String, String> roles = new LinkedHashMap<>();
         if (roleBindings != null) {
             for (Map.Entry<String, String> entry : roleBindings.entrySet()) {
-                if (notBlank(entry.getKey()) && notBlank(entry.getValue())) {
+                if (StringUtils.isNotBlank(entry.getKey()) && StringUtils.isNotBlank(entry.getValue())) {
                     roles.put(normalize(entry.getKey()), normalize(entry.getValue()));
                 }
             }
@@ -110,7 +111,7 @@ public final class ModelRegistry implements Closeable {
             throw new IllegalArgumentException("configPath must not be null");
         }
         String alias = ConfigLocator.aliasOf(configPath);
-        if (blank(alias) || !configFiles.containsKey(normalize(alias))) {
+        if (StringUtils.isBlank(alias) || !configFiles.containsKey(normalize(alias))) {
             throw new IllegalArgumentException("模型别名不存在：" + alias + "，可用：" + aliases());
         }
         this.currentAlias = alias;
@@ -147,7 +148,7 @@ public final class ModelRegistry implements Closeable {
      * @throws IllegalArgumentException 当前别名未建立索引时
      */
     public synchronized ProviderConfiguration currentConfiguration() {
-        if (blank(currentAlias)) {
+        if (StringUtils.isBlank(currentAlias)) {
             throw new IllegalStateException("尚未选择模型配置");
         }
         return configuration(currentAlias);
@@ -175,15 +176,15 @@ public final class ModelRegistry implements Closeable {
      */
     public synchronized ProviderConfiguration resolve(String role, String modelAlias) {
         String alias;
-        if (notBlank(modelAlias)) {
+        if (StringUtils.isNotBlank(modelAlias)) {
             alias = modelAlias;
-        } else if (notBlank(role)) {
+        } else if (StringUtils.isNotBlank(role)) {
             String mapped = roleAliases.get(normalize(role));
             alias = mapped == null ? role : mapped;
         } else {
             alias = currentAlias;
         }
-        if (blank(alias)) {
+        if (StringUtils.isBlank(alias)) {
             throw new IllegalStateException("工作流 AGENT 节点尚未绑定模型：未指定 role / model，且未设置默认模型");
         }
         return configuration(alias);
@@ -200,7 +201,7 @@ public final class ModelRegistry implements Closeable {
      * @throws IllegalArgumentException 别名为空白或未建立索引时
      */
     private synchronized ProviderConfiguration configuration(String alias) {
-        if (blank(alias)) {
+        if (StringUtils.isBlank(alias)) {
             throw new IllegalArgumentException("alias must not be blank");
         }
         String key = normalize(alias);
@@ -236,11 +237,4 @@ public final class ModelRegistry implements Closeable {
         return value == null ? null : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private static boolean notBlank(String value) {
-        return value != null && !value.trim().isEmpty();
-    }
-
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

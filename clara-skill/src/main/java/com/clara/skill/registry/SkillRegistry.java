@@ -395,8 +395,11 @@ public final class SkillRegistry {
             Map<String, String> metadata) {
         float[] vector = embeddingClient.embed(content);
         long now = System.currentTimeMillis();
-        return new MemoryEntry(entryId(sourceType, sourceId), sourceType, sourceId, null, content,
-                sha256(content), vector, now, 0L, metadata);
+        return MemoryEntry.builder(entryId(sourceType, sourceId), sourceType, sourceId, content,
+                sha256(content), vector)
+                .createdAtEpochMillis(now)
+                .metadata(metadata)
+                .build();
     }
 
     private String entryId(MemorySourceTypeEnum sourceType, String sourceId) {

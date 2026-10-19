@@ -1,5 +1,10 @@
 package com.clara.exception;
 
+import com.clara.enums.ErrorCategoryEnum;
+import com.clara.utils.StringUtils;
+import lombok.Data;
+
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -14,32 +19,28 @@ import java.util.Map;
  * 按错误码生成中文提示，因此各模块沿用「消息取错误码」的旧写法也能得到可读文案；错误码本身仍由
  * {@link #getCode()} 承载，按码分支的逻辑不受影响。
  *
- * <p>字段与取值来源：错误码取自 {@link ErrorCodes}，分类取自 {@link ErrorCategory}；是否可重试由构造方
+ * <p>字段与取值来源：错误码取自 {@link ErrorCodes}，分类取自 {@link ErrorCategoryEnum}；是否可重试由构造方
  * 显式给出，不从分类推导。实例不可变，可跨线程传递。
  */
-public final class ClaraError {
-    /**
-     * 构造只带错误码、分类与跟踪标识的错误，其余字段为 null 或空 map。
-     *
-     * @param code     稳定错误码，不可为 null 或空白
-     * @param category 错误分类，不可为 null
-     * @param traceId  调用跟踪标识，可为 null
-     * @return 结构化错误，非 null
-     */
-    private static ClaraError simple(String code, ErrorCategory category, String traceId) {
-        return new ClaraError(code, category, null, false, traceId,
-                null, null, null, Collections.emptyMap());
-    }
+@Data
+public final class ClaraError implements Serializable {
+
+    /** 序列化版本号。 */
+    private static final long serialVersionUID = 1L;
+
     /**
      * 构造「调用已被取消」的错误，供取消令牌在终止调用时使用。
      *
      * @param traceId 调用跟踪标识，可为 null
-     * @return 错误码为 {@link ErrorCodes#INVOCATION_CANCELLED}、分类为 {@link ErrorCategory#CANCELLED}
-     *         且不可重试的错误，非 null
+     * @return 错误码为 {@link ErrorCodes#INVOCATION_CANCELLED}、分类为 {@link ErrorCategoryEnum#CANCELLED}
+     * 且不可重试的错误，非 null
      */
     public static ClaraError cancelled(String traceId) {
-        return simple(ErrorCodes.INVOCATION_CANCELLED, ErrorCategory.CANCELLED, traceId);
+        return builder(ErrorCodes.INVOCATION_CANCELLED, ErrorCategoryEnum.CANCELLED)
+                .traceId(traceId)
+                .build();
     }
+
     /**
      * 稳定错误码，非 null 且非空白，取值见 {@link ErrorCodes}。
      */
@@ -47,7 +48,7 @@ public final class ClaraError {
     /**
      * 错误分类，非 null。
      */
-    private final ErrorCategory category;
+    private final ErrorCategoryEnum category;
     /**
      * 面向使用者的安全文案，非 null；未显式给出或直接传入错误码时由 {@link ErrorMessages} 按错误码生成。
      */
@@ -78,93 +79,98 @@ public final class ClaraError {
     private final Map<String, String> safeDetails;
 
     /**
-     * 创建领域错误。
+     * 由构建器创建领域错误。
      *
      * <p>兜底规则：{@code safeMessage} 为 null 或等于 {@code code} 时改用 {@link ErrorMessages#of(String)}
      * 生成中文提示；{@code safeDetails} 为 null 时置为空 map，否则拷贝成不可变映射。
      *
-     * @param code             稳定错误码，不可为 null 或空白
-     * @param category         错误分类，不可为 null
-     * @param safeMessage      面向使用者的文案，可为 null
-     * @param retryable        是否可重试
-     * @param traceId          调用跟踪标识，可为 null
-     * @param provider         出错的平台名，可为 null
-     * @param providerCode     平台返回的错误码，可为 null
-     * @param retryAfterMillis 建议的重试等待毫秒数，可为 null
-     * @param safeDetails      可安全外发的错误细节，可为 null
+     * @param builder 已填充必填字段的构建器，不能为 null
      * @throws IllegalArgumentException code 为 null 或空白，或 category 为 null 时
      */
-    public ClaraError(String code, ErrorCategory category, String safeMessage,
-            boolean retryable, String traceId, String provider, String providerCode,
-            Long retryAfterMillis, Map<String, String> safeDetails) {
-        if (code == null || code.trim().isEmpty()) { throw new IllegalArgumentException("code must not be blank"); }
-        if (category == null) { throw new IllegalArgumentException("category must not be null"); }
-        this.code = code;
-        this.category = category;
-        this.safeMessage = safeMessage == null || safeMessage.equals(code)
-                ? ErrorMessages.of(code)
-                : safeMessage;
-        this.retryable = retryable;
-        this.traceId = traceId;
-        this.provider = provider;
-        this.providerCode = providerCode;
-        this.retryAfterMillis = retryAfterMillis;
-        this.safeDetails = safeDetails == null
-                ? Collections.<String, String>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<>(safeDetails));
+    private ClaraError(Builder builder) {
+        if (StringUtils.isBlank(builder.code)) {
+            throw new IllegalArgumentException("code must not be blank");
+        }
+        if (builder.category == null) {
+            throw new IllegalArgumentException("category must not be null");
+        }
+        this.code = builder.code;
+        this.category = builder.category;
+        this.safeMessage = builder.safeMessage == null || builder.safeMessage.equals(builder.code)
+                ? ErrorMessages.of(builder.code) : builder.safeMessage;
+        this.retryable = builder.retryable;
+        this.traceId = builder.traceId;
+        this.provider = builder.provider;
+        this.providerCode = builder.providerCode;
+        this.retryAfterMillis = builder.retryAfterMillis;
+        this.safeDetails = builder.safeDetails == null
+                ? Collections.emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(builder.safeDetails));
     }
+
     /**
-     * 读取稳定错误码。
+     * 创建领域错误构建器。
      *
-     * @return 错误码，非 null 且非空白
+     * @param code     稳定错误码，不可为 null 或空白
+     * @param category 错误分类，不可为 null
+     * @return 构建器，非 null
      */
-    public String getCode() { return code; }
+    public static Builder builder(String code, ErrorCategoryEnum category) {
+        return new Builder(code, category);
+    }
+
     /**
-     * 读取错误分类。
-     *
-     * @return 错误分类，非 null
+     * 领域错误构建器；必填字段在工厂方法中传入，其余字段按需设置。
      */
-    public ErrorCategory getCategory() { return category; }
-    /**
-     * 读取面向使用者的中文文案。
-     *
-     * @return 中文文案，非 null
-     */
-    public String getSafeMessage() { return safeMessage; }
-    /**
-     * 读取该错误是否可重试。
-     *
-     * @return 可重试时为 true
-     */
-    public boolean isRetryable() { return retryable; }
-    /**
-     * 读取调用跟踪标识。
-     *
-     * @return 跟踪标识，可为 null
-     */
-    public String getTraceId() { return traceId; }
-    /**
-     * 读取出错的平台名。
-     *
-     * @return 平台名，可为 null
-     */
-    public String getProvider() { return provider; }
-    /**
-     * 读取平台返回的错误码。
-     *
-     * @return 平台错误码，可为 null
-     */
-    public String getProviderCode() { return providerCode; }
-    /**
-     * 读取建议的重试等待毫秒数。
-     *
-     * @return 等待毫秒数，未知时为 null
-     */
-    public Long getRetryAfterMillis() { return retryAfterMillis; }
-    /**
-     * 读取可安全外发的错误细节。
-     *
-     * @return 错误细节，非 null、不可变；无细节时为空 map
-     */
-    public Map<String, String> getSafeDetails() { return safeDetails; }
+    public static final class Builder {
+
+        private final String code;
+        private final ErrorCategoryEnum category;
+        private String safeMessage;
+        private boolean retryable;
+        private String traceId;
+        private String provider;
+        private String providerCode;
+        private Long retryAfterMillis;
+        private Map<String, String> safeDetails;
+
+        private Builder(String code, ErrorCategoryEnum category) {
+            this.code = code;
+            this.category = category;
+        }
+
+        public Builder safeMessage(String safeMessage) {
+            this.safeMessage = safeMessage;
+            return this;
+        }
+
+        public Builder retryable(boolean retryable) {
+            this.retryable = retryable;
+            return this;
+        }
+
+        public Builder traceId(String traceId) {
+            this.traceId = traceId;
+            return this;
+        }
+
+        public Builder provider(String provider) {
+            this.provider = provider;
+            return this;
+        }
+
+        public Builder providerCode(String providerCode) {
+            this.providerCode = providerCode;
+            return this;
+        }
+
+        public Builder safeDetails(Map<String, String> safeDetails) {
+            this.safeDetails = safeDetails;
+            return this;
+        }
+
+        public ClaraError build() {
+            return new ClaraError(this);
+        }
+    }
 }

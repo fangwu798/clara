@@ -88,17 +88,29 @@ public final class MilvusSettings {
     private final String analyzer;
     private final boolean recreateOnSchemaMismatch;
 
-    private MilvusSettings(String host, int port, String collection, int dimension, String username,
-            String password, String mode, String analyzer, boolean recreateOnSchemaMismatch) {
-        this.host = host;
-        this.port = port;
-        this.collection = collection;
-        this.dimension = dimension;
-        this.username = username;
-        this.password = password;
-        this.mode = mode;
-        this.analyzer = analyzer;
-        this.recreateOnSchemaMismatch = recreateOnSchemaMismatch;
+    private MilvusSettings(Builder builder) {
+        this.host = builder.host;
+        this.port = builder.port;
+        this.collection = builder.collection;
+        this.dimension = builder.dimension;
+        this.username = builder.username;
+        this.password = builder.password;
+        this.mode = builder.mode;
+        this.analyzer = builder.analyzer;
+        this.recreateOnSchemaMismatch = builder.recreateOnSchemaMismatch;
+    }
+
+    /**
+     * 创建 Milvus 配置构建器。
+     *
+     * @param host        Milvus 主机
+     * @param port        gRPC 端口
+     * @param collection  集合名
+     * @param dimension   向量维度
+     * @return 构建器，非 null
+     */
+    private static Builder builder(String host, int port, String collection, int dimension) {
+        return new Builder(host, port, collection, dimension);
     }
 
     /**
@@ -138,15 +150,16 @@ public final class MilvusSettings {
             throw new IllegalArgumentException("clara.yml 的 milvus.mode 只能是 " + MODE_VECTOR
                     + " 或 " + MODE_BM25 + "，实际：" + mode);
         }
-        return new MilvusSettings(text(milvus, "host", DEFAULT_HOST),
+        return builder(text(milvus, "host", DEFAULT_HOST),
                 positive(milvus, "port", DEFAULT_PORT),
                 collection.trim(),
-                positive(milvus, "dimension", defaultDimension),
-                text(milvus, "username", null),
-                text(milvus, "password", null),
-                mode,
-                text(milvus, "analyzer", DEFAULT_ANALYZER),
-                bool(milvus, "recreateOnSchemaMismatch", false));
+                positive(milvus, "dimension", defaultDimension))
+                .username(text(milvus, "username", null))
+                .password(text(milvus, "password", null))
+                .mode(mode)
+                .analyzer(text(milvus, "analyzer", DEFAULT_ANALYZER))
+                .recreateOnSchemaMismatch(bool(milvus, "recreateOnSchemaMismatch", false))
+                .build();
     }
 
     public String getHost() {
@@ -296,5 +309,57 @@ public final class MilvusSettings {
             throw new IllegalArgumentException("clara.yml 的 milvus." + field + " 必须为正整数，实际：" + value);
         }
         return value.asInt();
+    }
+
+    /**
+     * Milvus 配置构建器；核心连接参数在工厂方法中传入，其余字段按需设置。
+     */
+    private static final class Builder {
+
+        private final String host;
+        private final int port;
+        private final String collection;
+        private final int dimension;
+        private String username;
+        private String password;
+        private String mode = MODE_VECTOR;
+        private String analyzer = DEFAULT_ANALYZER;
+        private boolean recreateOnSchemaMismatch;
+
+        private Builder(String host, int port, String collection, int dimension) {
+            this.host = host;
+            this.port = port;
+            this.collection = collection;
+            this.dimension = dimension;
+        }
+
+        private Builder username(String username) {
+            this.username = username;
+            return this;
+        }
+
+        private Builder password(String password) {
+            this.password = password;
+            return this;
+        }
+
+        private Builder mode(String mode) {
+            this.mode = mode;
+            return this;
+        }
+
+        private Builder analyzer(String analyzer) {
+            this.analyzer = analyzer;
+            return this;
+        }
+
+        private Builder recreateOnSchemaMismatch(boolean recreateOnSchemaMismatch) {
+            this.recreateOnSchemaMismatch = recreateOnSchemaMismatch;
+            return this;
+        }
+
+        private MilvusSettings build() {
+            return new MilvusSettings(this);
+        }
     }
 }

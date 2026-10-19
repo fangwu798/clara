@@ -1,7 +1,7 @@
 package com.clara.orchestration.api;
 
 import com.clara.exception.ClaraError;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.kernel.message.delta.TokenUsage;
 import org.junit.Test;
@@ -18,8 +18,9 @@ public class ConversationResultTest {
     @Test
     public void builderPopulatesAllFields() {
         TokenUsage usage = new TokenUsage(10, 5, 15, null);
-        ClaraError error = new ClaraError(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION,
-                "boom", false, null, null, null, null, null);
+        ClaraError error = ClaraError.builder(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION)
+                .safeMessage("boom")
+                .build();
 
         ConversationResult result = ConversationResult.builder()
                 .conversationId("c1")

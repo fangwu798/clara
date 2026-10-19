@@ -4,7 +4,7 @@ import com.clara.core.planner.IExecutionLedger;
 import com.clara.dto.planner.ExecutionRecord;
 import com.clara.dto.planner.TaskExecutionResult;
 import com.clara.enums.planner.ExecutionRecordStatusEnum;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
 import java.util.LinkedHashMap;
@@ -108,7 +108,7 @@ public final class InMemoryExecutionLedger implements IExecutionLedger {
     }
 
     private static void conflict() {
-        throw PlannerErrors.error(ErrorCodes.EXECUTION_LEDGER_CONFLICT, ErrorCategory.CONFLICT);
+        throw PlannerErrors.error(ErrorCodes.EXECUTION_LEDGER_CONFLICT, ErrorCategoryEnum.CONFLICT);
     }
 
     private static void require(String value) {

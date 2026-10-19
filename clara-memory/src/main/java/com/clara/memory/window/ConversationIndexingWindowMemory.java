@@ -104,9 +104,11 @@ public final class ConversationIndexingWindowMemory implements IWindowMemory {
             if (content == null) {
                 continue;
             }
-            entries.add(new MemoryEntry(entryId(offset + position), MemorySourceTypeEnum.CONVERSATION,
-                    conversationId(), conversationId(), content, sha256(content),
-                    embeddingClient.embed(content), now, 0L, null));
+            entries.add(MemoryEntry.builder(entryId(offset + position), MemorySourceTypeEnum.CONVERSATION,
+                    conversationId(), content, sha256(content), embeddingClient.embed(content))
+                    .conversationId(conversationId())
+                    .createdAtEpochMillis(now)
+                    .build());
         }
         if (entries.isEmpty()) {
             return;

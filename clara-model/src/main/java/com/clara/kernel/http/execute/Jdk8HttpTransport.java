@@ -11,7 +11,7 @@ import com.clara.core.transport.IHttpTransport;
 import com.clara.core.transport.RawHttpRequest;
 import com.clara.core.transport.RawHttpResponse;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.kernel.api.execute.IHttpExecute;
 import com.clara.kernel.api.execute.ISseListener;
@@ -103,7 +103,7 @@ public final class Jdk8HttpTransport implements IHttpExecute {
             case PROTOCOL_ERROR:
                 return ExceptionUtils.protocolError();
             case CANCELLED:
-                return ExceptionUtils.fail(ErrorCodes.INVOCATION_CANCELLED, ErrorCategory.CANCELLED, false);
+                return ExceptionUtils.fail(ErrorCodes.INVOCATION_CANCELLED, ErrorCategoryEnum.CANCELLED, false);
             case CLOSED:
             case IO_ERROR:
             default:

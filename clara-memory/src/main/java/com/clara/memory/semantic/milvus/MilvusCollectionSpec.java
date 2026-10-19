@@ -1,5 +1,6 @@
 package com.clara.memory.semantic.milvus;
 
+import com.clara.utils.StringUtils;
 /**
  * Milvus 集合规格：描述集合名称、向量维度、索引类型与距离度量。
  *
@@ -89,8 +90,8 @@ public final class MilvusCollectionSpec {
      */
     public MilvusCollectionSpec(String collection, int dimension, String metricType, String indexType,
             String mode, String analyzer) {
-        if (blank(collection) || dimension <= 0 || blank(metricType) || blank(indexType)
-                || blank(mode) || blank(analyzer)) {
+        if (StringUtils.isBlank(collection) || dimension <= 0 || StringUtils.isBlank(metricType) || StringUtils.isBlank(indexType)
+                || StringUtils.isBlank(mode) || StringUtils.isBlank(analyzer)) {
             throw new IllegalArgumentException("milvus collection specification is invalid");
         }
         this.collection = collection;
@@ -176,7 +177,4 @@ public final class MilvusCollectionSpec {
      */
     private static final int PLACEHOLDER_DIMENSION = 1;
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

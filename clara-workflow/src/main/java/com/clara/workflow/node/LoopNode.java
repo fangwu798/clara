@@ -1,5 +1,6 @@
 package com.clara.workflow.node;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IScopeCondition;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
@@ -19,7 +20,7 @@ public final class LoopNode implements IWorkflowNode {
     private final IScopeCondition exitCondition;
 
     LoopNode(String id, IWorkflowNode body, int maxIterations, IScopeCondition exitCondition) {
-        if (blank(id)) {
+        if (StringUtils.isBlank(id)) {
             throw new IllegalArgumentException("node id must not be blank");
         }
         this.id = id;
@@ -60,7 +61,4 @@ public final class LoopNode implements IWorkflowNode {
         return exitCondition;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

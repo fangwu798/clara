@@ -1,5 +1,6 @@
 package com.clara.dto.interaction;
 
+import com.clara.utils.StringUtils;
 import lombok.Data;
 
 import java.util.Collections;
@@ -28,21 +29,15 @@ public final class InteractionResponse {
      * @param submittedAtEpochMillis 提交时间（Unix epoch 毫秒），不可为负
      * @throws IllegalArgumentException 任一字段不合法时
      */
-    public InteractionResponse(String interactionId, Map<String, Object> answer, String responderId,
-            String idempotencyKey, long submittedAtEpochMillis) {
-        if (blank(interactionId) || blank(responderId) || blank(idempotencyKey)
-                || submittedAtEpochMillis < 0L) {
+    public InteractionResponse(String interactionId, Map<String, Object> answer, String responderId, String idempotencyKey, long submittedAtEpochMillis) {
+        if (StringUtils.isBlank(interactionId) || StringUtils.isBlank(responderId) || StringUtils.isBlank(idempotencyKey) || submittedAtEpochMillis < 0L) {
             throw new IllegalArgumentException("response fields are invalid");
         }
         this.interactionId = interactionId;
-        this.answer = answer == null ? Collections.<String, Object>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<>(answer));
+        this.answer = answer == null ? Collections.emptyMap() : Collections.unmodifiableMap(new LinkedHashMap<>(answer));
         this.responderId = responderId;
         this.idempotencyKey = idempotencyKey;
         this.submittedAtEpochMillis = submittedAtEpochMillis;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

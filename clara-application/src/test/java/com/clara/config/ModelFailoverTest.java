@@ -2,7 +2,7 @@ package com.clara.config;
 
 import com.clara.enums.ModelProviderEnum;
 import com.clara.exception.ClaraError;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.utils.ExceptionUtils;
 import org.junit.Test;
 
@@ -67,10 +67,10 @@ public class ModelFailoverTest {
 
     @Test
     public void requestSideAndPolicyFailuresAreNotUnavailable() {
-        ErrorCategory[] categories = {ErrorCategory.VALIDATION, ErrorCategory.RESOURCE_LIMIT,
-                ErrorCategory.CONTENT_SAFETY, ErrorCategory.CAPABILITY, ErrorCategory.INTERNAL,
-                ErrorCategory.UNKNOWN_SIDE_EFFECT, ErrorCategory.CONFLICT};
-        for (ErrorCategory category : categories) {
+        ErrorCategoryEnum[] categories = {ErrorCategoryEnum.VALIDATION, ErrorCategoryEnum.RESOURCE_LIMIT,
+                ErrorCategoryEnum.CONTENT_SAFETY, ErrorCategoryEnum.CAPABILITY, ErrorCategoryEnum.INTERNAL,
+                ErrorCategoryEnum.UNKNOWN_SIDE_EFFECT, ErrorCategoryEnum.CONFLICT};
+        for (ErrorCategoryEnum category : categories) {
             assertFalse(category + " 不该触发换模型", ModelFailover.isUnavailable(error(category)));
         }
     }
@@ -115,7 +115,7 @@ public class ModelFailoverTest {
     /**
      * 造一个指定类别的错误：错误码用类别名，只为让断言的失败信息可读。
      */
-    private static ClaraError error(ErrorCategory category) {
+    private static ClaraError error(ErrorCategoryEnum category) {
         return ExceptionUtils.fail(category.name(), category, false).getError();
     }
 }

@@ -1,7 +1,7 @@
 package com.clara.mcp.client.gateway;
 
 import com.clara.context.CallContext;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.McpErrors;
 import com.clara.mcp.api.IMcpCapabilityCatalog;
@@ -88,17 +88,17 @@ public final class DefaultMcpGateway implements IMcpGateway {
         call.getCancellationToken().throwIfCancellationRequested(call.getTraceId());
         McpServerRegistration registration = registry.get(tenantId, serverKey);
         if (registration == null) {
-            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_FOUND, ErrorCategory.CONFIGURATION);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_FOUND, ErrorCategoryEnum.CONFIGURATION);
         }
         if (registration.getStatus() != McpRegistrationStatus.ACTIVE) {
-            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategory.AUTHORIZATION);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategoryEnum.AUTHORIZATION);
         }
         McpServerSnapshot snapshot = catalog.get(tenantId, serverKey, snapshotId);
         if (snapshot == null) {
-            throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, ErrorCategory.CAPABILITY);
+            throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, ErrorCategoryEnum.CAPABILITY);
         }
         if (snapshot.getHealthStatus() != McpHealthStatus.HEALTHY) {
-            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategory.EXTERNAL_SERVICE);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategoryEnum.EXTERNAL_SERVICE);
         }
         return new Prepared(registration, snapshot);
     }
@@ -119,7 +119,7 @@ public final class DefaultMcpGateway implements IMcpGateway {
                     Collections.singletonList(prepared.snapshot.getProtocolVersion()));
             if (!prepared.snapshot.getProtocolVersion().equals(initialization.getProtocolVersion())
                     || !prepared.snapshot.getIdentity().equals(initialization.getIdentity())) {
-                throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_CHANGED, ErrorCategory.CAPABILITY);
+                throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_CHANGED, ErrorCategoryEnum.CAPABILITY);
             }
             return operation.apply(client);
         } catch (RuntimeException exception) {
@@ -131,7 +131,7 @@ public final class DefaultMcpGateway implements IMcpGateway {
             } catch (IOException exception) {
                 if (failure == null) {
                     throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED,
-                            ErrorCategory.EXTERNAL_SERVICE);
+                            ErrorCategoryEnum.EXTERNAL_SERVICE);
                 }
             }
         }

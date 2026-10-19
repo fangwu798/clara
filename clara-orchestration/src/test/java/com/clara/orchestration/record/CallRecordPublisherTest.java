@@ -49,10 +49,10 @@ public class CallRecordPublisherTest {
 
         assertEquals(1, sink.records.size());
         CallRecord record = sink.records.get(0);
-        assertSame(request, record.request());
-        assertSame(response, record.response());
-        assertEquals(ModelProviderEnum.DEEPSEEK, record.provider());
-        assertEquals("deepseek-chat", record.modelType());
+        assertSame(request, record.getRequest());
+        assertSame(response, record.getResponse());
+        assertEquals(ModelProviderEnum.DEEPSEEK, record.getProvider());
+        assertEquals("deepseek-chat", record.getModelType());
     }
 
     // ---- helpers -----------------------------------------------------------

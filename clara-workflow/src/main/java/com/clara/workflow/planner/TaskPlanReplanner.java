@@ -3,8 +3,9 @@ package com.clara.workflow.planner;
 import com.clara.dto.planner.TaskNode;
 import com.clara.dto.planner.TaskPlan;
 import com.clara.enums.planner.PlanStatusEnum;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
+import com.clara.utils.ObjectUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,7 +34,7 @@ public final class TaskPlanReplanner {
                 && current.getStatus() != PlanStatusEnum.REPLANNING)
                 || !current.getGoal().equals(replacement.getGoal())
                 || replacement.getVersion() != current.getVersion() + 1
-                || priorReplans >= validator.getLimits().getMaxReplans()) {
+                || priorReplans >= validator.getLimits().getMaxRePlans()) {
             invalid();
         }
         Map<String, TaskNode> oldTasks = index(current);
@@ -43,7 +44,7 @@ public final class TaskPlanReplanner {
             TaskNode newTask = newTasks.get(taskId);
             if (oldTask == null || newTask == null
                     || !oldTask.getOutputKey().equals(newTask.getOutputKey())
-                    || !equal(oldTask.getCapability(), newTask.getCapability())) {
+                    || !ObjectUtils.equal(oldTask.getCapability(), newTask.getCapability())) {
                 invalid();
             }
         }
@@ -59,10 +60,7 @@ public final class TaskPlanReplanner {
     }
 
     private static void invalid() {
-        throw PlannerErrors.error(ErrorCodes.PLAN_REPLAN_INVALID, ErrorCategory.VALIDATION);
+        throw PlannerErrors.error(ErrorCodes.PLAN_RE_PLAN_INVALID, ErrorCategoryEnum.VALIDATION);
     }
 
-    private static boolean equal(Object one, Object two) {
-        return one == null ? two == null : one.equals(two);
-    }
 }

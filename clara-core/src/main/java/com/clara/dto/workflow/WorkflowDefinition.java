@@ -1,6 +1,8 @@
 package com.clara.dto.workflow;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IWorkflowNode;
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,6 +15,7 @@ import java.util.Set;
  *
  * <p>构造时通过 {@link IWorkflowNode#children()} 递归收集节点并校验：节点 ID 唯一、图无环。无租户概念。
  */
+@Data
 public final class WorkflowDefinition {
 
     private final String workflowId;
@@ -32,9 +35,8 @@ public final class WorkflowDefinition {
      * @param root         根节点，不可为 null
      * @throws IllegalArgumentException workflowId、version 或 root 不合法，或图中存在环 / 重复节点 ID 时
      */
-    public WorkflowDefinition(String workflowId, String version, String inputSchema,
-            String outputSchema, IWorkflowNode root) {
-        if (blank(workflowId) || blank(version) || root == null) {
+    public WorkflowDefinition(String workflowId, String version, String inputSchema, String outputSchema, IWorkflowNode root) {
+        if (StringUtils.isBlank(workflowId) || StringUtils.isBlank(version) || root == null) {
             throw new IllegalArgumentException("workflowId, version and root are required");
         }
         this.workflowId = workflowId;
@@ -47,32 +49,7 @@ public final class WorkflowDefinition {
         this.nodes = Collections.unmodifiableList(collected);
     }
 
-    public String getWorkflowId() {
-        return workflowId;
-    }
-
-    public String getVersion() {
-        return version;
-    }
-
-    public String getInputSchema() {
-        return inputSchema;
-    }
-
-    public String getOutputSchema() {
-        return outputSchema;
-    }
-
-    public IWorkflowNode getRoot() {
-        return root;
-    }
-
-    public List<IWorkflowNode> getNodes() {
-        return nodes;
-    }
-
-    private static void collect(IWorkflowNode node, Set<String> ids, Set<IWorkflowNode> path,
-            List<IWorkflowNode> result) {
+    private static void collect(IWorkflowNode node, Set<String> ids, Set<IWorkflowNode> path, List<IWorkflowNode> result) {
         if (!path.add(node)) {
             throw new IllegalArgumentException("workflow graph contains a cycle");
         }
@@ -86,7 +63,4 @@ public final class WorkflowDefinition {
         path.remove(node);
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

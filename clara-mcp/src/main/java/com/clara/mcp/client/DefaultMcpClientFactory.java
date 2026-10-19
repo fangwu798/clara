@@ -1,6 +1,6 @@
 package com.clara.mcp.client;
 
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.McpErrors;
 import com.clara.mcp.api.IMcpClient;
@@ -8,7 +8,6 @@ import com.clara.mcp.api.IMcpClientFactory;
 import com.clara.mcp.api.IMcpHeadersProvider;
 import com.clara.mcp.api.IMcpJsonCodec;
 import com.clara.mcp.api.IProcessFactory;
-import com.clara.mcp.client.DefaultMcpClient;
 import com.clara.mcp.registry.McpServerRegistration;
 import com.clara.mcp.registry.McpTransportProfile;
 import com.clara.mcp.transport.http.StreamableHttpMcpTransport;
@@ -90,7 +89,7 @@ public final class DefaultMcpClientFactory implements IMcpClientFactory {
         if (profile == McpTransportProfile.STREAMABLE_HTTP) {
             return new DefaultMcpClient(http(registration), requestTimeoutMillis);
         }
-        throw McpErrors.error(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategory.CAPABILITY);
+        throw McpErrors.error(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategoryEnum.CAPABILITY);
     }
 
     private StdioMcpTransport stdio(McpServerRegistration registration) {
@@ -171,7 +170,7 @@ public final class DefaultMcpClientFactory implements IMcpClientFactory {
             }
         }
         if (command.isEmpty()) {
-            throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.VALIDATION);
+            throw McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategoryEnum.VALIDATION);
         }
         return command;
     }

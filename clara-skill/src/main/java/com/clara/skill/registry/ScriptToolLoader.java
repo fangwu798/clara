@@ -1,5 +1,6 @@
 package com.clara.skill.registry;
 
+import com.clara.utils.StringUtils;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.enums.skill.ScriptTypeEnum;
 import com.clara.skill.tool.script.PythonScriptExecutor;
@@ -166,7 +167,7 @@ public final class ScriptToolLoader {
         String name = text(root, "name");
         String description = text(root, "description");
         ScriptTypeEnum type = type(root);
-        if (blank(id) || blank(name) || blank(description) || type == null) {
+        if (StringUtils.isBlank(id) || StringUtils.isBlank(name) || StringUtils.isBlank(description) || type == null) {
             return null;
         }
         return new ToolMethod(id, name, type, description, parameters(root), script.getPath(),
@@ -213,7 +214,4 @@ public final class ScriptToolLoader {
         return value != null && value.isTextual() ? value.textValue() : null;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

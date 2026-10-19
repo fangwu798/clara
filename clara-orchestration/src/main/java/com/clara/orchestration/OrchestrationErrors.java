@@ -3,7 +3,7 @@ package com.clara.orchestration;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
 /**
@@ -21,8 +21,9 @@ public final class OrchestrationErrors {
      * @return 编排错误，非 null
      */
     public static ClaraException invalidArgument(String message) {
-        return new ClaraException(new ClaraError(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION,
-                message, false, null, null, null, null, null));
+        return new ClaraException(ClaraError.builder(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION)
+                .safeMessage(message)
+                .build());
     }
 
     /**
@@ -32,9 +33,9 @@ public final class OrchestrationErrors {
      * @return 编排错误，非 null
      */
     public static ClaraException capabilityNotSupported(CapabilityKindEnum kind) {
-        return new ClaraException(new ClaraError(ErrorCodes.CAPABILITY_NOT_SUPPORTED,
-                ErrorCategory.CAPABILITY, "capability is not supported by orchestration: " + kind,
-                false, null, null, null, null, null));
+        return new ClaraException(ClaraError.builder(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategoryEnum.CAPABILITY)
+                .safeMessage("capability is not supported by orchestration: " + kind)
+                .build());
     }
 
     /**
@@ -44,8 +45,8 @@ public final class OrchestrationErrors {
      * @return 编排错误，非 null
      */
     public static ClaraException toolRoundTripLimitExceeded(int limit) {
-        return new ClaraException(new ClaraError(ErrorCodes.INVALID_ARGUMENT,
-                ErrorCategory.RESOURCE_LIMIT,
-                "tool round trip limit exceeded: " + limit, false, null, null, null, null, null));
+        return new ClaraException(ClaraError.builder(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.RESOURCE_LIMIT)
+                .safeMessage("tool round trip limit exceeded: " + limit)
+                .build());
     }
 }

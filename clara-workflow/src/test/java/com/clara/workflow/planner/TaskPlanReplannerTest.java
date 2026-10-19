@@ -36,9 +36,13 @@ public class TaskPlanReplannerTest {
     }
 
     private static TaskNode task(String id, String outputKey, String capability) {
-        return new TaskNode(id, null, capability, outputKey, RetryPolicy.NONE, 1000L,
-                new BudgetAmount(1L, 1L, 1L),
-                context -> new TaskExecutionResult(Collections.singletonMap(outputKey, "v"), BudgetAmount.ZERO));
+        return TaskNode.builder(id, capability, outputKey)
+                .retryPolicy(RetryPolicy.NONE)
+                .timeoutMillis(1000L)
+                .budget(new BudgetAmount(1L, 1L, 1L))
+                .handler(context -> new TaskExecutionResult(Collections.singletonMap(outputKey, "v"),
+                        BudgetAmount.ZERO))
+                .build();
     }
 
     private static TaskPlan plan(int version, PlanStatusEnum status, List<TaskNode> tasks) {
@@ -49,7 +53,7 @@ public class TaskPlanReplannerTest {
             Set<String> completed) {
         ClaraException error = assertThrows(ClaraException.class,
                 () -> replanner().replan(current, replacement, priorReplans, completed));
-        assertEquals(ErrorCodes.PLAN_REPLAN_INVALID, error.getError().getCode());
+        assertEquals(ErrorCodes.PLAN_RE_PLAN_INVALID, error.getError().getCode());
     }
 
     @Test

@@ -28,17 +28,15 @@ public final class TaskPlanResult {
      * @param taskStatuses 各任务状态映射，不可为 null
      * @param outputs      合并后的输出变量映射，不可为 null
      * @param steps        实际执行步数，不可为负
-     * @throws IllegalArgumentException 任一字段不合法时
+     * @throws IllegalArgumentException 任意字段不合法时
      */
-    public TaskPlanResult(TaskPlan plan, PlanStatusEnum status,
-            Map<String, TaskNodeStatusEnum> taskStatuses, Map<String, Object> outputs, int steps) {
+    public TaskPlanResult(TaskPlan plan, PlanStatusEnum status, Map<String, TaskNodeStatusEnum> taskStatuses, Map<String, Object> outputs, int steps) {
         if (plan == null || status == null || taskStatuses == null || outputs == null || steps < 0) {
             throw new IllegalArgumentException("task plan result is invalid");
         }
         this.plan = plan;
         this.status = status;
-        this.taskStatuses = Collections.unmodifiableMap(
-                new LinkedHashMap<>(taskStatuses));
+        this.taskStatuses = Collections.unmodifiableMap(new LinkedHashMap<>(taskStatuses));
         this.outputs = Collections.unmodifiableMap(new LinkedHashMap<>(outputs));
         this.steps = steps;
     }

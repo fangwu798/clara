@@ -1,5 +1,6 @@
 package com.clara.model.provider.compatible;
 
+import com.clara.utils.StringUtils;
 import com.clara.context.ConvContext;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.FinishReasonEnum;
@@ -313,7 +314,7 @@ public class CompatibleTest {
                 assertFalse("没有返回任何图片", images.isEmpty());
                 for (ImageItem image : images) {
                     assertTrue("图片既没有 url 也没有 b64_json",
-                            !isBlank(image.getUrl()) || !isBlank(image.getB64Json()));
+                            !StringUtils.isBlank(image.getUrl()) || !StringUtils.isBlank(image.getB64Json()));
                 }
                 if (response.getGeneratedImages() != null) {
                     assertEquals("生成张数与 data 长度不一致",
@@ -349,7 +350,7 @@ public class CompatibleTest {
                     HttpResponse completed = observer.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     assertFinished(handle);
                     System.out.println("[" + tag + "] model=" + config.getModelId() + " 事件数=" + observer.eventCount() + " 增量文本长度=" + observer.text().length() + " " + describe(completed));
-                    assertFalse("响应没有正文", isBlank(completed.getContent()));
+                    assertFalse("响应没有正文", StringUtils.isBlank(completed.getContent()));
                     assertFalse("没有收到任何文本增量事件", observer.text().isEmpty());
                     assertEquals("增量拼接结果应与终态响应一致", completed.getContent(), observer.text());
                     assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
@@ -358,7 +359,7 @@ public class CompatibleTest {
                     HttpResponse response = model.chat(request(config.getModelId(), userMessages(PROMPT), null, false), HttpResponse.class);
                     System.out.println("[" + tag + "] model=" + config.getModelId() + " " + describe(response));
                     assertSuccess(response);
-                    assertFalse("响应没有正文", isBlank(response.getContent()));
+                    assertFalse("响应没有正文", StringUtils.isBlank(response.getContent()));
                     assertEquals(FinishReasonEnum.STOP, response.getFinishReason());
                     assertNotNull("真实响应应带 token 用量", response.getInputTokens());
                     assertTrue("输入 token 应大于 0", response.getInputTokens() > 0);
@@ -394,7 +395,7 @@ public class CompatibleTest {
                     HttpResponse completed = second.awaitResponse(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     assertFinished(secondHandle);
                     System.out.println("[" + tag + "] 第二轮 " + describe(completed));
-                    assertFalse("工具结果回填后模型没有给出回答", isBlank(completed.getContent()));
+                    assertFalse("工具结果回填后模型没有给出回答", StringUtils.isBlank(completed.getContent()));
                     assertEquals(FinishReasonEnum.STOP, completed.getFinishReason());
                     assertStreamingUsage(completed);
                 } else {
@@ -405,7 +406,7 @@ public class CompatibleTest {
                     HttpResponse second = model.chat(request(config.getModelId(), toolResultMessages(call), tools(), false), HttpResponse.class);
                     System.out.println("[" + tag + "] 第二轮 " + describe(second));
                     assertSuccess(second);
-                    assertFalse("工具结果回填后模型没有给出回答", isBlank(second.getContent()));
+                    assertFalse("工具结果回填后模型没有给出回答", StringUtils.isBlank(second.getContent()));
                     assertEquals(FinishReasonEnum.STOP, second.getFinishReason());
                 }
             }
@@ -654,7 +655,7 @@ public class CompatibleTest {
      * @throws Exception 下载失败时
      */
     private static int download(String url) throws Exception {
-        if (isBlank(url)) {
+        if (StringUtils.isBlank(url)) {
             return 0;
         }
         URLConnection connection = new URL(url).openConnection();
@@ -694,9 +695,6 @@ public class CompatibleTest {
      * @param value 待判断文本
      * @return 为 null 或全空白时返回 true
      */
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 
     /**
      * 构造 {@code get_weather} 的入参 schema。

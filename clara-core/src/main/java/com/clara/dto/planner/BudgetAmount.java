@@ -1,8 +1,11 @@
 package com.clara.dto.planner;
 
+import lombok.Data;
+
 /**
  * 预算额度：以 token 数、成本微元与工作单元三个维度计量。
  */
+@Data
 public final class BudgetAmount {
 
     /** 零预算。 */
@@ -24,37 +27,30 @@ public final class BudgetAmount {
         this.workUnits = workUnits;
     }
 
-    public long getTokens() {
-        return tokens;
-    }
 
-    public long getCostMicros() {
-        return costMicros;
-    }
-
-    public long getWorkUnits() {
-        return workUnits;
-    }
 
     public BudgetAmount plus(BudgetAmount other) {
         require(other);
-        return new BudgetAmount(add(tokens, other.tokens), add(costMicros, other.costMicros),
-                add(workUnits, other.workUnits));
+        return new BudgetAmount(add(tokens, other.tokens), add(costMicros, other.costMicros), add(workUnits, other.workUnits));
     }
 
     public BudgetAmount minus(BudgetAmount other) {
         require(other);
-        if (!covers(other)) {
+        if (other.isExceededBy(this)) {
             throw new IllegalArgumentException("budget subtraction underflow");
         }
-        return new BudgetAmount(tokens - other.tokens, costMicros - other.costMicros,
-                workUnits - other.workUnits);
+        return new BudgetAmount(tokens - other.tokens, costMicros - other.costMicros, workUnits - other.workUnits);
     }
 
-    public boolean covers(BudgetAmount other) {
+    /**
+     * 判断本额度是否已超出：计量维度更大即视为超出。
+     *
+     * @param other 待比较额度，不可为 null
+     * @return 分量超出本额度时返回 true
+     */
+    public boolean isExceededBy(BudgetAmount other) {
         require(other);
-        return tokens >= other.tokens && costMicros >= other.costMicros
-                && workUnits >= other.workUnits;
+        return other.tokens > tokens || other.costMicros > costMicros || other.workUnits > workUnits;
     }
 
     private static void require(BudgetAmount value) {

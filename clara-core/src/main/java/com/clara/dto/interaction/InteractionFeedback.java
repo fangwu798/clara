@@ -1,5 +1,6 @@
 package com.clara.dto.interaction;
 
+import com.clara.utils.StringUtils;
 import lombok.Data;
 
 import java.util.Collections;
@@ -24,18 +25,16 @@ public final class InteractionFeedback {
     /**
      * 创建交互反馈。
      *
-     * @param runId                  运行标识，不可为空白
-     * @param interactionId          交互标识，不可为空白
-     * @param responderId            响应者标识，不可为空白
+     * @param runId                   运行标识，不可为空白
+     * @param interactionId           交互标识，不可为空白
+     * @param responderId             响应者标识，不可为空白
      * @param expectedInstanceVersion 期望实例版本，不可为负
-     * @param idempotencyKey         幂等键，不可为空白
-     * @param answer                 用户答案，可为 null
-     * @throws IllegalArgumentException 任一字段不合法时
+     * @param idempotencyKey          幂等键，不可为空白
+     * @param answer                  用户答案，可为 null
+     * @throws IllegalArgumentException 任意字段不合法时
      */
-    public InteractionFeedback(String runId, String interactionId, String responderId,
-            long expectedInstanceVersion, String idempotencyKey, Map<String, Object> answer) {
-        if (blank(runId) || blank(interactionId) || blank(responderId)
-                || expectedInstanceVersion < 0L || blank(idempotencyKey)) {
+    public InteractionFeedback(String runId, String interactionId, String responderId, long expectedInstanceVersion, String idempotencyKey, Map<String, Object> answer) {
+        if (StringUtils.isBlank(runId) || StringUtils.isBlank(interactionId) || StringUtils.isBlank(responderId) || expectedInstanceVersion < 0L || StringUtils.isBlank(idempotencyKey)) {
             throw new IllegalArgumentException("feedback fields are invalid");
         }
         this.runId = runId;
@@ -43,11 +42,7 @@ public final class InteractionFeedback {
         this.responderId = responderId;
         this.expectedInstanceVersion = expectedInstanceVersion;
         this.idempotencyKey = idempotencyKey;
-        this.answer = answer == null ? Collections.<String, Object>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<>(answer));
+        this.answer = answer == null ? Collections.emptyMap() : Collections.unmodifiableMap(new LinkedHashMap<>(answer));
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

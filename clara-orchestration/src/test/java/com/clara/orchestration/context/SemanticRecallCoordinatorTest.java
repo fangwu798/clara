@@ -174,12 +174,16 @@ public class SemanticRecallCoordinatorTest {
     // ---- helpers -----------------------------------------------------------
 
     private static ContextControlConfig control(int retrievalCount, double threshold) {
-        return new ContextControlConfig(-1L, -1, -1L, 80, false, false, retrievalCount, threshold);
+        return ContextControlConfig.builder()
+                .contextWindowTokens(-1L).windowMaxMessages(-1).windowMaxSizeBytes(-1L)
+                .windowMaxTokensPercent(80).retrievalCount(retrievalCount)
+                .similarityThreshold(threshold).build();
     }
 
     private static MemoryEntry entry(MemorySourceTypeEnum sourceType, String id, String content) {
-        return new MemoryEntry(id, sourceType, id, "c1", content, HASH,
-                new float[] {1f, 0f}, 0L, 0L, null);
+        return MemoryEntry.builder(id, sourceType, id, content, HASH, new float[] {1f, 0f})
+                .conversationId("c1")
+                .build();
     }
 
     private static ISemanticMemoryStore store(final List<MemoryMatch> matches) {

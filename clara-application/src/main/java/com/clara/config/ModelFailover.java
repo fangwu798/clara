@@ -1,7 +1,7 @@
 package com.clara.config;
 
 import com.clara.exception.ClaraError;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -57,12 +57,12 @@ public final class ModelFailover {
         if (ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE.equals(error.getCode())) {
             return true;
         }
-        ErrorCategory category = error.getCategory();
-        return category == ErrorCategory.AUTHENTICATION
-                || category == ErrorCategory.AUTHORIZATION
-                || category == ErrorCategory.RATE_LIMIT
-                || category == ErrorCategory.TIMEOUT
-                || category == ErrorCategory.EXTERNAL_SERVICE;
+        ErrorCategoryEnum category = error.getCategory();
+        return category == ErrorCategoryEnum.AUTHENTICATION
+                || category == ErrorCategoryEnum.AUTHORIZATION
+                || category == ErrorCategoryEnum.RATE_LIMIT
+                || category == ErrorCategoryEnum.TIMEOUT
+                || category == ErrorCategoryEnum.EXTERNAL_SERVICE;
     }
 
     /**

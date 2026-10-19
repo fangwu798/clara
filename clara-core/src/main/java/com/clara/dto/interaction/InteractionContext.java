@@ -1,5 +1,6 @@
 package com.clara.dto.interaction;
 
+import com.clara.utils.StringUtils;
 import lombok.Data;
 
 /**
@@ -29,12 +30,12 @@ public final class InteractionContext {
      * @param expectedInstanceVersion 创建交互时实例检查点版本，不可为负
      * @param createdAtEpochMillis    创建时间（Unix epoch 毫秒），不可为负
      * @param expiresAtEpochMillis    失效时间（Unix epoch 毫秒），必须晚于创建时间
-     * @throws IllegalArgumentException 任一字段不合法时
+     * @throws IllegalArgumentException 任意字段不合法时
      */
     public InteractionContext(String interactionId, String runId, String instanceId,
             String nodeOrTaskId, long expectedInstanceVersion, long createdAtEpochMillis,
             long expiresAtEpochMillis) {
-        if (blank(interactionId) || blank(runId) || blank(instanceId) || blank(nodeOrTaskId)
+        if (StringUtils.isBlank(interactionId) || StringUtils.isBlank(runId) || StringUtils.isBlank(instanceId) || StringUtils.isBlank(nodeOrTaskId)
                 || expectedInstanceVersion < 0L || createdAtEpochMillis < 0L
                 || expiresAtEpochMillis <= createdAtEpochMillis) {
             throw new IllegalArgumentException("interaction context is invalid");
@@ -48,7 +49,4 @@ public final class InteractionContext {
         this.expiresAtEpochMillis = expiresAtEpochMillis;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

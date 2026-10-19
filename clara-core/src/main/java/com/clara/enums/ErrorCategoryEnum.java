@@ -1,4 +1,6 @@
-package com.clara.exception;
+package com.clara.enums;
+
+import com.clara.exception.ClaraError;
 
 /**
  * Clara 错误的分类：表示失败的性质，供上层决定如何处置（提示、降级或重试）。
@@ -7,7 +9,7 @@ package com.clara.exception;
  * {@link ClaraError#getCategory()} 的取值；分类本身不决定能否重试——是否可重试由构造错误的一方通过
  * {@link ClaraError#isRetryable()} 显式给出。
  */
-public enum ErrorCategory {
+public enum ErrorCategoryEnum {
     /** 配置错误：配置项缺失或非法，如凭据不可用、平台未配置该能力。 */
     CONFIGURATION,
     /** 入参非法：调用方传入的参数不满足接口契约。 */

@@ -7,7 +7,7 @@ import com.clara.core.tool.IToolInvocation;
 import com.clara.dto.tool.ToolResult;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.api.IMcpGateway;
 import com.clara.mcp.client.call.McpToolCall;
@@ -86,7 +86,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
         }
         String toolName = invocation.name();
         if (toolName == null || toolName.trim().isEmpty()) {
-            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION, "工具名不能为空");
+            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION, "工具名不能为空");
         }
         if (skillRegistry.findToolByName(toolName) != null) {
             return localToolInvoker.invoke(invocation);
@@ -95,7 +95,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
         if (binding != null) {
             return invokeExternal(invocation, binding);
         }
-        throw error(ErrorCodes.SKILL_NOT_FOUND, ErrorCategory.VALIDATION,
+        throw error(ErrorCodes.SKILL_NOT_FOUND, ErrorCategoryEnum.VALIDATION,
                 "工具未找到：" + toolName + "（本地技能未注册，且外部工具未登记）");
     }
 
@@ -108,15 +108,15 @@ public final class CompositeToolInvoker implements IToolInvoker {
      */
     private ToolResult invokeExternal(IToolInvocation invocation, ExternalToolBinding binding) {
         if (mcpGateway == null) {
-            throw error(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategory.CAPABILITY, "外部工具未接入：" + invocation.name() + "（MCP 网关未装配）");
+            throw error(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategoryEnum.CAPABILITY, "外部工具未接入：" + invocation.name() + "（MCP 网关未装配）");
         }
         ConvContext conversation = ConvContext.current();
         if (conversation == null) {
-            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION, "外部工具调用缺少会话上下文：" + invocation.name());
+            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION, "外部工具调用缺少会话上下文：" + invocation.name());
         }
         CallContext call = conversation.currentCall();
         if (call == null) {
-            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION, "外部工具调用缺少调用上下文：" + invocation.name());
+            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION, "外部工具调用缺少调用上下文：" + invocation.name());
         }
         McpToolCall mcpCall = new McpToolCall(binding.getTenantId(), binding.getServerKey(), binding.getSnapshotId(), invocation.name(), binding.getSchemaHash(), arguments(invocation), conversation, call);
         McpToolResult result = mcpGateway.callTool(mcpCall);
@@ -137,7 +137,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
         try {
             return JSON.readValue(json, ARGUMENTS_TYPE);
         } catch (IOException e) {
-            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategory.VALIDATION, "外部工具入参不是合法 JSON：" + invocation.name());
+            throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION, "外部工具入参不是合法 JSON：" + invocation.name());
         }
     }
 
@@ -155,7 +155,9 @@ public final class CompositeToolInvoker implements IToolInvoker {
         }
     }
 
-    private static ClaraException error(String code, ErrorCategory category, String message) {
-        return new ClaraException(new ClaraError(code, category, message, false, null, null, null, null, Collections.emptyMap()));
+    private static ClaraException error(String code, ErrorCategoryEnum category, String message) {
+        return new ClaraException(ClaraError.builder(code, category)
+                .safeMessage(message)
+                .build());
     }
 }

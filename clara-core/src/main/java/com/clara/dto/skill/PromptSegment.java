@@ -1,5 +1,6 @@
 package com.clara.dto.skill;
 
+import com.clara.utils.StringUtils;
 import lombok.Data;
 
 /**
@@ -19,14 +20,11 @@ public final class PromptSegment {
      * @throws IllegalArgumentException role 或 content 为空白时
      */
     public PromptSegment(String role, String content) {
-        if (blank(role) || blank(content)) {
+        if (StringUtils.isBlank(role) || StringUtils.isBlank(content)) {
             throw new IllegalArgumentException("prompt segment is invalid");
         }
         this.role = role;
         this.content = content;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

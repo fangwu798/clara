@@ -1,5 +1,7 @@
 package com.clara.exception;
 
+import lombok.Data;
+
 /**
  * Clara 领域错误的运行时载体：把 {@link ClaraError} 抛出给上层。
  *
@@ -10,11 +12,19 @@ package com.clara.exception;
  * <p>携带内容：异常消息取自 {@link ClaraError#getSafeMessage()}（非 null）；本类不额外保存 cause，
  * 是否可重试由 {@link ClaraError#isRetryable()} 表达。
  */
+@Data
 public class ClaraException extends RuntimeException {
+
+    /**
+     * 序列化版本号。
+     */
+    private static final long serialVersionUID = 1L;
+
     /**
      * 本次失败的结构化错误，非 null。
      */
     private final ClaraError error;
+
     /**
      * 创建异常，异常消息取自错误的 {@code safeMessage}。
      *
@@ -25,6 +35,8 @@ public class ClaraException extends RuntimeException {
         super(requireError(error).getSafeMessage());
         this.error = error;
     }
+
+
     /**
      * 校验结构化错误非 null。
      *
@@ -33,15 +45,10 @@ public class ClaraException extends RuntimeException {
      * @throws IllegalArgumentException error 为 null 时
      */
     private static ClaraError requireError(ClaraError error) {
-        if (error == null) { throw new IllegalArgumentException("error must not be null"); }
+        if (error == null) {
+            throw new IllegalArgumentException("error must not be null");
+        }
         return error;
     }
-    /**
-     * 读取本次失败的结构化错误。
-     *
-     * @return 结构化错误，非 null
-     */
-    public ClaraError getError() {
-        return error;
-    }
+
 }

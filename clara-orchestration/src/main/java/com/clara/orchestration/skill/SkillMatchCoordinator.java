@@ -160,9 +160,11 @@ public final class SkillMatchCoordinator {
      */
     private List<MemoryMatch> search(MemorySourceTypeEnum sourceType, float[] vector,
             ContextControlConfig control, String queryText) {
-        SemanticMemoryQuery query = new SemanticMemoryQuery(sourceType, null, vector,
-                control.getRetrievalCount(), NO_PRE_FILTER,
-                System.currentTimeMillis(), null, queryText);
+        SemanticMemoryQuery query = SemanticMemoryQuery.builder(vector,
+                control.getRetrievalCount(), NO_PRE_FILTER, System.currentTimeMillis())
+                .sourceType(sourceType)
+                .queryText(queryText)
+                .build();
         return semanticMemoryStore.search(query);
     }
 

@@ -1,5 +1,6 @@
 package com.clara.dto.planner;
 
+import com.clara.utils.StringUtils;
 import com.clara.enums.planner.ExecutionRecordStatusEnum;
 import lombok.Data;
 
@@ -32,9 +33,8 @@ public final class ExecutionRecord {
      * @param failure        执行失败 / 未知时的异常，可为 null
      * @throws IllegalArgumentException 幂等键为空白或状态为 null 时
      */
-    public ExecutionRecord(String idempotencyKey, String planId, int planVersion, String taskId,
-            ExecutionRecordStatusEnum status, TaskExecutionResult result, Throwable failure) {
-        if (blank(idempotencyKey) || status == null || planVersion < 0) {
+    public ExecutionRecord(String idempotencyKey, String planId, int planVersion, String taskId, ExecutionRecordStatusEnum status, TaskExecutionResult result, Throwable failure) {
+        if (StringUtils.isBlank(idempotencyKey) || status == null || planVersion < 0) {
             throw new IllegalArgumentException("execution record is invalid");
         }
         this.idempotencyKey = idempotencyKey;
@@ -46,7 +46,4 @@ public final class ExecutionRecord {
         this.failure = failure;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

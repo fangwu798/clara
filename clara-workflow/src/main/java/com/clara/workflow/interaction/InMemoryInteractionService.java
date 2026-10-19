@@ -14,7 +14,7 @@ import com.clara.dto.interaction.Question;
 import com.clara.dto.interaction.ResumeOutcome;
 import com.clara.enums.interaction.InteractionStateEnum;
 import com.clara.enums.interaction.InteractionTypeEnum;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
 import java.util.ArrayList;
@@ -72,7 +72,7 @@ public final class InMemoryInteractionService implements IInteractionService {
             }
         }
         if (count >= maxInteractionsPerRun) {
-            throw InteractionErrors.error(ErrorCodes.INTERACTION_LIMIT_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
+            throw InteractionErrors.error(ErrorCodes.INTERACTION_LIMIT_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
         }
         InteractionRequest created = new InteractionRequest(context, question,
                 InteractionStateEnum.PENDING, null, null);
@@ -144,7 +144,7 @@ public final class InMemoryInteractionService implements IInteractionService {
             request = expireRequest(request);
         }
         if (request.getState() == InteractionStateEnum.EXPIRED) {
-            throw InteractionErrors.error(ErrorCodes.INTERACTION_EXPIRED, ErrorCategory.CONFLICT);
+            throw InteractionErrors.error(ErrorCodes.INTERACTION_EXPIRED, ErrorCategoryEnum.CONFLICT);
         }
         if (request.getState() != InteractionStateEnum.PENDING
                 || feedback.getExpectedInstanceVersion() != request.getContext().getExpectedInstanceVersion()) {
@@ -344,18 +344,18 @@ public final class InMemoryInteractionService implements IInteractionService {
     }
 
     private static void invalidAnswer() {
-        throw InteractionErrors.error(ErrorCodes.INTERACTION_INVALID_ANSWER, ErrorCategory.VALIDATION);
+        throw InteractionErrors.error(ErrorCodes.INTERACTION_INVALID_ANSWER, ErrorCategoryEnum.VALIDATION);
     }
 
     private static RuntimeException conflict() {
-        return InteractionErrors.error(ErrorCodes.INTERACTION_CONFLICT, ErrorCategory.CONFLICT);
+        return InteractionErrors.error(ErrorCodes.INTERACTION_CONFLICT, ErrorCategoryEnum.CONFLICT);
     }
 
     private static RuntimeException notFound() {
-        return InteractionErrors.error(ErrorCodes.INTERACTION_NOT_FOUND, ErrorCategory.VALIDATION);
+        return InteractionErrors.error(ErrorCodes.INTERACTION_NOT_FOUND, ErrorCategoryEnum.VALIDATION);
     }
 
     private static RuntimeException denied() {
-        return InteractionErrors.error(ErrorCodes.INTERACTION_ACCESS_DENIED, ErrorCategory.AUTHORIZATION);
+        return InteractionErrors.error(ErrorCodes.INTERACTION_ACCESS_DENIED, ErrorCategoryEnum.AUTHORIZATION);
     }
 }

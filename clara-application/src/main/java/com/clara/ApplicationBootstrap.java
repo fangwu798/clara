@@ -491,7 +491,7 @@ public final class ApplicationBootstrap implements Closeable {
         long total = 0L;
         int calls = 0;
         for (CallRecord record : callRecordSink.snapshot()) {
-            IResponse response = record.response();
+            IResponse response = record.getResponse();
             if (!(response instanceof HttpResponse)) {
                 continue;
             }

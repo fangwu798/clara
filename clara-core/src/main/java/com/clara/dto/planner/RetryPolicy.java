@@ -1,8 +1,11 @@
 package com.clara.dto.planner;
 
+import lombok.Data;
+
 /**
  * 重试策略：定义任务的最大尝试次数与重试间隔。
  */
+@Data
 public final class RetryPolicy {
 
     /** 不重试策略。 */
@@ -20,13 +23,5 @@ public final class RetryPolicy {
         }
         this.maxAttempts = maxAttempts;
         this.delayMillis = delayMillis;
-    }
-
-    public int getMaxAttempts() {
-        return maxAttempts;
-    }
-
-    public long getDelayMillis() {
-        return delayMillis;
     }
 }

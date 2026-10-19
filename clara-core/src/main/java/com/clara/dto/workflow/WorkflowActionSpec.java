@@ -1,5 +1,8 @@
 package com.clara.dto.workflow;
 
+import com.clara.utils.StringUtils;
+import lombok.Data;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -13,6 +16,7 @@ import java.util.Map;
  * <p>属性在构造时做防御性拷贝并转为不可变；{@link #getAttribute(String)} 返回原始对象（可能是
  * String / List / Map），供工厂按类型读取。
  */
+@Data
 public final class WorkflowActionSpec {
 
     private final String nodeId;
@@ -28,26 +32,12 @@ public final class WorkflowActionSpec {
      * @throws IllegalArgumentException nodeId 或 kind 为空白时
      */
     public WorkflowActionSpec(String nodeId, String kind, Map<String, Object> attributes) {
-        if (blank(nodeId) || blank(kind)) {
+        if (StringUtils.isBlank(nodeId) || StringUtils.isBlank(kind)) {
             throw new IllegalArgumentException("nodeId and kind are required");
         }
         this.nodeId = nodeId;
         this.kind = kind;
-        this.attributes = Collections.unmodifiableMap(attributes == null
-                ? new LinkedHashMap<>()
-                : new LinkedHashMap<>(attributes));
-    }
-
-    public String getNodeId() {
-        return nodeId;
-    }
-
-    public String getKind() {
-        return kind;
-    }
-
-    public Map<String, Object> getAttributes() {
-        return attributes;
+        this.attributes = Collections.unmodifiableMap(attributes == null ? new LinkedHashMap<>() : new LinkedHashMap<>(attributes));
     }
 
     /**
@@ -60,7 +50,4 @@ public final class WorkflowActionSpec {
         return attributes.get(name);
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

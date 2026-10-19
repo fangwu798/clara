@@ -1,6 +1,6 @@
 package com.clara.mcp.registry;
 
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.McpErrors;
 import com.clara.mcp.api.IMcpServerRegistry;
@@ -22,7 +22,7 @@ public final class InMemoryMcpServerRegistry implements IMcpServerRegistry {
         if (registration == null) { throw new IllegalArgumentException("registration must not be null"); }
         if (registrations.putIfAbsent(key(registration.getTenantId(), registration.getServerKey()),
                 registration) != null) {
-            throw McpErrors.error(ErrorCodes.MCP_SERVER_ALREADY_REGISTERED, ErrorCategory.CONFLICT);
+            throw McpErrors.error(ErrorCodes.MCP_SERVER_ALREADY_REGISTERED, ErrorCategoryEnum.CONFLICT);
         }
     }
     public void updateStatus(String tenantId, String serverKey, McpRegistrationStatus status) {
@@ -60,6 +60,6 @@ public final class InMemoryMcpServerRegistry implements IMcpServerRegistry {
         if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(field + " must not be blank"); }
     }
     private static RuntimeException notFound() {
-        return McpErrors.error(ErrorCodes.MCP_SERVER_NOT_REGISTERED, ErrorCategory.CONFIGURATION);
+        return McpErrors.error(ErrorCodes.MCP_SERVER_NOT_REGISTERED, ErrorCategoryEnum.CONFIGURATION);
     }
 }

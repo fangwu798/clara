@@ -1,5 +1,6 @@
 package com.clara.dto.planner;
 
+import com.clara.utils.StringUtils;
 import lombok.Data;
 
 import java.util.Collections;
@@ -24,11 +25,10 @@ public final class TaskExecutionContext {
      * @param attempt       本次尝试的序号，从 1 起，不可小于 1
      * @param idempotencyKey 本次执行的幂等键，不可为空白
      * @param values        当前可读的变量映射，不可为 null
-     * @throws IllegalArgumentException 任一字段不合法时
+     * @throws IllegalArgumentException 任意字段不合法时
      */
-    public TaskExecutionContext(TaskPlan plan, int attempt, String idempotencyKey,
-            Map<String, Object> values) {
-        if (plan == null || attempt < 1 || blank(idempotencyKey) || values == null) {
+    public TaskExecutionContext(TaskPlan plan, int attempt, String idempotencyKey, Map<String, Object> values) {
+        if (plan == null || attempt < 1 || StringUtils.isBlank(idempotencyKey) || values == null) {
             throw new IllegalArgumentException("task execution context is invalid");
         }
         this.plan = plan;
@@ -37,7 +37,4 @@ public final class TaskExecutionContext {
         this.values = Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

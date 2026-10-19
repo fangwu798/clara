@@ -2,12 +2,11 @@ package com.clara.utils;
 
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.exception.ErrorMessages;
 import com.clara.enums.ModelProviderEnum;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -58,7 +57,7 @@ public final class ExceptionUtils {
      * @return 鉴权类、不可重试的异常
      */
     public static ClaraException endpointDenied() {
-        return fail(ErrorCodes.MODEL_ENDPOINT_DENIED, ErrorCategory.AUTHORIZATION, false);
+        return fail(ErrorCodes.MODEL_ENDPOINT_DENIED, ErrorCategoryEnum.AUTHORIZATION, false);
     }
 
     /**
@@ -67,7 +66,7 @@ public final class ExceptionUtils {
      * @return 资源限制类、不可重试的异常
      */
     public static ClaraException requestTooLarge() {
-        return fail(ErrorCodes.MODEL_REQUEST_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false);
+        return fail(ErrorCodes.MODEL_REQUEST_TOO_LARGE, ErrorCategoryEnum.RESOURCE_LIMIT, false);
     }
 
     /**
@@ -79,7 +78,7 @@ public final class ExceptionUtils {
      * @return 资源限制类、不可重试的异常
      */
     public static ClaraException requestTooLarge(ModelProviderEnum provider) {
-        return fail(ErrorCodes.MODEL_REQUEST_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false, provider);
+        return fail(ErrorCodes.MODEL_REQUEST_TOO_LARGE, ErrorCategoryEnum.RESOURCE_LIMIT, false, provider);
     }
 
     /**
@@ -91,7 +90,7 @@ public final class ExceptionUtils {
      * @return 配置类、不可重试的异常
      */
     public static ClaraException mediaTransportUnsupported(ModelProviderEnum provider) {
-        return fail(ErrorCodes.MEDIA_TRANSPORT_NOT_SUPPORTED, ErrorCategory.CONFIGURATION, false, provider);
+        return fail(ErrorCodes.MEDIA_TRANSPORT_NOT_SUPPORTED, ErrorCategoryEnum.CONFIGURATION, false, provider);
     }
 
     /**
@@ -100,7 +99,7 @@ public final class ExceptionUtils {
      * @return 资源限制类、不可重试的异常
      */
     public static ClaraException responseTooLarge() {
-        return fail(ErrorCodes.MODEL_RESPONSE_TOO_LARGE, ErrorCategory.RESOURCE_LIMIT, false);
+        return fail(ErrorCodes.MODEL_RESPONSE_TOO_LARGE, ErrorCategoryEnum.RESOURCE_LIMIT, false);
     }
 
     /**
@@ -109,7 +108,7 @@ public final class ExceptionUtils {
      * @return 超时类、可重试的异常
      */
     public static ClaraException requestTimeout() {
-        return fail(ErrorCodes.MODEL_REQUEST_TIMEOUT, ErrorCategory.TIMEOUT, true);
+        return fail(ErrorCodes.MODEL_REQUEST_TIMEOUT, ErrorCategoryEnum.TIMEOUT, true);
     }
 
     /**
@@ -118,7 +117,7 @@ public final class ExceptionUtils {
      * @return 外部服务类、不可重试的异常
      */
     public static ClaraException protocolError() {
-        return fail(ErrorCodes.MODEL_PROTOCOL_ERROR, ErrorCategory.EXTERNAL_SERVICE, false);
+        return fail(ErrorCodes.MODEL_PROTOCOL_ERROR, ErrorCategoryEnum.EXTERNAL_SERVICE, false);
     }
 
     /**
@@ -130,7 +129,7 @@ public final class ExceptionUtils {
      * @return 外部服务类、不可重试的异常
      */
     public static ClaraException protocolError(ModelProviderEnum provider) {
-        return fail(ErrorCodes.MODEL_PROTOCOL_ERROR, ErrorCategory.EXTERNAL_SERVICE, false, provider);
+        return fail(ErrorCodes.MODEL_PROTOCOL_ERROR, ErrorCategoryEnum.EXTERNAL_SERVICE, false, provider);
     }
 
     /**
@@ -141,7 +140,7 @@ public final class ExceptionUtils {
      * @return 能力类、不可重试的异常
      */
     public static ClaraException capabilityUnsupported() {
-        return fail(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategory.CAPABILITY, false);
+        return fail(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategoryEnum.CAPABILITY, false);
     }
 
     /**
@@ -150,7 +149,7 @@ public final class ExceptionUtils {
      * @return 外部服务类、可重试的异常
      */
     public static ClaraException transportIoError() {
-        return fail(ErrorCodes.MODEL_TRANSPORT_IO_ERROR, ErrorCategory.EXTERNAL_SERVICE, true);
+        return fail(ErrorCodes.MODEL_TRANSPORT_IO_ERROR, ErrorCategoryEnum.EXTERNAL_SERVICE, true);
     }
 
     /**
@@ -162,7 +161,7 @@ public final class ExceptionUtils {
      * @return 配置类、不可重试的异常
      */
     public static ClaraException credentialUnavailable(ModelProviderEnum provider) {
-        return fail(ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategory.CONFIGURATION, false, provider);
+        return fail(ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, ErrorCategoryEnum.CONFIGURATION, false, provider);
     }
 
     /**
@@ -195,16 +194,19 @@ public final class ExceptionUtils {
      * @return 映射后的异常
      */
     public static ClaraException providerFailure(ModelProviderEnum provider, int status, String providerMessage) {
-        ErrorCategory category = status == 401 ? ErrorCategory.AUTHENTICATION : status == 403 ? ErrorCategory.AUTHORIZATION : status == 429 ? ErrorCategory.RATE_LIMIT : ErrorCategory.EXTERNAL_SERVICE;
+        ErrorCategoryEnum category = status == 401 ? ErrorCategoryEnum.AUTHENTICATION : status == 403 ? ErrorCategoryEnum.AUTHORIZATION : status == 429 ? ErrorCategoryEnum.RATE_LIMIT : ErrorCategoryEnum.EXTERNAL_SERVICE;
         Map<String, String> details = new LinkedHashMap<>();
         String detail = withoutRequestId(providerMessage);
         if (detail != null) {
             details.put("providerMessage", detail);
         }
-        return new ClaraException(new ClaraError(ErrorCodes.MODEL_PROVIDER_FAILED, category,
-                message(ErrorCodes.MODEL_PROVIDER_FAILED, provider, String.valueOf(status)),
-                status == 429 || status >= 500, null, provider == null ? null : provider.name(),
-                String.valueOf(status), null, details));
+        return new ClaraException(ClaraError.builder(ErrorCodes.MODEL_PROVIDER_FAILED, category)
+                .safeMessage(message(ErrorCodes.MODEL_PROVIDER_FAILED, provider, String.valueOf(status)))
+                .retryable(status == 429 || status >= 500)
+                .provider(provider == null ? null : provider.name())
+                .providerCode(String.valueOf(status))
+                .safeDetails(details)
+                .build());
     }
 
     /**
@@ -219,7 +221,7 @@ public final class ExceptionUtils {
      * @return 外部服务类、不可重试的异常
      */
     public static ClaraException providerEventFailure(ModelProviderEnum provider, String providerCode) {
-        return fail(ErrorCodes.MODEL_PROVIDER_FAILED, ErrorCategory.EXTERNAL_SERVICE, false, provider, providerCode);
+        return fail(ErrorCodes.MODEL_PROVIDER_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE, false, provider, providerCode);
     }
 
     /**
@@ -242,16 +244,12 @@ public final class ExceptionUtils {
         if (detail != null) {
             details.put("providerMessage", detail);
         }
-        return new ClaraException(new ClaraError(
-                ErrorCodes.MODEL_PROVIDER_FAILED,
-                ErrorCategory.EXTERNAL_SERVICE,
-                message(ErrorCodes.MODEL_PROVIDER_FAILED, provider, providerCode),
-                false,
-                null,
-                provider == null ? null : provider.name(),
-                providerCode,
-                null,
-                details));
+        return new ClaraException(ClaraError.builder(ErrorCodes.MODEL_PROVIDER_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE)
+                .safeMessage(message(ErrorCodes.MODEL_PROVIDER_FAILED, provider, providerCode))
+                .provider(provider == null ? null : provider.name())
+                .providerCode(providerCode)
+                .safeDetails(details)
+                .build());
     }
 
     /**
@@ -265,7 +263,7 @@ public final class ExceptionUtils {
      * @param retryable 是否可由上层重试
      * @return 模型调用异常
      */
-    public static ClaraException fail(String code, ErrorCategory category, boolean retryable) {
+    public static ClaraException fail(String code, ErrorCategoryEnum category, boolean retryable) {
         return fail(code, category, retryable, null);
     }
 
@@ -281,7 +279,7 @@ public final class ExceptionUtils {
      * @param provider  平台，可为 null
      * @return 模型调用异常
      */
-    public static ClaraException fail(String code, ErrorCategory category, boolean retryable,
+    public static ClaraException fail(String code, ErrorCategoryEnum category, boolean retryable,
                                       ModelProviderEnum provider) {
         return fail(code, category, retryable, provider, null);
     }
@@ -299,11 +297,14 @@ public final class ExceptionUtils {
      * @param providerCode 平台侧原始错误标识，可为 null
      * @return 模型调用异常
      */
-    public static ClaraException fail(String code, ErrorCategory category, boolean retryable,
+    public static ClaraException fail(String code, ErrorCategoryEnum category, boolean retryable,
                                       ModelProviderEnum provider, String providerCode) {
-        return new ClaraException(new ClaraError(code, category, message(code, provider, providerCode), retryable,
-                null, provider == null ? null : provider.name(), providerCode, null,
-                Collections.<String, String>emptyMap()));
+        return new ClaraException(ClaraError.builder(code, category)
+                .safeMessage(message(code, provider, providerCode))
+                .retryable(retryable)
+                .provider(provider == null ? null : provider.name())
+                .providerCode(providerCode)
+                .build());
     }
 
     /**

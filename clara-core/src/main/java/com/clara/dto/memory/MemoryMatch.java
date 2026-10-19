@@ -1,8 +1,11 @@
 package com.clara.dto.memory;
 
+import lombok.Data;
+
 /**
  * 记忆匹配结果：一条命中条目及其相似度得分。
  */
+@Data
 public final class MemoryMatch {
 
     private final MemoryEntry entry;
@@ -23,11 +26,4 @@ public final class MemoryMatch {
         this.score = score;
     }
 
-    public MemoryEntry getEntry() {
-        return entry;
-    }
-
-    public double getScore() {
-        return score;
-    }
 }

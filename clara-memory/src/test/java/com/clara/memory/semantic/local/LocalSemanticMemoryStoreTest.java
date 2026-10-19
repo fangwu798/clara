@@ -24,12 +24,14 @@ public class LocalSemanticMemoryStoreTest {
 
     private static MemoryEntry entry(String id, MemorySourceTypeEnum type, String conversationId,
             float[] vector, long createdAt) {
-        return new MemoryEntry(id, type, id, conversationId, "content-" + id, sha256("content-" + id),
-                vector, createdAt, 0L, null);
+        return MemoryEntry.builder(id, type, id, "content-" + id, sha256("content-" + id), vector)
+                .conversationId(conversationId)
+                .createdAtEpochMillis(createdAt)
+                .build();
     }
 
     private static SemanticMemoryQuery query(float[] vector, int topK, double minScore) {
-        return new SemanticMemoryQuery(null, null, vector, topK, minScore, NOW, null);
+        return SemanticMemoryQuery.builder(vector, topK, minScore, NOW).build();
     }
 
     private static String sha256(String value) {

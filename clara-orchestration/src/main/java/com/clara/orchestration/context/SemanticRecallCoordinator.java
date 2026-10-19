@@ -105,9 +105,12 @@ public final class SemanticRecallCoordinator {
         }
         long started = System.nanoTime();
         float[] vector = embeddingClient.embed(userInput);
-        SemanticMemoryQuery query = new SemanticMemoryQuery(MemorySourceTypeEnum.CONVERSATION,
-                conversationId, vector, control.getRetrievalCount(), NO_PRE_FILTER,
-                System.currentTimeMillis(), null, userInput);
+        SemanticMemoryQuery query = SemanticMemoryQuery.builder(vector,
+                control.getRetrievalCount(), NO_PRE_FILTER, System.currentTimeMillis())
+                .sourceType(MemorySourceTypeEnum.CONVERSATION)
+                .conversationId(conversationId)
+                .queryText(userInput)
+                .build();
         List<MemoryMatch> matches = semanticMemoryStore.search(query);
         Set<String> visible = visibleTexts(visibleMessages);
         List<String> knowledge = new ArrayList<>();

@@ -315,17 +315,18 @@ public final class MilvusGrpcBackend implements MilvusBackend {
         if (conversationId != null && conversationId.isEmpty()) {
             conversationId = null;
         }
-        return new MemoryEntry(
+        return MemoryEntry.builder(
                 asString(record.get(FIELD_ID)),
                 MemorySourceTypeEnum.valueOf(asString(record.get(FIELD_SOURCE_TYPE))),
                 asString(record.get(FIELD_SOURCE_ID)),
-                conversationId,
                 asString(record.get(FIELD_CONTENT)),
                 asString(record.get(FIELD_CONTENT_HASH)),
-                toFloatArray(record.get(FIELD_VECTOR)),
-                ((Number) record.get(FIELD_CREATED_AT)).longValue(),
-                ((Number) record.get(FIELD_EXPIRES_AT)).longValue(),
-                toMetadata(record.get(FIELD_METADATA)));
+                toFloatArray(record.get(FIELD_VECTOR)))
+                .conversationId(conversationId)
+                .createdAtEpochMillis(((Number) record.get(FIELD_CREATED_AT)).longValue())
+                .expiresAtEpochMillis(((Number) record.get(FIELD_EXPIRES_AT)).longValue())
+                .metadata(toMetadata(record.get(FIELD_METADATA)))
+                .build();
     }
 
     private static InsertParam.Field field(String name, List<?> values) {

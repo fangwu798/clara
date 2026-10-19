@@ -1,5 +1,6 @@
 package com.clara.workflow.node;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IScopeCondition;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
@@ -23,7 +24,7 @@ public final class ConditionNode implements IWorkflowNode {
 
     ConditionNode(String id, IScopeCondition condition, IWorkflowNode whenTrue,
             IWorkflowNode whenFalse) {
-        if (blank(id)) {
+        if (StringUtils.isBlank(id)) {
             throw new IllegalArgumentException("node id must not be blank");
         }
         this.id = id;
@@ -78,7 +79,4 @@ public final class ConditionNode implements IWorkflowNode {
         return Collections.unmodifiableSet(values);
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

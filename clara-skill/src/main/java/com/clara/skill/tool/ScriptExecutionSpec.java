@@ -1,5 +1,6 @@
 package com.clara.skill.tool;
 
+import com.clara.utils.StringUtils;
 import com.clara.api.IScriptExecutor;
 import com.clara.context.CancellationToken;
 import com.clara.enums.skill.ScriptTypeEnum;
@@ -36,7 +37,7 @@ public final class ScriptExecutionSpec {
      */
     public ScriptExecutionSpec(ScriptTypeEnum type, String script, String argumentsJson, long timeoutMillis,
             CancellationToken cancellationToken) {
-        if (type == null || blank(script) || timeoutMillis <= 0L) {
+        if (type == null || StringUtils.isBlank(script) || timeoutMillis <= 0L) {
             throw new IllegalArgumentException("script execution spec is invalid");
         }
         this.type = type;
@@ -66,7 +67,4 @@ public final class ScriptExecutionSpec {
         return cancellationToken;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

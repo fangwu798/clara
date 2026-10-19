@@ -1,5 +1,6 @@
 package com.clara.mcp.registry.config;
 
+import com.clara.utils.StringUtils;
 import com.clara.mcp.registry.McpTransportProfile;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,7 +57,7 @@ public final class McpServerConfig {
      */
     public static McpTransportProfile inferTransportProfile(List<String> command, String url) {
         boolean hasCommand = command != null && !command.isEmpty();
-        boolean hasUrl = !isBlank(url);
+        boolean hasUrl = !StringUtils.isBlank(url);
         if (hasCommand && hasUrl) {
             throw new IllegalArgumentException("mcp server config must not define both command and url");
         }
@@ -78,12 +79,12 @@ public final class McpServerConfig {
      */
     public McpServerConfig(String serverKey, McpTransportProfile transportProfile,
             List<String> command, Map<String, String> env, String url, Map<String, String> headers) {
-        if (isBlank(serverKey)) { throw new IllegalArgumentException("serverKey must not be blank"); }
+        if (StringUtils.isBlank(serverKey)) { throw new IllegalArgumentException("serverKey must not be blank"); }
         if (transportProfile == null) { throw new IllegalArgumentException("transportProfile must not be null"); }
         List<String> commandLine = immutableCommand(command);
         Map<String, String> environment = immutableMap(env, "env");
         Map<String, String> headerMap = immutableMap(headers, "headers");
-        String endpoint = isBlank(url) ? null : url.trim();
+        String endpoint = StringUtils.isBlank(url) ? null : url.trim();
         if (transportProfile == McpTransportProfile.STDIO) {
             if (commandLine.isEmpty()) { throw new IllegalArgumentException("stdio config requires a command"); }
             if (endpoint != null) { throw new IllegalArgumentException("stdio config must not define url"); }
@@ -114,7 +115,7 @@ public final class McpServerConfig {
         if (source == null) { return Collections.emptyList(); }
         List<String> result = new ArrayList<>(source.size());
         for (String token : source) {
-            if (isBlank(token)) { throw new IllegalArgumentException("command must not contain blank tokens"); }
+            if (StringUtils.isBlank(token)) { throw new IllegalArgumentException("command must not contain blank tokens"); }
             result.add(token);
         }
         return Collections.unmodifiableList(result);
@@ -124,7 +125,7 @@ public final class McpServerConfig {
         if (source == null) { return Collections.emptyMap(); }
         Map<String, String> result = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : source.entrySet()) {
-            if (isBlank(entry.getKey()) || entry.getValue() == null) {
+            if (StringUtils.isBlank(entry.getKey()) || entry.getValue() == null) {
                 throw new IllegalArgumentException(field + " must not contain blank keys or null values");
             }
             result.put(entry.getKey(), entry.getValue());
@@ -132,5 +133,4 @@ public final class McpServerConfig {
         return Collections.unmodifiableMap(result);
     }
 
-    private static boolean isBlank(String value) { return value == null || value.trim().isEmpty(); }
 }

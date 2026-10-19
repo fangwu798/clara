@@ -59,6 +59,16 @@ public final class StringUtils {
     }
 
     /**
+     * 判断字符串是否包含非空白字符。
+     *
+     * @param value 待判断字符串，可为 null
+     * @return 非 null 且包含至少一个非空白字符时返回 true
+     */
+    public static boolean isNotBlank(String value) {
+        return !isBlank(value);
+    }
+
+    /**
      * 将空白字符串转换为 null。
      *
      * @param value 待处理的字符串，可为 null
@@ -96,7 +106,7 @@ public final class StringUtils {
     /**
      * 以严格 UTF-8 解码字节数组。
      *
-     * <p>严格指遇到非法或不完整字节序列时直接报错，而不是替换为 U+FFFD，便于调用方按协议错误处理。
+     * <p>严格指遇到非法或不完整字节序列时直接报错，而不是替换，便于调用方按协议错误处理。
      *
      * @param bytes 待解码的字节数组，不可为 null
      * @return 解码后的字符串
@@ -112,7 +122,7 @@ public final class StringUtils {
     /**
      * 计算字符串在等宽终端中的显示宽度：东亚全角字符占两列，其余字符占一列。
      *
-     * <p>为什么按显示宽度而不是字符数：中文与英文混排时，按字符数补齐会让后续列错位。
+     * <p>为什么按显示宽度而不是字符数：中文与英文混排时，按字符数 补齐会让后续列错位。
      *
      * @param value 待计算的字符串，不可为 null
      * @return 显示宽度，单位为列
@@ -126,9 +136,9 @@ public final class StringUtils {
     }
 
     /**
-     * 在右侧补空格，使文本达到指定显示宽度。
+     * 在右侧 补充空格，使文本达到指定显示宽度。
      *
-     * @param value 待补齐的字符串，不可为 null
+     * @param value 待补充的字符串，不可为 null
      * @param width 目标显示宽度，单位为列
      * @return 显示宽度不小于目标宽度的文本；已足够宽时原样返回
      */

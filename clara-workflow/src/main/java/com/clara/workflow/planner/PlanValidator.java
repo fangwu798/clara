@@ -6,7 +6,7 @@ import com.clara.dto.planner.PlanLimits;
 import com.clara.dto.planner.TaskNode;
 import com.clara.dto.planner.TaskPlan;
 import com.clara.enums.planner.PlanStatusEnum;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
 import java.util.HashMap;
@@ -36,7 +36,7 @@ public final class PlanValidator {
         }
         if (plan.getTasks().size() > limits.getMaxTasks()
                 || plan.getTasks().size() > limits.getMaxPlanSteps()) {
-            throw PlannerErrors.error(ErrorCodes.PLAN_LIMIT_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
+            throw PlannerErrors.error(ErrorCodes.PLAN_LIMIT_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
         }
         Map<String, TaskNode> tasks = new HashMap<>();
         Set<String> outputs = new HashSet<>();
@@ -46,12 +46,12 @@ public final class PlanValidator {
                 invalid();
             }
             if (task.getCapability() != null && !authorizer.isAllowed(task.getCapability())) {
-                throw PlannerErrors.error(ErrorCodes.PLAN_CAPABILITY_DENIED, ErrorCategory.AUTHORIZATION);
+                throw PlannerErrors.error(ErrorCodes.PLAN_CAPABILITY_DENIED, ErrorCategoryEnum.AUTHORIZATION);
             }
             maximum = maximum.plus(task.getBudget());
         }
-        if (!limits.getTotalBudget().covers(maximum)) {
-            throw PlannerErrors.error(ErrorCodes.BUDGET_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
+        if (limits.getTotalBudget().isExceededBy(maximum)) {
+            throw PlannerErrors.error(ErrorCodes.BUDGET_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
         }
         for (TaskNode task : plan.getTasks()) {
             for (String dependency : task.getDependencies()) {
@@ -88,6 +88,6 @@ public final class PlanValidator {
     }
 
     private static void invalid() {
-        throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.VALIDATION);
+        throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.VALIDATION);
     }
 }

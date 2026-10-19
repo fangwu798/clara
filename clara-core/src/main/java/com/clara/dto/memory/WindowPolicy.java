@@ -1,11 +1,14 @@
 package com.clara.dto.memory;
 
+import lombok.Data;
+
 /**
  * 窗口策略：会话历史允许携带的上限，支持条数、具体大小、百分比三种维度。
  *
  * <p>组合时取 AND（更严）；默认按百分比 80% 限定、不限制条数。{@code -1} 表示「不限」，{@code 0} 表示
  * 「不启用该维度」。
  */
+@Data
 public final class WindowPolicy {
 
     private final long contextWindowTokens;
@@ -20,7 +23,7 @@ public final class WindowPolicy {
      * @param maxMessages         历史最大条数，-1 表示不限
      * @param maxSizeBytes        历史最大字节数，-1 表示不限
      * @param maxTokensPercent    历史占上下文窗口最大百分比（0-100），0 表示不按百分比
-     * @throws IllegalArgumentException 任一字段不合法时
+     * @throws IllegalArgumentException 任意字段不合法时
      */
     public WindowPolicy(long contextWindowTokens, int maxMessages, long maxSizeBytes, int maxTokensPercent) {
         if (contextWindowTokens == 0 || contextWindowTokens < -1) {
@@ -48,21 +51,5 @@ public final class WindowPolicy {
      */
     public static WindowPolicy defaults() {
         return new WindowPolicy(-1L, -1, -1L, 80);
-    }
-
-    public long getContextWindowTokens() {
-        return contextWindowTokens;
-    }
-
-    public int getMaxMessages() {
-        return maxMessages;
-    }
-
-    public long getMaxSizeBytes() {
-        return maxSizeBytes;
-    }
-
-    public int getMaxTokensPercent() {
-        return maxTokensPercent;
     }
 }

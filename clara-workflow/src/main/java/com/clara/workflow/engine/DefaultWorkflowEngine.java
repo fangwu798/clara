@@ -9,7 +9,7 @@ import com.clara.dto.workflow.WorkflowDefinition;
 import com.clara.dto.workflow.WorkflowResult;
 import com.clara.enums.workflow.WorkflowInstanceStatusEnum;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.workflow.node.ActionNode;
 import com.clara.workflow.node.CompositeNode;
@@ -53,7 +53,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         requireDefinition(definition);
         requireId(instanceId);
         if (checkpoints.load(instanceId).isPresent()) {
-            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategory.CONFLICT);
+            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategoryEnum.CONFLICT);
         }
         Run run = new Run(definition, instanceId, new ExecutionScope(inputs), -1L);
         run.checkpoint(WorkflowInstanceStatusEnum.RUNNING);
@@ -73,20 +73,20 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         requireId(instanceId);
         Optional<WorkflowCheckpoint> loaded = checkpoints.load(instanceId);
         if (!loaded.isPresent()) {
-            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, ErrorCategory.VALIDATION);
+            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, ErrorCategoryEnum.VALIDATION);
         }
         WorkflowCheckpoint checkpoint = loaded.get();
         if (expectedCheckpointVersion >= 0L
                 && checkpoint.getVersion() != expectedCheckpointVersion) {
-            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_VERSION_CONFLICT, ErrorCategory.CONFLICT);
+            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_VERSION_CONFLICT, ErrorCategoryEnum.CONFLICT);
         }
         if (!definition.getWorkflowId().equals(checkpoint.getWorkflowId())
                 || !definition.getVersion().equals(checkpoint.getWorkflowVersion())) {
-            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_DEFINITION_INVALID, ErrorCategory.VALIDATION);
+            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_DEFINITION_INVALID, ErrorCategoryEnum.VALIDATION);
         }
         if (checkpoint.getStatus() != WorkflowInstanceStatusEnum.WAITING_INPUT
                 && checkpoint.getStatus() != WorkflowInstanceStatusEnum.SUSPENDED) {
-            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategory.CONFLICT);
+            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategoryEnum.CONFLICT);
         }
         ExecutionScope scope = checkpoint.getScope();
         scope.addInputs(inputs);
@@ -99,7 +99,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
     public WorkflowResult cancel(String instanceId) {
         requireId(instanceId);
         WorkflowCheckpoint checkpoint = checkpoints.load(instanceId).orElseThrow(
-                () -> WorkflowErrors.error(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, ErrorCategory.VALIDATION));
+                () -> WorkflowErrors.error(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, ErrorCategoryEnum.VALIDATION));
         if (checkpoint.getStatus().isTerminal()) {
             return new WorkflowResult(instanceId, checkpoint.getStatus(),
                     checkpoint.getScope(), checkpoint.getVersion());
@@ -114,9 +114,9 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
     public WorkflowResult suspend(String instanceId) {
         requireId(instanceId);
         WorkflowCheckpoint checkpoint = checkpoints.load(instanceId).orElseThrow(
-                () -> WorkflowErrors.error(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, ErrorCategory.VALIDATION));
+                () -> WorkflowErrors.error(ErrorCodes.WORKFLOW_INSTANCE_NOT_FOUND, ErrorCategoryEnum.VALIDATION));
         if (checkpoint.getStatus().isTerminal()) {
-            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategory.CONFLICT);
+            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategoryEnum.CONFLICT);
         }
         if (checkpoint.getStatus() == WorkflowInstanceStatusEnum.SUSPENDED) {
             return new WorkflowResult(instanceId, checkpoint.getStatus(),
@@ -163,7 +163,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         } else if (node instanceof HumanNode) {
             executeHuman((HumanNode) node, run, executionKey, persist);
         } else {
-            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_DEFINITION_INVALID, ErrorCategory.VALIDATION);
+            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_DEFINITION_INVALID, ErrorCategoryEnum.VALIDATION);
         }
     }
 
@@ -171,7 +171,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         Map<String, Object> outputs = node.getAction().execute(run.scope.copy());
         outputs = outputs == null ? Collections.<String, Object>emptyMap() : outputs;
         if (!node.getOutputKeys().containsAll(outputs.keySet())) {
-            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_OUTPUT_CONFLICT, ErrorCategory.CONFLICT);
+            throw WorkflowErrors.error(ErrorCodes.WORKFLOW_OUTPUT_CONFLICT, ErrorCategoryEnum.CONFLICT);
         }
         run.scope.complete(key, node.getId(), outputs);
         if (persist) {
@@ -212,13 +212,13 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
                 run.scope.merge(base, future.get());
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
-                throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategory.CANCELLED);
+                throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategoryEnum.CANCELLED);
             } catch (ExecutionException exception) {
                 Throwable cause = exception.getCause();
                 if (deferred == null) {
                     deferred = cause instanceof RuntimeException
                             ? (RuntimeException) cause
-                            : WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategory.INTERNAL);
+                            : WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategoryEnum.INTERNAL);
                 }
             }
         }

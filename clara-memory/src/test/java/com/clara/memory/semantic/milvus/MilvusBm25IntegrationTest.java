@@ -136,13 +136,20 @@ public class MilvusBm25IntegrationTest {
     }
 
     private static SemanticMemoryQuery query(String queryText) {
-        return new SemanticMemoryQuery(MemorySourceTypeEnum.CONVERSATION, CONVERSATION, new float[] {1f},
-                5, -1.0d, System.currentTimeMillis(), null, queryText);
+        return SemanticMemoryQuery.builder(new float[] {1f}, 5, -1.0d, System.currentTimeMillis())
+                .sourceType(MemorySourceTypeEnum.CONVERSATION)
+                .conversationId(CONVERSATION)
+                .queryText(queryText)
+                .build();
     }
 
     private static MemoryEntry entry(String id, String content, long now) {
-        return new MemoryEntry(id, MemorySourceTypeEnum.CONVERSATION, CONVERSATION, CONVERSATION, content,
-                sha256(content), new float[] {1f}, now, 0L, Collections.<String, String>emptyMap());
+        return MemoryEntry.builder(id, MemorySourceTypeEnum.CONVERSATION, CONVERSATION, content,
+                sha256(content), new float[] {1f})
+                .conversationId(CONVERSATION)
+                .createdAtEpochMillis(now)
+                .metadata(Collections.<String, String>emptyMap())
+                .build();
     }
 
     private static String sha256(String value) {

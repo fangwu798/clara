@@ -52,8 +52,8 @@ public class UserInteractionGatewayTest {
         UserInteractionGateway gateway = new UserInteractionGateway(service);
 
         InteractionContext context = new InteractionContext("i1", "r1", "inst-1", "node-1", 0L, 100L, 10000L);
-        Question question = new Question(InteractionTypeEnum.TEXT_INPUT, "Q", null, null, null, true,
-                "answer", 50);
+        Question question = Question.builder(InteractionTypeEnum.TEXT_INPUT, "Q")
+                .required(true).scopeKey("answer").maxTextLength(50).build();
 
         InteractionRequest request = gateway.request(context, question);
 

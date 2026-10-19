@@ -16,7 +16,7 @@ import com.clara.enums.planner.PlanStatusEnum;
 import com.clara.enums.planner.TaskNodeStatusEnum;
 import com.clara.exception.UnknownSideEffectException;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
 import java.util.ArrayList;
@@ -72,7 +72,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         while (!allSucceeded(statuses)) {
             List<TaskNode> ready = readyTasks(plan, statuses, validator.getLimits().getMaxParallelism());
             if (ready.isEmpty()) {
-                throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.VALIDATION);
+                throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.VALIDATION);
             }
             final Map<String, Object> batchValues = new LinkedHashMap<>(values);
             List<Future<TaskOutcome>> futures = new ArrayList<>();
@@ -119,7 +119,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
                     if (deferred == null) {
                         deferred = cause instanceof RuntimeException
                                 ? (RuntimeException) cause
-                                : PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.INTERNAL);
+                                : PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.INTERNAL);
                     }
                 }
             }
@@ -160,7 +160,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         for (int attempt = 1; attempt <= task.getRetryPolicy().getMaxAttempts(); attempt++) {
             if (steps.incrementAndGet() > validator.getLimits().getMaxPlanSteps()) {
                 budgets.release(reservation.getReservationId());
-                throw PlannerErrors.error(ErrorCodes.PLAN_LIMIT_EXCEEDED, ErrorCategory.RESOURCE_LIMIT);
+                throw PlannerErrors.error(ErrorCodes.PLAN_LIMIT_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
             }
             executions.beginAttempt(executionKey);
             TaskExecutionResult result;
@@ -192,7 +192,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         if (lastFailure instanceof RuntimeException) {
             throw (RuntimeException) lastFailure;
         }
-        throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.INTERNAL);
+        throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.INTERNAL);
     }
 
     private TaskExecutionResult invoke(final TaskNode task, final TaskPlan plan, final int attempt,
@@ -233,7 +233,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
 
     private static void applyResult(TaskNode task, TaskExecutionResult result, Map<String, Object> values) {
         if (result == null || !result.getOutputs().containsKey(task.getOutputKey())) {
-            throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategory.VALIDATION);
+            throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.VALIDATION);
         }
         values.putAll(result.getOutputs());
     }
@@ -289,7 +289,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
     }
 
     private static ClaraException unknown() {
-        return PlannerErrors.error(ErrorCodes.EXECUTION_SIDE_EFFECT_UNKNOWN, ErrorCategory.UNKNOWN_SIDE_EFFECT);
+        return PlannerErrors.error(ErrorCodes.EXECUTION_SIDE_EFFECT_UNKNOWN, ErrorCategoryEnum.UNKNOWN_SIDE_EFFECT);
     }
 
     /**

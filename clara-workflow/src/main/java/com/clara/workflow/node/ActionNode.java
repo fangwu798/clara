@@ -1,5 +1,6 @@
 package com.clara.workflow.node;
 
+import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
@@ -22,10 +23,10 @@ public final class ActionNode implements IWorkflowNode {
 
     ActionNode(String id, WorkflowNodeTypeEnum type, Set<String> outputKeys,
             String idempotencyKey, IWorkflowAction action) {
-        if (blank(id)) {
+        if (StringUtils.isBlank(id)) {
             throw new IllegalArgumentException("node id must not be blank");
         }
-        if (blank(idempotencyKey) || action == null) {
+        if (StringUtils.isBlank(idempotencyKey) || action == null) {
             throw new IllegalArgumentException("idempotencyKey and action are required");
         }
         this.id = id;
@@ -65,7 +66,4 @@ public final class ActionNode implements IWorkflowNode {
         return action;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

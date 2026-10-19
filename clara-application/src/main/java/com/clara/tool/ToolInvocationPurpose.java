@@ -1,5 +1,6 @@
 package com.clara.tool;
 
+import com.clara.utils.StringUtils;
 import com.clara.workflow.WorkflowCatalog;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,19 +32,19 @@ public final class ToolInvocationPurpose {
     public static String describe(String toolName, String argumentsJson, String declaredDescription) {
         JsonNode root = parse(argumentsJson);
         JsonNode explicit = root == null ? null : root.get("purpose");
-        if (explicit != null && explicit.isTextual() && !blank(explicit.textValue())) {
+        if (explicit != null && explicit.isTextual() && !StringUtils.isBlank(explicit.textValue())) {
             return explicit.textValue().trim();
         }
         if (RUN_COMMAND.equals(toolName)) {
             String command = command(root);
-            if (!blank(command)) {
+            if (!StringUtils.isBlank(command)) {
                 String purpose = COMMAND_PURPOSES.get(commandKey(command));
                 return purpose == null ? commandLine(root) : purpose;
             }
         }
         if (RUN_WORKFLOW.equals(toolName)) {
             JsonNode workflow = root == null ? null : root.get("workflow");
-            if (workflow != null && workflow.isTextual() && !blank(workflow.textValue())) {
+            if (workflow != null && workflow.isTextual() && !StringUtils.isBlank(workflow.textValue())) {
                 String id = workflow.textValue().trim();
                 String description = WorkflowCatalog.describe(id);
                 return description == null ? "运行工作流 " + id : "运行工作流 " + id + "：" + description;
@@ -117,11 +118,8 @@ public final class ToolInvocationPurpose {
     }
 
     private static JsonNode parse(String value) {
-        if (blank(value)) return null;
+        if (StringUtils.isBlank(value)) return null;
         try { return JSON.readTree(value); } catch (IOException ignored) { return null; }
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

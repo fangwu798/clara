@@ -1,6 +1,6 @@
 package com.clara.mcp.registry;
 
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.McpErrors;
 import com.clara.mcp.api.IMcpCapabilityCatalog;
@@ -82,7 +82,7 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
     }
     private static void requireHash(String expected, String actual) {
         if (!expected.equals(actual)) {
-            throw McpErrors.error(ErrorCodes.MCP_SCHEMA_MISMATCH, ErrorCategory.CAPABILITY);
+            throw McpErrors.error(ErrorCodes.MCP_SCHEMA_MISMATCH, ErrorCategoryEnum.CAPABILITY);
         }
     }
     private static String serverKey(String tenantId, String serverKey) {
@@ -96,6 +96,6 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
         if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(field + " must not be blank"); }
     }
     private static RuntimeException notFound() {
-        return McpErrors.error(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, ErrorCategory.CAPABILITY);
+        return McpErrors.error(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, ErrorCategoryEnum.CAPABILITY);
     }
 }

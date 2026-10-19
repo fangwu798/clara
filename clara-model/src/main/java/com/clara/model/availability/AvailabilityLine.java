@@ -332,10 +332,10 @@ public final class AvailabilityLine {
      */
     private static String conclusion(ModelCheckResult result) {
         if (!result.isAvailable()) {
-            return isBlank(result.getDetail()) ? "" : result.getDetail();
+            return StringUtils.isBlank(result.getDetail()) ? "" : result.getDetail();
         }
         String latency = "首字符响应=" + result.getFirstCharacterMillis() + "ms";
-        return isBlank(result.getDetail()) ? latency : latency + GAP + result.getDetail();
+        return StringUtils.isBlank(result.getDetail()) ? latency : latency + GAP + result.getDetail();
     }
 
     /**
@@ -345,7 +345,7 @@ public final class AvailabilityLine {
      * @return 显示宽度，单位为列
      */
     private static int width(String value) {
-        return isBlank(value) ? 0 : StringUtils.displayWidth(value);
+        return StringUtils.isBlank(value) ? 0 : StringUtils.displayWidth(value);
     }
 
     /**
@@ -354,7 +354,4 @@ public final class AvailabilityLine {
      * @param value 待检查字符串
      * @return 字符串没有有效内容时返回 true
      */
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

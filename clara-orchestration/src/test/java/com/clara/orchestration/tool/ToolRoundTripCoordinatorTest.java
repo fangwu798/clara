@@ -4,7 +4,7 @@ import com.clara.core.message.IContent;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ToolContent;
@@ -152,9 +152,9 @@ public class ToolRoundTripCoordinatorTest {
         IToolInvoker failing = new IToolInvoker() {
             @Override
             public ToolResult invoke(IToolInvocation invocation) {
-                throw new ClaraException(new ClaraError(ErrorCodes.INVALID_ARGUMENT,
-                        ErrorCategory.VALIDATION, "入参不是合法 JSON", false, null, null, null, null,
-                        Collections.<String, String>emptyMap()));
+                throw new ClaraException(ClaraError.builder(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION)
+                        .safeMessage("入参不是合法 JSON")
+                        .build());
             }
         };
         ToolRoundTripCoordinator coordinator = new ToolRoundTripCoordinator(failing);

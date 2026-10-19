@@ -13,7 +13,7 @@ import com.clara.core.transport.RawHttpResponse;
 import com.clara.core.transport.sse.ISseEventListener;
 import com.clara.core.transport.sse.SseEvent;
 import com.clara.core.transport.sse.SseParserConfig;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.McpErrors;
 import com.clara.mcp.api.IMcpHeadersProvider;
@@ -144,7 +144,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
         final ActiveCall call = new ActiveCall();
         if (active.putIfAbsent(request.getId(), call) != null) {
             return failed(McpErrors.error(ErrorCodes.MCP_DUPLICATE_REQUEST_ID,
-                    ErrorCategory.CONFLICT, false));
+                    ErrorCategoryEnum.CONFLICT, false));
         }
         final DeadlineGuard guard = DeadlineGuard.after(timeoutMillis);
         call.guard = guard;
@@ -432,7 +432,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
         switch (exception.getKind()) {
             case TIMEOUT:
                 return McpErrors.error(ErrorCodes.MCP_REQUEST_TIMEOUT,
-                        ErrorCategory.TIMEOUT, true);
+                        ErrorCategoryEnum.TIMEOUT, true);
             case RESPONSE_TOO_LARGE:
             case REQUEST_TOO_LARGE:
                 return messageTooLarge();
@@ -441,7 +441,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
                 return invalidMessage();
             case CANCELLED:
                 return McpErrors.error(ErrorCodes.INVOCATION_CANCELLED,
-                        ErrorCategory.CANCELLED, false);
+                        ErrorCategoryEnum.CANCELLED, false);
             case CLOSED:
                 return closedError();
             case IO_ERROR:
@@ -457,21 +457,21 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
     }
 
     private static RuntimeException closedError() {
-        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_CLOSED, ErrorCategory.CANCELLED, false);
+        return McpErrors.error(ErrorCodes.MCP_TRANSPORT_CLOSED, ErrorCategoryEnum.CANCELLED, false);
     }
 
     private static RuntimeException ioError() {
         return McpErrors.error(ErrorCodes.MCP_TRANSPORT_IO_ERROR,
-                ErrorCategory.EXTERNAL_SERVICE, true);
+                ErrorCategoryEnum.EXTERNAL_SERVICE, true);
     }
 
     private static RuntimeException invalidMessage() {
-        return McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategory.VALIDATION, false);
+        return McpErrors.error(ErrorCodes.MCP_INVALID_MESSAGE, ErrorCategoryEnum.VALIDATION, false);
     }
 
     private static RuntimeException messageTooLarge() {
         return McpErrors.error(ErrorCodes.MCP_MESSAGE_TOO_LARGE,
-                ErrorCategory.RESOURCE_LIMIT, false);
+                ErrorCategoryEnum.RESOURCE_LIMIT, false);
     }
 
     /**

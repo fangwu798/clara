@@ -1,5 +1,6 @@
 package com.clara.workflow;
 
+import com.clara.utils.StringUtils;
 import com.clara.config.ModelRegistry;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.workflow.IWorkflowAction;
@@ -52,17 +53,13 @@ public final class AgentActionFactory implements IWorkflowActionFactory {
         }
         String prompt = asText(spec.getAttribute("prompt"));
         String promptText = asText(spec.getAttribute("promptText"));
-        if (blank(prompt) && blank(promptText)) {
+        if (StringUtils.isBlank(prompt) && StringUtils.isBlank(promptText)) {
             throw new IllegalArgumentException("AGENT 节点缺少 prompt 或 promptText：" + spec.getNodeId());
         }
         Map<String, Object> promptVars = asMap(spec.getAttribute("promptVars"), spec.getNodeId(), "promptVars");
         AgentNodeOptions options = AgentNodeOptions.fromSpec(spec);
-        return new AgentWorkflowAction(context, spec.getNodeId(), blank(prompt) ? null : prompt.trim(),
+        return new AgentWorkflowAction(context, spec.getNodeId(), StringUtils.isBlank(prompt) ? null : prompt.trim(),
                 promptText, promptVars, options);
-    }
-
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
     }
 
     private static String asText(Object value) {

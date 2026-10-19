@@ -4,7 +4,7 @@ import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.skill.registry.SkillLoader;
 import com.clara.skill.registry.SkillRegistry;
 import org.junit.Rule;
@@ -50,7 +50,7 @@ public class DefaultToolExecutorCancellationTest {
             executor.execute("demo", "{}");
             fail("已取消的会话令牌应让工具在执行前失败");
         } catch (ClaraException expected) {
-            assertEquals(ErrorCategory.CANCELLED, expected.getError().getCategory());
+            assertEquals(ErrorCategoryEnum.CANCELLED, expected.getError().getCategory());
         }
     }
 }

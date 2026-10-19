@@ -5,7 +5,7 @@ import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.mcp.api.IMcpTransport;
 import com.clara.mcp.api.IMcpTransportListener;
@@ -237,8 +237,8 @@ public class DefaultMcpClientTest {
     @Test
     public void transportFailurePropagates() {
         FakeTransport transport = new FakeTransport();
-        transport.failure = new ClaraException(new ClaraError(ErrorCodes.MCP_TRANSPORT_IO_ERROR,
-                ErrorCategory.EXTERNAL_SERVICE, null, true, null, null, null, null, null));
+        transport.failure = new ClaraException(ClaraError.builder(ErrorCodes.MCP_TRANSPORT_IO_ERROR,
+                ErrorCategoryEnum.EXTERNAL_SERVICE).retryable(true).build());
         final DefaultMcpClient client = new DefaultMcpClient(transport, 1000L);
 
         assertCode(ErrorCodes.MCP_TRANSPORT_IO_ERROR, new Runnable() {

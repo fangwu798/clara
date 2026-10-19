@@ -56,24 +56,32 @@ public class MilvusSemanticMemoryStoreIntegrationTest {
             store.upsert(Arrays.asList(conversationA, conversationB, prompt));
 
             List<MemoryMatch> hits = store.search(
-                    new SemanticMemoryQuery(null, "conv-1", vec(1, 0), 5, -1.0d, now, null));
+                    SemanticMemoryQuery.builder(vec(1, 0), 5, -1.0d, now)
+                            .conversationId("conv-1")
+                            .build());
             assertFalse("expect conversation hits", hits.isEmpty());
             assertEquals("it-a", hits.get(0).getEntry().getId());
 
             store.deleteById("it-b");
             List<MemoryMatch> afterDeleteById = store.search(
-                    new SemanticMemoryQuery(null, "conv-1", vec(0, 1), 5, -1.0d, now, null));
+                    SemanticMemoryQuery.builder(vec(0, 1), 5, -1.0d, now)
+                            .conversationId("conv-1")
+                            .build());
             for (MemoryMatch match : afterDeleteById) {
                 assertNotEquals("it-b", match.getEntry().getId());
             }
 
             store.deleteByConversation("conv-1");
             List<MemoryMatch> afterDeleteConversation = store.search(
-                    new SemanticMemoryQuery(null, "conv-1", vec(1, 0), 5, -1.0d, now, null));
+                    SemanticMemoryQuery.builder(vec(1, 0), 5, -1.0d, now)
+                            .conversationId("conv-1")
+                            .build());
             assertTrue("conversation entries should be removed", afterDeleteConversation.isEmpty());
 
             List<MemoryMatch> promptHits = store.search(
-                    new SemanticMemoryQuery(MemorySourceTypeEnum.PROMPT, null, vec(1, 0), 5, -1.0d, now, null));
+                    SemanticMemoryQuery.builder(vec(1, 0), 5, -1.0d, now)
+                            .sourceType(MemorySourceTypeEnum.PROMPT)
+                            .build());
             assertFalse("prompt entry should survive conversation delete", promptHits.isEmpty());
             assertEquals("it-c", promptHits.get(0).getEntry().getId());
 
@@ -85,8 +93,12 @@ public class MilvusSemanticMemoryStoreIntegrationTest {
 
     private static MemoryEntry entry(String id, MemorySourceTypeEnum sourceType, String sourceId,
             String conversationId, float[] vector, long now) {
-        return new MemoryEntry(id, sourceType, sourceId, conversationId, "content-" + id,
-                sha256("content-" + id), vector, now, 0L, Collections.<String, String>emptyMap());
+        return MemoryEntry.builder(id, sourceType, sourceId, "content-" + id,
+                sha256("content-" + id), vector)
+                .conversationId(conversationId)
+                .createdAtEpochMillis(now)
+                .metadata(Collections.<String, String>emptyMap())
+                .build();
     }
 
     private static float[] vec(float first, float second) {

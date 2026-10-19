@@ -1,5 +1,6 @@
 package com.clara.context;
 
+import com.clara.utils.StringUtils;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.config.ProviderConfiguration;
@@ -97,7 +98,6 @@ public final class ConvContext {
      */
     private final CancellationToken cancellationToken;
 
-
     /**
      * 创建不携带调用上下文历史的会话上下文，等价于 {@code historyCall} 为空 map；取消令牌由本类自建。
      *
@@ -141,7 +141,7 @@ public final class ConvContext {
      * @throws IllegalArgumentException convId 为 null 或空白，或 cancellationToken 为 null 时
      */
     public ConvContext(String userId, String convId, Map<String, CallContext> historyCall, ProviderConfiguration providerConfiguration, CapabilityKindEnum capabilityKind, CancellationToken cancellationToken) {
-        if (isBlank(convId)) {
+        if (StringUtils.isBlank(convId)) {
             throw new IllegalArgumentException("conversationId must not be blank");
         }
         if (cancellationToken == null) {
@@ -330,8 +330,6 @@ public final class ConvContext {
         }
     }
 
-
-
     /**
      * 为本次对话创建调用上下文并登记进会话调用历史。
      *
@@ -396,7 +394,4 @@ public final class ConvContext {
      * @param value 待判断的字符串，可为 null
      * @return 为 null、空串或全空白时返回 {@code true}
      */
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

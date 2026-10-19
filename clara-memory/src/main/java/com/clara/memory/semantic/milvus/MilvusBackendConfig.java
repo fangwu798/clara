@@ -1,5 +1,6 @@
 package com.clara.memory.semantic.milvus;
 
+import com.clara.utils.StringUtils;
 /**
  * Milvus 后端连接配置：主机、端口、可选鉴权、数据库名与超时。
  *
@@ -55,7 +56,7 @@ public final class MilvusBackendConfig {
      */
     public MilvusBackendConfig(String host, int port, String username, String password, String database,
             long connectTimeoutMillis, long idleTimeoutMillis) {
-        if (blank(host) || port <= 0 || blank(database) || connectTimeoutMillis <= 0 || idleTimeoutMillis <= 0) {
+        if (StringUtils.isBlank(host) || port <= 0 || StringUtils.isBlank(database) || connectTimeoutMillis <= 0 || idleTimeoutMillis <= 0) {
             throw new IllegalArgumentException("milvus backend config is invalid");
         }
         this.host = host;
@@ -95,7 +96,4 @@ public final class MilvusBackendConfig {
         return idleTimeoutMillis;
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

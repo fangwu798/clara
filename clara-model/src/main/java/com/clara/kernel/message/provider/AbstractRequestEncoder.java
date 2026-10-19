@@ -202,7 +202,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
         }
         if (value instanceof Thinking) {
             ThinkingEnum type = ((Thinking) value).getType();
-            return type == null ? null : type.name();
+            return type == null ? null : type.value();
         }
         return null;
     }

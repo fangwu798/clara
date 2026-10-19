@@ -5,7 +5,7 @@ import com.clara.kernel.api.config.IConfigResolver;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.exception.ClaraException;
-import com.clara.exception.ErrorCategory;
+import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.enums.ModelProviderEnum;
 
@@ -36,7 +36,7 @@ import java.util.List;
  * <p>失败语义：
  * <ul>
  *   <li>平台与能力种类没有对应 resolver 时，抛 {@code ClaraException}，错误码
- *       {@link ErrorCodes#CAPABILITY_NOT_SUPPORTED}、分类 {@link ErrorCategory#CONFIGURATION}、不可重试；</li>
+ *       {@link ErrorCodes#CAPABILITY_NOT_SUPPORTED}、分类 {@link ErrorCategoryEnum#CONFIGURATION}、不可重试；</li>
  *   <li>两个 resolver 声明了同一组合时，类初始化期抛 {@link IllegalStateException}
  *       ——属于编码错误，必须在启动前修正；</li>
  *   <li>解析过程中能力节点或必填参数不合法时，由具体 resolver 抛 {@link IllegalArgumentException}。</li>
@@ -73,7 +73,7 @@ public final class ConfigResolvers {
                 return resolver;
             }
         }
-        throw ExceptionUtils.fail(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategory.CONFIGURATION, false, provider);
+        throw ExceptionUtils.fail(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategoryEnum.CONFIGURATION, false, provider);
     }
 
     /**

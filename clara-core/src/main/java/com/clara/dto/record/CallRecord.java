@@ -3,12 +3,14 @@ package com.clara.dto.record;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.core.model.IRequest;
 import com.clara.core.model.IResponse;
+import lombok.Data;
 
 /**
  * 调用记录：一次大模型调用的留痕，是后续「对话总结 / 理解」的原始依据。
  *
  * <p>字段口径（严格四项）：请求内容、响应内容、供应商类型、调用模型类型。
  */
+@Data
 public final class CallRecord {
 
     private final IRequest request;
@@ -39,21 +41,5 @@ public final class CallRecord {
         this.response = response;
         this.provider = provider;
         this.modelType = modelType;
-    }
-
-    public IRequest request() {
-        return request;
-    }
-
-    public IResponse response() {
-        return response;
-    }
-
-    public ModelProviderEnum provider() {
-        return provider;
-    }
-
-    public String modelType() {
-        return modelType;
     }
 }
