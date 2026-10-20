@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -60,6 +61,22 @@ public class WorkflowRunnerTest {
 
         assertTrue(failure.getMessage().contains("工作流不存在：missing_flow"));
         assertTrue(failure.getMessage().contains("broken.yml"));
+    }
+
+    @Test
+    public void resumesWaitingInstanceWithGivenIdentifier() throws Exception {
+        Path directory = folder.newFolder("workflow").toPath();
+        WorkflowDefinitionRegistry registry = registry(directory);
+        write(directory, "resume_flow.yml", definition("resume_flow"));
+        RecordingEngine engine = new RecordingEngine();
+        WorkflowRunner runner = new WorkflowRunner(engine, registry);
+
+        String result = runner.resume("resume_flow", "inst-1", "{\"promptFeedback\":\"approve\"}");
+
+        assertEquals("inst-1", engine.instanceId);
+        assertEquals("approve", engine.inputs.get("promptFeedback"));
+        assertTrue(result.contains("\"instanceId\":\"inst-1\""));
+        assertTrue(result.contains("SUCCEEDED"));
     }
 
     private static WorkflowDefinitionRegistry registry(Path directory) {
@@ -134,6 +151,50 @@ public class WorkflowRunnerTest {
         public WorkflowResult cancel(String instanceId) {
             return new WorkflowResult(instanceId, WorkflowInstanceStatusEnum.CANCELLED,
                     new ExecutionScope(Collections.<String, Object>emptyMap()), 1L);
+        }
+
+        @Override
+        public WorkflowResult suspend(String instanceId) {
+            return cancel(instanceId);
+        }
+
+        @Override
+        public void close() {
+            // 无外部资源需要释放
+        }
+    }
+
+    /**
+     * 记录恢复调用的测试引擎：用于验证运行器把实例标识与人工输入原样交给引擎。
+     */
+    private static final class RecordingEngine implements IWorkflowEngine {
+
+        private String instanceId;
+        private Map<String, Object> inputs;
+
+        @Override
+        public WorkflowResult start(WorkflowDefinition definition, String instanceId, Map<String, Object> inputs) {
+            throw new AssertionError("resume must not start a new instance");
+        }
+
+        @Override
+        public WorkflowResult resume(WorkflowDefinition definition, String instanceId, Map<String, Object> inputs) {
+            this.instanceId = instanceId;
+            this.inputs = new LinkedHashMap<>(inputs);
+            return new WorkflowResult(instanceId, WorkflowInstanceStatusEnum.SUCCEEDED,
+                    new ExecutionScope(inputs), 2L);
+        }
+
+        @Override
+        public WorkflowResult resume(WorkflowDefinition definition, String instanceId, Map<String, Object> inputs,
+                long expectedCheckpointVersion) {
+            return resume(definition, instanceId, inputs);
+        }
+
+        @Override
+        public WorkflowResult cancel(String instanceId) {
+            return new WorkflowResult(instanceId, WorkflowInstanceStatusEnum.CANCELLED,
+                    new ExecutionScope(Collections.<String, Object>emptyMap()), 2L);
         }
 
         @Override

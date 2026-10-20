@@ -20,7 +20,8 @@ import java.util.function.Consumer;
  * <p>指令一览：{@code exit}/{@code quit}/{@code /exit} 结束会话；{@code /log}（或 {@code /verbose}）
  * 切换精简/全量日志；{@code /color} 开关颜色；{@code /model} 重新选择模型；{@code /compress}（或
  * {@code /compact}）压缩当前上下文；{@code /new} 开始新对话；{@code /usage}（或 {@code /tokens}）
- * 统计 token 用量；{@code /?}（或 {@code /help}）打印命令提示。其余输入一律视为对话内容。
+ * 统计 token 用量；{@code /init} 重新初始化（重新检测模型可用性并重建装配，保留当前会话）；
+ * {@code /?}（或 {@code /help}）打印命令提示。其余输入一律视为对话内容。
  */
 public final class SessionCommandHandler {
 
@@ -37,6 +38,7 @@ public final class SessionCommandHandler {
     private static final String USAGE_ALIAS = "/tokens";
     private static final String GRAPH_COMMAND = "/graph";
     private static final String GRAPH_IMPORT_COMMAND = "/graph import";
+    private static final String INIT_COMMAND = "/init";
 
     private final ConsoleView view;
     private final BufferedReader reader;
@@ -73,6 +75,9 @@ public final class SessionCommandHandler {
         if (isExitCommand(input)) {
             view.println("bye.");
             return SessionCommandOutcomeEnum.EXIT;
+        }
+        if (INIT_COMMAND.equals(input)) {
+            return SessionCommandOutcomeEnum.REINIT;
         }
         Runnable command = commands.get(input);
         if (command == null) {
@@ -154,6 +159,7 @@ public final class SessionCommandHandler {
         view.println("内置命令（一行一个）：");
         view.println("  /?            显示本命令提示（别名 /help）");
         view.println("  /model        重新选择模型");
+        view.println("  /init         重新初始化：重新检测模型可用性并重建配置 / 技能 / MCP 连接（保留当前会话）");
         view.println("  /compress     压缩当前上下文：把历史归纳为摘要（别名 /compact）");
         view.println("  /new          开始新对话：上下文清空，旧历史保留在磁盘");
         view.println("  /usage        统计 token 用量：全部历史记录估算 + 本次进程累计调用（别名 /tokens）");

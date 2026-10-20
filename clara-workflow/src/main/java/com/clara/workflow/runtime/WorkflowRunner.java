@@ -4,6 +4,7 @@ import com.clara.core.workflow.IWorkflowEngine;
 import com.clara.dto.workflow.ExecutionScope;
 import com.clara.dto.workflow.WorkflowDefinition;
 import com.clara.dto.workflow.WorkflowResult;
+import com.clara.enums.workflow.WorkflowInstanceStatusEnum;
 import com.clara.workflow.definition.WorkflowDefinitionRegistry;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -72,6 +73,43 @@ public final class WorkflowRunner {
             inputs.put(FIELD_INSTANCE_ID, instanceId);
         }
         WorkflowResult result = engine.start(definition, instanceId, inputs);
+        return payload(workflowId, instanceId, result);
+    }
+
+    /**
+     * 恢复一个正在等待人工输入的工作流实例，并返回结果 JSON 文本。
+     *
+     * <p>使用场景：{@code run} 返回 {@code WAITING_INPUT} 后，把提示词展示给用户；用户批准或提出修改意见，
+     * 再调用本方法并传入同一实例 id 与对应输入键的值（如 {@code promptFeedback=approve}）。
+     *
+     * @param workflowId 工作流标识，不可为空白
+     * @param instanceId 首次运行返回的实例标识，不可为空白
+     * @param inputsJson 人工输入 JSON 对象文本，可为 null / 空白（视为空）
+     * @return 结果 JSON 文本，非 null
+     * @throws IllegalArgumentException 标识不存在、实例标识为空或输入非法时
+     */
+    public String resume(String workflowId, String instanceId, String inputsJson) {
+        if (instanceId == null || instanceId.trim().isEmpty()) {
+            throw new IllegalArgumentException("instanceId must not be blank");
+        }
+        registry.refresh();
+        WorkflowDefinition definition = require(workflowId);
+        LinkedHashMap<String, Object> inputs = parseInputs(inputsJson);
+        // 实例标识由首次运行确定，恢复时不允许被输入覆盖。
+        inputs.remove(FIELD_INSTANCE_ID);
+        WorkflowResult result = engine.resume(definition, instanceId.trim(), inputs);
+        return payload(workflowId, instanceId.trim(), result);
+    }
+
+    /**
+     * 把执行结果整理为对模型友好的 JSON：状态、等待信息与声明的输出变量。
+     *
+     * @param workflowId 工作流标识，非空白
+     * @param instanceId 实例标识，非空白
+     * @param result     引擎结果，非 null
+     * @return 结果 JSON 文本，非 null
+     */
+    private String payload(String workflowId, String instanceId, WorkflowResult result) {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("workflowId", workflowId);
@@ -93,11 +131,33 @@ public final class WorkflowRunner {
             }
         }
         payload.put("outputs", outputs);
+        boolean waitingForUser = result.getStatus() == WorkflowInstanceStatusEnum.WAITING_INPUT;
+        payload.put("waitingForUser", waitingForUser);
+        if (waitingForUser) {
+            payload.put("display", waitingDisplay(outputs));
+        }
         try {
             return JSON.writeValueAsString(payload);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("工作流结果序列化失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 生成暂停时的用户可见文案：列出已产出的对外变量，并提示确认或修改。
+     *
+     * @param outputs 已声明输出，非 null
+     * @return 展示文本，非 null
+     */
+    private static String waitingDisplay(Map<String, Object> outputs) {
+        StringBuilder text = new StringBuilder("工作流已暂停，等待人工确认。");
+        if (!outputs.isEmpty()) {
+            text.append('\n');
+            for (Map.Entry<String, Object> entry : outputs.entrySet()) {
+                text.append(entry.getKey()).append("：").append(entry.getValue()).append('\n');
+            }
+        }
+        return text.append("请回复“确认”继续，或直接提出修改意见。").toString();
     }
 
     /**

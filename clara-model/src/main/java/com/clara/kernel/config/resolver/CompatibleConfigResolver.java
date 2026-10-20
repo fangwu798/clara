@@ -14,7 +14,7 @@ import java.util.EnumSet;
 import java.util.Set;
 
 /**
- * OpenAI 兼容协议家族的配置解析器，覆盖对话与图片生成两种能力种类。
+ * OpenAI 兼容协议家族的配置解析器，覆盖对话、图片与视频生成能力。
  *
  * <p>用途与位置：配置层组件（{@code com.clara.kernel.config.resolver}），负责 OPENAI / DEEPSEEK /
  * VOLCENGINE / ALIBABA / KIMI 五家在
@@ -39,7 +39,7 @@ public final class CompatibleConfigResolver implements IConfigResolver {
      * 本解析器覆盖的能力种类，非 null。
      */
     private static final Set<CapabilityKindEnum> KIND = Collections.unmodifiableSet(
-            EnumSet.of(CapabilityKindEnum.CHAT, CapabilityKindEnum.IMAGE));
+            EnumSet.of(CapabilityKindEnum.CHAT, CapabilityKindEnum.IMAGE, CapabilityKindEnum.VIDEO));
 
     /**
      * 判断平台是否属于兼容协议家族，且能力种类为对话或图片生成。
@@ -57,7 +57,7 @@ public final class CompatibleConfigResolver implements IConfigResolver {
      * 按能力种类构造 OpenAI 兼容配置。
      *
      * @param provider       已加载的平台配置，不可为 null，其平台必须是兼容协议家族成员
-     * @param kind           能力种类，必须是 {@link CapabilityKindEnum#CHAT} 或 {@link CapabilityKindEnum#IMAGE}
+     * @param kind           能力种类，必须是兼容家族覆盖的种类（对话 / 图片 / 视频）
      * @return OpenAI 兼容配置，非 null
      * @throws IllegalArgumentException 能力未配置或必填参数缺失、类型不符时
      */

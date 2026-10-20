@@ -177,8 +177,16 @@ public final class DefaultConversationOrchestrator {
             if (plan.maxToolRoundTrips > 0 && toolRoundTrips >= plan.maxToolRoundTrips) {
                 throw OrchestrationErrors.toolRoundTripLimitExceeded(plan.maxToolRoundTrips);
             }
-            state.windowMemory.append(toolRoundTripCoordinator.perform(response));
+            List<IContent> toolMessages = toolRoundTripCoordinator.perform(response);
+            state.windowMemory.append(toolMessages);
             toolRoundTrips++;
+            String userInputRequest = toolRoundTripCoordinator.userInputRequest(toolMessages);
+            if (userInputRequest != null) {
+                state.windowMemory.append(Collections.singletonList(new AssistantContent(userInputRequest)));
+                return conversationResult(plan.request.getConversationId(), userInputRequest,
+                        OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
+                        state.reasoning.toString(), true);
+            }
         }
     }
 
@@ -233,9 +241,11 @@ public final class DefaultConversationOrchestrator {
         if (content != null && !content.trim().isEmpty()) {
             state.windowMemory.append(Collections.singletonList(new AssistantContent(content)));
         }
-        return conversationResult(plan.request.getConversationId(), content,
+        ConversationResult result = conversationResult(plan.request.getConversationId(), content,
                 OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
                 state.reasoning.toString());
+        result.setGeneratedImages(response.getGeneratedImages());
+        return result;
     }
 
     private static ConversationResult failureResult(ConversationPlan plan, ConversationState state,
@@ -410,6 +420,17 @@ public final class DefaultConversationOrchestrator {
     private static ConversationResult conversationResult(String conversationId, String content,
             OrchestrationStatusEnum status, int toolRoundTrips, TokenUsage usage, ClaraError error,
             String reasoning) {
+        return conversationResult(conversationId, content, status, toolRoundTrips, usage, error, reasoning, false);
+    }
+
+    /**
+     * 构造对话结果，并标记是否因等待人工输入而暂停。
+     *
+     * <p>暂停时 content 是工作流返回的确认文案；模型本轮没有产生最终正文，宿主需自行展示该文案。
+     */
+    private static ConversationResult conversationResult(String conversationId, String content,
+            OrchestrationStatusEnum status, int toolRoundTrips, TokenUsage usage, ClaraError error,
+            String reasoning, boolean pausedForUserInput) {
         return ConversationResult.builder()
                 .conversationId(conversationId)
                 .content(content)
@@ -418,6 +439,7 @@ public final class DefaultConversationOrchestrator {
                 .usage(usage)
                 .error(error)
                 .reasoning(reasoning)
+                .pausedForUserInput(pausedForUserInput)
                 .build();
     }
 

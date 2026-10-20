@@ -2,8 +2,8 @@
   "id": "run_workflow",
   "name": "run_workflow",
   "type": "BUILTIN",
-  "description": "运行一个已配置的工作流：workflow 填工作流标识，inputs 填该流程的入参对象（标识后的括号里写了描述与必填入参）。本描述的末尾会列出当前可用工作流，包含 config/workflow/custom 下由模型生成的自定义流程——它们写入即生效，无需重启。需要新增或改造流程时，先用 publish_workflow 发布，再用本工具运行。image_generation 与 video_generation 会先优化提示词并等待用户确认再生成，用户批准或提出修改意见后继续；video_generation 可选 inputs.reference（公开图片 URL 或 data URL）。",
-  "parameters": "{\"type\":\"object\",\"properties\":{\"workflow\":{\"type\":\"string\"},\"inputs\":{\"type\":\"object\"}},\"required\":[\"workflow\"]}",
+  "description": "运行一个已配置的工作流：workflow 填工作流标识，inputs 填该流程的入参对象（标识后的括号里写了描述与必填入参）。本描述的末尾会列出当前可用工作流，包含 config/workflow/custom 下由模型生成的自定义流程——它们写入即生效，无需重启。需要新增或改造流程时，先用 publish_workflow 发布，再用本工具运行。当结果 status=WAITING_INPUT 时，先把 outputs 中的提示词（如 prompt）展示给用户并请其确认，绝不代替用户确认；用户批准或提出修改意见后，用同一 workflow 和结果里的 instanceId 再次调用本工具，在 inputs 中填写 waitingInputKey 对应的值（批准填 approve，修改则填意见原文）；第二轮等待键通常是 promptFeedbackAgain。video_generation 会先优化提示词并等待人工确认，只有明确批准后才会调用视频生成；生成完成后视频下载到 .clara/media/videos，outputs.video.localFiles 是本地路径；outputs.video.usage 是平台返回的 token 用量（如 completion_tokens / total_tokens），请在结果中一并告知用户。video_generation 的 inputs：subject 必填，reference 可选（公开图片 URL 或 data URL）。",
+  "parameters": "{\"type\":\"object\",\"properties\":{\"workflow\":{\"type\":\"string\"},\"instanceId\":{\"type\":\"string\",\"description\":\"续接等待人工输入的工作流实例；首次运行不要传\"},\"inputs\":{\"type\":\"object\"}},\"required\":[\"workflow\"]}",
   "script": "run_workflow",
   "metadata": { "domain": "workflow", "tags": "workflow,builtin" }
 }

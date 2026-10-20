@@ -16,6 +16,22 @@ import java.util.Set;
  */
 public final class ExecutionScope {
 
+    /**
+     * 作用域控制键：已有 HUMAN 节点收到用户输入。
+     *
+     * <p>视频生成等高价能力据此要求「先人工确认再调用」；值为 human 节点 id。
+     */
+    public static final String CONTROL_HUMAN_CONFIRMED = "human:confirmed";
+
+    /**
+     * 作用域控制键：已有 HUMAN 节点收到明确的批准输入。
+     *
+     * <p>与 {@link #CONTROL_HUMAN_CONFIRMED} 的区别：后者只表示「用户回复过」，本键只在回复为
+     * {@code approve / approved / yes / true / ok / 确认 / 同意} 时写入。视频生成这类高价能力要求本键存在，
+     * 避免「用户只提了修改意见」也被当成批准。
+     */
+    public static final String CONTROL_HUMAN_APPROVED = "human:approved";
+
     private static final int SCHEMA_VERSION = 1;
 
     private final Map<String, Object> variables;

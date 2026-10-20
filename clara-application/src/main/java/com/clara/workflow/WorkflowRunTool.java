@@ -14,7 +14,8 @@ import java.io.IOException;
  * {@link IBuiltinTool} 的实现，运行类型为 BUILTIN。宿主把它注册进内置工具执行器，模型在工具往返中即可
  * 按名调用工作流（如读取本地目录代码并整理技术文档）。
  *
- * <p>入参 JSON：{@code workflow}（必填，工作流标识）、{@code inputs}（可选对象，传给工作流的输入变量）。
+ * <p>入参 JSON：{@code workflow}（必填，工作流标识）、{@code instanceId}（可选，续接等待人工输入的实例）、
+ * {@code inputs}（可选对象，传给工作流的输入变量或人工输入值）。
  * 失败语义：缺少 {@code workflow} 或入参非法抛 {@link IllegalArgumentException}；工作流执行失败按运行器约定
  * 向上抛。
  */
@@ -52,6 +53,11 @@ public final class WorkflowRunTool implements IBuiltinTool {
         }
         JsonNode inputsNode = root.get("inputs");
         String inputsJson = inputsNode == null || inputsNode.isNull() ? null : inputsNode.toString();
+        JsonNode instanceNode = root.get("instanceId");
+        String instanceId = instanceNode != null && instanceNode.isTextual() ? instanceNode.textValue() : null;
+        if (instanceId != null && !instanceId.trim().isEmpty()) {
+            return runner.resume(workflow.trim(), instanceId.trim(), inputsJson);
+        }
         return runner.run(workflow.trim(), inputsJson);
     }
 

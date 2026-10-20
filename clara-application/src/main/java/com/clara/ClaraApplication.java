@@ -57,8 +57,9 @@ import java.util.List;
  *
  * <p>使用方法：主（默认）模型由 {@code config/clara.yml} 的 {@code defaultModel} 指定；未配置或未匹配到时，
  * 若存在多个模型配置会列出编号供选择，也可用首个命令行参数直接指定配置文件。进入对话后逐行输入回车发送，
- * {@code /model} 重新选择模型，{@code /graph} 查看代码知识图谱状态、{@code /graph import} 把当前工作目录
- * 导入图谱，{@code /log} 切换日志模式，{@code /color} 开关颜色，{@code exit} / {@code quit} 结束；
+ * {@code /model} 重新选择模型，{@code /init} 重新检测模型可用性并重建配置 / 技能 / MCP 连接（保留当前会话），
+ * {@code /graph} 查看代码知识图谱状态、{@code /graph import} 把当前工作目录导入图谱，
+ * {@code /log} 切换日志模式，{@code /color} 开关颜色，{@code exit} / {@code quit} 结束；
  * 一轮执行过程中按 ESC 两次可取消本轮正在进行的模型调用与工具执行（首次 ESC 仅提示，避开误触）。
  *
  * <p>会话标识由工作目录推导，对话历史落盘在工作目录下的 {@code .clara/state/conversations}，因此<b>退出后
@@ -105,7 +106,7 @@ public final class ClaraApplication {
         try (ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(), options.forcedColor()); CancelKeyMonitor monitor = CancelKeyMonitor.create(view)) {
             List<Path> candidates = new ModelAvailabilityManager().checkAndPersist(ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(), line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
             ModelChoice choice = selectModelConfig(view, reader, options, candidates);
-            runSession(view, reader, candidates, choice, monitor);
+            runSession(view, reader, options, candidates, choice, monitor);
         }
     }
 
@@ -114,31 +115,52 @@ public final class ClaraApplication {
      *
      * @param view       控制台视图，非 null
      * @param reader     标准输入读取器，非 null
+     * @param options    启动参数（{@code /init} 重新选择模型时沿用命令行指定），非 null
      * @param candidates 候选模型配置，非 null
      * @param choice     选中的模型配置与来源，非 null
      * @param monitor    ESC 取消监听器，非 null
      * @throws IOException 读取标准输入失败时
      */
-    private static void runSession(ConsoleView view, BufferedReader reader, List<Path> candidates, ModelChoice choice, CancelKeyMonitor monitor) throws IOException {
-        // 控制台观测：每轮把图谱补充与向量召回的命中情况打在控制台（同时落详细日志）。
-        try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(new ConsoleContextTrace(view))) {
-            ModelRegistry registry = bootstrap.modelRegistry();
-            registry.select(choice.configPath());
-            SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry, candidates, contextControls(view, bootstrap, registry));
+    private static void runSession(ConsoleView view, BufferedReader reader, LaunchOptions options,
+            List<Path> candidates, ModelChoice choice, CancelKeyMonitor monitor) throws IOException {
+        List<Path> sessionCandidates = candidates;
+        ModelChoice sessionChoice = choice;
+        while (true) {
+            // 控制台观测：每轮把图谱补充与向量召回的命中情况打在控制台（同时落详细日志）。
+            try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(new ConsoleContextTrace(view))) {
+                ModelRegistry registry = bootstrap.modelRegistry();
+                registry.select(sessionChoice.configPath());
+                SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry,
+                        sessionCandidates, contextControls(view, bootstrap, registry));
 
-            view.printBanner(bootstrap, registry.currentConfiguration(), choice.configPath(), choice.source());
-            printMcpStatus(view, bootstrap);
-            prepareCodeGraph(view, bootstrap);
-            view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
-            view.printHints(WorkflowCatalog.customSummaries());
-            if (monitor.isAvailable()) {
-                view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
+                view.printBanner(bootstrap, registry.currentConfiguration(),
+                        sessionChoice.configPath(), sessionChoice.source());
+                printMcpStatus(view, bootstrap);
+                prepareCodeGraph(view, bootstrap);
+                view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
+                view.printHints(WorkflowCatalog.customSummaries());
+                if (monitor.isAvailable()) {
+                    view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
+                }
+                if (loop(view, reader, bootstrap, registry, sessionCandidates, commands, monitor)
+                        != SessionCommandOutcomeEnum.REINIT) {
+                    return;
+                }
+            } catch (RuntimeException startupFailure) {
+                view.println("启动失败：" + startupFailure.getClass().getSimpleName() + ": " + startupFailure.getMessage());
+                view.println("请确认：1) 所选模型配置存在且合法（当前 " + sessionChoice.configPath().toAbsolutePath() + "）；"
+                        + "2) 其 credential 声明的环境变量已设置。");
+                System.exit(1);
+                return;
             }
-            loop(view, reader, bootstrap, registry, candidates, commands, monitor);
-        } catch (RuntimeException startupFailure) {
-            view.println("启动失败：" + startupFailure.getClass().getSimpleName() + ": " + startupFailure.getMessage());
-            view.println("请确认：1) 所选模型配置存在且合法（当前 " + choice.configPath().toAbsolutePath() + "）；" + "2) 其 credential 声明的环境变量已设置。");
-            System.exit(1);
+            view.emit("", ConsoleView.ANSI_GRAY);
+            view.emit("正在重新初始化：重新检测模型可用性，并重建配置 / 技能 / MCP / 图谱连接...",
+                    ConsoleView.ANSI_GRAY);
+            sessionCandidates = new ModelAvailabilityManager().checkAndPersist(
+                    ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(),
+                    line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
+            sessionChoice = reselectModel(view, reader, options, sessionCandidates, sessionChoice);
+            view.emit("", ConsoleView.ANSI_GRAY);
         }
     }
 
@@ -289,6 +311,7 @@ public final class ClaraApplication {
             public void newConversation() {
                 conversationId = newConversationId();
                 usageTrend.reset();
+                bootstrap.capabilityUsage().reset();
                 view.emit("已开始新对话，会话标识：" + conversationId, ConsoleView.ANSI_GRAY);
             }
 
@@ -313,6 +336,8 @@ public final class ClaraApplication {
                     view.println(report);
                     view.println("");
                     view.println(usageTrend.render());
+                    view.println("");
+                    view.println(bootstrap.capabilityUsage().report());
                 } catch (RuntimeException failure) {
                     view.emit("[error] 统计用量失败：" + failure.getMessage(), ConsoleView.ANSI_RED);
                 }
@@ -351,9 +376,13 @@ public final class ClaraApplication {
      * @param registry  模型注册表（提供当前生效的平台配置），非 null
      * @param commands  会话内指令处理器，非 null
      * @param monitor   ESC 取消监听器，非 null
+     * @return {@link SessionCommandOutcomeEnum#REINIT} 表示需要重建装配会话；其余情况返回
+     *         {@link SessionCommandOutcomeEnum#EXIT}
      * @throws IOException 读取标准输入失败时
      */
-    private static void loop(ConsoleView view, BufferedReader reader, ApplicationBootstrap bootstrap, ModelRegistry registry, List<Path> candidates, SessionCommandHandler commands, CancelKeyMonitor monitor) throws IOException {
+    private static SessionCommandOutcomeEnum loop(ConsoleView view, BufferedReader reader,
+            ApplicationBootstrap bootstrap, ModelRegistry registry, List<Path> candidates,
+            SessionCommandHandler commands, CancelKeyMonitor monitor) throws IOException {
         String line;
         while ((line = reader.readLine()) != null) {
             String input = line.trim();
@@ -361,14 +390,15 @@ public final class ClaraApplication {
                 continue;
             }
             SessionCommandOutcomeEnum outcome = commands.handle(input);
-            if (outcome == SessionCommandOutcomeEnum.EXIT) {
-                return;
+            if (outcome == SessionCommandOutcomeEnum.EXIT || outcome == SessionCommandOutcomeEnum.REINIT) {
+                return outcome;
             }
             if (outcome == SessionCommandOutcomeEnum.INPUT) {
                 view.logUserInput(input);
                 converse(view, bootstrap, registry, candidates, input, monitor);
             }
         }
+        return SessionCommandOutcomeEnum.EXIT;
     }
 
     /**
@@ -405,6 +435,58 @@ public final class ClaraApplication {
             return new ModelChoice(Paths.get(""), "无可用模型配置");
         }
         return new ModelChoice(view.chooseModel(candidates, reader), "交互选择");
+    }
+
+    /**
+     * 重新初始化时重新选择模型：命令行指定优先；否则沿用仍可用的当前模型；再退回 clara.yml 主模型；
+     * 最后才交互选择。
+     *
+     * <p>与首次启动不同：重新检测后若没有任何可用模型，不会退出进程，而是继续使用当前配置，
+     * 便于用户修好凭据后再次执行 {@code /init}。
+     *
+     * @param view       控制台视图，非 null
+     * @param reader     标准输入读取器，非 null
+     * @param options    启动参数，非 null
+     * @param candidates 重新检测后的可用模型配置，非 null
+     * @param previous   重新初始化前使用的模型与来源，非 null
+     * @return 重新初始化后使用的模型与来源，非 null
+     */
+    private static ModelChoice reselectModel(ConsoleView view, BufferedReader reader, LaunchOptions options,
+            List<Path> candidates, ModelChoice previous) {
+        if (options.configFile() != null) {
+            return new ModelChoice(ConfigLocator.locateFile(Paths.get(options.configFile())), "命令行参数");
+        }
+        if (containsPath(candidates, previous.configPath())) {
+            return new ModelChoice(previous.configPath(), "重新初始化（沿用当前模型）");
+        }
+        String defaultModel = ConfigLocator.defaultModel();
+        Path preferred = defaultModel == null ? null : ConfigLocator.resolveModel(candidates, defaultModel);
+        if (preferred != null) {
+            return new ModelChoice(preferred, "config/clara.yml 指定的主模型（" + defaultModel + "）");
+        }
+        if (candidates.isEmpty()) {
+            view.emit("  [init] 未检测到可用模型，继续使用当前配置："
+                    + previous.configPath().getFileName(), ConsoleView.ANSI_YELLOW);
+            return previous;
+        }
+        return new ModelChoice(view.chooseModel(candidates, reader), "交互选择");
+    }
+
+    /**
+     * 判断候选配置中是否包含指定路径（按绝对路径归一化比较）。
+     *
+     * @param candidates 候选配置，非 null
+     * @param target     目标路径，非 null
+     * @return 包含时返回 true
+     */
+    private static boolean containsPath(List<Path> candidates, Path target) {
+        Path expected = target.toAbsolutePath().normalize();
+        for (Path candidate : candidates) {
+            if (candidate.toAbsolutePath().normalize().equals(expected)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -535,6 +617,13 @@ public final class ClaraApplication {
                     .build());
             // 思考与正文已实时流式展示，这里只把完整记录写进详细日志文件（控制台不重复打印）。
             view.logTurn(result);
+            // 工作流停在人工确认节点时，本轮没有模型的最终正文：流式输出的是节点中间结果，
+            // 确认文案只存在于结果里，需要在这里补打，否则用户看不到「请回复确认继续」的提示。
+            if (result.isPausedForUserInput() && result.getContent() != null
+                    && !result.getContent().trim().isEmpty()) {
+                observer.endStream();
+                view.emit(result.getContent(), ConsoleView.ANSI_GREEN);
+            }
             // 记录本轮用量，形成 /usage 的累计趋势。
             recordUsageTrend(result.getUsage());
             // 回复段结束后空一行，避免状态行紧贴助手回复。

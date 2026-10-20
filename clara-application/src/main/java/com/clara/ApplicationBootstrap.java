@@ -88,6 +88,8 @@ import com.clara.skill.tool.ScriptExecutorRegistry;
 import com.clara.skill.tool.builtin.BuiltinToolExecutor;
 import com.clara.tool.CompositeToolCatalog;
 import com.clara.tool.CompositeToolInvoker;
+import com.clara.media.VideoDownloader;
+import com.clara.usage.CapabilityUsageLedger;
 import com.clara.tool.McpToolCatalog;
 import com.clara.tool.ToolInvocationPurpose;
 import com.clara.workflow.AgentActionFactory;
@@ -241,6 +243,8 @@ public final class ApplicationBootstrap implements Closeable {
     private final WindowCompressionCoordinator windowCompression;
     private final CodeGraphSettings codeGraphSettings;
     private final InMemoryCallRecordSink callRecordSink;
+    /** 图片 / 视频 / 图谱的独立用量台账，由工作流动作写入、{@code /usage} 读取。 */
+    private final CapabilityUsageLedger capabilityUsage = new CapabilityUsageLedger();
 
     /**
      * 使用默认配置装配：离线哈希嵌入（{@link HashingEmbeddingClient}）、工作目录下的本地对话历史存储、
@@ -344,7 +348,8 @@ public final class ApplicationBootstrap implements Closeable {
         // 脚本执行器注册表默认含 Python / JavaScript / Shell，稍后追加内置执行器（工具名 run_workflow）
         ScriptExecutorRegistry scriptExecutors = new ScriptExecutorRegistry();
         IToolInvoker localToolInvoker = new DefaultToolInvoker(new DefaultToolExecutor(skillRegistry, scriptExecutors, new SkillSchemaValidator(), new SkillPermissionAuthorizer(), 30_000L));
-        IToolInvoker toolInvoker = new CompositeToolInvoker(skillRegistry, localToolInvoker, mcpGateway, externalToolCatalog);
+        IToolInvoker toolInvoker = new CompositeToolInvoker(skillRegistry, localToolInvoker, mcpGateway,
+                externalToolCatalog, capabilityUsage);
         // 意图识别与动态执行计划：复杂任务先生成计划，并交给内置工具 validate_execution_plan 校验；
         // 简单任务不生成计划，仍由主链路直接回答。开关见 config/clara.yml 的 intentPlanning 节点。
         IntentPlanSettings intentPlanSettings = IntentPlanSettings.load(ConfigLocator.claraConfigFile());
@@ -407,7 +412,8 @@ public final class ApplicationBootstrap implements Closeable {
         // 工作流配置化装配：模型绑定注册表 + 动作工厂 → 定义目录加载 → 定义注册表 → 运行器 → 内置工具
         this.modelRegistry = new ModelRegistry(ConfigLocator.modelConfigs(), ConfigLocator.roleBindings());
         List<IWorkflowActionFactory> actionFactories = Arrays.asList(
-                new AgentActionFactory(orchestrator, promptProvider, modelRegistry),
+                new AgentActionFactory(orchestrator, promptProvider, modelRegistry, new VideoDownloader(),
+                        capabilityUsage),
                 new ReviewActionFactory(orchestrator, promptProvider, modelRegistry),
                 new ToolActionFactory(toolInvoker));
         this.workflowDefinitionRegistry = new WorkflowDefinitionRegistry(DEFAULT_WORKFLOW_DIRECTORY, new WorkflowDefinitionLoader(actionFactories));
@@ -534,6 +540,15 @@ public final class ApplicationBootstrap implements Closeable {
      */
     public InMemoryCallRecordSink callRecordSink() {
         return callRecordSink;
+    }
+
+    /**
+     * 图片 / 视频 / 图谱的独立用量台账（{@code /usage} 与工作流节点共用同一实例）。
+     *
+     * @return 非 null
+     */
+    public CapabilityUsageLedger capabilityUsage() {
+        return capabilityUsage;
     }
 
     /**

@@ -361,6 +361,7 @@ public final class ConsoleView implements Closeable {
     public void printHints(List<String> customWorkflows) {
         println("常用命令（/? 查看全部）：");
         println(hint("/model", "切换模型"));
+        println(hint("/init", "重新初始化（重新检测模型与配置）"));
         println(hint("/compress", "压缩当前上下文"));
         println(hint("/new", "开始新对话"));
         println(hint("/usage", "统计 token 用量"));

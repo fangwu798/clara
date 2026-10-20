@@ -269,9 +269,33 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         Map<String, Object> output = new LinkedHashMap<>();
         output.put(node.getInputKey(), run.scope.get(node.getInputKey()));
         run.scope.complete(key, node.getId(), output);
+        // 记录「本实例已收到人工输入」：视频等高价能力在动作层据此拒绝未经确认的调用。
+        run.scope.control(ExecutionScope.CONTROL_HUMAN_CONFIRMED, node.getId());
+        if (isApproval(run.scope.get(node.getInputKey()))) {
+            run.scope.control(ExecutionScope.CONTROL_HUMAN_APPROVED, node.getId());
+        }
         if (persist) {
             run.checkpoint(WorkflowInstanceStatusEnum.RUNNING);
         }
+    }
+
+    /**
+     * 判断人工输入是否为明确批准；批准值大小写不敏感，兼容中英文常见写法。
+     *
+     * @param value 人工输入值，可为 null
+     * @return 明确批准时返回 true
+     */
+    private static boolean isApproval(Object value) {
+        if (value instanceof Boolean) {
+            return ((Boolean) value).booleanValue();
+        }
+        if (value == null) {
+            return false;
+        }
+        String text = String.valueOf(value).trim();
+        return "approve".equalsIgnoreCase(text) || "approved".equalsIgnoreCase(text)
+                || "yes".equalsIgnoreCase(text) || "true".equalsIgnoreCase(text)
+                || "ok".equalsIgnoreCase(text) || "确认".equals(text) || "同意".equals(text);
     }
 
     private static void requireDefinition(WorkflowDefinition value) {

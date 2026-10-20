@@ -1,7 +1,17 @@
 workflowId: video_generation
-description: 文生视频：优化提示词并在用户确认后生成视频，可附参考图片
-version: "1.1.0"
+description: 文生视频（必填 subject，可选 reference）：先生成提示词并等待人工确认，只有明确批准后才调用视频生成；产物下载到 .clara/media/videos
+version: "1.2.1"
 outputs: [prompt, video]
+inputSchema:
+  type: object
+  required: [subject]
+  properties:
+    subject:
+      type: string
+      description: 视频主题与画面内容（必填）
+    reference:
+      type: string
+      description: 可选参考图（公开图片 URL 或 data URL），用于图生视频
 root:
   id: root
   type: SEQUENCE
@@ -26,12 +36,13 @@ root:
         id: generate
         type: AGENT
         outputKeys: [video]
+        model: volcengine-response
         capability: VIDEO
         prompt: video_render
         promptVars:
           prompt: "${prompt}"
         attachments:
-          - "${reference}"
+          - "${reference?}"
       whenFalse:
         id: revise_and_review
         type: SEQUENCE
@@ -47,12 +58,20 @@ root:
           - id: review_prompt_again
             type: HUMAN
             inputKey: promptFeedbackAgain
-          - id: generate_after_feedback
-            type: AGENT
-            outputKeys: [video]
-            capability: VIDEO
-            prompt: video_render
-            promptVars:
-              prompt: "${prompt}"
-            attachments:
-              - "${reference}"
+          - id: confirm_again
+            type: CONDITION
+            condition:
+              key: promptFeedbackAgain
+              operator: equals
+              value: approve
+            whenTrue:
+              id: generate_after_feedback
+              type: AGENT
+              outputKeys: [video]
+              model: volcengine-response
+              capability: VIDEO
+              prompt: video_render
+              promptVars:
+                prompt: "${prompt}"
+              attachments:
+                - "${reference?}"

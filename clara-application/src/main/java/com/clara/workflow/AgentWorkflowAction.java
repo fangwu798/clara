@@ -3,14 +3,18 @@ package com.clara.workflow;
 import com.clara.utils.StringUtils;
 import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
+import com.clara.core.media.VideoGenerationRequest;
+import com.clara.core.media.VideoGenerationResult;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.dto.workflow.ExecutionScope;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.core.model.IStreamObserver;
+import com.clara.model.video.VideoGeneratorFactory;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
+import com.clara.usage.CapabilityUsageLedger;
 import com.clara.workflow.runtime.AgentNodeOptions;
 import com.clara.workflow.runtime.WorkflowProgress;
 import com.clara.workflow.runtime.WorkflowVariableResolver;
@@ -18,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,8 +39,8 @@ import java.util.Collections;
  * <p>执行流程：按节点选项（角色 / 模型别名）经 {@link AgentActionContext#modelRegistry()} 取到平台配置（未绑定
  * 则失败）→ 组装提示词与变量为 userInput（声明了 {@code attachments} 时以「文本 + 图片」多模态消息下发，
  * 用于图片识别）→ 经 {@link AgentActionContext#orchestrator()} 以节点声明的能力调用模型 → 按能力整理输出：
- * 文本能力把回复解析为 JSON 对象（失败则用原文），图片和视频能力保留模型返回的产物引用；返回
- * {@code {"output": <值>}} 供节点落位。
+ * 文本能力把回复解析为 JSON 对象（失败则用原文），图片和视频能力保留模型返回的产物引用；视频还会下载到
+ * 本地并追加 {@code localFiles}；返回 {@code {"output": <值>}} 供节点落位。
  *
  * <p>失败语义：模型未绑定抛 {@link IllegalStateException}；节点声明的能力在该平台未配置时由
  * {@code ProviderConfiguration#getCapability} 抛配置异常；模型调用异常直接向上抛，由引擎把节点标记为失败。
@@ -119,6 +124,12 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         }
         ProviderConfiguration configuration = context.modelRegistry().resolve(options.role(), options.modelAlias());
         CapabilityKindEnum capability = options.capability();
+        // 高成本能力保护：视频生成必须发生在 HUMAN 节点之后，且该节点收到的是明确批准，
+        // 避免自定义工作流或后续改动绕过「先确认参数再生成」。
+        if (capability == CapabilityKindEnum.VIDEO
+                && StringUtils.isBlank(scope.control(ExecutionScope.CONTROL_HUMAN_APPROVED))) {
+            throw new IllegalStateException("视频生成必须先经工作流人工确认并批准（节点 " + nodeId + "）");
+        }
         // 节点声明的能力在该平台未配置时立即失败（配置问题，不静默降级）
         configuration.getCapability(capability);
         String model = configuration.toConfig(capability).getModelId();
@@ -132,6 +143,9 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         String preview = inputPreview(resolved);
         if (!preview.isEmpty()) {
             progressDetail("提示词：" + preview);
+        }
+        if (capability == CapabilityKindEnum.VIDEO) {
+            return executeVideo(configuration, userInput, attachments(scope));
         }
         // 文本类节点复用当轮对话的流式观察者，实时显示思考 / 正文；图片 / 视频接口本身不产生思考、也不支持
         // 流式，故只保留前后进度行。
@@ -157,8 +171,55 @@ public final class AgentWorkflowAction implements IWorkflowAction {
                     + result.getStatus() + (result.getError() == null
                     ? "" : "，错误 " + result.getError().getSafeMessage()) + "）");
         }
-        progress("节点 " + nodeId + "：完成");
         Object output = output(capability, result.getContent());
+        if (capability == CapabilityKindEnum.IMAGE) {
+            context.usageLedger().recordImage(result.getUsage(), result.getGeneratedImages());
+            progress("节点 " + nodeId + "：图片用量 "
+                    + CapabilityUsageLedger.describeImage(result.getUsage(), result.getGeneratedImages()));
+        }
+        progress("节点 " + nodeId + "：完成");
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("output", output);
+        return response;
+    }
+
+    /**
+     * 视频节点专用执行路径：走平台异步任务（提交 + 轮询），成功后把产物下载到本地。
+     *
+     * <p>为什么不走对话编排器：视频接口是「提交任务 → 轮询任务」的异步协议，返回体只有任务标识，
+     * 与聊天 / 生图的同步响应结构不同；单独走视频客户端可以读取能力节点里的任务查询地址与轮询参数。
+     *
+     * @param configuration 平台配置，不可为 null
+     * @param userInput     解析后的视频提示词，非空白
+     * @param references    参考图地址，可为 null
+     * @return 节点输出，非 null
+     */
+    private Map<String, Object> executeVideo(ProviderConfiguration configuration, String userInput,
+            List<String> references) {
+        VideoGenerationResult result;
+        try {
+            result = VideoGeneratorFactory.create(configuration)
+                    .generate(new VideoGenerationRequest(userInput, references,
+                            message -> progress("节点 " + nodeId + "：" + message)));
+        } catch (RuntimeException failure) {
+            throw new IllegalStateException("节点 " + nodeId + " 视频生成失败：" + failure.getMessage(), failure);
+        }
+        List<String> urls = result.getVideoUrls();
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("mediaType", "VIDEO");
+        output.put("references", urls);
+        output.put("taskId", result.getTaskId());
+        output.put("status", result.getStatus());
+        if (!result.getUsage().isEmpty()) {
+            output.put("usage", result.getUsage());
+        }
+        downloadVideos(output, urls);
+        context.usageLedger().recordVideo(result.getUsage());
+        if (!result.getUsage().isEmpty()) {
+            progress("节点 " + nodeId + "：视频用量 "
+                    + CapabilityUsageLedger.describeVideo(result.getUsage()));
+        }
+        progress("节点 " + nodeId + "：完成");
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("output", output);
         return response;
@@ -225,7 +286,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
     }
 
     /**
-     * 按能力整理输出：图片能力保留产物引用，其余能力按文本 / JSON 处理。
+     * 按能力整理输出：图片 / 视频能力保留产物引用，其余能力按文本 / JSON 处理。
      */
     private Object output(CapabilityKindEnum capability, String content) {
         if (capability == CapabilityKindEnum.IMAGE || capability == CapabilityKindEnum.VIDEO) {
@@ -239,11 +300,11 @@ public final class AgentWorkflowAction implements IWorkflowAction {
     }
 
     /**
-     * 把图片生成结果（换行分隔的 URL / base64 引用）逐项落成媒体资产，返回资产描述列表。
+     * 把媒体生成结果（换行分隔的 URL / base64 引用）逐项落成媒体资产，返回资产描述列表。
      */
     private Object ingestMediaReferences(String content, CapabilityKindEnum capability) {
         if (StringUtils.isBlank(content)) {
-            throw new IllegalStateException("工作流 AGENT 节点图片生成结果为空（节点 " + nodeId + "）");
+            throw new IllegalStateException("工作流 AGENT 节点媒体生成结果为空（节点 " + nodeId + "）");
         }
         List<String> references = new ArrayList<>();
         for (String reference : content.split("\\r?\\n")) {
@@ -253,12 +314,39 @@ public final class AgentWorkflowAction implements IWorkflowAction {
             references.add(reference.trim());
         }
         if (references.isEmpty()) {
-            throw new IllegalStateException("工作流 AGENT 节点未产出可用图片（节点 " + nodeId + "）");
+            throw new IllegalStateException("工作流 AGENT 节点未产出可用媒体（节点 " + nodeId + "）");
         }
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("mediaType", capability == CapabilityKindEnum.VIDEO ? "VIDEO" : "IMAGE");
         output.put("references", references);
+        if (capability == CapabilityKindEnum.VIDEO) {
+            downloadVideos(output, references);
+        }
         return output;
+    }
+
+    /**
+     * 把视频 URL 下载到本地；失败不抛出，只把原因写进输出，保证已生成视频的 URL 仍能回传。
+     *
+     * @param output     节点输出（会被追加 {@code localFiles} 或 {@code downloadError}），非 null
+     * @param references 视频 URL 列表，非 null
+     */
+    private void downloadVideos(Map<String, Object> output, List<String> references) {
+        try {
+            List<Path> files = context.videoDownloader().download(references);
+            if (files.isEmpty()) {
+                return;
+            }
+            List<String> paths = new ArrayList<>();
+            for (Path file : files) {
+                paths.add(file.toString());
+            }
+            output.put("localFiles", paths);
+            progress("视频已保存到本地：" + String.join("，", paths));
+        } catch (RuntimeException failure) {
+            output.put("downloadError", failure.getMessage());
+            progress("视频下载失败（URL 仍可用，可稍后重试）：" + failure.getMessage());
+        }
     }
 
     /**

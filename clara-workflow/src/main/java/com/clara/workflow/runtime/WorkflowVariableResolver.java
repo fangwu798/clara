@@ -21,6 +21,8 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>{@code ${name}} 取 {@link ExecutionScope#get(String)}（顶层变量，即节点声明的输出键）；</li>
  *   <li>{@code ${name.field}} 在顶层变量为 Map（如 AGENT 节点解析出的 JSON 对象）时按字段逐级下钻；</li>
+ *   <li>{@code ${name?}} 表示可选变量：解析不到时返回 null（字符串替换时替换为空串），用于
+ *       可选输入（如视频生成的可选参考图）；不带 {@code ?} 时仍按失败语义抛异常；</li>
  *   <li>整个字符串恰为一个 {@code ${...}} 时返回原始对象（可能是 List / Map，供数组参数使用）；</li>
  *   <li>否则做字符串替换，非字符串对象用 Jackson 序列化为 JSON 文本。</li>
  * </ul>
@@ -33,6 +35,9 @@ public final class WorkflowVariableResolver {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern EXPRESSION = Pattern.compile("\\$\\{([^}]+)}");
     private static final Pattern WHOLE_EXPRESSION = Pattern.compile("^\\$\\{([^}]+)}$");
+
+    /** 可选变量后缀：表达式以它结尾时，变量缺失返回 null 而不是抛异常。 */
+    private static final String OPTIONAL_SUFFIX = "?";
 
     private WorkflowVariableResolver() {
     }
@@ -105,12 +110,19 @@ public final class WorkflowVariableResolver {
 
     private static Object resolveExpression(String expression, ExecutionScope scope, String nodeId) {
         String expr = expression == null ? "" : expression.trim();
+        boolean optional = expr.endsWith(OPTIONAL_SUFFIX);
+        if (optional) {
+            expr = expr.substring(0, expr.length() - OPTIONAL_SUFFIX.length()).trim();
+        }
         String[] segments = expr.split("\\.");
         Object value = segments.length == 0 ? null : scope.get(segments[0]);
         for (int index = 1; index < segments.length && value != null; index++) {
             value = value instanceof Map ? ((Map<?, ?>) value).get(segments[index]) : null;
         }
         if (value == null) {
+            if (optional) {
+                return null;
+            }
             throw new IllegalArgumentException("工作流变量解析失败：${" + expr + "}（节点 " + nodeId + "）");
         }
         return value;

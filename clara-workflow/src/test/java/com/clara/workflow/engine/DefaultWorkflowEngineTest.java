@@ -4,6 +4,7 @@ import com.clara.core.workflow.IScopeCondition;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.dto.workflow.WorkflowCheckpoint;
 import com.clara.dto.workflow.WorkflowDefinition;
+import com.clara.dto.workflow.ExecutionScope;
 import com.clara.dto.workflow.WorkflowResult;
 import com.clara.enums.workflow.WorkflowInstanceStatusEnum;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
@@ -25,6 +26,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -202,7 +204,21 @@ public class DefaultWorkflowEngineTest {
 
         assertEquals(WorkflowInstanceStatusEnum.SUCCEEDED, resumed.getStatus());
         assertEquals("yes", resumed.getScope().get("answer"));
+        assertEquals("h", resumed.getScope().control(ExecutionScope.CONTROL_HUMAN_APPROVED));
         assertEquals(WorkflowInstanceStatusEnum.SUCCEEDED, store.load("inst-h2").get().getStatus());
+    }
+
+    @Test
+    public void revisionInputIsNotMarkedAsApproved() {
+        WorkflowDefinition definition = definition(WorkflowNodes.human("h", "answer"));
+        DefaultWorkflowEngine engine = engine(2);
+        engine.start(definition, "inst-h3", Collections.emptyMap());
+
+        WorkflowResult resumed = engine.resume(definition, "inst-h3",
+                Collections.<String, Object>singletonMap("answer", "把镜头拉远一点"));
+
+        assertEquals("h", resumed.getScope().control(ExecutionScope.CONTROL_HUMAN_CONFIRMED));
+        assertNull(resumed.getScope().control(ExecutionScope.CONTROL_HUMAN_APPROVED));
     }
 
     @Test

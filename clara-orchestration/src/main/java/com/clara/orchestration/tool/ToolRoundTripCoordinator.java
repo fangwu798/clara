@@ -12,6 +12,7 @@ import com.clara.dto.tool.ToolCallContent;
 import com.clara.dto.tool.ToolCallFunction;
 import com.clara.dto.tool.ToolResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
@@ -81,6 +82,44 @@ public final class ToolRoundTripCoordinator {
             messages.add(invokeSafely(call));
         }
         return messages;
+    }
+
+    /**
+     * 检查本轮工具结果是否要求「先让用户确认再继续」。
+     *
+     * <p>工作流遇到 HUMAN 节点时会在结果 JSON 里写 {@code waitingForUser=true} 与用户可见的
+     * {@code display} 文本。编排层据此结束当前轮，把 display 返回给用户；用户的下一轮输入才可能触发
+     * 工作流恢复，从机制上避免模型在同一次工具往返里自行确认高价操作。
+     *
+     * @param messages 本轮产出的消息，可为 null
+     * @return 需要暂停时返回展示文本，否则返回 null
+     */
+    public String userInputRequest(List<IContent> messages) {
+        if (messages == null) {
+            return null;
+        }
+        for (IContent message : messages) {
+            if (!(message instanceof ToolContent)) {
+                continue;
+            }
+            String output = ((ToolContent) message).getContent();
+            if (output == null || output.trim().isEmpty()) {
+                continue;
+            }
+            try {
+                JsonNode root = JSON.readTree(output);
+                JsonNode waiting = root == null ? null : root.get("waitingForUser");
+                if (waiting == null || !waiting.asBoolean(false)) {
+                    continue;
+                }
+                JsonNode display = root.get("display");
+                return display != null && display.isTextual() && !display.textValue().trim().isEmpty()
+                        ? display.textValue() : "工作流已暂停，等待人工确认。";
+            } catch (JsonProcessingException ignored) {
+                // 非 JSON 工具结果不参与暂停判断
+            }
+        }
+        return null;
     }
 
     /**

@@ -47,7 +47,9 @@ public final class SafeHttpUriDeserializer extends JsonDeserializer<URI> {
             throw invalid(parser, value, "不能为空，必须是安全的绝对 HTTP(S) 地址");
         }
         try {
-            URI uri = new URI(value);
+            // 异步任务查询地址允许用 {id} 作为占位符；花括号不是合法 URI 字符，
+            // 这里只把它们编码为 %7B / %7D，其余字符仍交给 URI 做严格校验。
+            URI uri = new URI(value.replace("{", "%7B").replace("}", "%7D"));
             if (!uri.isAbsolute() || uri.getHost() == null || uri.getUserInfo() != null
                     || !("https".equalsIgnoreCase(uri.getScheme())
                     || "http".equalsIgnoreCase(uri.getScheme()))) {

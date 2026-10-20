@@ -5,12 +5,15 @@ import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.dto.workflow.WorkflowActionSpec;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
 import org.junit.Rule;
+import org.junit.Assume;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
@@ -58,6 +61,23 @@ public class WorkflowDefinitionLoaderTest {
         assertThrows(IllegalArgumentException.class, () -> loader.load(file));
     }
 
+    @Test
+    public void loadsRepositoryVideoGenerationWorkflow() throws Exception {
+        Path classes = Paths.get(WorkflowDefinitionLoaderTest.class.getProtectionDomain()
+                .getCodeSource().getLocation().toURI());
+        Path file = classes.getParent().getParent().getParent()
+                .resolve("config").resolve("workflow").resolve("video_generation.yml");
+        Assume.assumeTrue("未找到工作流配置: " + file.toAbsolutePath(), Files.isRegularFile(file));
+        WorkflowDefinitionLoader loader = new WorkflowDefinitionLoader(
+                Collections.<IWorkflowActionFactory>singletonList(new StubFactory()));
+
+        LoadedWorkflow loaded = loader.load(file);
+
+        assertEquals("video_generation", loaded.getDefinition().getWorkflowId());
+        assertEquals("1.2.1", loaded.getDefinition().getVersion());
+        assertEquals(Arrays.asList("prompt", "video"), loaded.getOutputs());
+    }
+
     private Path write(String name, String content) throws Exception {
         Path file = folder.newFile(name).toPath();
         Files.write(file, content.getBytes(StandardCharsets.UTF_8));
@@ -86,7 +106,7 @@ public class WorkflowDefinitionLoaderTest {
 
         @Override
         public boolean supports(String actionKind) {
-            return "REVIEW".equalsIgnoreCase(actionKind);
+            return "REVIEW".equalsIgnoreCase(actionKind) || "AGENT".equalsIgnoreCase(actionKind);
         }
 
         @Override

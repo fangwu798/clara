@@ -15,6 +15,7 @@ import com.clara.mcp.client.call.McpToolResult;
 import com.clara.mcp.tool.ExternalToolBinding;
 import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.skill.registry.SkillRegistry;
+import com.clara.usage.CapabilityUsageLedger;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -48,10 +49,14 @@ public final class CompositeToolInvoker implements IToolInvoker {
 
     private static final TypeReference<Map<String, Object>> ARGUMENTS_TYPE = new TypeReference<Map<String, Object>>() { };
 
+    /** 代码图谱工具名：其返回内容属于 MCP 静态分析，不产生模型 token。 */
+    private static final String GRAPH_TOOL = "code_graph";
+
     private final SkillRegistry skillRegistry;
     private final IToolInvoker localToolInvoker;
     private final IMcpGateway mcpGateway;
     private final ExternalToolCatalog externalToolCatalog;
+    private final CapabilityUsageLedger usageLedger;
 
     /**
      * 创建组合工具调用器。
@@ -64,6 +69,21 @@ public final class CompositeToolInvoker implements IToolInvoker {
      */
     public CompositeToolInvoker(SkillRegistry skillRegistry, IToolInvoker localToolInvoker,
             IMcpGateway mcpGateway, ExternalToolCatalog externalToolCatalog) {
+        this(skillRegistry, localToolInvoker, mcpGateway, externalToolCatalog, null);
+    }
+
+    /**
+     * 创建组合工具调用器，并记录代码图谱查询用量。
+     *
+     * @param skillRegistry       技能注册表，用于判定是否为本地工具，不可为 null
+     * @param localToolInvoker    本地工具执行入口（skill 模块实现），不可为 null
+     * @param mcpGateway          MCP 调用门面，可为 null（null 时外部分支抛「未接入」错误）
+     * @param externalToolCatalog 外部工具路由目录，不可为 null
+     * @param usageLedger         能力用量台账，可为 null（为 null 时不统计图谱查询）
+     * @throws IllegalArgumentException 除 mcpGateway / usageLedger 外的依赖为 null 时
+     */
+    public CompositeToolInvoker(SkillRegistry skillRegistry, IToolInvoker localToolInvoker,
+            IMcpGateway mcpGateway, ExternalToolCatalog externalToolCatalog, CapabilityUsageLedger usageLedger) {
         if (skillRegistry == null) {
             throw new IllegalArgumentException("skillRegistry must not be null");
         }
@@ -77,6 +97,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
         this.localToolInvoker = localToolInvoker;
         this.mcpGateway = mcpGateway;
         this.externalToolCatalog = externalToolCatalog;
+        this.usageLedger = usageLedger;
     }
 
     @Override
@@ -89,7 +110,9 @@ public final class CompositeToolInvoker implements IToolInvoker {
             throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION, "工具名不能为空");
         }
         if (skillRegistry.findToolByName(toolName) != null) {
-            return localToolInvoker.invoke(invocation);
+            ToolResult result = localToolInvoker.invoke(invocation);
+            recordGraphUsage(toolName, result);
+            return result;
         }
         ExternalToolBinding binding = externalToolCatalog.find(toolName);
         if (binding != null) {
@@ -97,6 +120,21 @@ public final class CompositeToolInvoker implements IToolInvoker {
         }
         throw error(ErrorCodes.SKILL_NOT_FOUND, ErrorCategoryEnum.VALIDATION,
                 "工具未找到：" + toolName + "（本地技能未注册，且外部工具未登记）");
+    }
+
+    /**
+     * 记录代码图谱查询：{@code code_graph} 是 MCP 静态分析，不产生模型 token，
+     * 这里累计查询次数与返回字符数，供 {@code /usage} 单独展示。
+     *
+     * @param toolName 工具名，非 null
+     * @param result   工具结果，可为 null
+     */
+    private void recordGraphUsage(String toolName, ToolResult result) {
+        if (usageLedger == null || !GRAPH_TOOL.equals(toolName)) {
+            return;
+        }
+        String output = result == null ? null : result.getOutput();
+        usageLedger.recordGraph(output == null ? 0L : output.length());
     }
 
     /**

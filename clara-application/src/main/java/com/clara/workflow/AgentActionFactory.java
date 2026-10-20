@@ -6,7 +6,9 @@ import com.clara.core.skill.IPromptProvider;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.dto.workflow.WorkflowActionSpec;
+import com.clara.media.VideoDownloader;
 import com.clara.orchestration.DefaultConversationOrchestrator;
+import com.clara.usage.CapabilityUsageLedger;
 import com.clara.workflow.runtime.AgentNodeOptions;
 
 import java.util.LinkedHashMap;
@@ -38,7 +40,37 @@ public final class AgentActionFactory implements IWorkflowActionFactory {
      */
     public AgentActionFactory(DefaultConversationOrchestrator orchestrator, IPromptProvider promptProvider,
             ModelRegistry modelRegistry) {
-        this.context = new AgentActionContext(orchestrator, promptProvider, modelRegistry);
+        this(orchestrator, promptProvider, modelRegistry, new VideoDownloader(), new CapabilityUsageLedger());
+    }
+
+    /**
+     * 创建 AGENT 动作工厂，并指定视频产物下载器。
+     *
+     * @param orchestrator    对话编排器，不可为 null
+     * @param promptProvider  提示词提供器，不可为 null
+     * @param modelRegistry   模型绑定注册表，不可为 null
+     * @param videoDownloader 视频产物下载器，不可为 null
+     * @throws IllegalArgumentException 任一项为 null 时
+     */
+    public AgentActionFactory(DefaultConversationOrchestrator orchestrator, IPromptProvider promptProvider,
+            ModelRegistry modelRegistry, VideoDownloader videoDownloader) {
+        this(orchestrator, promptProvider, modelRegistry, videoDownloader, new CapabilityUsageLedger());
+    }
+
+    /**
+     * 创建 AGENT 动作工厂，并共享宿主的用量台账。
+     *
+     * @param orchestrator    对话编排器，不可为 null
+     * @param promptProvider  提示词提供器，不可为 null
+     * @param modelRegistry   模型绑定注册表，不可为 null
+     * @param videoDownloader 视频产物下载器，不可为 null
+     * @param usageLedger     能力用量台账，不可为 null
+     * @throws IllegalArgumentException 任一项为 null 时
+     */
+    public AgentActionFactory(DefaultConversationOrchestrator orchestrator, IPromptProvider promptProvider,
+            ModelRegistry modelRegistry, VideoDownloader videoDownloader, CapabilityUsageLedger usageLedger) {
+        this.context = new AgentActionContext(orchestrator, promptProvider, modelRegistry, videoDownloader,
+                usageLedger);
     }
 
     @Override

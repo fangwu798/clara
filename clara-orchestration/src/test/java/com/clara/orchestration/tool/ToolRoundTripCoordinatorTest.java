@@ -23,6 +23,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -74,6 +75,24 @@ public class ToolRoundTripCoordinatorTest {
     public void performRejectsNullResponse() {
         ToolRoundTripCoordinator coordinator = new ToolRoundTripCoordinator(new RecordingInvoker());
         assertThrows(IllegalArgumentException.class, () -> coordinator.perform(null));
+    }
+
+    @Test
+    public void userInputRequestReturnsDisplayForWaitingToolResult() {
+        ToolRoundTripCoordinator coordinator = new ToolRoundTripCoordinator(new RecordingInvoker());
+        List<IContent> messages = Arrays.<IContent>asList(
+                new ToolContent("call-1", "{\"waitingForUser\":true,\"display\":\"请确认提示词\"}"),
+                new ToolContent("call-2", "{\"ok\":true}"));
+
+        assertEquals("请确认提示词", coordinator.userInputRequest(messages));
+    }
+
+    @Test
+    public void userInputRequestReturnsNullForNormalToolResult() {
+        ToolRoundTripCoordinator coordinator = new ToolRoundTripCoordinator(new RecordingInvoker());
+
+        assertNull(coordinator.userInputRequest(Collections.<IContent>singletonList(
+                new ToolContent("call-1", "{\"ok\":true}"))));
     }
 
     @Test
