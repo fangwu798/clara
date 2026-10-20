@@ -104,6 +104,7 @@ public final class ReviewWorkflowAction implements IWorkflowAction {
                 .model(model)
                 .capabilityKind(CapabilityKindEnum.CHAT)
                 .userInput(userInput(role, round, topic, discussion, isFinal))
+                .planningEnabled(false)
                 .providerConfiguration(configuration)
                 .stream(false)
                 .build());

@@ -27,8 +27,7 @@ public final class SkillSchemaValidator {
      * 严格 JSON 解析器：开启 {@code FAIL_ON_TRAILING_TOKENS}，使 {@code {"a":1} 尾随内容} 这类
      * 能被 Jackson 默认宽松放行、却会被下游脚本（如 Python {@code json}）拒绝的入参在调用前被拦下。
      */
-    private final ObjectMapper mapper = new ObjectMapper()
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+    private final ObjectMapper mapper = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     /**
      * 校验入参合法性：始终先做严格 JSON 解析，再在声明了 Schema 时做结构匹配。
@@ -72,7 +71,7 @@ public final class SkillSchemaValidator {
     public boolean isValid(String schemaJson, String instanceJson) {
         JsonNode schema = parseSchema(schemaJson);
         JsonNode instance = parseInstance(instanceJson);
-        return schema != null && instance != null && matches(schema, instance);
+        return  matches(schema, instance);
     }
 
     private JsonNode parseSchema(String schemaJson) {

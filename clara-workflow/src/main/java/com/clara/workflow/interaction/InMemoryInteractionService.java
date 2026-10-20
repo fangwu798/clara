@@ -17,15 +17,7 @@ import com.clara.enums.interaction.InteractionTypeEnum;
 import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 在内存中管理待处理交互，并在收到反馈后触发恢复。
@@ -38,15 +30,11 @@ public final class InMemoryInteractionService implements IInteractionService {
     private final IAnswerSchemaValidator schemaValidator;
     private final ITimeSource timeSource;
     private final int maxInteractionsPerRun;
-    private final Map<String, InteractionRequest> requests =
-            new LinkedHashMap<>();
-    private final Map<String, FeedbackResult> feedbackByKey =
-            new LinkedHashMap<>();
+    private final Map<String, InteractionRequest> requests = new LinkedHashMap<>();
+    private final Map<String, FeedbackResult> feedbackByKey = new LinkedHashMap<>();
 
-    public InMemoryInteractionService(IInteractionResumeCoordinator coordinator,
-            IAnswerSchemaValidator schemaValidator, ITimeSource timeSource, int maxInteractionsPerRun) {
-        if (coordinator == null || schemaValidator == null || timeSource == null
-                || maxInteractionsPerRun <= 0) {
+    public InMemoryInteractionService(IInteractionResumeCoordinator coordinator, IAnswerSchemaValidator schemaValidator, ITimeSource timeSource, int maxInteractionsPerRun) {
+        if (coordinator == null || schemaValidator == null || timeSource == null || maxInteractionsPerRun <= 0) {
             throw new IllegalArgumentException("interaction service dependencies are invalid");
         }
         this.coordinator = coordinator;
@@ -75,8 +63,7 @@ public final class InMemoryInteractionService implements IInteractionService {
         if (count >= maxInteractionsPerRun) {
             throw InteractionErrors.error(ErrorCodes.INTERACTION_LIMIT_EXCEEDED, ErrorCategoryEnum.RESOURCE_LIMIT);
         }
-        InteractionRequest created = new InteractionRequest(context, question,
-                InteractionStateEnum.PENDING, null, null);
+        InteractionRequest created = new InteractionRequest(context, question, InteractionStateEnum.PENDING, null, null);
         requests.put(context.getInteractionId(), created);
         return created;
     }
@@ -87,17 +74,11 @@ public final class InMemoryInteractionService implements IInteractionService {
         expire(timeSource.currentTimeMillis());
         List<InteractionRequest> result = new ArrayList<>();
         for (InteractionRequest request : requests.values()) {
-            if (request.getContext().getRunId().equals(runId)
-                    && request.getState() == InteractionStateEnum.PENDING) {
+            if (request.getContext().getRunId().equals(runId) && request.getState() == InteractionStateEnum.PENDING) {
                 result.add(request);
             }
         }
-        Collections.sort(result, (one, two) -> {
-            int time = Long.compare(one.getContext().getCreatedAtEpochMillis(),
-                    two.getContext().getCreatedAtEpochMillis());
-            return time != 0 ? time : one.getContext().getInteractionId()
-                    .compareTo(two.getContext().getInteractionId());
-        });
+        result.sort(Comparator.comparingLong((InteractionRequest one) -> one.getContext().getCreatedAtEpochMillis()).thenComparing(one -> one.getContext().getInteractionId()));
         return Collections.unmodifiableList(result);
     }
 
@@ -258,7 +239,7 @@ public final class InMemoryInteractionService implements IInteractionService {
 
     private Map<String, Object> effectiveAnswer(Question question, Map<String, Object> submitted) {
         Map<String, Object> values = submitted == null
-                ? Collections.<String, Object>emptyMap()
+                ? Collections.emptyMap()
                 : submitted;
         if (values.isEmpty() && !question.getDefaultAnswer().isEmpty()) {
             return question.getDefaultAnswer();

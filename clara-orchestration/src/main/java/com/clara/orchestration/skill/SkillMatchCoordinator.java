@@ -103,7 +103,7 @@ public final class SkillMatchCoordinator {
                 && embeddingClient != null && semanticMemoryStore != null
                 && userInput != null && !userInput.trim().isEmpty()) {
             float[] vector = embeddingClient.embed(userInput);
-            List<MemoryMatch> candidates = search(MemorySourceTypeEnum.PROMPT, vector, control, userInput);
+            List<MemoryMatch> candidates = search(vector, control, userInput);
             int aboveThreshold = 0;
             double bestScore = Double.NEGATIVE_INFINITY;
             for (MemoryMatch candidate : candidates) {
@@ -129,8 +129,7 @@ public final class SkillMatchCoordinator {
             details.add("本轮未开启提示词检索（retrievalCount <= 0 或依赖缺失）");
         }
         trace(prompts.size(), started, details);
-        List<ToolContext> tools = toolCatalog == null
-                ? Collections.<ToolContext>emptyList() : toolCatalog.availableTools();
+        List<ToolContext> tools = toolCatalog == null ? Collections.emptyList() : toolCatalog.availableTools();
         return new MatchedSkill(prompts, tools);
     }
 
@@ -153,16 +152,15 @@ public final class SkillMatchCoordinator {
     }
 
     /**
-     * 按来源类型检索原始候选：不做阈值过滤与同源去重，调用方要能看到「候选几条、为什么被刷掉」。
+     * 按提示词来源（PROMPT）检索原始候选：不做阈值过滤与同源去重，调用方要能看到「候选几条、为什么被刷掉」。
      *
      * <p>查询一并带上原始文本：全文检索后端（Milvus BM25）直接拿文本检索，
      * 不读向量；向量后端会忽略它。
      */
-    private List<MemoryMatch> search(MemorySourceTypeEnum sourceType, float[] vector,
-            ContextControlConfig control, String queryText) {
+    private List<MemoryMatch> search(float[] vector, ContextControlConfig control, String queryText) {
         SemanticMemoryQuery query = SemanticMemoryQuery.builder(vector,
                 control.getRetrievalCount(), NO_PRE_FILTER, System.currentTimeMillis())
-                .sourceType(sourceType)
+                .sourceType(MemorySourceTypeEnum.PROMPT)
                 .queryText(queryText)
                 .build();
         return semanticMemoryStore.search(query);
@@ -185,27 +183,5 @@ public final class SkillMatchCoordinator {
         }
         return String.format(Locale.ROOT, "召回 %d 条 / 过阈值 %d 条（阈值 %.2f，最高分 %.3f）",
                 recalled, above, control.getSimilarityThreshold(), bestScore);
-    }
-
-    /**
-     * 技能匹配结果：本轮要注入的提示词与工具声明。
-     */
-    public static final class MatchedSkill {
-
-        private final List<String> prompts;
-        private final List<ToolContext> tools;
-
-        MatchedSkill(List<String> prompts, List<ToolContext> tools) {
-            this.prompts = Collections.unmodifiableList(new ArrayList<>(prompts));
-            this.tools = Collections.unmodifiableList(new ArrayList<>(tools));
-        }
-
-        public List<String> getPrompts() {
-            return prompts;
-        }
-
-        public List<ToolContext> getTools() {
-            return tools;
-        }
     }
 }

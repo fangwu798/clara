@@ -4,6 +4,7 @@ import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IWorkflowAction;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
+import lombok.Data;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -13,6 +14,7 @@ import java.util.Set;
 /**
  * 动作节点：承载 AGENT / TOOL 动作、输出键与幂等键。
  */
+@Data
 public final class ActionNode implements IWorkflowNode {
 
     private final String id;
@@ -21,8 +23,7 @@ public final class ActionNode implements IWorkflowNode {
     private final String idempotencyKey;
     private final IWorkflowAction action;
 
-    ActionNode(String id, WorkflowNodeTypeEnum type, Set<String> outputKeys,
-            String idempotencyKey, IWorkflowAction action) {
+    ActionNode(String id, WorkflowNodeTypeEnum type, Set<String> outputKeys, String idempotencyKey, IWorkflowAction action) {
         if (StringUtils.isBlank(id)) {
             throw new IllegalArgumentException("node id must not be blank");
         }
@@ -31,39 +32,14 @@ public final class ActionNode implements IWorkflowNode {
         }
         this.id = id;
         this.type = type;
-        this.outputKeys = outputKeys == null
-                ? Collections.<String>emptySet()
-                : Collections.unmodifiableSet(new LinkedHashSet<>(outputKeys));
+        this.outputKeys = outputKeys == null ? Collections.emptySet() : Collections.unmodifiableSet(new LinkedHashSet<>(outputKeys));
         this.idempotencyKey = idempotencyKey;
         this.action = action;
     }
 
     @Override
-    public String getId() {
-        return id;
-    }
-
-    @Override
-    public WorkflowNodeTypeEnum getType() {
-        return type;
-    }
-
-    @Override
-    public Set<String> getOutputKeys() {
-        return outputKeys;
-    }
-
-    @Override
     public List<IWorkflowNode> children() {
         return Collections.emptyList();
-    }
-
-    public String getIdempotencyKey() {
-        return idempotencyKey;
-    }
-
-    public IWorkflowAction getAction() {
-        return action;
     }
 
 }

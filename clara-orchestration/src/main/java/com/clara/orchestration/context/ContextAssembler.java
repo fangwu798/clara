@@ -9,6 +9,7 @@ import com.clara.dto.memory.WindowPolicy;
 import com.clara.enums.RoleEnum;
 import com.clara.kernel.message.delta.SystemContent;
 import com.clara.kernel.message.delta.UserContent;
+import com.clara.orchestration.skill.MatchedSkill;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
 
 import java.util.ArrayList;
@@ -54,21 +55,6 @@ public final class ContextAssembler {
         this(windowCompressionCoordinator, semanticRecallCoordinator, null, skillMatchCoordinator, null);
     }
 
-    /**
-     * 创建上下文装配器。
-     *
-     * @param windowCompressionCoordinator 窗口压缩协调器，不可为 null
-     * @param semanticRecallCoordinator    知识找回协调器，不可为 null
-     * @param supplementProvider           外部知识补充提供者（如代码知识图谱）；可为 null（不补充）
-     * @param skillMatchCoordinator        技能匹配协调器，不可为 null
-     */
-    public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
-                            SemanticRecallCoordinator semanticRecallCoordinator,
-                            IContextSupplementProvider supplementProvider,
-                            SkillMatchCoordinator skillMatchCoordinator) {
-        this(windowCompressionCoordinator, semanticRecallCoordinator, supplementProvider, skillMatchCoordinator,
-                null);
-    }
 
     /**
      * 创建上下文装配器并指定常驻提示词。
@@ -106,6 +92,20 @@ public final class ContextAssembler {
      * @return 装配结果，非 null
      */
     public AssembledContext assemble(IWindowMemory windowMemory, ContextControlConfig control, ITokenCountEstimator estimator) {
+        return assemble(windowMemory, control, estimator, Collections.emptyList());
+    }
+
+    /**
+     * 装配本轮下发给模型的消息与工具声明，并追加本轮临时提示词（如已校验的执行计划）。
+     *
+     * @param windowMemory 会话窗口记忆，不可为 null
+     * @param control      上下文控制配置；为 null 时使用默认配置
+     * @param estimator    token 估算器，可为 null（仅按百分比维度限制时需要）
+     * @param extraPrompts 本轮临时提示词，可为 null（视为无）
+     * @return 装配结果，非 null
+     */
+    public AssembledContext assemble(IWindowMemory windowMemory, ContextControlConfig control,
+            ITokenCountEstimator estimator, List<String> extraPrompts) {
         if (windowMemory == null) {
             throw new IllegalArgumentException("windowMemory must not be null");
         }
@@ -128,7 +128,7 @@ public final class ContextAssembler {
                 systemParts.add(summary);
             }
         }
-        SkillMatchCoordinator.MatchedSkill matched = skillMatchCoordinator.match(userInput, effective);
+        MatchedSkill matched = skillMatchCoordinator.match(userInput, effective);
         // 外部知识补充：先问一次代码知识图谱，命中就把「既有事实」直接放进 system 指令；没命中返回空，
         // 模型自然走工具查本地文件那条路（补充提供者自身兜底，失败不阻断本轮）。
         List<String> supplement = supplementProvider == null ? Collections.emptyList() : supplementProvider.supplement(userInput);
@@ -137,7 +137,7 @@ public final class ContextAssembler {
         List<String> recall = semanticRecallCoordinator.recall(windowMemory.conversationId(), userInput,
                 effective, prepared);
 
-        String systemText = systemText(systemParts, basePrompts, matched.getPrompts(), supplement, recall);
+        String systemText = systemText(systemParts, extraPrompts, basePrompts, matched.getPrompts(), supplement, recall);
         List<IContent> messages = new ArrayList<>();
         if (!systemText.isEmpty()) {
             messages.add(new SystemContent(systemText));
@@ -177,8 +177,14 @@ public final class ContextAssembler {
     /**
      * 归一化 system 指令文本：常驻提示词、技能提示词、图谱补充信息、压缩摘要、检索知识按序拼接。
      */
-    private static String systemText(List<IContent> systemParts, List<String> basePrompts, List<String> prompts, List<String> supplement, List<String> recall) {
+    private static String systemText(List<IContent> systemParts, List<String> extraPrompts,
+            List<String> basePrompts, List<String> prompts, List<String> supplement, List<String> recall) {
         StringBuilder text = new StringBuilder();
+        if (extraPrompts != null) {
+            for (String prompt : extraPrompts) {
+                append(text, prompt);
+            }
+        }
         for (String prompt : basePrompts) {
             append(text, prompt);
         }

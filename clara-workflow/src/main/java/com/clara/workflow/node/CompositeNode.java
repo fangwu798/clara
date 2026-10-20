@@ -3,6 +3,7 @@ package com.clara.workflow.node;
 import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,6 +14,7 @@ import java.util.Set;
 /**
  * 组合节点：承载 SEQUENCE / PARALLEL 子节点列表。
  */
+@Data
 public final class CompositeNode implements IWorkflowNode {
 
     private final String id;
@@ -32,28 +34,11 @@ public final class CompositeNode implements IWorkflowNode {
     }
 
     @Override
-    public String getId() {
-        return id;
-    }
-
-    @Override
-    public WorkflowNodeTypeEnum getType() {
-        return type;
-    }
-
-    @Override
-    public Set<String> getOutputKeys() {
-        return outputKeys;
-    }
-
-    @Override
     public List<IWorkflowNode> children() {
         return children;
     }
 
-    public List<IWorkflowNode> getChildren() {
-        return children;
-    }
+
 
     private static List<IWorkflowNode> requireChildren(List<IWorkflowNode> children) {
         if (children == null || children.isEmpty() || children.contains(null)) {

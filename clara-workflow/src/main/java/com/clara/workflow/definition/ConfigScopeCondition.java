@@ -3,6 +3,8 @@ package com.clara.workflow.definition;
 import com.clara.core.workflow.IScopeCondition;
 import com.clara.dto.workflow.ExecutionScope;
 
+import java.util.Objects;
+
 /** 配置化条件节点使用的简单作用域条件。 */
 public final class ConfigScopeCondition implements IScopeCondition {
 
@@ -26,7 +28,7 @@ public final class ConfigScopeCondition implements IScopeCondition {
             return value != null;
         }
         String actual = value == null ? null : String.valueOf(value);
-        boolean equal = expected == null ? actual == null : expected.equals(actual);
-        return "notEquals".equalsIgnoreCase(operator) ? !equal : equal;
+        boolean equal = Objects.equals(expected, actual);
+        return "notEquals".equalsIgnoreCase(operator) != equal;
     }
 }

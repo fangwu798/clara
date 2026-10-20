@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 技能注册表：按分类扫描 {@code tools/}、{@code prompt/} 与 {@code scripts/} 目录（内置 {@code resource/config}
- * 与运行期 {@code config/skill} 两处来源），识别技能与提示词，支持热加载与同名覆盖，并把描述向量化
+ * 与运行期 {@code config/skill} 两处 来源），识别技能与提示词，支持热加载与同名覆盖，并把描述向量化
  * 写入语义记忆存储（来源 {@code PROMPT} / {@code TOOL_DESCRIPTION}）。
  *
  * <p>工具来源有两种：{@code tools/} 下的 JSON 声明（如内置 {@code BUILTIN} 工具），以及 {@code scripts/} 下
@@ -49,24 +49,28 @@ public final class SkillRegistry {
     private final Map<String, ToolMethod> toolsByName = new ConcurrentHashMap<>();
     private final Map<String, PromptDefinition> prompts = new ConcurrentHashMap<>();
 
-    /** 运行期来源文件签名（绝对路径 → 修改时间:大小），用于发现 prompt / scripts 目录的运行期改动。 */
+    /**
+     * 运行期来源文件签名（绝对路径 → 修改时间:大小），用于发现 prompt / scripts 目录的运行期改动。
+     */
     private final AtomicReference<Map<String, String>> sourceStamps =
             new AtomicReference<>(Collections.emptyMap());
 
-    /** 重载互斥：签名比对与整体替换串行化，避免并发触发重复重载。 */
+    /**
+     * 重载互斥：签名比对 整体替换串行化，避免并发触发重复重载。
+     */
     private final Object reloadLock = new Object();
 
     /**
      * 创建注册表。
      *
-     * @param builtinRoot    内置技能根目录（对应 {@code resource/config}），可为 null
-     * @param runtimeRoot    运行期技能根目录（对应 {@code config/skill}），可为 null
-     * @param loader         文件解析器，可为 null（使用默认解析器）
+     * @param builtinRoot     内置技能根目录（对应 {@code resource/config}），可为 null
+     * @param runtimeRoot     运行期技能根目录（对应 {@code config/skill}），可为 null
+     * @param loader          文件解析器，可为 null（使用默认解析器）
      * @param embeddingClient 描述向量化客户端，可为 null（null 时跳过语义记忆索引）
-     * @param memoryStore    语义记忆存储，可为 null（null 时跳过语义记忆索引）
+     * @param memoryStore     语义记忆存储，可为 null（null 时跳过语义记忆索引）
      */
     public SkillRegistry(File builtinRoot, File runtimeRoot, SkillLoader loader,
-            IEmbeddingClient embeddingClient, ISemanticMemoryStore memoryStore) {
+                         IEmbeddingClient embeddingClient, ISemanticMemoryStore memoryStore) {
         this(builtinRoot, runtimeRoot, loader, new ScriptToolLoader(), embeddingClient, memoryStore);
     }
 
@@ -81,8 +85,8 @@ public final class SkillRegistry {
      * @param memoryStore      语义记忆存储，可为 null（null 时跳过语义记忆索引）
      */
     public SkillRegistry(File builtinRoot, File runtimeRoot, SkillLoader loader,
-            ScriptToolLoader scriptToolLoader, IEmbeddingClient embeddingClient,
-            ISemanticMemoryStore memoryStore) {
+                         ScriptToolLoader scriptToolLoader, IEmbeddingClient embeddingClient,
+                         ISemanticMemoryStore memoryStore) {
         this.builtinRoot = builtinRoot;
         this.runtimeRoot = runtimeRoot;
         this.loader = loader == null ? new SkillLoader() : loader;
@@ -252,7 +256,7 @@ public final class SkillRegistry {
     }
 
     private void scanDirectory(Map<String, ToolMethod> targetTools, Map<String, PromptDefinition> targetPrompts,
-            File root) {
+                               File root) {
         if (root == null || !root.isDirectory()) {
             return;
         }
@@ -346,7 +350,7 @@ public final class SkillRegistry {
      * <p>运行期改动通常只涉及个别文件，增量同步避免每次改动都重新向量化全部描述。
      */
     private void syncSemanticMemory(Map<String, ToolMethod> previousTools,
-            Map<String, PromptDefinition> previousPrompts) {
+                                    Map<String, PromptDefinition> previousPrompts) {
         if (embeddingClient == null || memoryStore == null) {
             return;
         }
@@ -406,16 +410,14 @@ public final class SkillRegistry {
         String content = prompt.getDescription() == null || prompt.getDescription().trim().isEmpty()
                 ? prompt.getId()
                 : prompt.getDescription();
-        return entry(MemorySourceTypeEnum.PROMPT, prompt.getId(), content,
-                Collections.<String, String>emptyMap());
+        return entry(MemorySourceTypeEnum.PROMPT, prompt.getId(), content, Collections.emptyMap());
     }
 
-    private MemoryEntry entry(MemorySourceTypeEnum sourceType, String sourceId, String content,
-            Map<String, String> metadata) {
+    private MemoryEntry entry(MemorySourceTypeEnum sourceType, String sourceId, String content, Map<String, String> metadata) {
         float[] vector = embeddingClient.embed(content);
         long now = System.currentTimeMillis();
         return MemoryEntry.builder(entryId(sourceType, sourceId), sourceType, sourceId, content,
-                sha256(content), vector)
+                        sha256(content), vector)
                 .createdAtEpochMillis(now)
                 .metadata(metadata)
                 .build();

@@ -53,8 +53,7 @@ public final class WorkflowDefinitionLoader {
     /**
      * 节点中不参与动作属性透传的结构化字段。
      */
-    private static final Set<String> STRUCTURAL_FIELDS = Collections.unmodifiableSet(new HashSet<>(
-            Arrays.asList("id", "type", "outputKeys", "idempotencyKey", "children", "action")));
+    private static final Set<String> STRUCTURAL_FIELDS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList("id", "type", "outputKeys", "idempotencyKey", "children", "action")));
 
     private final List<IWorkflowActionFactory> actionFactories;
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
@@ -218,7 +217,7 @@ public final class WorkflowDefinitionLoader {
 
     private List<IWorkflowNode> buildChildren(JsonNode node, Path file, String id) {
         JsonNode childrenNode = node.get("children");
-        if (childrenNode == null || !childrenNode.isArray() || childrenNode.size() == 0) {
+        if (childrenNode == null || !childrenNode.isArray() || childrenNode.isEmpty()) {
             throw invalid(file, id, "组合节点缺少 children");
         }
         List<IWorkflowNode> children = new ArrayList<>();

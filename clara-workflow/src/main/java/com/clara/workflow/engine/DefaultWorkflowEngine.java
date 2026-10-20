@@ -17,6 +17,8 @@ import com.clara.workflow.node.ConditionNode;
 import com.clara.workflow.node.HumanNode;
 import com.clara.workflow.node.LoopNode;
 
+
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -168,7 +170,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
 
     private void executeAction(ActionNode node, Run run, String key, boolean persist) {
         Map<String, Object> outputs = node.getAction().execute(run.scope.copy());
-        outputs = outputs == null ? Collections.<String, Object>emptyMap() : outputs;
+        outputs = outputs == null ? Collections.emptyMap() : outputs;
         if (!node.getOutputKeys().containsAll(outputs.keySet())) {
             throw WorkflowErrors.error(ErrorCodes.WORKFLOW_OUTPUT_CONFLICT, ErrorCategoryEnum.CONFLICT);
         }
@@ -186,7 +188,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         } else {
             executeParallel(node, run, key);
         }
-        run.scope.complete(key, node.getId(), Collections.<String, Object>emptyMap());
+        run.scope.complete(key, node.getId(), Collections.emptyMap());
         if (persist) {
             run.checkpoint(WorkflowInstanceStatusEnum.RUNNING);
         }
@@ -234,7 +236,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         if (branch != null) {
             executeNode(branch, run, key + "/" + selected + "/", persist);
         }
-        run.scope.complete(key, node.getId(), Collections.<String, Object>emptyMap());
+        run.scope.complete(key, node.getId(), Collections.emptyMap());
         if (persist) {
             run.checkpoint(WorkflowInstanceStatusEnum.RUNNING);
         }
@@ -254,7 +256,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
                 run.checkpoint(WorkflowInstanceStatusEnum.RUNNING);
             }
         }
-        run.scope.complete(key, node.getId(), Collections.<String, Object>emptyMap());
+        run.scope.complete(key, node.getId(), Collections.emptyMap());
         if (persist) {
             run.checkpoint(WorkflowInstanceStatusEnum.RUNNING);
         }

@@ -5,6 +5,7 @@ import com.clara.codegraph.CodeGraphSupplement;
 import com.clara.config.AlwaysPromptSettings;
 import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
+import com.clara.config.IntentPlanSettings;
 import com.clara.config.ModelRegistry;
 import com.clara.context.ConvContext;
 import com.clara.core.memory.IContextSupplementProvider;
@@ -68,9 +69,12 @@ import com.clara.orchestration.context.ContextAssembler;
 import com.clara.orchestration.context.HistorySanitizer;
 import com.clara.orchestration.context.SemanticRecallCoordinator;
 import com.clara.orchestration.context.WindowCompressionCoordinator;
+import com.clara.orchestration.intent.ExecutionPlanValidator;
+import com.clara.orchestration.intent.IntentPlanCoordinator;
 import com.clara.orchestration.record.CallRecordPublisher;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
+import com.clara.planner.ValidateExecutionPlanTool;
 import com.clara.record.InMemoryCallRecordSink;
 import com.clara.skill.executor.SkillPermissionAuthorizer;
 import com.clara.skill.executor.SkillSchemaValidator;
@@ -341,6 +345,14 @@ public final class ApplicationBootstrap implements Closeable {
         ScriptExecutorRegistry scriptExecutors = new ScriptExecutorRegistry();
         IToolInvoker localToolInvoker = new DefaultToolInvoker(new DefaultToolExecutor(skillRegistry, scriptExecutors, new SkillSchemaValidator(), new SkillPermissionAuthorizer(), 30_000L));
         IToolInvoker toolInvoker = new CompositeToolInvoker(skillRegistry, localToolInvoker, mcpGateway, externalToolCatalog);
+        // 意图识别与动态执行计划：复杂任务先生成计划，并交给内置工具 validate_execution_plan 校验；
+        // 简单任务不生成计划，仍由主链路直接回答。开关见 config/clara.yml 的 intentPlanning 节点。
+        IntentPlanSettings intentPlanSettings = IntentPlanSettings.load(ConfigLocator.claraConfigFile());
+        ExecutionPlanValidator executionPlanValidator = new ExecutionPlanValidator(intentPlanSettings.getMaxSteps());
+        IntentPlanCoordinator intentPlanCoordinator = intentPlanSettings.isEnabled()
+                ? new IntentPlanCoordinator(streamModel, toolInvoker, executionPlanValidator,
+                        intentPlanSettings.getMaxRepairAttempts(), contextTrace)
+                : null;
 
         // clara-memory：窗口压缩编排（把被淘汰历史交给模型总结为摘要）
         this.windowCompression = new WindowCompressionCoordinator(new DefaultSummarizeCoordinator(streamModel, promptProvider));
@@ -387,7 +399,7 @@ public final class ApplicationBootstrap implements Closeable {
                             : memory;
                 };
 
-        this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler, capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator);
+        this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler, capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator, intentPlanCoordinator);
 
         // clara-workflow：默认内存检查点工作流引擎；IWorkflowDefinitionResolver 本阶段未接入
         this.workflowEngine = new DefaultWorkflowEngine(new InMemoryCheckpointStore(), 4);
@@ -405,7 +417,8 @@ public final class ApplicationBootstrap implements Closeable {
         // 内置工具与本地工具调用共享同一脚本执行器注册表，故可在运行器就绪后再注册内置执行器：
         // run_workflow 负责按标识运行；publish_workflow 负责校验并发布模型生成的自定义工作流
         scriptExecutors.register(new BuiltinToolExecutor(Arrays.<IBuiltinTool>asList(
-                new WorkflowRunTool(workflowRunner), new PublishWorkflowTool(workflowDefinitionRegistry))));
+                new WorkflowRunTool(workflowRunner), new PublishWorkflowTool(workflowDefinitionRegistry),
+                new ValidateExecutionPlanTool(executionPlanValidator))));
     }
 
     /**

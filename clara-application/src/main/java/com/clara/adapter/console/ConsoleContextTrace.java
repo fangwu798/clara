@@ -7,7 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 控制台上下文来源观测：把「图谱补充 / 向量召回 / 提示词匹配」的命中结果打成一行摘要 + 明细。
+ * 控制台上下文来源观测：把「图谱补充 / 向量召回 / 提示词匹配」的命中结果，以及
+ * 「意图判断 / 计划生成 / 计划校验」的阶段进展打成一行摘要 + 明细。
  *
  * <p>是什么、在哪一层：application 的控制台适配器（包 {@code com.clara.adapter.console}），
  * 实现 core 的 {@link IContextTraceSink}；由 {@code ClaraApplication} 装配进 {@code ApplicationBootstrap}。
@@ -17,7 +18,7 @@ import java.util.List;
  * 同一份文本由 {@link ConsoleView#emit(String, String)} 同时落详细日志，事后也可回查。
  *
  * <p>排版：标签列按 {@link StringUtils#padRight(String, int)} 的显示宽度（中文按两列算），
- * 所以「[图谱]」「[向量]」「[提示词]」后的状态列在终端里是对齐的。
+ * 所以「[图谱]」「[向量]」「[提示词]」「[意图]」「[计划]」「[校验]」后的状态列在终端里是对齐的。
  *
  * <p>线程安全：只持有只读的视图引用，可跨线程调用。
  */
@@ -37,6 +38,21 @@ public final class ConsoleContextTrace implements IContextTraceSink {
      * 知识源标识：提示词向量匹配（{@code SkillMatchCoordinator} 的 PROMPT 检索），与该类中的标识一致。
      */
     public static final String SOURCE_PROMPT_MATCH = "prompt_match";
+
+    /**
+     * 观测源标识：意图判断（复杂任务 / 简单任务）。
+     */
+    public static final String SOURCE_INTENT = "intent";
+
+    /**
+     * 观测源标识：动态执行计划（通过校验的步骤清单）。
+     */
+    public static final String SOURCE_PLAN = "plan";
+
+    /**
+     * 观测源标识：动态执行计划的格式校验（工具校验 / 本地兜底校验）。
+     */
+    public static final String SOURCE_VALIDATION = "validation";
 
     /**
      * 标签列宽（按显示宽度，中文按两列算）：中文标签下状态列也能对齐。
@@ -70,8 +86,33 @@ public final class ConsoleContextTrace implements IContextTraceSink {
 
     @Override
     public void onTrace(String source, int hits, long elapsedMillis, List<String> details) {
-        List<String> rendered = lines(source, hits, elapsedMillis, details);
-        view.emit(rendered.get(0), hits > 0 ? ConsoleView.ANSI_GREEN : ConsoleView.ANSI_GRAY);
+        emit(lines(source, hits, elapsedMillis, details),
+                hits > 0 ? ConsoleView.ANSI_GREEN : ConsoleView.ANSI_GRAY);
+    }
+
+    /**
+     * 输出阶段进展：状态文本原样展示，成功绿色、失败红色。
+     *
+     * @param source        观测源标识，可为 null（按未知源展示）
+     * @param status        阶段状态文本，为空时按「进行中」展示
+     * @param success       阶段是否成功
+     * @param elapsedMillis 阶段耗时（毫秒）
+     * @param details       阶段明细，可为 null（视为无）
+     */
+    @Override
+    public void onTrace(String source, String status, boolean success, long elapsedMillis, List<String> details) {
+        emit(phaseLines(source, status, elapsedMillis, details),
+                success ? ConsoleView.ANSI_GREEN : ConsoleView.ANSI_RED);
+    }
+
+    /**
+     * 首行按来源结果着色，明细行统一灰色。
+     *
+     * @param rendered 已渲染的行，不可为 null 或空
+     * @param colorCode 首行颜色码，非 null
+     */
+    private void emit(List<String> rendered, String colorCode) {
+        view.emit(rendered.get(0), colorCode);
         for (int index = 1; index < rendered.size(); index++) {
             view.emit(rendered.get(index), ConsoleView.ANSI_GRAY);
         }
@@ -89,9 +130,36 @@ public final class ConsoleContextTrace implements IContextTraceSink {
      * @return 渲染后的行列表，至少一行，非 null
      */
     static List<String> lines(String source, int hits, long elapsedMillis, List<String> details) {
+        String status = hits > 0 ? "命中 " + hits + " 条" : "未命中";
+        return render(source, status, elapsedMillis, details);
+    }
+
+    /**
+     * 渲染阶段行：首行是「[标签] 状态（耗时）」，其后每个明细一行。
+     *
+     * @param source        观测源标识，可为 null（按未知源展示）
+     * @param status        阶段状态文本；为空时按「进行中」展示
+     * @param elapsedMillis 阶段耗时（毫秒）
+     * @param details       阶段明细，可为 null（视为无）
+     * @return 渲染后的行列表，至少一行，非 null
+     */
+    static List<String> phaseLines(String source, String status, long elapsedMillis, List<String> details) {
+        String text = status == null || status.trim().isEmpty() ? "进行中" : status.trim();
+        return render(source, text, elapsedMillis, details);
+    }
+
+    /**
+     * 渲染通用观测行：标签列按显示宽度补齐，明细行与状态列起点对齐。
+     *
+     * @param source        观测源标识，可为 null（按未知源展示）
+     * @param status        状态文本，非 null
+     * @param elapsedMillis 耗时（毫秒）
+     * @param details       明细，可为 null（视为无）
+     * @return 渲染后的行列表，至少一行，非 null
+     */
+    private static List<String> render(String source, String status, long elapsedMillis, List<String> details) {
         List<String> rendered = new ArrayList<>();
         String label = "[" + label(source) + "]";
-        String status = hits > 0 ? "命中 " + hits + " 条" : "未命中";
         rendered.add(LINE_INDENT + StringUtils.padRight(label, LABEL_WIDTH) + status
                 + "（" + elapsedMillis + "ms）");
         if (details != null) {
@@ -119,6 +187,15 @@ public final class ConsoleContextTrace implements IContextTraceSink {
         }
         if (SOURCE_SEMANTIC_RECALL.equals(source)) {
             return "向量";
+        }
+        if (SOURCE_INTENT.equals(source)) {
+            return "意图";
+        }
+        if (SOURCE_PLAN.equals(source)) {
+            return "计划";
+        }
+        if (SOURCE_VALIDATION.equals(source)) {
+            return "校验";
         }
         return source == null || source.trim().isEmpty() ? "未知" : source.trim();
     }

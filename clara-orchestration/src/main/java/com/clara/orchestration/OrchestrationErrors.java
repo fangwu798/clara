@@ -1,6 +1,5 @@
 package com.clara.orchestration;
 
-import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
 import com.clara.enums.ErrorCategoryEnum;
@@ -26,17 +25,6 @@ public final class OrchestrationErrors {
                 .build());
     }
 
-    /**
-     * 创建能力不支持错误。
-     *
-     * @param kind 不受支持的能力种类
-     * @return 编排错误，非 null
-     */
-    public static ClaraException capabilityNotSupported(CapabilityKindEnum kind) {
-        return new ClaraException(ClaraError.builder(ErrorCodes.CAPABILITY_NOT_SUPPORTED, ErrorCategoryEnum.CAPABILITY)
-                .safeMessage("capability is not supported by orchestration: " + kind)
-                .build());
-    }
 
     /**
      * 创建工具往返次数超限错误。

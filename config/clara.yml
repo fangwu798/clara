@@ -53,6 +53,20 @@ codeGraph:
 context:
   alwaysPrompts: [code_graph_guide]
 
+# 意图识别与动态执行计划（可选）。
+# 开启后每轮用户输入先做一次复杂度判断：
+#   1) 简单任务（闲聊、单点问答、单个操作）不生成计划，直接由模型回答；
+#   2) 复杂任务（多步骤、跨文件 / 工具、先分析再修改再验证）生成执行计划，并经内置工具
+#      validate_execution_plan 校验格式后注入本轮 system 指令，模型按计划推进。
+# 明确的问候等短输入走本地快速判断，不额外调用模型。
+# 关闭时行为与之前一致：不判断意图、不生成计划。
+intentPlanning:
+  enabled: true
+  # 计划最大步骤数，超过会被校验器拒绝并要求模型修正。
+  maxSteps: 12
+  # 计划校验失败后允许模型修正的最大次数；0 表示失败即退回直接回答。
+  maxRepairAttempts: 1
+
 # 语义记忆（可选）。配了 milvus 且 enabled 不为 false 时：
 #   1) 所有对话记录都会写入 Milvus（来源 CONVERSATION，按会话隔离，用于长程/跨窗口关联）；
 #   2) 每轮按输入从 Milvus 召回历史上下文，注入到提示词。

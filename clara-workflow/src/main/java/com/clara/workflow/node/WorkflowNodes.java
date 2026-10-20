@@ -17,10 +17,8 @@ public final class WorkflowNodes {
     private WorkflowNodes() {
     }
 
-    public static IWorkflowNode action(String id, WorkflowNodeTypeEnum type, Set<String> outputKeys,
-            String idempotencyKey, IWorkflowAction action) {
-        if (type != WorkflowNodeTypeEnum.AGENT && type != WorkflowNodeTypeEnum.TOOL
-                && type != WorkflowNodeTypeEnum.REVIEW) {
+    public static IWorkflowNode action(String id, WorkflowNodeTypeEnum type, Set<String> outputKeys, String idempotencyKey, IWorkflowAction action) {
+        if (type != WorkflowNodeTypeEnum.AGENT && type != WorkflowNodeTypeEnum.TOOL && type != WorkflowNodeTypeEnum.REVIEW) {
             throw new IllegalArgumentException("action type must be AGENT, TOOL or REVIEW");
         }
         return new ActionNode(id, type, outputKeys, idempotencyKey, action);
@@ -42,16 +40,14 @@ public final class WorkflowNodes {
         return new CompositeNode(id, WorkflowNodeTypeEnum.PARALLEL, children);
     }
 
-    public static IWorkflowNode condition(String id, IScopeCondition condition,
-            IWorkflowNode whenTrue, IWorkflowNode whenFalse) {
+    public static IWorkflowNode condition(String id, IScopeCondition condition, IWorkflowNode whenTrue, IWorkflowNode whenFalse) {
         if (condition == null || whenTrue == null) {
             throw new IllegalArgumentException("condition and true branch are required");
         }
         return new ConditionNode(id, condition, whenTrue, whenFalse);
     }
 
-    public static IWorkflowNode loop(String id, IWorkflowNode body, int maxIterations,
-            IScopeCondition exitCondition) {
+    public static IWorkflowNode loop(String id, IWorkflowNode body, int maxIterations, IScopeCondition exitCondition) {
         if (body == null || maxIterations <= 0) {
             throw new IllegalArgumentException("loop body and positive maxIterations are required");
         }

@@ -46,7 +46,7 @@ public final class ToolOutputCompactor {
      */
     public static List<IContent> compact(List<IContent> messages, int maxChars) {
         if (messages == null || messages.isEmpty() || maxChars <= 0) {
-            return messages == null ? Collections.<IContent>emptyList() : messages;
+            return messages == null ? Collections.emptyList() : messages;
         }
         int boundary = lastUserIndex(messages);
         if (boundary <= 0) {
@@ -72,8 +72,7 @@ public final class ToolOutputCompactor {
     private static int lastUserIndex(List<IContent> messages) {
         for (int index = messages.size() - 1; index >= 0; index--) {
             IContent message = messages.get(index);
-            if (message != null && message.getRoleType() == RoleEnum.USER
-                    && message instanceof UserContent) {
+            if (message != null && message.getRoleType() == RoleEnum.USER && message instanceof UserContent) {
                 return index;
             }
         }
@@ -98,8 +97,7 @@ public final class ToolOutputCompactor {
         int head = maxChars / 2;
         int tail = maxChars - head;
         String omitted = String.format(OMISSION_MARKER, content.length() - maxChars);
-        String compressed = content.substring(0, head) + omitted
-                + content.substring(content.length() - tail);
+        String compressed = content.substring(0, head) + omitted + content.substring(content.length() - tail);
         return new ToolContent(((ToolContent) message).getToolCallId(), compressed);
     }
 }

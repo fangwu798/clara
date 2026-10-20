@@ -1,6 +1,7 @@
 package com.clara.workflow.definition;
 
 import com.clara.dto.workflow.WorkflowDefinition;
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,6 +17,7 @@ import java.util.List;
  * <p>谁创建谁调用：由 {@link WorkflowDefinitionLoader} 创建、{@link WorkflowDefinitionRegistry} 持有、
  * 运行器读取；不可变。
  */
+@Data
 public final class LoadedWorkflow {
 
     private final WorkflowDefinition definition;
@@ -34,15 +36,7 @@ public final class LoadedWorkflow {
         }
         this.definition = definition;
         this.outputs = outputs == null
-                ? Collections.<String>emptyList()
+                ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(outputs));
-    }
-
-    public WorkflowDefinition getDefinition() {
-        return definition;
-    }
-
-    public List<String> getOutputs() {
-        return outputs;
     }
 }

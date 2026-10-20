@@ -43,6 +43,8 @@ public final class ConversationRequest {
     private boolean stream;
     /** 流式调用的领域事件接收方；为 null 时退化为同步调用。 */
     private IStreamObserver observer;
+    /** 是否启用意图识别与动态执行计划；null 表示使用平台默认（启用）。 */
+    private Boolean planningEnabled;
     /** 单轮对话允许的最大工具往返次数；非正时使用编排默认值。 */
     private int maxToolRoundTrips;
     /** 本会话的取消令牌；非空时编排层复用它，外部置位即可取消本轮模型调用与工具执行；为 null 时编排层自建。 */

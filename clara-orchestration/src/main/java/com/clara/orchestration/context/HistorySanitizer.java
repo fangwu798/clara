@@ -29,7 +29,7 @@ public final class HistorySanitizer {
      */
     public static List<IContent> dropInvalidAssistantMessages(List<IContent> messages) {
         if (messages == null || messages.isEmpty()) {
-            return messages == null ? java.util.Collections.<IContent>emptyList() : messages;
+            return messages == null ? java.util.Collections.emptyList() : messages;
         }
         List<IContent> result = new ArrayList<>(messages.size());
         for (IContent message : messages) {

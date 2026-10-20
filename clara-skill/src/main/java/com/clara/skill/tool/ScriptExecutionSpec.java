@@ -4,12 +4,14 @@ import com.clara.utils.StringUtils;
 import com.clara.api.IScriptExecutor;
 import com.clara.context.CancellationToken;
 import com.clara.enums.skill.ScriptTypeEnum;
+import lombok.Data;
 
 /**
  * 统一脚本执行描述：一次脚本执行的上下文（运行类型、脚本引用、入参、超时与可选取消信号）。
  *
  * <p>作为 {@link IScriptExecutor} 的入参，屏蔽各运行环境的差异，是调度层与具体执行器之间的公共数据契约。
  */
+@Data
 public final class ScriptExecutionSpec {
 
     private final ScriptTypeEnum type;
@@ -46,25 +48,4 @@ public final class ScriptExecutionSpec {
         this.timeoutMillis = timeoutMillis;
         this.cancellationToken = cancellationToken;
     }
-
-    public ScriptTypeEnum getType() {
-        return type;
-    }
-
-    public String getScript() {
-        return script;
-    }
-
-    public String getArgumentsJson() {
-        return argumentsJson;
-    }
-
-    public long getTimeoutMillis() {
-        return timeoutMillis;
-    }
-
-    public CancellationToken getCancellationToken() {
-        return cancellationToken;
-    }
-
 }

@@ -66,7 +66,7 @@ public class SkillMatchCoordinatorTest {
         SkillMatchCoordinator coordinator = new SkillMatchCoordinator(text -> new float[] {1f, 0f},
                 store(prompts, empty()), promptProvider("PROMPT-"));
 
-        SkillMatchCoordinator.MatchedSkill matched = coordinator.match("查询引用", control(3, 0.5));
+        MatchedSkill matched = coordinator.match("查询引用", control(3, 0.5));
 
         assertEquals(Collections.singletonList("PROMPT-p1"), matched.getPrompts());
         assertTrue(matched.getTools().isEmpty());
@@ -80,7 +80,7 @@ public class SkillMatchCoordinatorTest {
         SkillMatchCoordinator coordinator = new SkillMatchCoordinator(text -> new float[] {1f},
                 store(empty(), empty()), promptProvider("x"), () -> catalogTools);
 
-        SkillMatchCoordinator.MatchedSkill matched = coordinator.match("hello", control(3, 0.5));
+        MatchedSkill matched = coordinator.match("hello", control(3, 0.5));
 
         assertEquals(2, matched.getTools().size());
         assertEquals("get_weather", matched.getTools().get(0).getFunction().getName());

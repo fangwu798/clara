@@ -49,6 +49,33 @@ public class ConsoleContextTraceTest {
                 ConsoleContextTrace.lines(null, 0, 0, null).get(0));
     }
 
+    @Test
+    public void phaseLinesAlignWithHitLines() {
+        String intent = ConsoleContextTrace.phaseLines("intent", "复杂任务", 860,
+                Collections.singletonList("依据：跨多个文件")).get(0);
+        String validation = ConsoleContextTrace.phaseLines("validation", "通过", 6, null).get(0);
+        String recall = ConsoleContextTrace.lines("semantic_recall", 0, 8, Collections.emptyList()).get(0);
+
+        assertEquals("  [意图]    复杂任务（860ms）", intent);
+        assertEquals("  [校验]    通过（6ms）", validation);
+        assertEquals(columnOf(recall, "未命中"), columnOf(intent, "复杂任务"));
+        assertEquals(columnOf(intent, "复杂任务"), columnOf(validation, "通过"));
+    }
+
+    @Test
+    public void phaseDetailsAreIndentedAndBlankStatusFallsBack() {
+        List<String> lines = ConsoleContextTrace.phaseLines("plan", "  ", 3,
+                Collections.singletonList("[s1] 读取代码"));
+
+        assertEquals("  [计划]    进行中（3ms）", lines.get(0));
+        assertEquals("            [s1] 读取代码", lines.get(1));
+    }
+
+    /** 指定标记之前的显示宽度，用于断言不同来源的状态列起点一致。 */
+    private static int columnOf(String line, String marker) {
+        return StringUtils.displayWidth(line.substring(0, line.indexOf(marker)));
+    }
+
     /** 状态列起点：状态文本之前那段的显示宽度，不同来源应一致。 */
     private static int statusColumn(String line) {
         int at = line.contains("未命中") ? line.indexOf("未命中") : line.indexOf("命中");

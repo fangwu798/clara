@@ -27,7 +27,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,8 +42,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
     private final ExecutorService schedulers;
     private final ExecutorService calls;
 
-    public DefaultTaskPlanEngine(PlanValidator validator, IBudgetLedger budgets,
-            IExecutionLedger executions, int callThreads) {
+    public DefaultTaskPlanEngine(PlanValidator validator, IBudgetLedger budgets, IExecutionLedger executions, int callThreads) {
         if (validator == null || budgets == null || executions == null || callThreads <= 0) {
             throw new IllegalArgumentException("engine dependencies are invalid");
         }
@@ -59,9 +57,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
     public TaskPlanResult execute(TaskPlan draft, String runId, Map<String, Object> inputs) {
         TaskPlan plan = validator.validate(draft);
         budgets.openRun(runId, validator.getLimits().getTotalBudget());
-        Map<String, Object> values = inputs == null
-                ? new LinkedHashMap<>()
-                : new LinkedHashMap<>(inputs);
+        Map<String, Object> values = inputs == null ? new LinkedHashMap<>() : new LinkedHashMap<>(inputs);
         Map<String, TaskNodeStatusEnum> statuses = initialStatuses(plan);
         AtomicInteger steps = new AtomicInteger();
         long deadline = deadline(validator.getLimits().getTotalTimeoutMillis());
@@ -78,8 +74,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
                 throw deferred;
             }
         }
-        TaskPlan completed = new TaskPlan(plan.getGoal(), plan.getVersion(), plan.getTasks(),
-                plan.getLimits(), PlanStatusEnum.SUCCEEDED);
+        TaskPlan completed = new TaskPlan(plan.getGoal(), plan.getVersion(), plan.getTasks(), plan.getLimits(), PlanStatusEnum.SUCCEEDED);
         return new TaskPlanResult(completed, PlanStatusEnum.SUCCEEDED, statuses, values, steps.get());
     }
 
@@ -91,8 +86,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         return statuses;
     }
 
-    private List<BudgetReservation> reserve(String runId, List<TaskNode> ready,
-            Map<String, TaskNodeStatusEnum> statuses) {
+    private List<BudgetReservation> reserve(String runId, List<TaskNode> ready, Map<String, TaskNodeStatusEnum> statuses) {
         List<BudgetReservation> reservations = new ArrayList<>();
         try {
             for (TaskNode task : ready) {
@@ -114,9 +108,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         }
     }
 
-    private List<Future<TaskOutcome>> submit(TaskPlan plan, String runId, List<TaskNode> ready,
-            List<BudgetReservation> reservations, Map<String, Object> batchValues, long deadline,
-            AtomicInteger steps) {
+    private List<Future<TaskOutcome>> submit(TaskPlan plan, String runId, List<TaskNode> ready, List<BudgetReservation> reservations, Map<String, Object> batchValues, long deadline, AtomicInteger steps) {
         List<Future<TaskOutcome>> futures = new ArrayList<>();
         for (int index = 0; index < ready.size(); index++) {
             final TaskNode task = ready.get(index);
@@ -127,8 +119,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         return futures;
     }
 
-    private static RuntimeException collect(List<TaskNode> ready, List<Future<TaskOutcome>> futures,
-            Map<String, Object> values, Map<String, TaskNodeStatusEnum> statuses) {
+    private static RuntimeException collect(List<TaskNode> ready, List<Future<TaskOutcome>> futures, Map<String, Object> values, Map<String, TaskNodeStatusEnum> statuses) {
         RuntimeException deferred = null;
         for (int index = 0; index < futures.size(); index++) {
             TaskNode task = ready.get(index);
@@ -165,9 +156,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         calls.shutdownNow();
     }
 
-    private TaskOutcome executeTask(TaskPlan plan, String runId, TaskNode task,
-            BudgetReservation reservation, Map<String, Object> values, long deadline,
-            AtomicInteger steps) {
+    private TaskOutcome executeTask(TaskPlan plan, String runId, TaskNode task, BudgetReservation reservation, Map<String, Object> values, long deadline, AtomicInteger steps) {
         String executionKey = runId + ":" + task.getTaskId();
         ExecutionRecord executionRecord = executions.recordIntent(executionKey, plan.getGoal(),
                 plan.getVersion(), task.getTaskId());
@@ -194,8 +183,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         }
     }
 
-    private TaskOutcome executeWithRetries(TaskPlan plan, TaskNode task, BudgetReservation reservation,
-            Map<String, Object> values, long deadline, AtomicInteger steps, String executionKey) {
+    private TaskOutcome executeWithRetries(TaskPlan plan, TaskNode task, BudgetReservation reservation, Map<String, Object> values, long deadline, AtomicInteger steps, String executionKey) {
         Throwable lastFailure = null;
         for (int attempt = 1; attempt <= task.getRetryPolicy().getMaxAttempts(); attempt++) {
             if (steps.incrementAndGet() > validator.getLimits().getMaxPlanSteps()) {
@@ -224,8 +212,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         throw PlannerErrors.error(ErrorCodes.PLAN_INVALID, ErrorCategoryEnum.INTERNAL);
     }
 
-    private TaskOutcome attemptOnce(TaskPlan plan, TaskNode task, BudgetReservation reservation,
-            Map<String, Object> values, long deadline, String executionKey, int attempt) throws Exception {
+    private TaskOutcome attemptOnce(TaskPlan plan, TaskNode task, BudgetReservation reservation, Map<String, Object> values, long deadline, String executionKey, int attempt) throws Exception {
         TaskExecutionResult result = invoke(task, plan, attempt, executionKey, values, deadline);
         if (result == null || !result.getOutputs().containsKey(task.getOutputKey())) {
             throw new UnknownSideEffectException("task result is invalid");
@@ -235,9 +222,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         return new TaskOutcome(result);
     }
 
-    private TaskExecutionResult invoke(final TaskNode task, final TaskPlan plan, final int attempt,
-            final String executionKey, final Map<String, Object> values, long totalDeadline)
-            throws Exception {
+    private TaskExecutionResult invoke(final TaskNode task, final TaskPlan plan, final int attempt, final String executionKey, final Map<String, Object> values, long totalDeadline) throws Exception {
         long remaining = Math.max(0L, totalDeadline - System.currentTimeMillis());
         long timeout = Math.min(task.getTimeoutMillis(), remaining);
         if (timeout <= 0L) {
@@ -273,8 +258,7 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
         values.putAll(result.getOutputs());
     }
 
-    private static List<TaskNode> readyTasks(TaskPlan plan, Map<String, TaskNodeStatusEnum> statuses,
-            int maximum) {
+    private static List<TaskNode> readyTasks(TaskPlan plan, Map<String, TaskNodeStatusEnum> statuses, int maximum) {
         List<TaskNode> result = new ArrayList<>();
         for (TaskNode task : plan.getTasks()) {
             if (statuses.get(task.getTaskId()) == TaskNodeStatusEnum.PENDING
@@ -317,39 +301,5 @@ public final class DefaultTaskPlanEngine implements ITaskPlanEngine {
 
     private static ClaraException unknown() {
         return PlannerErrors.error(ErrorCodes.EXECUTION_SIDE_EFFECT_UNKNOWN, ErrorCategoryEnum.UNKNOWN_SIDE_EFFECT);
-    }
-
-    /**
-     * 负责创建规划器线程实例。
-     */
-    private static final class PlannerThreadFactory implements ThreadFactory {
-        private final AtomicInteger sequence = new AtomicInteger();
-        private final String role;
-
-        private PlannerThreadFactory() {
-            this("call");
-        }
-
-        private PlannerThreadFactory(String role) {
-            this.role = role;
-        }
-
-        @Override
-        public Thread newThread(Runnable runnable) {
-            Thread thread = new Thread(runnable, "clara-planner-" + role + "-" + sequence.incrementAndGet());
-            thread.setDaemon(true);
-            return thread;
-        }
-    }
-
-    /**
-     * 表示任务的处理结果。
-     */
-    private static final class TaskOutcome {
-        final TaskExecutionResult result;
-
-        TaskOutcome(TaskExecutionResult result) {
-            this.result = result;
-        }
     }
 }

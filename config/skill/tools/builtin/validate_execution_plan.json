@@ -1,0 +1,9 @@
+{
+  "id": "validate_execution_plan",
+  "name": "validate_execution_plan",
+  "type": "BUILTIN",
+  "description": "校验一份动态执行计划的格式：计划对象需包含 goal 与 steps，steps 至少 1 步、id 唯一、dependencies 只能引用已有 id 且不得成环。用于「复杂任务先生成计划、再按步骤执行」的场景；校验通过返回归一化计划，不通过返回可直接据此修正的 error。入参 plan 既可以是计划对象，也可用 {\"plan\": {...}} 包裹。",
+  "parameters": "{\"type\":\"object\",\"properties\":{\"plan\":{\"type\":\"object\",\"description\":\"计划对象，包含 goal 与 steps\"}},\"required\":[\"plan\"]}",
+  "script": "validate_execution_plan",
+  "metadata": { "domain": "planner", "tags": "planner,builtin,validation" }
+}

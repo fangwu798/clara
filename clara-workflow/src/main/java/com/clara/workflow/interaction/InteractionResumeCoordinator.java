@@ -29,14 +29,12 @@ public final class InteractionResumeCoordinator implements IInteractionResumeCoo
     }
 
     @Override
-    public ResumeOutcome resumeAndRecord(InteractionRequest trigger,
-            List<InteractionResponse> responses, Map<String, Object> scopeUpdates) {
+    public ResumeOutcome resumeAndRecord(InteractionRequest trigger, List<InteractionResponse> responses, Map<String, Object> scopeUpdates) {
         WorkflowDefinition definition = definitions.resolve(trigger.getContext().getInstanceId());
         if (definition == null) {
             throw new IllegalArgumentException("workflow definition was not resolved");
         }
-        WorkflowResult result = engine.resume(definition, trigger.getContext().getInstanceId(),
-                scopeUpdates, trigger.getContext().getExpectedInstanceVersion());
+        WorkflowResult result = engine.resume(definition, trigger.getContext().getInstanceId(), scopeUpdates, trigger.getContext().getExpectedInstanceVersion());
         return new ResumeOutcome(result.getStatus().name(), result.getCheckpointVersion());
     }
 

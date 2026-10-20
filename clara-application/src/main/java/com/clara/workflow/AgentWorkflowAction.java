@@ -145,6 +145,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
                 .capabilityKind(capability)
                 .userInput(userInput)
                 .attachments(attachments(scope))
+                .planningEnabled(false)
                 .providerConfiguration(configuration)
                 .stream(streaming)
                 .observer(streaming ? observer : null)

@@ -130,6 +130,25 @@ public class ContextAssemblerTest {
     }
 
     @Test
+    public void assemblePrependsExtraPromptsAsSystemInstruction() {
+        UserContent user = new UserContent("hi");
+        FakeWindowMemory window = new FakeWindowMemory("c1", Collections.<IContent>singletonList(user));
+
+        ContextAssembler assembler = new ContextAssembler(
+                new WindowCompressionCoordinator(null),
+                new SemanticRecallCoordinator(null, null),
+                new SkillMatchCoordinator(null, null, null));
+
+        AssembledContext assembled = assembler.assemble(window, control(false), null,
+                Collections.singletonList("PLAN-PROMPT"));
+
+        List<IContent> messages = assembled.getMessages();
+        assertEquals(2, messages.size());
+        assertTrue(messages.get(0) instanceof SystemContent);
+        assertEquals("PLAN-PROMPT", ((SystemContent) messages.get(0)).instructionText());
+        assertSame(user, messages.get(1));
+    }
+    @Test
     public void assembleRejectsNullWindowMemory() {
         ContextAssembler assembler = new ContextAssembler(
                 new WindowCompressionCoordinator(null),

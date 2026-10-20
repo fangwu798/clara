@@ -4,6 +4,7 @@ import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IScopeCondition;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,6 +15,7 @@ import java.util.Set;
 /**
  * 条件分支节点：承载条件与真假分支。
  */
+@Data
 public final class ConditionNode implements IWorkflowNode {
 
     private final String id;
@@ -22,8 +24,7 @@ public final class ConditionNode implements IWorkflowNode {
     private final IWorkflowNode whenFalse;
     private final Set<String> outputKeys;
 
-    ConditionNode(String id, IScopeCondition condition, IWorkflowNode whenTrue,
-            IWorkflowNode whenFalse) {
+    ConditionNode(String id, IScopeCondition condition, IWorkflowNode whenTrue, IWorkflowNode whenFalse) {
         if (StringUtils.isBlank(id)) {
             throw new IllegalArgumentException("node id must not be blank");
         }
@@ -35,18 +36,8 @@ public final class ConditionNode implements IWorkflowNode {
     }
 
     @Override
-    public String getId() {
-        return id;
-    }
-
-    @Override
     public WorkflowNodeTypeEnum getType() {
         return WorkflowNodeTypeEnum.CONDITION;
-    }
-
-    @Override
-    public Set<String> getOutputKeys() {
-        return outputKeys;
     }
 
     @Override
@@ -57,18 +48,6 @@ public final class ConditionNode implements IWorkflowNode {
             result.add(whenFalse);
         }
         return Collections.unmodifiableList(result);
-    }
-
-    public IScopeCondition getCondition() {
-        return condition;
-    }
-
-    public IWorkflowNode getWhenTrue() {
-        return whenTrue;
-    }
-
-    public IWorkflowNode getWhenFalse() {
-        return whenFalse;
     }
 
     private static Set<String> unionBranches(IWorkflowNode one, IWorkflowNode two) {

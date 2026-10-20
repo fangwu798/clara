@@ -3,6 +3,7 @@ package com.clara.workflow.node;
 import com.clara.utils.StringUtils;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.enums.workflow.WorkflowNodeTypeEnum;
+import lombok.Data;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -12,6 +13,7 @@ import java.util.Set;
 /**
  * 人工输入节点：承载等待输入的键。
  */
+@Data
 public final class HumanNode implements IWorkflowNode {
 
     private final String id;
@@ -33,27 +35,13 @@ public final class HumanNode implements IWorkflowNode {
     }
 
     @Override
-    public String getId() {
-        return id;
-    }
-
-    @Override
     public WorkflowNodeTypeEnum getType() {
         return WorkflowNodeTypeEnum.HUMAN;
     }
 
     @Override
-    public Set<String> getOutputKeys() {
-        return outputKeys;
-    }
-
-    @Override
     public List<IWorkflowNode> children() {
         return Collections.emptyList();
-    }
-
-    public String getInputKey() {
-        return inputKey;
     }
 
 }

@@ -31,8 +31,7 @@ public final class DefaultToolExecutor implements IToolExecutor {
      * @param registry 技能注册表，不可为 null
      */
     public DefaultToolExecutor(SkillRegistry registry) {
-        this(registry, new ScriptExecutorRegistry(), new SkillSchemaValidator(),
-                new SkillPermissionAuthorizer(), DEFAULT_TIMEOUT_MILLIS);
+        this(registry, new ScriptExecutorRegistry(), new SkillSchemaValidator(), new SkillPermissionAuthorizer(), DEFAULT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -44,9 +43,7 @@ public final class DefaultToolExecutor implements IToolExecutor {
      * @param permissionAuthorizer 权限校验器，不可为 null
      * @param defaultTimeoutMillis 单次脚本执行的默认硬超时（毫秒），必须为正
      */
-    public DefaultToolExecutor(SkillRegistry registry, ScriptExecutorRegistry executors,
-            SkillSchemaValidator schemaValidator, SkillPermissionAuthorizer permissionAuthorizer,
-            long defaultTimeoutMillis) {
+    public DefaultToolExecutor(SkillRegistry registry, ScriptExecutorRegistry executors, SkillSchemaValidator schemaValidator, SkillPermissionAuthorizer permissionAuthorizer, long defaultTimeoutMillis) {
         if (registry == null || executors == null || schemaValidator == null || permissionAuthorizer == null) {
             throw new IllegalArgumentException("dependencies must not be null");
         }

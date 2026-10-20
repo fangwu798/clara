@@ -30,14 +30,16 @@ public final class WorkflowDefinitionRegistry {
 
     private final Path directory;
     private final WorkflowDefinitionLoader loader;
-    private final AtomicReference<Map<String, LoadedWorkflow>> workflows =
-            new AtomicReference<>(Collections.emptyMap());
+    private final AtomicReference<Map<String, LoadedWorkflow>> workflows = new AtomicReference<>(Collections.emptyMap());
 
-    /** 定义文件签名（路径 → 修改时间:大小），用于发现运行期新增 / 修改 / 删除的定义文件。 */
-    private final AtomicReference<Map<String, String>> sourceStamps =
-            new AtomicReference<>(Collections.emptyMap());
+    /**
+     * 定义文件签名（路径 → 修改时间:大小），用于发现运行期新增 / 修改 / 删除的定义文件。
+     */
+    private final AtomicReference<Map<String, String>> sourceStamps = new AtomicReference<>(Collections.emptyMap());
 
-    /** 最近一次刷新失败的说明（成功时为 null）：既有索引保留可用，失败原因透出给调用方。 */
+    /**
+     * 最近一次刷新失败的说明（成功时为 null）：既有索引保留可用，失败原因透出给调用方。
+     */
     private volatile String lastError;
 
     /**
@@ -206,7 +208,7 @@ public final class WorkflowDefinitionRegistry {
      */
     public List<String> outputs(String workflowId) {
         LoadedWorkflow workflow = workflows.get().get(workflowId);
-        return workflow == null ? Collections.<String>emptyList() : workflow.getOutputs();
+        return workflow == null ? Collections.emptyList() : workflow.getOutputs();
     }
 
     /**

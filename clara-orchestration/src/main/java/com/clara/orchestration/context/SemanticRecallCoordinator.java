@@ -26,7 +26,7 @@ import java.util.Set;
  * <p>可观测性：每次检索都把「命中几条 / 耗时 / 阈值与候选数 / 命中片段（带相似度）」报给可选的
  * {@link IContextTraceSink}，供控制台观察；未接入宿主时不上报。
  * <p>判重：命中内容若本轮请求里已经带着（本轮提问、刚返回的工具结果），直接丢弃、不进补充信息——
- * 与写入端共用 {@link ConversationMemoryText} 折算文本，一字不差才算重复。
+ * 与写入端共用 {@link ConversationMemoryText} 折算文本，一个字不差才算重复。
  */
 public final class SemanticRecallCoordinator {
 
@@ -79,7 +79,7 @@ public final class SemanticRecallCoordinator {
      * @return 命中的知识文本列表，非 null
      */
     public List<String> recall(String conversationId, String userInput, ContextControlConfig control) {
-        return recall(conversationId, userInput, control, Collections.<IContent>emptyList());
+        return recall(conversationId, userInput, control, Collections.emptyList());
     }
 
     /**
@@ -88,8 +88,8 @@ public final class SemanticRecallCoordinator {
      * <p>为什么必须丢弃：同一条消息写进语义库时往往还在本轮上下文里——本轮提问本身、刚返回的工具结果都算。
      * 命中它们等于把模型刚看过的内容再抄一份塞进 system 指令：白占 token，还会让「召回命中了」这个观测结论失真。
      *
-     * <p>判重口径：只比文本、不比分数，与写入端共用 {@link ConversationMemoryText} 折算文本，一字不差才算重复；
-     * 因此被压缩或截断过的历史（正文已经变了）仍会被召回，「找回被淘汰内容」这个本职不受影响。
+     * <p>判重口径：只比文本、不比分数，与写入端共用 {@link ConversationMemoryText} 折算文本，一个字不差才算重复；
+     * 因此压缩或截断过的历史消息（正文已经变了）仍会被召回，「找回被淘汰内容」这个本职不受影响。
      *
      * @param conversationId  会话标识，不可为空白
      * @param userInput       当前用户输入
@@ -97,10 +97,8 @@ public final class SemanticRecallCoordinator {
      * @param visibleMessages 本轮请求将要下发的消息（含本轮提问与其后的工具调用、工具结果），可为 null
      * @return 命中的知识文本列表，非 null
      */
-    public List<String> recall(String conversationId, String userInput, ContextControlConfig control,
-            List<IContent> visibleMessages) {
-        if (embeddingClient == null || semanticMemoryStore == null || control == null
-                || control.getRetrievalCount() <= 0 || userInput == null || userInput.trim().isEmpty()) {
+    public List<String> recall(String conversationId, String userInput, ContextControlConfig control, List<IContent> visibleMessages) {
+        if (embeddingClient == null || semanticMemoryStore == null || control == null || control.getRetrievalCount() <= 0 || userInput == null || userInput.trim().isEmpty()) {
             return Collections.emptyList();
         }
         long started = System.nanoTime();

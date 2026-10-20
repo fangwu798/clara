@@ -110,7 +110,7 @@ clara-orchestration/src/main/java/com/clara/orchestration/
 - 使用范围：发送请求前。
 - 为什么需要：编排层按匹配结果动态装配技能能力（提示词 + 工具声明），避免全量加载；检索走 `ISemanticMemoryStore`，取回走 `IPromptProvider`。
 - 业务细节：用当前用户输入向量化，构造 `SemanticMemoryQuery`（来源 `PROMPT` / `TOOL_DESCRIPTION`、topK 与阈值取自 control 配置）检索；按相似度排序、过滤低于阈值的命中、同技能去重；命中的提示词经 `IPromptProvider` 取回定义；命中的工具方法组装为请求的 `tools` 声明；无命中则不注入任何技能。
-- 技术细节：构造注入 `IEmbeddingClient` / `ISemanticMemoryStore` / `IPromptProvider`（均可为 null）；方法 `MatchedSkill match(userInput, control)`；分别按 `PROMPT`、`TOOL_DESCRIPTION` 各检索一次（`SemanticMemoryQuery(sourceType, null 会话, vector, retrievalCount, threshold, now, null)`），用 `LinkedHashSet<sourceId>` 去重、`score>=阈值` 过滤；提示词经 `IPromptProvider.prompt(sourceId)` 取回；工具方法把 `sourceId` 规整为合法工具名（仅 `[a-zA-Z0-9_-]`、≤128 字符、空则 `skill_tool`）并附空 object schema 组装 `ToolContext`/`ToolSpecification`；返回内嵌不可变 `MatchedSkill`。
+- 技术细节：构造注入 `IEmbeddingClient` / `ISemanticMemoryStore` / `IPromptProvider`（均可为 null）；方法 `MatchedSkill match(userInput, control)`；分别按 `PROMPT`、`TOOL_DESCRIPTION` 各检索一次（`SemanticMemoryQuery(sourceType, null 会话, vector, retrievalCount, threshold, now, null)`），用 `LinkedHashSet<sourceId>` 去重、`score>=阈值` 过滤；提示词经 `IPromptProvider.prompt(sourceId)` 取回；工具方法把 `sourceId` 规整为合法工具名（仅 `[a-zA-Z0-9_-]`、≤128 字符、空则 `skill_tool`）并附空 object schema 组装 `ToolContext`/`ToolSpecification`；返回不可变 `MatchedSkill`。
 
 ### 4.4 工具往返
 
@@ -157,6 +157,30 @@ clara-orchestration/src/main/java/com/clara/orchestration/
 - 业务细节：覆盖入参非法、能力不受支持、工具往返超限等编排错误，统一错误码与分类，供上层识别与处理。
 - 技术细节：私有构造 + 静态工厂，返回 `ClaraException(ClaraError)`；`invalidArgument`（`INVALID_ARGUMENT` / `VALIDATION`）、`capabilityNotSupported`（`CAPABILITY_NOT_SUPPORTED` / `CAPABILITY`）、`toolRoundTripLimitExceeded`（`INVALID_ARGUMENT` / `RESOURCE_LIMIT`），均标记为不可重试。
 
+### 4.9 意图识别与动态计划
+
+**`IntentPlanCoordinator`（`com.clara.orchestration.intent`）**
+- 作用：在进入 Agent Loop 前判断用户输入是简单任务还是复杂任务；复杂任务生成执行计划，简单任务直接交给模型。
+- 使用范围：`DefaultConversationOrchestrator.converse` 在追加用户消息后、首次模型调用前调用；`ConversationRequest.planningEnabled=false` 时跳过（工作流内部节点使用该开关）。
+- 为什么需要：简单问答不必承担计划开销；复杂任务先形成可校验的步骤清单，能减少漏步、重复读取与执行顺序错误。
+- 业务细节：明显问候等短输入走本地快速判断，不调用模型；其余输入由模型输出「simple / complex + 计划 JSON」；复杂计划经内置工具 `validate_execution_plan` 校验，未通过时最多修正 `maxRepairAttempts` 次；通过后由 `ExecutionPlan.toPrompt()` 注入本轮 system 指令，并按正常工具往返执行。
+- 技术细节：构造注入 `IStreamModel`、`IToolInvoker`（可为 null，退回本地校验）、`ExecutionPlanValidator`、修正次数与 `IContextTraceSink`；计划校验工具通过 `ToolCall` 调用；模型未返回、JSON 非法、校验失败或工具不可用时一律退回简单任务。
+- 控制台观测：`IContextTraceSink` 新增阶段接口 `onTrace(source, status, success, elapsed, details)`（默认实现退化为命中接口，不破坏既有宿主）。规划过程按阶段输出：`[意图]` 判断中 / 简单任务 / 复杂任务 / 已降级，`[计划]` 生成完成 / 修正中 / 已生成，`[校验]` 校验中 / 通过 / 未通过 / 工具不可用；状态行按成功绿色、失败红色着色，明细行灰色并与状态列对齐。
+- 失败语义：规划是增强能力，任何异常都不阻断本轮对话；计划不写入会话历史，仅当前轮生效。
+
+**`ExecutionPlan` / `ExecutionStep`（`com.clara.dto.planner`）**
+- 作用：承载轻量执行计划（目标 + 有序步骤 + 依赖 + 预期产出）。
+- 为什么与 `TaskPlan` 分开：`TaskPlan` 绑定任务处理器、预算与能力授权，面向规划引擎执行；本 DTO 只服务「模型生成 → 格式校验 → 注入提示词」的对话内计划。
+
+**`ExecutionPlanValidator`（`com.clara.orchestration.intent`）**
+- 作用：校验计划结构：goal 非空、steps 数量在 1..maxSteps、步骤 id 唯一、title 非空、依赖存在且无自依赖、DAG 无环。
+- 使用范围：`IntentPlanCoordinator` 与内置工具 `validate_execution_plan` 共用，保证「编排内部校验」与「模型自查」口径一致。
+
+**内置工具 `validate_execution_plan`（`com.clara.planner`，application 装配）**
+- 入参：`{"plan": {...}}`。
+- 成功：返回 `{"ok":true,"goal":"...","stepCount":N,"plan":{...}}`。
+- 失败：返回 `{"ok":false,"error":"..."}`，错误文本可直接反馈给模型修正。
+- 配置：`config/clara.yml` 的 `intentPlanning` 节点（`enabled` / `maxSteps` / `maxRepairAttempts`）。
 ## 5. 关键实现细节
 
 ### 5.1 Agent Loop 主流程（`DefaultConversationOrchestrator`）

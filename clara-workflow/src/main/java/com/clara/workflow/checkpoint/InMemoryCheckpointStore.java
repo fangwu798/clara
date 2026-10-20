@@ -17,10 +17,8 @@ import java.util.concurrent.ConcurrentMap;
  */
 public final class InMemoryCheckpointStore implements ICheckpointStore {
 
-    private final ConcurrentMap<String, WorkflowCheckpoint> checkpoints =
-            new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, ConcurrentMap<Long, WorkflowCheckpoint>> history =
-            new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, WorkflowCheckpoint> checkpoints = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ConcurrentMap<Long, WorkflowCheckpoint>> history = new ConcurrentHashMap<>();
     private final Object saveLock = new Object();
 
     @Override
@@ -37,8 +35,7 @@ public final class InMemoryCheckpointStore implements ICheckpointStore {
             throw new IllegalArgumentException("instanceId and version are invalid");
         }
         ConcurrentMap<Long, WorkflowCheckpoint> versions = history.get(instanceId);
-        return versions == null ? Optional.<WorkflowCheckpoint>empty()
-                : Optional.ofNullable(versions.get(Long.valueOf(version)));
+        return versions == null ? Optional.empty() : Optional.ofNullable(versions.get(version));
     }
 
     @Override
@@ -61,7 +58,7 @@ public final class InMemoryCheckpointStore implements ICheckpointStore {
                         checkpoint.getInstanceId(), created);
                 versions = raced == null ? created : raced;
             }
-            versions.put(Long.valueOf(checkpoint.getVersion()), checkpoint);
+            versions.put(checkpoint.getVersion(), checkpoint);
             return checkpoint;
         }
     }
