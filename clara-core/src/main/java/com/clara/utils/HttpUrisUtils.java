@@ -48,7 +48,7 @@ public final class HttpUrisUtils {
         if (port < 0) {
             effectivePort = "https".equals(scheme) ? 443 : 80;
         }
-        String authorityHost = host.indexOf(':') >= 0 ? "[" + host + "]" : host;
+        String authorityHost = host.indexOf(':') >= 0 && !host.startsWith("[") ? "[" + host + "]" : host;
         return scheme + "://" + authorityHost + ":" + effectivePort;
     }
 

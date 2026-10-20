@@ -36,7 +36,7 @@ public final class BudgetAmount {
 
     public BudgetAmount minus(BudgetAmount other) {
         require(other);
-        if (other.isExceededBy(this)) {
+        if (isExceededBy(other)) {
             throw new IllegalArgumentException("budget subtraction underflow");
         }
         return new BudgetAmount(tokens - other.tokens, costMicros - other.costMicros, workUnits - other.workUnits);

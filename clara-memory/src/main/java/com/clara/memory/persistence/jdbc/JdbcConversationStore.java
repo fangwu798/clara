@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * JDBC 会话存储：通过 JDBC 持久化会话快照，用于多实例共享部署。
@@ -27,14 +28,32 @@ public final class JdbcConversationStore implements ConversationStore {
 
     private static final String WHERE_STORE_KEY = " WHERE store_key = ?";
 
+    /** 表名白名单：只允许字母或下划线开头的简单标识符，杜绝 SQL 注入。 */
+    private static final Pattern SIMPLE_IDENTIFIER = Pattern.compile("[A-Za-z_]\\w*");
+
     /**
      * 默认表名。
      */
     public static final String DEFAULT_TABLE = "clara_conversation";
 
     private final DataSource dataSource;
-    private final String table;
     private final ConversationCodec codec = new ConversationCodec();
+
+    /** 读取快照语句，表名在构造期校验后一次性拼接。 */
+    private final String selectSql;
+
+    /** 乐观并发更新语句，表名在构造期校验后一次性拼接。 */
+    private final String updateSql;
+
+    /** 首次写入语句，表名在构造期校验后一次性拼接。 */
+    private final String insertSql;
+
+    /** 删除语句，表名在构造期校验后一次性拼接。 */
+    private final String deleteSql;
+
+    /** 存在性探测语句，表名在构造期校验后一次性拼接。 */
+    private final String existsSql;
+
     private volatile boolean closed = false;
 
     /**
@@ -56,18 +75,21 @@ public final class JdbcConversationStore implements ConversationStore {
         if (dataSource == null) {
             throw new IllegalArgumentException("dataSource must not be null");
         }
-        if (table == null || !table.matches("[A-Za-z_]\\w*")) {
-            throw new IllegalArgumentException("table must be a simple identifier");
-        }
+        String tableName = requireSimpleIdentifier(table);
         this.dataSource = dataSource;
-        this.table = table;
+        this.selectSql = "SELECT payload FROM " + tableName + WHERE_STORE_KEY;
+        this.updateSql = "UPDATE " + tableName + " SET version = ?, payload = ? WHERE store_key = ? AND version = ?";
+        this.insertSql = "INSERT INTO " + tableName + " (store_key, version, payload) VALUES (?, ?, ?)";
+        this.deleteSql = "DELETE FROM " + tableName + WHERE_STORE_KEY;
+        this.existsSql = "SELECT 1 FROM " + tableName + WHERE_STORE_KEY;
     }
 
     @Override
     public ConversationSnapshot loadSnapshot(ConversationKey key) {
         open();
         requireKey(key);
-        try (Connection connection = dataSource.getConnection(); PreparedStatement statement = connection.prepareStatement("SELECT payload FROM " + table + WHERE_STORE_KEY)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(selectSql)) {
             statement.setString(1, key.value());
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
@@ -121,8 +143,7 @@ public final class JdbcConversationStore implements ConversationStore {
         connection.setAutoCommit(false);
         try {
             int updated;
-            try (PreparedStatement update = connection.prepareStatement(
-                    "UPDATE " + table + " SET version = ?, payload = ? WHERE store_key = ? AND version = ?")) {
+            try (PreparedStatement update = connection.prepareStatement(updateSql)) {
                 update.setLong(1, next.version());
                 update.setBytes(2, payload);
                 update.setString(3, key.value());
@@ -133,8 +154,7 @@ public final class JdbcConversationStore implements ConversationStore {
                 if (rowExists(connection, key.value())) {
                     throw ConversationStoreErrors.versionConflict();
                 }
-                try (PreparedStatement insert = connection.prepareStatement(
-                        "INSERT INTO " + table + " (store_key, version, payload) VALUES (?, ?, ?)")) {
+                try (PreparedStatement insert = connection.prepareStatement(insertSql)) {
                     insert.setString(1, key.value());
                     insert.setLong(2, next.version());
                     insert.setBytes(3, payload);
@@ -155,8 +175,7 @@ public final class JdbcConversationStore implements ConversationStore {
         open();
         requireKey(key);
         try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(
-                        "DELETE FROM " + table + WHERE_STORE_KEY)) {
+                PreparedStatement statement = connection.prepareStatement(deleteSql)) {
             statement.setString(1, key.value());
             statement.executeUpdate();
         } catch (SQLException e) {
@@ -170,8 +189,7 @@ public final class JdbcConversationStore implements ConversationStore {
     }
 
     private boolean rowExists(Connection connection, String keyValue) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT 1 FROM " + table + WHERE_STORE_KEY)) {
+        try (PreparedStatement statement = connection.prepareStatement(existsSql)) {
             statement.setString(1, keyValue);
             try (ResultSet resultSet = statement.executeQuery()) {
                 return resultSet.next();
@@ -197,5 +215,22 @@ public final class JdbcConversationStore implements ConversationStore {
         if (key == null) {
             throw new IllegalArgumentException("key must not be null");
         }
+    }
+
+    /**
+     * 校验表名，仅接受 {@code [A-Za-z_]\w*} 形式的简单标识符。
+     *
+     * <p>表名无法通过占位符绑定，因此在参与任何 SQL 拼接前必须先做白名单校验；
+     * 校验通过的值只在构造期参与一次拼接，运行期执行的始终是固定语句。
+     *
+     * @param table 待校验的表名
+     * @return 校验通过的表名
+     * @throws IllegalArgumentException 表名为 null 或不满足标识符规则
+     */
+    private static String requireSimpleIdentifier(String table) {
+        if (table == null || !SIMPLE_IDENTIFIER.matcher(table).matches()) {
+            throw new IllegalArgumentException("table must be a simple identifier");
+        }
+        return table;
     }
 }

@@ -36,6 +36,9 @@
         <maven.surefire.version>3.2.5</maven.surefire.version>
         <maven.enforcer.version>3.4.1</maven.enforcer.version>
         <maven.shade.version>3.5.1</maven.shade.version>
+        <jacoco.version>0.8.11</jacoco.version>
+        <!-- surefire 的 JVM 参数入口；JaCoCo prepare-agent 会在该值后追加 -javaagent。 -->
+        <argLine>-Dfile.encoding=UTF-8</argLine>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -195,8 +198,9 @@
                     <version>${maven.surefire.version}</version>
                     <configuration>
                         <!-- 与 clara.bat / clara.sh 保持一致：Milvus Java SDK 用 String.getBytes()
-                             （平台默认字符集）发送全文检索正文，默认 GBK 时 BM25 联测会让 Milvus 服务端直接 abort。 -->
-                        <argLine>-Dfile.encoding=UTF-8</argLine>
+                             （平台默认字符集）发送全文检索正文，默认 GBK 时 BM25 联测会让 Milvus 服务端直接 abort。
+                             argLine 使用 surefire 延迟替换，确保 JaCoCo prepare-agent 生成的 -javaagent 生效。 -->
+                        <argLine>@{argLine}</argLine>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -243,6 +247,26 @@
                                 <dependencyConvergence/>
                             </rules>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>

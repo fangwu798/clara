@@ -107,4 +107,39 @@
             </plugin>
         </plugins>
     </build>
+    <!--
+        覆盖率门禁（可选）：mvn -B verify -Pcoverage-gate。
+        汇总各模块 target/site/jacoco/jacoco.xml，整体行覆盖率低于 80% 时构建失败。
+    -->
+    <profiles>
+        <profile>
+            <id>coverage-gate</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.0.0</version>
+                        <executions>
+                            <execution>
+                                <id>check-coverage</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>node</executable>
+                                    <workingDirectory>${project.basedir}/..</workingDirectory>
+                                    <arguments>
+                                        <argument>tools/coverage/check-coverage.mjs</argument>
+                                        <argument>0.80</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

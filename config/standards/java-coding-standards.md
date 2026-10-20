@@ -521,6 +521,8 @@ if (!items.isEmpty()) { ... }
 - 新增分支必须覆盖：正常路径、边界值、异常路径。
 - 集成测试以 `IT` 结尾，默认不随 `mvn test` 执行；涉及容器的测试必须提供跳过开关。
 - 禁止为了测试放宽生产代码可见性；确需放宽时使用 `@VisibleForTesting`，且生产代码不得调用（S5803）。
+- 覆盖率以 JaCoCo 行覆盖率为准，新增代码行覆盖率不得低于 80%；Sonar 门禁使用
+  `new_line_coverage`，`new_coverage`（行 + 分支综合口径）仅作为观察指标，不作为门禁条件。
 
 ```java
 // 正例
@@ -596,6 +598,9 @@ String apiKey = System.getenv("CLARA_DEEPSEEK_API_KEY");
 | S4512 | CRITICAL | 禁止对不可信输入做 JavaBean 批量属性赋值 |
 | S5876 | CRITICAL | 用户登录成功后必须新建 Session，防会话固定 |
 | S5042 | CRITICAL | 解压必须限制文件数量、单文件大小与总大小，防 zip bomb |
+
+表名、列名等无法通过占位符绑定的 SQL 标识符，必须在进入拼接前按 `[A-Za-z_]\w*` 白名单校验，
+且只在构造期拼接一次；校验通过后运行期只执行固定语句，禁止把请求参数带入标识符。
 
 ```java
 // 正例：安全 XML 解析
