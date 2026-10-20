@@ -89,10 +89,10 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
                 SseParserConfig.DEFAULT_MAX_EVENTS, maxResponseBytes, true);
         this.policy = new HttpTransportPolicy(endpointPolicy, builder.connectTimeoutMillis,
                 Integer.MAX_VALUE, maxResponseBytes, maxResponseBytes,
-                Collections.<String, String>emptyMap(), sse);
+                Collections.emptyMap(), sse);
         this.eventStreamPolicy = new HttpTransportPolicy(endpointPolicy,
                 builder.connectTimeoutMillis, Integer.MAX_VALUE, maxResponseBytes,
-                Integer.MAX_VALUE, Collections.<String, String>emptyMap(),
+                Integer.MAX_VALUE, Collections.emptyMap(),
                 new SseParserConfig(
                         Math.min(SseParserConfig.DEFAULT_MAX_LINE_BYTES, maxResponseBytes),
                         Math.min(SseParserConfig.DEFAULT_MAX_EVENT_BYTES, maxResponseBytes),
@@ -205,9 +205,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
         }
         ensureStarted();
         executor.execute(() -> {
-            IHttpCall call = httpTransport.newCall(postRequest(codec.encode(notification)),
-                    policy, DeadlineGuard.after(policy.getConnectTimeoutMillis()));
-            try {
+            try (IHttpCall call = httpTransport.newCall(postRequest(codec.encode(notification)), policy, DeadlineGuard.after(policy.getConnectTimeoutMillis()))) {
                 RawHttpResponse response = call.execute();
                 captureSession(response);
                 if (!response.isSuccessful()) {
@@ -217,8 +215,6 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
                 reportFailure(map(exception));
             } catch (RuntimeException exception) {
                 reportFailure(exception);
-            } finally {
-                call.close();
             }
         });
     }
@@ -272,10 +268,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
     }
 
     private void openEventStream() {
-        IHttpCall call = null;
-        try {
-            call = httpTransport.newCall(eventStreamRequest(), eventStreamPolicy,
-                    DeadlineGuard.withoutDeadline());
+        try (IHttpCall call = httpTransport.newCall(eventStreamRequest(), eventStreamPolicy, DeadlineGuard.withoutDeadline())) {
             eventStreamCall.set(call);
             RawHttpResponse response = call.execute(new ISseEventListener() {
                 @Override
@@ -297,9 +290,6 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
             reportIfOpen(exception);
         } finally {
             eventStreamCall.set(null);
-            if (call != null) {
-                call.close();
-            }
         }
     }
 
@@ -308,7 +298,7 @@ public final class StreamableHttpMcpTransport implements IMcpTransport {
             lastEventId.set(event.getId());
         }
         if (event.getRetryMillis() != null) {
-            retryMillis.set(event.getRetryMillis().longValue());
+            retryMillis.set(event.getRetryMillis());
         }
         if (event.getData() != null && !event.getData().isEmpty()) {
             dispatch(codec.decode(event.getData()));

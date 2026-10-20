@@ -1,12 +1,15 @@
 package com.clara.memory.semantic.milvus;
 
 import com.clara.utils.StringUtils;
+import lombok.Getter;
+
 /**
  * Milvus 后端连接配置：主机、端口、可选鉴权、数据库名与超时。
  *
  * <p>仅承载连接参数，不持有 SDK 客户端；由 {@link MilvusBackendFactory#create(MilvusBackendConfig)}
  * 消费后建立连接。
  */
+@Getter
 public final class MilvusBackendConfig {
 
     /**
@@ -66,34 +69,6 @@ public final class MilvusBackendConfig {
         this.database = database;
         this.connectTimeoutMillis = connectTimeoutMillis;
         this.idleTimeoutMillis = idleTimeoutMillis;
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public String getDatabase() {
-        return database;
-    }
-
-    public long getConnectTimeoutMillis() {
-        return connectTimeoutMillis;
-    }
-
-    public long getIdleTimeoutMillis() {
-        return idleTimeoutMillis;
     }
 
 }

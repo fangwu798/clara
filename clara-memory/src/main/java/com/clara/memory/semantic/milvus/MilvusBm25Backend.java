@@ -171,7 +171,7 @@ public final class MilvusBm25Backend implements MilvusBackend {
                 .metricType(IndexParam.MetricType.BM25)
                 .limit(backendQuery.getCandidateLimit())
                 .outputFields(OUT_FIELDS)
-                .data(Collections.<BaseVector>singletonList(new EmbeddedText(text)));
+                .data(Collections.singletonList(new EmbeddedText(text)));
         String expr = buildExpr(query);
         if (!expr.isEmpty()) {
             builder.filter(expr);
@@ -245,18 +245,18 @@ public final class MilvusBm25Backend implements MilvusBackend {
     private void createCollection(MilvusCollectionSpec spec) {
         List<CreateCollectionReq.FieldSchema> fields = new ArrayList<>();
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_ID).dataType(DataType.VarChar)
-                .maxLength(Integer.valueOf(128)).isPrimaryKey(true).build());
+                .maxLength(128).isPrimaryKey(true).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_SOURCE_TYPE).dataType(DataType.VarChar)
-                .maxLength(Integer.valueOf(64)).build());
+                .maxLength(64).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_SOURCE_ID).dataType(DataType.VarChar)
-                .maxLength(Integer.valueOf(256)).build());
+                .maxLength(256).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_CONVERSATION_ID).dataType(DataType.VarChar)
-                .maxLength(Integer.valueOf(256)).build());
+                .maxLength(256).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_CONTENT).dataType(DataType.VarChar)
-                .maxLength(Integer.valueOf(65535)).enableAnalyzer(true)
-                .analyzerParams(Collections.<String, Object>singletonMap("type", spec.getAnalyzer())).build());
+                .maxLength(65535).enableAnalyzer(true)
+                .analyzerParams(Collections.singletonMap("type", spec.getAnalyzer())).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_CONTENT_HASH).dataType(DataType.VarChar)
-                .maxLength(Integer.valueOf(64)).build());
+                .maxLength(64).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_CREATED_AT).dataType(DataType.Int64).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_EXPIRES_AT).dataType(DataType.Int64).build());
         fields.add(CreateCollectionReq.FieldSchema.builder().name(FIELD_METADATA).dataType(DataType.JSON).build());
@@ -369,8 +369,8 @@ public final class MilvusBm25Backend implements MilvusBackend {
         row.addProperty(FIELD_CONVERSATION_ID, entry.getConversationId() == null ? "" : entry.getConversationId());
         row.addProperty(FIELD_CONTENT, entry.getContent());
         row.addProperty(FIELD_CONTENT_HASH, entry.getContentHash());
-        row.addProperty(FIELD_CREATED_AT, Long.valueOf(entry.getCreatedAtEpochMillis()));
-        row.addProperty(FIELD_EXPIRES_AT, Long.valueOf(entry.getExpiresAtEpochMillis()));
+        row.addProperty(FIELD_CREATED_AT, entry.getCreatedAtEpochMillis());
+        row.addProperty(FIELD_EXPIRES_AT, entry.getExpiresAtEpochMillis());
         JsonObject metadata = new JsonObject();
         if (entry.getMetadata() != null) {
             for (Map.Entry<String, String> value : entry.getMetadata().entrySet()) {

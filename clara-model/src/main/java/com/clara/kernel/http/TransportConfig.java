@@ -104,7 +104,7 @@ public final class TransportConfig {
      * @throws IllegalArgumentException 白名单为空或含 null、任一上限非正、origin 非法时
      */
     public TransportConfig(Set<String> allowedOrigins, int connectTimeoutMillis, int readTimeoutMillis, int maxRequestBytes, int maxResponseBytes, boolean allowHttp) {
-        this(allowedOrigins, connectTimeoutMillis, readTimeoutMillis, maxRequestBytes, maxResponseBytes, allowHttp, Collections.<String, String>emptyMap());
+        this(allowedOrigins, connectTimeoutMillis, readTimeoutMillis, maxRequestBytes, maxResponseBytes, allowHttp, Collections.emptyMap());
     }
 
     /**

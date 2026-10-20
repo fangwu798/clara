@@ -3,6 +3,7 @@ package com.clara.memory.semantic.milvus;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -34,6 +35,7 @@ import java.util.Locale;
  * <p>失败语义：文件读取失败、{@code port} / {@code dimension} 非正、{@code collection} 为空白时抛
  * {@link IllegalArgumentException}（配置错误应在启动期暴露，而不是等第一次写入才失败）。
  */
+@Getter
 public final class MilvusSettings {
     /** 配置错误消息的统一前缀。 */
     private static final String CONFIG_PREFIX = "clara.yml 的 milvus.";
@@ -86,8 +88,28 @@ public final class MilvusSettings {
     private final int dimension;
     private final String username;
     private final String password;
+    /**
+     * -- GETTER --
+     *  取检索模式：
+     *  或
+     * 。
+     *
+     * @return 检索模式，非 null
+     */
     private final String mode;
+    /**
+     * -- GETTER --
+     *  取 BM25 模式的分词器名（仅 BM25 模式使用）。
+     *
+     * @return 分词器名，非 null
+     */
     private final String analyzer;
+    /**
+     * -- GETTER --
+     *  集合结构与配置不匹配时是否自动删除旧集合并按新结构重建。
+     *
+     * @return 需要自动重建时返回 true
+     */
     private final boolean recreateOnSchemaMismatch;
 
     private MilvusSettings(Builder builder) {
@@ -164,39 +186,6 @@ public final class MilvusSettings {
                 .build();
     }
 
-    public String getHost() {
-        return host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public String getCollection() {
-        return collection;
-    }
-
-    public int getDimension() {
-        return dimension;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    /**
-     * 取检索模式：{@link #MODE_VECTOR} 或 {@link #MODE_BM25}。
-     *
-     * @return 检索模式，非 null
-     */
-    public String getMode() {
-        return mode;
-    }
-
     /**
      * 是否为 BM25 全文检索模式。
      *
@@ -204,24 +193,6 @@ public final class MilvusSettings {
      */
     public boolean isBm25Mode() {
         return MODE_BM25.equals(mode);
-    }
-
-    /**
-     * 取 BM25 模式的分词器名（仅 BM25 模式使用）。
-     *
-     * @return 分词器名，非 null
-     */
-    public String getAnalyzer() {
-        return analyzer;
-    }
-
-    /**
-     * 集合结构与配置不匹配时是否自动删除旧集合并按新结构重建。
-     *
-     * @return 需要自动重建时返回 true
-     */
-    public boolean isRecreateOnSchemaMismatch() {
-        return recreateOnSchemaMismatch;
     }
 
     /**

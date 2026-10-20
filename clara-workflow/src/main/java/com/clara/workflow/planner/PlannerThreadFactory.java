@@ -2,6 +2,7 @@ package com.clara.workflow.planner;
 
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * 规划器线程工厂：创建带角色前缀的守护线程，便于区分调度线程与任务调用线程。
@@ -31,7 +32,7 @@ final class PlannerThreadFactory implements ThreadFactory {
     }
 
     @Override
-    public Thread newThread(Runnable runnable) {
+    public Thread newThread(@NotNull Runnable runnable) {
         Thread thread = new Thread(runnable, "clara-planner-" + role + "-" + sequence.incrementAndGet());
         thread.setDaemon(true);
         return thread;

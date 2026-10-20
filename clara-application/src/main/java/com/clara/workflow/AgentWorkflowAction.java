@@ -122,65 +122,66 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         if (scope == null) {
             throw new IllegalArgumentException("scope must not be null");
         }
-        ProviderConfiguration configuration = context.modelRegistry().resolve(options.role(), options.modelAlias());
-        CapabilityKindEnum capability = options.capability();
-        // 高成本能力保护：视频生成必须发生在 HUMAN 节点之后，且该节点收到的是明确批准，
-        // 避免自定义工作流或后续改动绕过「先确认参数再生成」。
-        if (capability == CapabilityKindEnum.VIDEO
-                && StringUtils.isBlank(scope.control(ExecutionScope.CONTROL_HUMAN_APPROVED))) {
-            throw new IllegalStateException("视频生成必须先经工作流人工确认并批准（节点 " + nodeId + "）");
-        }
-        // 节点声明的能力在该平台未配置时立即失败（配置问题，不静默降级）
-        configuration.getCapability(capability);
-        String model = configuration.toConfig(capability).getModelId();
-        Object instanceValue = scope.get("instanceId");
-        String instanceId = instanceValue == null ? nodeId : String.valueOf(instanceValue);
-        Map<String, String> resolved = resolveVars(scope);
-        String userInput = userInput(resolved);
-        // 工作流节点调用是同步的；图片生成约 1 分钟，期间若无过程信息用户会以为卡住。这里先打一行进度，
-        // 说明「哪个节点、调用什么能力、用哪个模型」，下一行给出本次实际输入（如精炼后的画面描述）。
-        progress("节点 " + nodeId + "：调用" + capabilityLabel(capability) + "能力（model=" + model + "）");
-        String preview = inputPreview(resolved);
-        if (!preview.isEmpty()) {
-            progressDetail("提示词：" + preview);
-        }
-        if (capability == CapabilityKindEnum.VIDEO) {
-            return executeVideo(configuration, userInput, attachments(scope));
-        }
-        // 文本类节点复用当轮对话的流式观察者，实时显示思考 / 正文；图片 / 视频接口本身不产生思考、也不支持
-        // 流式，故只保留前后进度行。
-        IStreamObserver observer = WorkflowProgress.observer();
-        boolean streaming = capability == CapabilityKindEnum.CHAT && observer != null;
+        try(ProviderConfiguration configuration = context.modelRegistry().resolve(options.role(), options.modelAlias())) {
+            CapabilityKindEnum capability = options.capability();
+            // 高成本能力保护：视频生成必须发生在 HUMAN 节点之后，且该节点收到的是明确批准，
+            // 避免自定义工作流或后续改动绕过「先确认参数再生成」。
+            if (capability == CapabilityKindEnum.VIDEO
+                    && StringUtils.isBlank(scope.control(ExecutionScope.CONTROL_HUMAN_APPROVED))) {
+                throw new IllegalStateException("视频生成必须先经工作流人工确认并批准（节点 " + nodeId + "）");
+            }
+            // 节点声明的能力在该平台未配置时立即失败（配置问题，不静默降级）
+            configuration.getCapability(capability);
+            String model = configuration.toConfig(capability).getModelId();
+            Object instanceValue = scope.get("instanceId");
+            String instanceId = instanceValue == null ? nodeId : String.valueOf(instanceValue);
+            Map<String, String> resolved = resolveVars(scope);
+            String userInput = userInput(resolved);
+            // 工作流节点调用是同步的；图片生成约 1 分钟，期间若无过程信息用户会以为卡住。这里先打一行进度，
+            // 说明「哪个节点、调用什么能力、用哪个模型」，下一行给出本次实际输入（如精炼后的画面描述）。
+            progress("节点 " + nodeId + "：调用" + capabilityLabel(capability) + "能力（model=" + model + "）");
+            String preview = inputPreview(resolved);
+            if (!preview.isEmpty()) {
+                progressDetail("提示词：" + preview);
+            }
+            if (capability == CapabilityKindEnum.VIDEO) {
+                return executeVideo(configuration, userInput, attachments(scope));
+            }
+            // 文本类节点复用当轮对话的流式观察者，实时显示思考 / 正文；图片 / 视频接口本身不产生思考、也不支持
+            // 流式，故只保留前后进度行。
+            IStreamObserver observer = WorkflowProgress.observer();
+            boolean streaming = capability == CapabilityKindEnum.CHAT && observer != null;
 
-        ConversationResult result = context.orchestrator().converse(ConversationRequest.builder()
-                .conversationId(conversationId(instanceId))
-                .provider(configuration.getProvider())
-                .model(model)
-                .capabilityKind(capability)
-                .userInput(userInput)
-                .attachments(attachments(scope))
-                .planningEnabled(false)
-                .providerConfiguration(configuration)
-                .stream(streaming)
-                .observer(streaming ? observer : null)
-                .cancellationToken(currentCancellationToken())
-                .build());
+            ConversationResult result = context.orchestrator().converse(ConversationRequest.builder()
+                    .conversationId(conversationId(instanceId))
+                    .provider(configuration.getProvider())
+                    .model(model)
+                    .capabilityKind(capability)
+                    .userInput(userInput)
+                    .attachments(attachments(scope))
+                    .planningEnabled(false)
+                    .providerConfiguration(configuration)
+                    .stream(streaming)
+                    .observer(streaming ? observer : null)
+                    .cancellationToken(currentCancellationToken())
+                    .build());
 
-        if (result.getStatus() != OrchestrationStatusEnum.COMPLETED) {
-            throw new IllegalStateException("工作流 AGENT 节点调用未成功（节点 " + nodeId + "，状态 "
-                    + result.getStatus() + (result.getError() == null
-                    ? "" : "，错误 " + result.getError().getSafeMessage()) + "）");
+            if (result.getStatus() != OrchestrationStatusEnum.COMPLETED) {
+                throw new IllegalStateException("工作流 AGENT 节点调用未成功（节点 " + nodeId + "，状态 "
+                        + result.getStatus() + (result.getError() == null
+                        ? "" : "，错误 " + result.getError().getSafeMessage()) + "）");
+            }
+            Object output = output(capability, result.getContent());
+            if (capability == CapabilityKindEnum.IMAGE) {
+                context.usageLedger().recordImage(result.getUsage(), result.getGeneratedImages());
+                progress("节点 " + nodeId + "：图片用量 "
+                        + CapabilityUsageLedger.describeImage(result.getUsage(), result.getGeneratedImages()));
+            }
+            progress("节点 " + nodeId + "：完成");
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("output", output);
+            return response;
         }
-        Object output = output(capability, result.getContent());
-        if (capability == CapabilityKindEnum.IMAGE) {
-            context.usageLedger().recordImage(result.getUsage(), result.getGeneratedImages());
-            progress("节点 " + nodeId + "：图片用量 "
-                    + CapabilityUsageLedger.describeImage(result.getUsage(), result.getGeneratedImages()));
-        }
-        progress("节点 " + nodeId + "：完成");
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("output", output);
-        return response;
     }
 
     /**

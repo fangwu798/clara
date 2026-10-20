@@ -1,8 +1,10 @@
 package com.clara.orchestration.capability;
 
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.StreamEventEnum;
 import com.clara.core.model.IStreamModel;
 import com.clara.core.model.IResponse;
+import com.clara.dto.model.StreamEvent;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ImageItem;
@@ -12,6 +14,8 @@ import com.clara.orchestration.OrchestrationErrors;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 多模态能力分派器：统一走 {@link IStreamModel} 调用入口，按能力种类选择请求构建与结果提取方式。
@@ -20,11 +24,6 @@ import java.util.List;
  * 调用记录与取消语义一致。
  */
 public final class CapabilityDispatcher {
-
-    /**
-     * 等待流终态时的轮询间隔（毫秒）。
-     */
-    private static final long STREAM_POLL_INTERVAL_MILLIS = 20L;
 
     /**
      * 等待流终态的最长时长（毫秒），作为兜底避免流异常不结束时无限阻塞；取值不小于传输层读超时。
@@ -66,8 +65,17 @@ public final class CapabilityDispatcher {
         if (observer == null) {
             return invoke(request);
         }
-        IStreamHandle handle = streamModel.chat(request, HttpResponse.class, observer);
-        awaitTerminal(handle);
+        CountDownLatch terminal = new CountDownLatch(1);
+        IStreamHandle handle = streamModel.chat(request, HttpResponse.class, event -> {
+            try {
+                observer.onEvent(event);
+            } finally {
+                if (isTerminal(event)) {
+                    terminal.countDown();
+                }
+            }
+        });
+        awaitTerminal(handle, terminal);
         IResponse result = handle.result();
         return result instanceof HttpResponse ? (HttpResponse) result : null;
     }
@@ -76,21 +84,34 @@ public final class CapabilityDispatcher {
      * 等待流进入终态后再取结果。
      *
      * <p>流式读取在后台线程执行（见 {@code StreamHandle.start()}），入口返回句柄时读数尚未完成；
-     * {@link IStreamHandle} 的约定是「轮询 {@link IStreamHandle#isDone()} 或等待终态事件」，
-     * 因此这里先等到 done，避免在读取未完成时 {@code result()} 恒为 null。
+     * 因此这里阻塞等待终态事件，避免在读取未完成时 {@code result()} 恒为 null。使用
+     * {@link CountDownLatch} 而非轮询睡眠，等待期间不占用 CPU。
      *
      * @param handle 流式句柄，非 null
+     * @param terminal 终态信号，收到 {@code RESPONSE_COMPLETE} 或 {@code ERROR} 时放行
      */
-    private static void awaitTerminal(IStreamHandle handle) {
-        long deadline = System.currentTimeMillis() + STREAM_TERMINAL_MAX_WAIT_MILLIS;
-        while (!handle.isDone() && System.currentTimeMillis() < deadline) {
-            try {
-                Thread.sleep(STREAM_POLL_INTERVAL_MILLIS);
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                return;
-            }
+    private static void awaitTerminal(IStreamHandle handle, CountDownLatch terminal) {
+        if (handle.isDone()) {
+            return;
         }
+        try {
+            if (!terminal.await(STREAM_TERMINAL_MAX_WAIT_MILLIS, TimeUnit.MILLISECONDS)) {
+                handle.cancel();
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * 判断事件是否为终态事件。
+     *
+     * @param event 流事件，可为 null
+     * @return {@code RESPONSE_COMPLETE} 或 {@code ERROR} 时返回 true
+     */
+    private static boolean isTerminal(StreamEvent event) {
+        return event != null && (event.getType() == StreamEventEnum.RESPONSE_COMPLETE
+                || event.getType() == StreamEventEnum.ERROR);
     }
 
     /**

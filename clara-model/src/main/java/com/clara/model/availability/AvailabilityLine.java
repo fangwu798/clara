@@ -1,6 +1,8 @@
 package com.clara.model.availability;
 
+import com.clara.enums.AvailabilityLevelEnum;
 import com.clara.utils.StringUtils;
+import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +19,7 @@ import java.util.List;
  * <p>两个渲染入口，产出完全一致：
  * <ul>
  *   <li>{@link #render(List)}：拿到整批结果后一次性渲染，列宽由结果自身推导；</li>
- *   <li>{@link #widths(List, List)} 预计算列宽 + {@link #line(ModelCheckResult, ColumnWidths)} 逐条渲染。
+ *   <li>{@link #widths(List, List)} 预计算列宽 + {@link #line(ModelCheckResult, AvailabilityColumnWidths)} 逐条渲染。
  *       需要这条路径的原因：探测一个模型要等一次网络往返，应当是「检查完一个就输出一个」，而列宽必须先
  *       定下来，否则先输出的行与后输出的行对不齐；于是调用方先用「本地即可取得的信息」（别名、已解析的
  *       平台与模型）算好列宽，再逐条渲染。</li>
@@ -27,6 +29,7 @@ import java.util.List;
  * {@link StringUtils#displayWidth(String)} 按「东亚全角占两列」计算）。状态列固定取三种状态标签的最大
  * 宽度，使列宽与「本批恰好出现哪些状态」无关，逐条渲染与整批渲染因此得到同样的排版。
  */
+@Getter
 public final class AvailabilityLine {
 
     /**
@@ -60,76 +63,22 @@ public final class AvailabilityLine {
     private static final int STATUS_WIDTH = StringUtils.displayWidth(STATUS_UNAVAILABLE);
 
     /**
-     * 单行的状态级别，供调用方决定呈现方式。
-     */
-    public enum Level {
-
-        /** 普通信息行（进度提示、表头）。 */
-        INFO,
-
-        /** 检查通过：模型可用。 */
-        OK,
-
-        /** 未发起真实请求或未取得正文的中间状态：跳过检查。 */
-        WARN,
-
-        /** 检查未通过：模型不可用。 */
-        FAIL
-    }
-
-    /**
-     * 输出行的前三列宽度：状态、别名、平台与模型。
-     *
-     * <p>为什么可以脱离结果提前算：这三列的宽度只取决于「会出现哪些别名」「会出现哪些平台与模型」，
-     * 而这些信息在发起请求前就能从配置文件解析出来；结论列紧随其后，不需要单独定宽。
-     */
-    public static final class ColumnWidths {
-
-        private final int statusWidth;
-        private final int aliasWidth;
-        private final int identityWidth;
-
-        private ColumnWidths(int statusWidth, int aliasWidth, int identityWidth) {
-            this.statusWidth = statusWidth;
-            this.aliasWidth = aliasWidth;
-            this.identityWidth = identityWidth;
-        }
-
-        /**
-         * 状态列宽度。
-         *
-         * @return 显示宽度，单位为列
-         */
-        public int getStatusWidth() {
-            return statusWidth;
-        }
-
-        /**
-         * 别名列宽度。
-         *
-         * @return 显示宽度，单位为列
-         */
-        public int getAliasWidth() {
-            return aliasWidth;
-        }
-
-        /**
-         * 「平台与模型」列宽度。
-         *
-         * @return 显示宽度，单位为列
-         */
-        public int getIdentityWidth() {
-            return identityWidth;
-        }
-    }
-
-    /**
      * 状态级别，非 null。
+     * -- GETTER --
+     *  读取状态级别。
+     *
+     * @return 状态级别，非 null
+
      */
-    private final Level level;
+    private final AvailabilityLevelEnum level;
 
     /**
      * 单行纯文本，非 null。
+     * -- GETTER --
+     *  读取单行纯文本。
+     *
+     * @return 文本，非 null
+
      */
     private final String text;
 
@@ -139,7 +88,7 @@ public final class AvailabilityLine {
      * @param level 状态级别，非 null
      * @param text  单行纯文本，非 null
      */
-    private AvailabilityLine(Level level, String text) {
+    private AvailabilityLine(AvailabilityLevelEnum level, String text) {
         this.level = level;
         this.text = text;
     }
@@ -148,40 +97,40 @@ public final class AvailabilityLine {
      * 创建普通信息行。
      *
      * @param text 单行纯文本，非 null
-     * @return 级别为 {@link Level#INFO} 的输出行
+     * @return 级别为 {@link AvailabilityLevelEnum#INFO} 的输出行
      */
     public static AvailabilityLine info(String text) {
-        return new AvailabilityLine(Level.INFO, text);
+        return new AvailabilityLine(AvailabilityLevelEnum.INFO, text);
     }
 
     /**
      * 创建「模型可用」输出行。
      *
      * @param text 单行纯文本，非 null
-     * @return 级别为 {@link Level#OK} 的输出行
+     * @return 级别为 {@link AvailabilityLevelEnum#OK} 的输出行
      */
     public static AvailabilityLine ok(String text) {
-        return new AvailabilityLine(Level.OK, text);
+        return new AvailabilityLine(AvailabilityLevelEnum.OK, text);
     }
 
     /**
      * 创建「跳过检查」输出行。
      *
      * @param text 单行纯文本，非 null
-     * @return 级别为 {@link Level#WARN} 的输出行
+     * @return 级别为 {@link AvailabilityLevelEnum#WARN} 的输出行
      */
     public static AvailabilityLine warn(String text) {
-        return new AvailabilityLine(Level.WARN, text);
+        return new AvailabilityLine(AvailabilityLevelEnum.WARN, text);
     }
 
     /**
      * 创建「模型不可用」输出行。
      *
      * @param text 单行纯文本，非 null
-     * @return 级别为 {@link Level#FAIL} 的输出行
+     * @return 级别为 {@link AvailabilityLevelEnum#FAIL} 的输出行
      */
     public static AvailabilityLine fail(String text) {
-        return new AvailabilityLine(Level.FAIL, text);
+        return new AvailabilityLine(AvailabilityLevelEnum.FAIL, text);
     }
 
     /**
@@ -194,7 +143,7 @@ public final class AvailabilityLine {
      * @param identities 与别名一一对应的「平台与模型」列文本，可为 null（视为空）
      * @return 可复用的列宽，非 null
      */
-    public static ColumnWidths widths(List<String> aliases, List<String> identities) {
+    public static AvailabilityColumnWidths widths(List<String> aliases, List<String> identities) {
         int aliasWidth = 0;
         if (aliases != null) {
             for (String alias : aliases) {
@@ -207,14 +156,14 @@ public final class AvailabilityLine {
                 identityWidth = Math.max(identityWidth, width(identity));
             }
         }
-        return new ColumnWidths(STATUS_WIDTH, aliasWidth, identityWidth);
+        return new AvailabilityColumnWidths(STATUS_WIDTH, aliasWidth, identityWidth);
     }
 
     /**
      * 把一批检查结果渲染成按列对齐的输出行，顺序与输入一致。
      *
      * <p>整批可用时用本方法；需要「检查完一个就输出一个」时改用 {@link #widths(List, List)} +
-     * {@link #line(ModelCheckResult, ColumnWidths)}，两者排版一致。
+     * {@link #line(ModelCheckResult, AvailabilityColumnWidths)}，两者排版一致。
      *
      * @param results 检查结果，非 null
      * @return 与输入一一对应的输出行
@@ -226,7 +175,7 @@ public final class AvailabilityLine {
             aliases.add(result.getAlias());
             identities.add(identity(result));
         }
-        ColumnWidths widths = widths(aliases, identities);
+        AvailabilityColumnWidths widths = widths(aliases, identities);
         List<AvailabilityLine> lines = new ArrayList<>();
         for (ModelCheckResult result : results) {
             lines.add(line(result, widths));
@@ -242,7 +191,7 @@ public final class AvailabilityLine {
      * @return 该结果对应的输出行，非 null
      * @throws IllegalArgumentException widths 为 null 时
      */
-    public static AvailabilityLine line(ModelCheckResult result, ColumnWidths widths) {
+    public static AvailabilityLine line(ModelCheckResult result, AvailabilityColumnWidths widths) {
         if (widths == null) {
             throw new IllegalArgumentException("widths must not be null");
         }
@@ -271,24 +220,6 @@ public final class AvailabilityLine {
     }
 
     /**
-     * 读取状态级别。
-     *
-     * @return 状态级别，非 null
-     */
-    public Level getLevel() {
-        return level;
-    }
-
-    /**
-     * 读取单行纯文本。
-     *
-     * @return 文本，非 null
-     */
-    public String getText() {
-        return text;
-    }
-
-    /**
      * 取状态标签。
      *
      * @param result 检查结果，非 null
@@ -305,13 +236,14 @@ public final class AvailabilityLine {
      * 取状态级别。
      *
      * @param result 检查结果，非 null
-     * @return 可用为 {@link Level#OK}、跳过为 {@link Level#WARN}、其余为 {@link Level#FAIL}
+     * @return 可用为 {@link AvailabilityLevelEnum#OK}、跳过为 {@link AvailabilityLevelEnum#WARN}、
+     *         其余为 {@link AvailabilityLevelEnum#FAIL}
      */
-    private static Level level(ModelCheckResult result) {
+    private static AvailabilityLevelEnum level(ModelCheckResult result) {
         if (result.isAvailable()) {
-            return Level.OK;
+            return AvailabilityLevelEnum.OK;
         }
-        return result.isSkipped() ? Level.WARN : Level.FAIL;
+        return result.isSkipped() ? AvailabilityLevelEnum.WARN : AvailabilityLevelEnum.FAIL;
     }
 
     /**
@@ -347,11 +279,4 @@ public final class AvailabilityLine {
     private static int width(String value) {
         return StringUtils.isBlank(value) ? 0 : StringUtils.displayWidth(value);
     }
-
-    /**
-     * 判断字符串是否为 null、空串或只含空白字符。
-     *
-     * @param value 待检查字符串
-     * @return 字符串没有有效内容时返回 true
-     */
 }

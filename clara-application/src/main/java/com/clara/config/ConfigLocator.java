@@ -584,7 +584,7 @@ public final class ConfigLocator {
                     .digest(value.getBytes(StandardCharsets.UTF_8));
             StringBuilder builder = new StringBuilder(digest.length * 2);
             for (byte item : digest) {
-                builder.append(String.format("%02x", Integer.valueOf(item & 0xff)));
+                builder.append(String.format("%02x", item & 0xff));
             }
             return builder.toString();
         } catch (NoSuchAlgorithmException failure) {

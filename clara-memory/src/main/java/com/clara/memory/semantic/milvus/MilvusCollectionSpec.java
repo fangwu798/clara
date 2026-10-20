@@ -1,6 +1,8 @@
 package com.clara.memory.semantic.milvus;
 
 import com.clara.utils.StringUtils;
+import lombok.Getter;
+
 /**
  * Milvus 集合规格：描述集合名称、向量维度、索引类型与距离度量。
  *
@@ -11,6 +13,7 @@ import com.clara.utils.StringUtils;
  * {@code bm25} 模式存全文稀疏向量（由分词函数自动生成），没有维度概念，身份改由分词器决定。
  * 两种模式的集合互不兼容，切换模式必须重建集合。
  */
+@Getter
 public final class MilvusCollectionSpec {
 
     /**
@@ -37,7 +40,19 @@ public final class MilvusCollectionSpec {
     private final int dimension;
     private final String metricType;
     private final String indexType;
+    /**
+     * -- GETTER --
+     *  取检索模式。
+     *
+     * @return {@link MilvusSettings#MODE_VECTOR} 或 {@link MilvusSettings#MODE_BM25}，非 null
+     */
     private final String mode;
+    /**
+     * -- GETTER --
+     *  取 BM25 模式的分词器名。
+     *
+     * @return 分词器名，非 null
+     */
     private final String analyzer;
 
     /**
@@ -110,40 +125,6 @@ public final class MilvusCollectionSpec {
      */
     public MilvusCollectionSpec(String collection, int dimension) {
         this(collection, dimension, COSINE);
-    }
-
-    public String getCollection() {
-        return collection;
-    }
-
-    public int getDimension() {
-        return dimension;
-    }
-
-    public String getMetricType() {
-        return metricType;
-    }
-
-    public String getIndexType() {
-        return indexType;
-    }
-
-    /**
-     * 取检索模式。
-     *
-     * @return {@link MilvusSettings#MODE_VECTOR} 或 {@link MilvusSettings#MODE_BM25}，非 null
-     */
-    public String getMode() {
-        return mode;
-    }
-
-    /**
-     * 取 BM25 模式的分词器名。
-     *
-     * @return 分词器名，非 null
-     */
-    public String getAnalyzer() {
-        return analyzer;
     }
 
     /**

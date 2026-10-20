@@ -4,6 +4,7 @@ import com.clara.core.tool.ITool;
 import com.clara.core.tool.IToolInvocation;
 import com.clara.enums.RoleEnum;
 import com.clara.core.message.IContent;
+import lombok.Getter;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -22,6 +23,7 @@ import java.util.Map;
  *
  * <p>注意：{@code output} 通常是 JSON 文本，直接回传即可，无需二次解析。
  */
+@Getter
 public final class ToolResult implements IContent {
 
     /**
@@ -43,14 +45,6 @@ public final class ToolResult implements IContent {
     public ToolResult(String callId, String output) {
         this.callId = callId;
         this.output = output;
-    }
-
-    public String getCallId() {
-        return callId;
-    }
-
-    public String getOutput() {
-        return output;
     }
 
     @Override

@@ -73,9 +73,9 @@ public final class ScalarMapDeserializer extends JsonDeserializer<Map<String, Ob
         } else if (valueToken == JsonToken.VALUE_NUMBER_INT) {
             putIntegral(result, name, parser.getLongValue());
         } else if (valueToken == JsonToken.VALUE_NUMBER_FLOAT) {
-            result.put(name, Double.valueOf(parser.getDoubleValue()));
+            result.put(name, parser.getDoubleValue());
         } else if (valueToken == JsonToken.VALUE_TRUE || valueToken == JsonToken.VALUE_FALSE) {
-            result.put(name, Boolean.valueOf(parser.getBooleanValue()));
+            result.put(name, parser.getBooleanValue());
         } else {
             throw InvalidFormatException.from(parser, "扩展参数只允许字符串、数字或布尔值：" + name,
                     valueToken == null ? null : valueToken.asString(), Object.class);
@@ -84,9 +84,9 @@ public final class ScalarMapDeserializer extends JsonDeserializer<Map<String, Ob
 
     private static void putIntegral(Map<String, Object> result, String name, long integral) {
         if (integral >= Integer.MIN_VALUE && integral <= Integer.MAX_VALUE) {
-            result.put(name, Integer.valueOf((int) integral));
+            result.put(name, (int) integral);
         } else {
-            result.put(name, Long.valueOf(integral));
+            result.put(name, integral);
         }
     }
 }

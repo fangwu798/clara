@@ -54,7 +54,7 @@ public final class CapabilityUsageLedger {
      * @param generatedImages 平台返回的生成张数，可为 null
      */
     public synchronized void recordImage(TokenUsage usage, Integer generatedImages) {
-        int images = generatedImages == null ? 0 : Math.max(0, generatedImages.intValue());
+        int images = generatedImages == null ? 0 : Math.max(0, generatedImages);
         imageCount += images;
         if (usage != null) {
             imageInputTokens += usage.getInputTokens();
@@ -142,7 +142,7 @@ public final class CapabilityUsageLedger {
      * @return 单行文本，非 null
      */
     public static String describeImage(TokenUsage usage, Integer generatedImages) {
-        int images = generatedImages == null ? 0 : Math.max(0, generatedImages.intValue());
+        int images = generatedImages == null ? 0 : Math.max(0, generatedImages);
         StringBuilder text = new StringBuilder(images + " 张");
         if (usage == null || total(usage.getInputTokens(), usage.getOutputTokens(), usage.getTotalTokens()) <= 0L) {
             return text.append("，平台未返回 token").toString();

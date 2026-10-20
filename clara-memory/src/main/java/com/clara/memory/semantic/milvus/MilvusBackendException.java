@@ -1,8 +1,11 @@
 package com.clara.memory.semantic.milvus;
 
+import lombok.Getter;
+
 /**
  * Milvus 后端异常：把 Milvus SDK / 服务的失败封装为领域异常，隔离 SDK 交互细节。
  */
+@Getter
 public class MilvusBackendException extends RuntimeException {
 
     private final boolean retryable;
@@ -30,7 +33,4 @@ public class MilvusBackendException extends RuntimeException {
         this.retryable = retryable;
     }
 
-    public boolean isRetryable() {
-        return retryable;
-    }
 }

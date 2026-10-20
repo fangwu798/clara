@@ -1,11 +1,14 @@
 package com.clara.mcp.transport.jsonrpc;
 
 import com.clara.mcp.registry.ImmutableValues;
+import lombok.Getter;
+
 import java.util.Map;
 
 /**
  * 表示。
  */
+@Getter
 public final class JsonRpcError {
     private final int code;
     private final String message;
@@ -17,7 +20,4 @@ public final class JsonRpcError {
         this.message = message;
         this.data = ImmutableValues.copyMap(data);
     }
-    public int getCode() { return code; }
-    public String getMessage() { return message; }
-    public Map<String, Object> getData() { return data; }
 }

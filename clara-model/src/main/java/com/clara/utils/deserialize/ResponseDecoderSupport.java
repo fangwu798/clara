@@ -143,7 +143,7 @@ public final class ResponseDecoderSupport {
      */
     public static void appendText(Field field, Object target, String text) {
         Object current = read(field, target);
-        write(field, target, current == null ? text : ((String) current) + text);
+        write(field, target, current == null ? text : current + text);
     }
 
     @SuppressWarnings("java:S3011")
@@ -184,28 +184,28 @@ public final class ResponseDecoderSupport {
         if (!node.isIntegralNumber() || !node.canConvertToInt()) {
             throw ExceptionUtils.protocolError(provider);
         }
-        return Integer.valueOf(node.intValue());
+        return node.intValue();
     }
 
     private static Object longValue(JsonNode node, ModelProviderEnum provider) {
         if (!node.isIntegralNumber()) {
             throw ExceptionUtils.protocolError(provider);
         }
-        return Long.valueOf(node.longValue());
+        return node.longValue();
     }
 
     private static Object doubleValue(JsonNode node, ModelProviderEnum provider) {
         if (!node.isNumber()) {
             throw ExceptionUtils.protocolError(provider);
         }
-        return Double.valueOf(node.doubleValue());
+        return node.doubleValue();
     }
 
     private static Object booleanValue(JsonNode node, ModelProviderEnum provider) {
         if (!node.isBoolean()) {
             throw ExceptionUtils.protocolError(provider);
         }
-        return Boolean.valueOf(node.booleanValue());
+        return node.booleanValue();
     }
 
     private static Object enumValue(Class<?> raw, JsonNode node, ModelProviderEnum provider) {

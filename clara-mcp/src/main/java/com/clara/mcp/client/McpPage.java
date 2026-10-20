@@ -1,5 +1,7 @@
 package com.clara.mcp.client;
 
+import lombok.Getter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -7,6 +9,7 @@ import java.util.List;
 /**
  * 封装MCP的分页数据。
  */
+@Getter
 public final class McpPage<T> {
     private final List<T> items;
     private final String nextCursor;
@@ -17,8 +20,7 @@ public final class McpPage<T> {
         this.items = Collections.unmodifiableList(new ArrayList<>(items));
         this.nextCursor = normalize(nextCursor);
     }
-    public List<T> getItems() { return items; }
-    public String getNextCursor() { return nextCursor; }
+
     private static String normalize(String value) {
         return value == null || value.trim().isEmpty() ? null : value;
     }

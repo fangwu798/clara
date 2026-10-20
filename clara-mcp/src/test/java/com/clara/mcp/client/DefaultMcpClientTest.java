@@ -41,7 +41,6 @@ import static org.junit.Assert.fail;
  * {@link DefaultMcpClient} 的行为测试：用假传输返回预置 JSON-RPC 响应，不依赖真实 MCP 服务端与网络。
  */
 public class DefaultMcpClientTest {
-    private static final String TENANT = "tenant-1";
     private static final String SERVER = "echo-server";
     private static final String SNAPSHOT = "snapshot-1";
 
@@ -262,17 +261,17 @@ public class DefaultMcpClientTest {
     }
 
     private static McpToolCall toolCall() {
-        return new McpToolCall(TENANT, SERVER, SNAPSHOT, "echo", "hash", map("text", "hi"),
+        return new McpToolCall(SERVER, SNAPSHOT, "echo", "hash", map("text", "hi"),
                 conversation(), call());
     }
 
     private static McpResourceRequest resourceRequest() {
-        return new McpResourceRequest(TENANT, SERVER, SNAPSHOT, "file://a.txt", "hash",
+        return new McpResourceRequest(SERVER, SNAPSHOT, "file://a.txt", "hash",
                 conversation(), call());
     }
 
     private static McpPromptRequest promptRequest() {
-        return new McpPromptRequest(TENANT, SERVER, SNAPSHOT, "greet", "hash", map("who", "world"),
+        return new McpPromptRequest(SERVER, SNAPSHOT, "greet", "hash", map("who", "world"),
                 conversation(), call());
     }
 

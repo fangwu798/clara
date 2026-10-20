@@ -6,6 +6,7 @@ import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.model.availability.ModelCheckResult;
 import com.clara.model.availability.AvailabilityLine;
+import com.clara.model.availability.AvailabilityColumnWidths;
 import com.clara.model.availability.StreamingModelProbe;
 import com.clara.model.availability.api.IModelProbe;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
@@ -97,7 +98,7 @@ public final class ModelAvailabilityManager {
         // 先本地预扫描（只解析配置、读环境变量，不发请求）以确定列宽，再逐条检查、逐条输出：
         // 这样每条结论在它自己的检查结束时就可见，同时各列仍然对齐。
         List<PendingCheck> pending = prescan(configFiles);
-        AvailabilityLine.ColumnWidths widths = AvailabilityLine.widths(aliasesOf(pending), identitiesOf(pending));
+        AvailabilityColumnWidths widths = AvailabilityLine.widths(aliasesOf(pending), identitiesOf(pending));
         List<ModelCheckResult> results = new ArrayList<>();
         try {
             for (PendingCheck check : pending) {
@@ -117,7 +118,7 @@ public final class ModelAvailabilityManager {
                 available.add(result);
             }
         }
-        Collections.sort(available, Comparator.comparingLong(ModelCheckResult::getFirstCharacterMillis));
+        available.sort(Comparator.comparingLong(ModelCheckResult::getFirstCharacterMillis));
         try {
             persist(claraConfig, available);
         } catch (IOException failure) {

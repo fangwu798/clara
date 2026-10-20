@@ -178,7 +178,7 @@ public final class ClaraApplication {
         try {
             // 发现要起子进程并做一次 MCP 握手，stdio 服务端可能要好几秒；先打一行提示，避免横幅之后长时间静置。
             view.emit("  mcp            : 正在接入外部 MCP 服务端（config/mcp）...", ConsoleView.ANSI_GRAY);
-            int servers = bootstrap.loadMcpServers(ApplicationBootstrap.DEFAULT_MCP_TENANT);
+            int servers = bootstrap.loadMcpServers();
             if (servers <= 0) {
                 view.emit("  mcp            : 未接入外部 MCP 服务端（config/mcp 无配置或发现失败）", ConsoleView.ANSI_GRAY);
                 return;
@@ -416,11 +416,12 @@ public final class ClaraApplication {
         }
         String defaultModel = ConfigLocator.defaultModel();
         List<String> enabled = ConfigLocator.enabledProviders();
+        Path configPath = Paths.get("");
         if (defaultModel != null && !enabled.isEmpty() && !containsIgnoreCase(enabled, defaultModel)) {
             view.println("启动失败：config/clara.yml 的 defaultModel=" + defaultModel + " 不在 enabledProviders 启用列表内 " + enabled + "。");
             view.println("请把主模型加入 enabledProviders，或把 defaultModel 改为已启用的模型。");
             System.exit(1);
-            return new ModelChoice(Paths.get(""), "配置错误");
+            return new ModelChoice(configPath, "配置错误");
         }
         Path preferred = defaultModel == null ? null : ConfigLocator.resolveModel(candidates, defaultModel);
         if (preferred != null) {
@@ -432,7 +433,7 @@ public final class ClaraApplication {
         if (candidates.isEmpty()) {
             view.println("未找到模型配置：请确认工作目录为仓库根，且 " + ConfigLocator.modelDirectory().toAbsolutePath() + " 下存在 *.yml / *.yaml（examples 样例会被忽略）。");
             System.exit(1);
-            return new ModelChoice(Paths.get(""), "无可用模型配置");
+            return new ModelChoice(configPath, "无可用模型配置");
         }
         return new ModelChoice(view.chooseModel(candidates, reader), "交互选择");
     }

@@ -124,7 +124,7 @@ public final class DefaultMcpClient implements IMcpClient {
                 string(serverInfo, "version"));
         McpServerCapabilities capabilities = capabilities(map(result, "capabilities"));
         transport.sendNotification(new JsonRpcNotification(INITIALIZED_NOTIFICATION,
-                Collections.<String, Object>emptyMap()));
+                Collections.emptyMap()));
         return new McpInitialization(protocolVersion, identity, capabilities);
     }
 
@@ -243,7 +243,7 @@ public final class DefaultMcpClient implements IMcpClient {
             throw McpErrors.error(ErrorCodes.MCP_DISCOVERY_FAILED, ErrorCategoryEnum.EXTERNAL_SERVICE);
         }
         Map<String, Object> result = response.getResult();
-        return result == null ? Collections.<String, Object>emptyMap() : result;
+        return result == null ? Collections.emptyMap() : result;
     }
 
     private void ensureOpen() {
@@ -278,7 +278,7 @@ public final class DefaultMcpClient implements IMcpClient {
     }
 
     private static McpServerCapabilities capabilities(Map<String, Object> value) {
-        Map<String, Object> caps = value == null ? Collections.<String, Object>emptyMap() : value;
+        Map<String, Object> caps = value == null ? Collections.emptyMap() : value;
         return new McpServerCapabilities(caps.containsKey(FIELD_TOOLS), caps.containsKey(FIELD_RESOURCES),
                 caps.containsKey(FIELD_PROMPTS), listChanged(caps, FIELD_TOOLS), listChanged(caps, FIELD_RESOURCES),
                 listChanged(caps, FIELD_PROMPTS));
@@ -322,6 +322,6 @@ public final class DefaultMcpClient implements IMcpClient {
     }
 
     private static boolean booleanValue(Object value) {
-        return value instanceof Boolean && ((Boolean) value).booleanValue();
+        return value instanceof Boolean && (Boolean) value;
     }
 }

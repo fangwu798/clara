@@ -1,5 +1,6 @@
 package com.clara.model.availability;
 
+import com.clara.enums.AvailabilityLevelEnum;
 import org.junit.Test;
 
 import java.nio.file.Paths;
@@ -27,9 +28,9 @@ public class AvailabilityLineTest {
                 ModelCheckResult.missingCredential(Paths.get("b.yml"), "b", "CLARA_KIMI_API_KEY"),
                 ModelCheckResult.unavailable(Paths.get("c.yml"), "c", "DEEPSEEK", "ds", "denied")));
 
-        assertEquals(AvailabilityLine.Level.OK, lines.get(0).getLevel());
-        assertEquals(AvailabilityLine.Level.WARN, lines.get(1).getLevel());
-        assertEquals(AvailabilityLine.Level.FAIL, lines.get(2).getLevel());
+        assertEquals(AvailabilityLevelEnum.OK, lines.get(0).getLevel());
+        assertEquals(AvailabilityLevelEnum.WARN, lines.get(1).getLevel());
+        assertEquals(AvailabilityLevelEnum.FAIL, lines.get(2).getLevel());
     }
 
     /**
@@ -74,15 +75,15 @@ public class AvailabilityLineTest {
             aliases.add(result.getAlias());
             identities.add(AvailabilityLine.identity(result.getProvider(), result.getModel()));
         }
-        AvailabilityLine.ColumnWidths widths = AvailabilityLine.widths(aliases, identities);
+        AvailabilityColumnWidths widths = AvailabilityLine.widths(aliases, identities);
 
         List<String> batch = texts(AvailabilityLine.render(results));
         for (int index = 0; index < results.size(); index++) {
             AvailabilityLine single = AvailabilityLine.line(results.get(index), widths);
             assertEquals(batch.get(index), single.getText());
         }
-        assertEquals(AvailabilityLine.Level.OK, AvailabilityLine.line(results.get(0), widths).getLevel());
-        assertEquals(AvailabilityLine.Level.WARN, AvailabilityLine.line(results.get(2), widths).getLevel());
+        assertEquals(AvailabilityLevelEnum.OK, AvailabilityLine.line(results.get(0), widths).getLevel());
+        assertEquals(AvailabilityLevelEnum.WARN, AvailabilityLine.line(results.get(2), widths).getLevel());
     }
 
     /**

@@ -121,13 +121,11 @@ public final class WorkflowRunner {
         List<String> declaredOutputs = registry.outputs(workflowId);
         Map<String, Object> outputs = new LinkedHashMap<>();
         ExecutionScope scope = result.getScope();
-        if (scope != null) {
-            for (Map.Entry<String, Object> entry : scope.getVariables().entrySet()) {
-                boolean instanceField = FIELD_INSTANCE_ID.equals(entry.getKey());
-                boolean declared = declaredOutputs.isEmpty() || declaredOutputs.contains(entry.getKey());
-                if (!instanceField && declared) {
-                    outputs.put(entry.getKey(), sanitize(entry.getValue()));
-                }
+        for (Map.Entry<String, Object> entry : scope.getVariables().entrySet()) {
+            boolean instanceField = FIELD_INSTANCE_ID.equals(entry.getKey());
+            boolean declared = declaredOutputs.isEmpty() || declaredOutputs.contains(entry.getKey());
+            if (!instanceField && declared) {
+                outputs.put(entry.getKey(), sanitize(entry.getValue()));
             }
         }
         payload.put("outputs", outputs);

@@ -2,6 +2,8 @@ package com.clara.mcp.registry.config;
 
 import com.clara.utils.StringUtils;
 import com.clara.mcp.registry.McpTransportProfile;
+import lombok.Getter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -21,6 +23,7 @@ import java.util.Map;
  *
  * <p>不可变值对象 + 构造期校验：集合均做只读拷贝，禁止 null / 空白元素；同一配置不得同时定义 command 与 url。
  */
+@Getter
 public final class McpServerConfig {
     private final String serverKey;
     private final McpTransportProfile transportProfile;
@@ -43,8 +46,7 @@ public final class McpServerConfig {
      * @param headers   http 请求头，可为 null
      * @return 配置值对象，非 null
      */
-    public static McpServerConfig of(String serverKey, List<String> command,
-            Map<String, String> env, String url, Map<String, String> headers) {
+    public static McpServerConfig of(String serverKey, List<String> command, Map<String, String> env, String url, Map<String, String> headers) {
         return new McpServerConfig(serverKey, inferTransportProfile(command, url), command, env, url, headers);
     }
 
@@ -77,10 +79,13 @@ public final class McpServerConfig {
      * @param url              http 端点，可为 null 或空白
      * @param headers          http 请求头，可为 null
      */
-    public McpServerConfig(String serverKey, McpTransportProfile transportProfile,
-            List<String> command, Map<String, String> env, String url, Map<String, String> headers) {
-        if (StringUtils.isBlank(serverKey)) { throw new IllegalArgumentException("serverKey must not be blank"); }
-        if (transportProfile == null) { throw new IllegalArgumentException("transportProfile must not be null"); }
+    public McpServerConfig(String serverKey, McpTransportProfile transportProfile, List<String> command, Map<String, String> env, String url, Map<String, String> headers) {
+        if (StringUtils.isBlank(serverKey)) {
+            throw new IllegalArgumentException("serverKey must not be blank");
+        }
+        if (transportProfile == null) {
+            throw new IllegalArgumentException("transportProfile must not be null");
+        }
         List<String> commandLine = immutableCommand(command);
         Map<String, String> environment = immutableMap(env, "env");
         Map<String, String> headerMap = immutableMap(headers, "headers");
@@ -94,8 +99,7 @@ public final class McpServerConfig {
         this.headers = headerMap;
     }
 
-    private static void validateTransport(McpTransportProfile profile, List<String> command,
-            Map<String, String> env, String endpoint, Map<String, String> headers) {
+    private static void validateTransport(McpTransportProfile profile, List<String> command, Map<String, String> env, String endpoint, Map<String, String> headers) {
         if (profile == McpTransportProfile.STDIO) {
             requireStdio(command, endpoint, headers);
         } else if (profile == McpTransportProfile.STREAMABLE_HTTP) {
@@ -106,36 +110,47 @@ public final class McpServerConfig {
     }
 
     private static void requireStdio(List<String> command, String endpoint, Map<String, String> headers) {
-        if (command.isEmpty()) { throw new IllegalArgumentException("stdio config requires a command"); }
-        if (endpoint != null) { throw new IllegalArgumentException("stdio config must not define url"); }
-        if (!headers.isEmpty()) { throw new IllegalArgumentException("stdio config must not define headers"); }
+        if (command.isEmpty()) {
+            throw new IllegalArgumentException("stdio config requires a command");
+        }
+        if (endpoint != null) {
+            throw new IllegalArgumentException("stdio config must not define url");
+        }
+        if (!headers.isEmpty()) {
+            throw new IllegalArgumentException("stdio config must not define headers");
+        }
     }
 
     private static void requireHttp(List<String> command, Map<String, String> env, String endpoint) {
-        if (endpoint == null) { throw new IllegalArgumentException("http config requires a url"); }
-        if (!command.isEmpty()) { throw new IllegalArgumentException("http config must not define command"); }
-        if (!env.isEmpty()) { throw new IllegalArgumentException("http config must not define env"); }
+        if (endpoint == null) {
+            throw new IllegalArgumentException("http config requires a url");
+        }
+        if (!command.isEmpty()) {
+            throw new IllegalArgumentException("http config must not define command");
+        }
+        if (!env.isEmpty()) {
+            throw new IllegalArgumentException("http config must not define env");
+        }
     }
 
-    public String getServerKey() { return serverKey; }
-    public McpTransportProfile getTransportProfile() { return transportProfile; }
-    public List<String> getCommand() { return command; }
-    public Map<String, String> getEnv() { return env; }
-    public String getUrl() { return url; }
-    public Map<String, String> getHeaders() { return headers; }
-
     private static List<String> immutableCommand(List<String> source) {
-        if (source == null) { return Collections.emptyList(); }
+        if (source == null) {
+            return Collections.emptyList();
+        }
         List<String> result = new ArrayList<>(source.size());
         for (String token : source) {
-            if (StringUtils.isBlank(token)) { throw new IllegalArgumentException("command must not contain blank tokens"); }
+            if (StringUtils.isBlank(token)) {
+                throw new IllegalArgumentException("command must not contain blank tokens");
+            }
             result.add(token);
         }
         return Collections.unmodifiableList(result);
     }
 
     private static Map<String, String> immutableMap(Map<String, String> source, String field) {
-        if (source == null) { return Collections.emptyMap(); }
+        if (source == null) {
+            return Collections.emptyMap();
+        }
         Map<String, String> result = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : source.entrySet()) {
             if (StringUtils.isBlank(entry.getKey()) || entry.getValue() == null) {

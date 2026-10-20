@@ -50,7 +50,7 @@ public final class UserVisionContent implements IContent {
     public UserVisionContent(String text, List<String> images) {
         this.text = text;
         this.images = images == null
-                ? Collections.<String>emptyList()
+                ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(images));
     }
 

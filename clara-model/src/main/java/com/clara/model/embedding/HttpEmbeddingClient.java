@@ -128,7 +128,7 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
                 new HostEndpointPolicy(Collections.singleton(endpoint.getHost()), allowHttp),
                 connectTimeoutMillis, readTimeoutMillis,
                 DEFAULT_MAX_REQUEST_BYTES, DEFAULT_MAX_RESPONSE_BYTES,
-                Collections.<String, String>emptyMap(),
+                Collections.emptyMap(),
                 new SseParserConfig(SseParserConfig.DEFAULT_MAX_LINE_BYTES,
                         SseParserConfig.DEFAULT_MAX_EVENT_BYTES,
                         SseParserConfig.DEFAULT_MAX_EVENTS,
@@ -345,11 +345,11 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
     private float[] parse(byte[] responseBody) throws IOException {
         JsonNode root = json.readTree(responseBody);
         JsonNode data = root.path("data");
-        if (!data.isArray() || data.size() == 0) {
+        if (!data.isArray() || data.isEmpty()) {
             throw new IllegalStateException("embedding response missing data array");
         }
         JsonNode embedding = data.get(0).path("embedding");
-        if (!embedding.isArray() || embedding.size() == 0) {
+        if (!embedding.isArray() || embedding.isEmpty()) {
             throw new IllegalStateException("embedding response missing embedding vector");
         }
         List<Float> values = new ArrayList<>();
@@ -357,11 +357,11 @@ public final class HttpEmbeddingClient implements IEmbeddingClient {
             if (!node.isNumber()) {
                 throw new IllegalStateException("embedding vector contains a non-number");
             }
-            values.add(Float.valueOf(node.floatValue()));
+            values.add(node.floatValue());
         }
         float[] result = new float[values.size()];
         for (int i = 0; i < values.size(); i++) {
-            result[i] = values.get(i).floatValue();
+            result[i] = values.get(i);
         }
         return result;
     }

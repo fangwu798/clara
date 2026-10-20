@@ -144,8 +144,8 @@ public final class MilvusGrpcBackend implements MilvusBackend {
             contents.add(entry.getContent());
             contentHashes.add(entry.getContentHash());
             vectors.add(toFloatList(entry.getVector()));
-            createdAts.add(Long.valueOf(entry.getCreatedAtEpochMillis()));
-            expiresAts.add(Long.valueOf(entry.getExpiresAtEpochMillis()));
+            createdAts.add(entry.getCreatedAtEpochMillis());
+            expiresAts.add(entry.getExpiresAtEpochMillis());
             metadatas.add(toJson(entry.getMetadata()));
         }
         List<InsertParam.Field> fields = new ArrayList<>();
@@ -177,7 +177,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
                 .withCollectionName(collection)
                 .withVectorFieldName(FIELD_VECTOR)
                 .withMetricType(metricType(currentMetric()))
-                .withLimit(Long.valueOf(backendQuery.getCandidateLimit()))
+                .withLimit((long) backendQuery.getCandidateLimit())
                 .withOutFields(OUT_FIELDS)
                 .withConsistencyLevel(ConsistencyLevelEnum.STRONG)
                 .withFloatVectors(Collections.singletonList(toFloatList(query.getVector())));
@@ -249,19 +249,19 @@ public final class MilvusGrpcBackend implements MilvusBackend {
     private void createCollection(MilvusCollectionSpec spec) {
         List<FieldType> fields = new ArrayList<>();
         fields.add(FieldType.newBuilder().withName(FIELD_ID).withDataType(DataType.VarChar)
-                .withMaxLength(Integer.valueOf(128)).withPrimaryKey(true).build());
+                .withMaxLength(128).withPrimaryKey(true).build());
         fields.add(FieldType.newBuilder().withName(FIELD_SOURCE_TYPE).withDataType(DataType.VarChar)
-                .withMaxLength(Integer.valueOf(64)).build());
+                .withMaxLength(64).build());
         fields.add(FieldType.newBuilder().withName(FIELD_SOURCE_ID).withDataType(DataType.VarChar)
-                .withMaxLength(Integer.valueOf(256)).build());
+                .withMaxLength(256).build());
         fields.add(FieldType.newBuilder().withName(FIELD_CONVERSATION_ID).withDataType(DataType.VarChar)
-                .withMaxLength(Integer.valueOf(256)).build());
+                .withMaxLength(256).build());
         fields.add(FieldType.newBuilder().withName(FIELD_CONTENT).withDataType(DataType.VarChar)
-                .withMaxLength(Integer.valueOf(65535)).build());
+                .withMaxLength(65535).build());
         fields.add(FieldType.newBuilder().withName(FIELD_CONTENT_HASH).withDataType(DataType.VarChar)
-                .withMaxLength(Integer.valueOf(64)).build());
+                .withMaxLength(64).build());
         fields.add(FieldType.newBuilder().withName(FIELD_VECTOR).withDataType(DataType.FloatVector)
-                .withDimension(Integer.valueOf(spec.getDimension())).build());
+                .withDimension(spec.getDimension()).build());
         fields.add(FieldType.newBuilder().withName(FIELD_CREATED_AT).withDataType(DataType.Int64).build());
         fields.add(FieldType.newBuilder().withName(FIELD_EXPIRES_AT).withDataType(DataType.Int64).build());
         fields.add(FieldType.newBuilder().withName(FIELD_METADATA).withDataType(DataType.JSON).build());
@@ -297,7 +297,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
                 .build());
         checkStatus(result, "describeCollection");
         DescribeCollectionResponse data = result.getData();
-        if (data == null || data.getSchema() == null) {
+        if (data == null) {
             throw new MilvusBackendException("milvus describeCollection returned no schema", false);
         }
         for (FieldSchema field : data.getSchema().getFieldsList()) {
@@ -340,7 +340,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
     private static List<Float> toFloatList(float[] vector) {
         List<Float> values = new ArrayList<>(vector.length);
         for (float value : vector) {
-            values.add(Float.valueOf(value));
+            values.add(value);
         }
         return values;
     }
@@ -443,7 +443,7 @@ public final class MilvusGrpcBackend implements MilvusBackend {
         if (response == null) {
             throw new MilvusBackendException("milvus " + operation + " returned null", false);
         }
-        if (response.getStatus() == null || response.getStatus().intValue() != R.Status.Success.getCode()) {
+        if (response.getStatus() == null || response.getStatus() != R.Status.Success.getCode()) {
             String message = response.getException() == null
                     ? String.valueOf(response.getStatus())
                     : response.getException().getMessage();

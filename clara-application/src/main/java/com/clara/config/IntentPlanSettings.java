@@ -3,6 +3,7 @@ package com.clara.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,6 +15,7 @@ import java.nio.file.Path;
  * <p>开启后，每轮用户输入先判断复杂度：复杂任务生成执行计划并经 {@code validate_execution_plan}
  * 工具校验后注入提示词，简单任务仍由模型直接回答。节点缺省时按默认值启用。
  */
+@Getter
 public final class IntentPlanSettings {
 
     private static final String NODE = "intentPlanning";
@@ -24,8 +26,26 @@ public final class IntentPlanSettings {
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
 
+    /**
+     * -- GETTER --
+     *  是否启用意图识别与动态计划。
+     *
+     * @return true 表示启用
+     */
     private final boolean enabled;
+    /**
+     * -- GETTER --
+     *  计划最大步骤数。
+     *
+     * @return 正整数的步骤上限
+     */
     private final int maxSteps;
+    /**
+     * -- GETTER --
+     *  校验失败后的最大修正次数。
+     *
+     * @return 非负整数
+     */
     private final int maxRepairAttempts;
 
     private IntentPlanSettings(boolean enabled, int maxSteps, int maxRepairAttempts) {
@@ -65,33 +85,6 @@ public final class IntentPlanSettings {
      */
     public static IntentPlanSettings defaults() {
         return new IntentPlanSettings(DEFAULT_ENABLED, DEFAULT_MAX_STEPS, DEFAULT_MAX_REPAIR_ATTEMPTS);
-    }
-
-    /**
-     * 是否启用意图识别与动态计划。
-     *
-     * @return true 表示启用
-     */
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    /**
-     * 计划最大步骤数。
-     *
-     * @return 正整数的步骤上限
-     */
-    public int getMaxSteps() {
-        return maxSteps;
-    }
-
-    /**
-     * 校验失败后的最大修正次数。
-     *
-     * @return 非负整数
-     */
-    public int getMaxRepairAttempts() {
-        return maxRepairAttempts;
     }
 
     private static boolean bool(JsonNode node, String field, boolean fallback) {

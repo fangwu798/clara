@@ -31,8 +31,8 @@ import java.util.function.Function;
  * {@link #getPrompt}；请求应携带发现时的 snapshot 标识和 Schema 哈希。
  *
  * <p>注意：仅 ACTIVE 且快照健康的服务端可调用。网关每次调用都会创建临时客户端并核对协议版本和身份，
- * 能力已变化时会拒绝执行；客户端由网关关闭，调用方不得复用或管理该实例。服务端所属租户由调用请求显式携带
- * （会话上下文已不再携带租户标识），网关据此在按租户分区的注册表与能力目录中定位服务端。
+ * 能力已变化时会拒绝执行；客户端由网关关闭，调用方不得复用或管理该实例。网关按调用请求中的服务端标识
+ * 在注册表与能力目录中定位服务端。
  */
 public final class DefaultMcpGateway implements IMcpGateway {
     private final IMcpServerRegistry registry;
@@ -51,26 +51,26 @@ public final class DefaultMcpGateway implements IMcpGateway {
 
     public McpToolResult callTool(final McpToolCall call) {
         if (call == null) { throw new IllegalArgumentException("call must not be null"); }
-        Prepared prepared = prepare(call.getTenantId(), call.getCall(), call.getServerKey(), call.getSnapshotId());
-        catalog.resolveTool(call.getTenantId(), call.getServerKey(), call.getSnapshotId(),
+        Prepared prepared = prepare(call.getCall(), call.getServerKey(), call.getSnapshotId());
+        catalog.resolveTool(call.getServerKey(), call.getSnapshotId(),
                 call.getToolName(), call.getSchemaHash());
         return execute(prepared, client -> client.callTool(call));
     }
 
     public McpResourceContent readResource(final McpResourceRequest request) {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
-        Prepared prepared = prepare(request.getTenantId(), request.getCall(), request.getServerKey(),
+        Prepared prepared = prepare(request.getCall(), request.getServerKey(),
                 request.getSnapshotId());
-        catalog.resolveResource(request.getTenantId(), request.getServerKey(),
+        catalog.resolveResource(request.getServerKey(),
                 request.getSnapshotId(), request.getUri(), request.getSchemaHash());
         return execute(prepared, client -> client.readResource(request));
     }
 
     public McpPromptResult getPrompt(final McpPromptRequest request) {
         if (request == null) { throw new IllegalArgumentException("request must not be null"); }
-        Prepared prepared = prepare(request.getTenantId(), request.getCall(), request.getServerKey(),
+        Prepared prepared = prepare(request.getCall(), request.getServerKey(),
                 request.getSnapshotId());
-        catalog.resolvePrompt(request.getTenantId(), request.getServerKey(),
+        catalog.resolvePrompt(request.getServerKey(),
                 request.getSnapshotId(), request.getPromptName(), request.getSchemaHash());
         return execute(prepared, client -> client.getPrompt(request));
     }
@@ -78,22 +78,21 @@ public final class DefaultMcpGateway implements IMcpGateway {
     /**
      * 校验注册状态、快照健康度并解析出可用快照。
      *
-     * @param tenantId   服务端所属租户，来自调用请求（会话上下文已不携带租户），不可为空白
      * @param call       本次调用的上下文，用于取消检查，不可为 null
      * @param serverKey  服务端键，不可为空白
      * @param snapshotId 发现时固化的快照 ID，不可为空白
      * @return 已校验的注册与快照，非 null
      */
-    private Prepared prepare(String tenantId, CallContext call, String serverKey, String snapshotId) {
+    private Prepared prepare(CallContext call, String serverKey, String snapshotId) {
         call.getCancellationToken().throwIfCancellationRequested(call.getTraceId());
-        McpServerRegistration registration = registry.get(tenantId, serverKey);
+        McpServerRegistration registration = registry.get(serverKey);
         if (registration == null) {
             throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_FOUND, ErrorCategoryEnum.CONFIGURATION);
         }
         if (registration.getStatus() != McpRegistrationStatus.ACTIVE) {
             throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_ACTIVE, ErrorCategoryEnum.AUTHORIZATION);
         }
-        McpServerSnapshot snapshot = catalog.get(tenantId, serverKey, snapshotId);
+        McpServerSnapshot snapshot = catalog.get(serverKey, snapshotId);
         if (snapshot == null) {
             throw McpErrors.error(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, ErrorCategoryEnum.CAPABILITY);
         }

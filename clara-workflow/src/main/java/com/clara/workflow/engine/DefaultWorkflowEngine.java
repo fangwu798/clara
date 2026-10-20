@@ -29,8 +29,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 执行确定性工作流，支持暂停、人工输入、恢复与取消。
@@ -56,7 +54,8 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         if (checkpoints.load(instanceId).isPresent()) {
             throw WorkflowErrors.error(ErrorCodes.WORKFLOW_INVALID_STATE, ErrorCategoryEnum.CONFLICT);
         }
-        Run run = new Run(definition, instanceId, new ExecutionScope(inputs), -1L);
+        WorkflowRun run = new WorkflowRun(checkpoints, definition, instanceId,
+                new ExecutionScope(inputs), -1L);
         run.checkpoint(WorkflowInstanceStatusEnum.RUNNING);
         return execute(run);
     }
@@ -91,7 +90,8 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
         ExecutionScope scope = checkpoint.getScope();
         scope.addInputs(inputs);
-        Run run = new Run(definition, instanceId, scope, checkpoint.getVersion());
+        WorkflowRun run = new WorkflowRun(checkpoints, definition, instanceId, scope,
+                checkpoint.getVersion());
         run.checkpoint(WorkflowInstanceStatusEnum.RUNNING);
         return execute(run);
     }
@@ -105,7 +105,8 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
             return new WorkflowResult(instanceId, checkpoint.getStatus(),
                     checkpoint.getScope(), checkpoint.getVersion());
         }
-        Run run = new Run(null, instanceId, checkpoint.getScope(), checkpoint.getVersion(),
+        WorkflowRun run = new WorkflowRun(checkpoints, null, instanceId, checkpoint.getScope(),
+                checkpoint.getVersion(),
                 checkpoint.getWorkflowId(), checkpoint.getWorkflowVersion());
         run.checkpoint(WorkflowInstanceStatusEnum.CANCELLED);
         return run.result(WorkflowInstanceStatusEnum.CANCELLED);
@@ -123,7 +124,8 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
             return new WorkflowResult(instanceId, checkpoint.getStatus(),
                     checkpoint.getScope(), checkpoint.getVersion());
         }
-        Run run = new Run(null, instanceId, checkpoint.getScope(), checkpoint.getVersion(),
+        WorkflowRun run = new WorkflowRun(checkpoints, null, instanceId, checkpoint.getScope(),
+                checkpoint.getVersion(),
                 checkpoint.getWorkflowId(), checkpoint.getWorkflowVersion());
         run.checkpoint(WorkflowInstanceStatusEnum.SUSPENDED);
         return run.result(WorkflowInstanceStatusEnum.SUSPENDED);
@@ -134,12 +136,12 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         parallelExecutor.shutdownNow();
     }
 
-    private WorkflowResult execute(Run run) {
+    private WorkflowResult execute(WorkflowRun run) {
         try {
             executeNode(run.definition.getRoot(), run, "root/", true);
             run.checkpoint(WorkflowInstanceStatusEnum.SUCCEEDED);
             return run.result(WorkflowInstanceStatusEnum.SUCCEEDED);
-        } catch (WaitingInput signal) {
+        } catch (WaitingInputSignal signal) {
             run.checkpoint(WorkflowInstanceStatusEnum.WAITING_INPUT);
             return run.result(WorkflowInstanceStatusEnum.WAITING_INPUT, signal.nodeId, signal.inputKey);
         } catch (RuntimeException failure) {
@@ -148,7 +150,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
     }
 
-    private void executeNode(IWorkflowNode node, Run run, String path, boolean persist) {
+    private void executeNode(IWorkflowNode node, WorkflowRun run, String path, boolean persist) {
         String executionKey = path + node.getId();
         if (run.scope.isCompleted(executionKey)) {
             return;
@@ -168,7 +170,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
     }
 
-    private void executeAction(ActionNode node, Run run, String key, boolean persist) {
+    private void executeAction(ActionNode node, WorkflowRun run, String key, boolean persist) {
         Map<String, Object> outputs = node.getAction().execute(run.scope.copy());
         outputs = outputs == null ? Collections.emptyMap() : outputs;
         if (!node.getOutputKeys().containsAll(outputs.keySet())) {
@@ -180,7 +182,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
     }
 
-    private void executeComposite(CompositeNode node, Run run, String key, boolean persist) {
+    private void executeComposite(CompositeNode node, WorkflowRun run, String key, boolean persist) {
         if (node.getType() == WorkflowNodeTypeEnum.SEQUENCE) {
             for (IWorkflowNode child : node.getChildren()) {
                 executeNode(child, run, key + "/", persist);
@@ -194,12 +196,12 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
     }
 
-    private void executeParallel(CompositeNode node, final Run run, final String key) {
+    private void executeParallel(CompositeNode node, final WorkflowRun run, final String key) {
         final ExecutionScope base = run.scope.copy();
         List<Future<ExecutionScope>> futures = new ArrayList<>();
         for (final IWorkflowNode child : node.getChildren()) {
             futures.add(parallelExecutor.submit(() -> {
-                Run branch = run.branch(base.copy());
+                WorkflowRun branch = run.branch(base.copy());
                 executeNode(child, branch, key + "/", false);
                 return branch.scope;
             }));
@@ -226,7 +228,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
     }
 
-    private void executeCondition(ConditionNode node, Run run, String key, boolean persist) {
+    private void executeCondition(ConditionNode node, WorkflowRun run, String key, boolean persist) {
         String selected = run.scope.control(key + ":branch");
         if (selected == null) {
             selected = node.getCondition().test(run.scope.copy()) ? "true" : "false";
@@ -242,7 +244,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
     }
 
-    private void executeLoop(LoopNode node, Run run, String key, boolean persist) {
+    private void executeLoop(LoopNode node, WorkflowRun run, String key, boolean persist) {
         String stored = run.scope.control(key + ":iteration");
         int iteration = stored == null ? 0 : Integer.parseInt(stored);
         while (iteration < node.getMaxIterations()) {
@@ -262,9 +264,9 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
     }
 
-    private void executeHuman(HumanNode node, Run run, String key, boolean persist) {
+    private void executeHuman(HumanNode node, WorkflowRun run, String key, boolean persist) {
         if (!run.scope.contains(node.getInputKey())) {
-            throw new WaitingInput(node.getId(), node.getInputKey());
+            throw new WaitingInputSignal(node.getId(), node.getInputKey());
         }
         Map<String, Object> output = new LinkedHashMap<>();
         output.put(node.getInputKey(), run.scope.get(node.getInputKey()));
@@ -287,7 +289,7 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
      */
     private static boolean isApproval(Object value) {
         if (value instanceof Boolean) {
-            return ((Boolean) value).booleanValue();
+            return (Boolean) value;
         }
         if (value == null) {
             return false;
@@ -310,75 +312,4 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         }
     }
 
-    /**
-     * 表示单次执行过程的状态。
-     */
-    private final class Run {
-        final WorkflowDefinition definition;
-        final String instanceId;
-        final ExecutionScope scope;
-        final String workflowId;
-        final String workflowVersion;
-        long checkpointVersion;
-
-        Run(WorkflowDefinition definition, String instanceId, ExecutionScope scope, long version) {
-            this(definition, instanceId, scope, version, definition.getWorkflowId(), definition.getVersion());
-        }
-
-        Run(WorkflowDefinition definition, String instanceId, ExecutionScope scope, long version,
-                String workflowId, String workflowVersion) {
-            this.definition = definition;
-            this.instanceId = instanceId;
-            this.scope = scope;
-            this.checkpointVersion = version;
-            this.workflowId = workflowId;
-            this.workflowVersion = workflowVersion;
-        }
-
-        void checkpoint(WorkflowInstanceStatusEnum status) {
-            WorkflowCheckpoint value = new WorkflowCheckpoint(instanceId, workflowId, workflowVersion,
-                    status, scope, checkpointVersion + 1L);
-            checkpoints.save(value, checkpointVersion);
-            checkpointVersion++;
-        }
-
-        Run branch(ExecutionScope branchScope) {
-            return new Run(definition, instanceId, branchScope, checkpointVersion, workflowId, workflowVersion);
-        }
-
-        WorkflowResult result(WorkflowInstanceStatusEnum status) {
-            return new WorkflowResult(instanceId, status, scope, checkpointVersion);
-        }
-
-        WorkflowResult result(WorkflowInstanceStatusEnum status, String waitingNodeId, String waitingInputKey) {
-            return new WorkflowResult(instanceId, status, scope, checkpointVersion, waitingNodeId, waitingInputKey);
-        }
-    }
-
-    /**
-     * 表示人工输入等待信号。
-     */
-    private static final class WaitingInput extends RuntimeException {
-        final String nodeId;
-        final String inputKey;
-
-        WaitingInput(String nodeId, String inputKey) {
-            this.nodeId = nodeId;
-            this.inputKey = inputKey;
-        }
-    }
-
-    /**
-     * 负责创建工作流线程实例。
-     */
-    private static final class WorkflowThreadFactory implements ThreadFactory {
-        private final AtomicInteger sequence = new AtomicInteger();
-
-        @Override
-        public Thread newThread(Runnable runnable) {
-            Thread thread = new Thread(runnable, "clara-workflow-" + sequence.incrementAndGet());
-            thread.setDaemon(true);
-            return thread;
-        }
-    }
 }

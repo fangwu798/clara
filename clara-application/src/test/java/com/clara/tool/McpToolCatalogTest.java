@@ -1,6 +1,8 @@
 package com.clara.tool;
 
 import com.clara.dto.tool.ToolContext;
+import com.clara.mcp.api.IMcpCapabilityCatalog;
+import com.clara.mcp.api.IMcpServerRegistry;
 import com.clara.mcp.client.McpServerCapabilities;
 import com.clara.mcp.client.McpServerIdentity;
 import com.clara.mcp.registry.InMemoryMcpCapabilityCatalog;
@@ -28,11 +30,10 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * {@link McpToolCatalog} 的单元测试：把已发现快照转成下发给模型的工具声明，以及无快照 / 跨租户与入参校验。
+ * {@link McpToolCatalog} 的单元测试：把已发现快照转成下发给模型的工具声明，以及无快照与入参校验。
  */
 public class McpToolCatalogTest {
 
-    private static final String TENANT = "local";
     private static final String SERVER = "codebase-memory-mcp";
     private static final String VERSION = "2024-11-05";
 
@@ -40,10 +41,10 @@ public class McpToolCatalogTest {
     public void mapsSnapshotToolsToDeclarations() {
         InMemoryMcpServerRegistry registry = new InMemoryMcpServerRegistry();
         InMemoryMcpCapabilityCatalog catalog = new InMemoryMcpCapabilityCatalog();
-        registry.register(registration(TENANT, SERVER));
-        catalog.publish(snapshot(TENANT, SERVER, "snap-1", tool("search_graph"), tool("get_file_outline")));
+        registry.register(registration(SERVER));
+        catalog.publish(snapshot(SERVER, "snap-1", tool("search_graph"), tool("get_file_outline")));
 
-        List<ToolContext> tools = new McpToolCatalog(registry, catalog, TENANT).availableTools();
+        List<ToolContext> tools = new McpToolCatalog(registry, catalog).availableTools();
 
         assertEquals(2, tools.size());
         assertEquals("search_graph", tools.get(0).getFunction().getName());
@@ -53,50 +54,46 @@ public class McpToolCatalogTest {
     }
 
     @Test
-    public void skipsServersWithoutSnapshotAndOtherTenants() {
+    public void skipsServersWithoutSnapshot() {
         InMemoryMcpServerRegistry registry = new InMemoryMcpServerRegistry();
         InMemoryMcpCapabilityCatalog catalog = new InMemoryMcpCapabilityCatalog();
-        registry.register(registration(TENANT, SERVER));
-        catalog.publish(snapshot("other-tenant", SERVER, "snap-1", tool("search_graph")));
+        registry.register(registration(SERVER));
+        catalog.publish(snapshot("other-server", "snap-0", tool("search_graph")));
 
-        assertTrue(new McpToolCatalog(registry, catalog, TENANT).availableTools().isEmpty());
+        assertTrue(new McpToolCatalog(registry, catalog).availableTools().isEmpty());
 
-        catalog.publish(snapshot(TENANT, SERVER, "snap-2", tool("search_graph")));
-        assertEquals(1, new McpToolCatalog(registry, catalog, TENANT).availableTools().size());
+        catalog.publish(snapshot(SERVER, "snap-1", tool("search_graph")));
+        assertEquals(1, new McpToolCatalog(registry, catalog).availableTools().size());
     }
 
     @Test
     public void emptySnapshotYieldsNoTool() {
         InMemoryMcpServerRegistry registry = new InMemoryMcpServerRegistry();
         InMemoryMcpCapabilityCatalog catalog = new InMemoryMcpCapabilityCatalog();
-        registry.register(registration(TENANT, SERVER));
-        catalog.publish(snapshot(TENANT, SERVER, "snap-1"));
+        registry.register(registration(SERVER));
+        catalog.publish(snapshot(SERVER, "snap-1"));
 
-        assertTrue(new McpToolCatalog(registry, catalog, TENANT).availableTools().isEmpty());
+        assertTrue(new McpToolCatalog(registry, catalog).availableTools().isEmpty());
     }
 
     @Test
     public void rejectsInvalidArguments() {
-        InMemoryMcpServerRegistry registry = new InMemoryMcpServerRegistry();
         InMemoryMcpCapabilityCatalog catalog = new InMemoryMcpCapabilityCatalog();
-        assertRejected(null, catalog, TENANT);
-        assertRejected(registry, null, TENANT);
-        assertRejected(registry, catalog, null);
-        assertRejected(registry, catalog, "  ");
+        assertRejected(null, catalog);
+        assertRejected(new InMemoryMcpServerRegistry(), null);
     }
 
-    private static void assertRejected(InMemoryMcpServerRegistry registry,
-            InMemoryMcpCapabilityCatalog catalog, String tenantId) {
+    private static void assertRejected(IMcpServerRegistry registry, IMcpCapabilityCatalog catalog) {
         try {
-            new McpToolCatalog(registry, catalog, tenantId);
+            new McpToolCatalog(registry, catalog);
             fail("expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
             assertTrue(true);
         }
     }
 
-    private static McpServerRegistration registration(String tenantId, String serverKey) {
-        return new McpServerRegistration(tenantId, serverKey, McpTransportProfile.STDIO,
+    private static McpServerRegistration registration(String serverKey) {
+        return new McpServerRegistration(serverKey, McpTransportProfile.STDIO,
                 "codebase-memory-mcp", null, null, null, McpRegistrationStatus.ACTIVE);
     }
 
@@ -106,11 +103,11 @@ public class McpToolCatalogTest {
         return new McpToolDescriptor(name, name + " tool", schema);
     }
 
-    private static McpServerSnapshot snapshot(String tenantId, String serverKey, String snapshotId,
+    private static McpServerSnapshot snapshot(String serverKey, String snapshotId,
             McpToolDescriptor... tools) {
         List<McpToolDescriptor> values = new ArrayList<>();
         Collections.addAll(values, tools);
-        return new McpServerSnapshot(snapshotId, tenantId, serverKey, 1L, VERSION,
+        return new McpServerSnapshot(snapshotId, serverKey, 1L, VERSION,
                 new McpServerIdentity(SERVER, "0.11.0"),
                 new McpServerCapabilities(true, false, false, false, false, false),
                 values, Collections.<McpResourceDescriptor>emptyList(),

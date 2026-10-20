@@ -65,8 +65,8 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
         Process process = null;
         StringBuilder stdout = new StringBuilder();
         StringBuilder stderr = new StringBuilder();
-        Thread stdoutThread = null;
-        Thread stderrThread = null;
+        Thread stdoutThread;
+        Thread stderrThread;
         try {
             ProcessBuilder builder = new ProcessBuilder(buildCommand(spec, scriptFile)).directory(workingDir);
             forceUtf8Environment(builder);

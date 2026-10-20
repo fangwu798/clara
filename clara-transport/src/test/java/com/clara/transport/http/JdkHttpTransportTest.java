@@ -1,5 +1,6 @@
 package com.clara.transport.http;
 
+import com.clara.enums.HttpTransportErrorKindEnum;
 import com.clara.exception.HttpTransportException;
 import com.clara.core.transport.HttpTransportPolicy;
 import com.clara.core.transport.IExecutionGuard;
@@ -117,7 +118,7 @@ public class JdkHttpTransportTest {
             call(endpoint, null, null, policy);
             fail("expected endpoint denial");
         } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.ENDPOINT_DENIED, expected.getKind());
+            assertEquals(HttpTransportErrorKindEnum.ENDPOINT_DENIED, expected.getKind());
         }
     }
 
@@ -127,7 +128,7 @@ public class JdkHttpTransportTest {
         HttpTransportPolicy limit = policy(2, 1024);
         HttpTransportException expected = assertThrows(HttpTransportException.class,
                 () -> call(endpoint, "abc", null, limit));
-        assertEquals(HttpTransportException.Kind.REQUEST_TOO_LARGE, expected.getKind());
+        assertEquals(HttpTransportErrorKindEnum.REQUEST_TOO_LARGE, expected.getKind());
     }
 
     @Test
@@ -136,7 +137,7 @@ public class JdkHttpTransportTest {
         HttpTransportPolicy limit = policy(1024, 4);
         HttpTransportException expected = assertThrows(HttpTransportException.class,
                 () -> call(endpoint, null, null, limit));
-        assertEquals(HttpTransportException.Kind.RESPONSE_TOO_LARGE, expected.getKind());
+        assertEquals(HttpTransportErrorKindEnum.RESPONSE_TOO_LARGE, expected.getKind());
     }
 
     @Test
@@ -156,7 +157,7 @@ public class JdkHttpTransportTest {
         HttpTransportPolicy limit = policy(1024, 1024);
         IHttpCall httpCall = transport.newCall(rawRequest, limit, cancelled);
         HttpTransportException expected = assertThrows(HttpTransportException.class, httpCall::execute);
-        assertEquals(HttpTransportException.Kind.CANCELLED, expected.getKind());
+        assertEquals(HttpTransportErrorKindEnum.CANCELLED, expected.getKind());
     }
 
     private RawHttpResponse call(URI endpoint, String body, ISseEventListener listener,

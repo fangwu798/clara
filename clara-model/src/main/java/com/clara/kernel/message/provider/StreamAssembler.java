@@ -7,6 +7,7 @@ import com.clara.exception.ClaraException;
 import com.clara.dto.model.StreamEvent;
 import com.clara.utils.deserialize.ResponseDecoderSupport;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.Getter;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -48,7 +49,11 @@ public abstract class StreamAssembler<R extends IResponse> {
     private long sequence;
     /**
      * 是否已收到结束标记。
+     * -- GETTER --
+     *  是否已收到结束标记。
+
      */
+    @Getter
     protected boolean terminated;
     /**
      * 流式失败信息；成功时为 null。
@@ -180,13 +185,6 @@ public abstract class StreamAssembler<R extends IResponse> {
      */
     public ClaraException failure() {
         return failure;
-    }
-
-    /**
-     * 是否已收到结束标记。
-     */
-    public boolean isTerminated() {
-        return terminated;
     }
 
     /**

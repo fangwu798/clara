@@ -6,10 +6,11 @@ import com.clara.enums.CapabilityKindEnum;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.core.model.IStreamObserver;
-import com.clara.model.availability.AvailabilityLine;
+import com.clara.enums.AvailabilityLevelEnum;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.utils.StringUtils;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
 import java.io.Closeable;
@@ -76,7 +77,7 @@ public final class ConsoleView implements Closeable {
      * @param level 可用性检查行的状态级别，可为 null
      * @return 颜色码；不染色时返回 null
      */
-    public static String colorOf(AvailabilityLine.Level level) {
+    public static String colorOf(AvailabilityLevelEnum level) {
         if (level == null) {
             return null;
         }
@@ -122,7 +123,7 @@ public final class ConsoleView implements Closeable {
         }
 
         @Override
-        public void write(byte[] buffer, int offset, int length) {
+        public void write(byte @NotNull [] buffer, int offset, int length) {
             // 精简模式下丢弃框架写入标准输出的内容。
         }
     };
@@ -779,7 +780,7 @@ public final class ConsoleView implements Closeable {
         }
 
         @Override
-        public void write(byte[] buffer, int offset, int length) throws IOException {
+        public void write(byte @NotNull [] buffer, int offset, int length) throws IOException {
             for (int index = offset; index < offset + length; index++) {
                 write(buffer[index]);
             }
@@ -811,7 +812,7 @@ public final class ConsoleView implements Closeable {
         }
 
         @Override
-        public void write(byte[] buffer, int offset, int length) throws IOException {
+        public void write(byte @NotNull [] buffer, int offset, int length) throws IOException {
             primary.write(buffer, offset, length);
             secondary.write(buffer, offset, length);
         }

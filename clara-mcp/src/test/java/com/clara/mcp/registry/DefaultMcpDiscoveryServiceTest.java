@@ -36,7 +36,6 @@ import static org.junit.Assert.fail;
  * {@link DefaultMcpDiscoveryService} 的行为测试：用假客户端返回能力与分页，不依赖真实服务端与网络。
  */
 public class DefaultMcpDiscoveryServiceTest {
-    private static final String TENANT = "tenant-1";
     private static final String SERVER = "echo-server";
     private static final String VERSION = "2024-11-05";
     private static final McpServerIdentity IDENTITY = new McpServerIdentity("echo", "1.0.0");
@@ -53,7 +52,6 @@ public class DefaultMcpDiscoveryServiceTest {
 
         McpServerSnapshot snapshot = service.discover(registration(IDENTITY.getName(), IDENTITY.getVersion()));
 
-        assertEquals(TENANT, snapshot.getTenantId());
         assertEquals(SERVER, snapshot.getServerKey());
         assertEquals(VERSION, snapshot.getProtocolVersion());
         assertEquals(1, snapshot.getTools().size());
@@ -127,10 +125,10 @@ public class DefaultMcpDiscoveryServiceTest {
         DefaultMcpDiscoveryService service = new DefaultMcpDiscoveryService(registry, catalog,
                 new FakeClientFactory(client), Arrays.asList(VERSION), 10);
 
-        service.refresh(TENANT, SERVER);
+        service.refresh(SERVER);
 
         assertSame(McpRegistrationStatus.ACTIVE, registry.status);
-        assertEquals(1, catalog.latest(TENANT, SERVER).getTools().size());
+        assertEquals(1, catalog.latest(SERVER).getTools().size());
         assertEquals(1, client.closeCount);
     }
 
@@ -144,7 +142,7 @@ public class DefaultMcpDiscoveryServiceTest {
 
         assertCode(ErrorCodes.MCP_PROTOCOL_INCOMPATIBLE, new Runnable() {
             public void run() {
-                service.refresh(TENANT, SERVER);
+                service.refresh(SERVER);
             }
         });
         assertSame(McpRegistrationStatus.INCOMPATIBLE, registry.status);
@@ -160,7 +158,7 @@ public class DefaultMcpDiscoveryServiceTest {
 
         assertCode(ErrorCodes.MCP_SERVER_IDENTITY_CHANGED, new Runnable() {
             public void run() {
-                service.refresh(TENANT, SERVER);
+                service.refresh(SERVER);
             }
         });
         assertSame(McpRegistrationStatus.REVIEW_REQUIRED, registry.status);
@@ -180,7 +178,7 @@ public class DefaultMcpDiscoveryServiceTest {
     }
 
     private static McpServerRegistration registration(String approvedName, String approvedVersion) {
-        return new McpServerRegistration(TENANT, SERVER, McpTransportProfile.STDIO, "node echo", null,
+        return new McpServerRegistration(SERVER, McpTransportProfile.STDIO, "node echo", null,
                 approvedName, approvedVersion, McpRegistrationStatus.PENDING_REVIEW);
     }
 
@@ -212,11 +210,11 @@ public class DefaultMcpDiscoveryServiceTest {
         private FakeRegistry(McpServerRegistration registration) { this.registration = registration; }
 
         public void register(McpServerRegistration value) { }
-        public void updateStatus(String tenantId, String serverKey, McpRegistrationStatus value) {
+        public void updateStatus(String serverKey, McpRegistrationStatus value) {
             this.status = value;
         }
-        public List<McpServerRegistration> listEnabled(String tenantId) { return Collections.emptyList(); }
-        public McpServerRegistration get(String tenantId, String serverKey) {
+        public List<McpServerRegistration> listEnabled() { return Collections.emptyList(); }
+        public McpServerRegistration get(String serverKey) {
             if (registration == null) { throw new IllegalStateException("not registered"); }
             return registration;
         }

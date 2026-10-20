@@ -325,11 +325,7 @@ public final class RecordingObserver<R extends IResponse> implements IStreamObse
     }
 
     private String[] toolCall(int index) {
-        String[] call = toolCalls.get(Integer.valueOf(index));
-        if (call == null) {
-            call = new String[3];
-            toolCalls.put(Integer.valueOf(index), call);
-        }
+        String[] call = toolCalls.computeIfAbsent(index, k -> new String[3]);
         return call;
     }
 

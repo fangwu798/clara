@@ -23,12 +23,10 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
 
     public void publish(McpServerSnapshot snapshot) {
         if (snapshot == null) { throw new IllegalArgumentException("snapshot must not be null"); }
-        String snapshotKey = snapshotKey(snapshot.getTenantId(), snapshot.getServerKey(),
-                snapshot.getSnapshotId());
-        if (snapshots.putIfAbsent(snapshotKey, snapshot) != null) {
+        if (snapshots.putIfAbsent(snapshot.getSnapshotId(), snapshot) != null) {
             throw new IllegalArgumentException("snapshotId is already published");
         }
-        String serverKey = serverKey(snapshot.getTenantId(), snapshot.getServerKey());
+        String serverKey = snapshot.getServerKey();
         for (;;) {
             McpServerSnapshot current = latest.get(serverKey);
             if (current != null && current.getDiscoveredAtEpochMillis()
@@ -38,16 +36,19 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
             } else if (latest.replace(serverKey, current, snapshot)) return;
         }
     }
-    public McpServerSnapshot latest(String tenantId, String serverKey) {
-        return latest.get(serverKey(tenantId, serverKey));
+    public McpServerSnapshot latest(String serverKey) {
+        require(serverKey, "serverKey");
+        return latest.get(serverKey);
     }
-    public McpServerSnapshot get(String tenantId, String serverKey, String snapshotId) {
-        return snapshots.get(snapshotKey(tenantId, serverKey, snapshotId));
+    public McpServerSnapshot get(String serverKey, String snapshotId) {
+        require(serverKey, "serverKey"); require(snapshotId, "snapshotId");
+        McpServerSnapshot snapshot = snapshots.get(snapshotId);
+        return snapshot != null && serverKey.equals(snapshot.getServerKey()) ? snapshot : null;
     }
-    public McpToolDescriptor resolveTool(String tenantId, String serverKey, String snapshotId,
+    public McpToolDescriptor resolveTool(String serverKey, String snapshotId,
             String toolName, String expectedSchemaHash) {
         require(toolName, "toolName"); require(expectedSchemaHash, FIELD_EXPECTED_SCHEMA_HASH);
-        McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
+        McpServerSnapshot snapshot = requireSnapshot(serverKey, snapshotId);
         for (McpToolDescriptor tool : snapshot.getTools()) {
             if (toolName.equals(tool.getName())) {
                 requireHash(expectedSchemaHash, tool.getSchemaHash()); return tool;
@@ -55,10 +56,10 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
         }
         throw notFound();
     }
-    public McpResourceDescriptor resolveResource(String tenantId, String serverKey, String snapshotId,
+    public McpResourceDescriptor resolveResource(String serverKey, String snapshotId,
             String uri, String expectedSchemaHash) {
         require(uri, "uri"); require(expectedSchemaHash, FIELD_EXPECTED_SCHEMA_HASH);
-        McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
+        McpServerSnapshot snapshot = requireSnapshot(serverKey, snapshotId);
         for (McpResourceDescriptor resource : snapshot.getResources()) {
             if (uri.equals(resource.getUri())) {
                 requireHash(expectedSchemaHash, resource.getSchemaHash()); return resource;
@@ -66,10 +67,10 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
         }
         throw notFound();
     }
-    public McpPromptDescriptor resolvePrompt(String tenantId, String serverKey, String snapshotId,
+    public McpPromptDescriptor resolvePrompt(String serverKey, String snapshotId,
             String promptName, String expectedSchemaHash) {
         require(promptName, "promptName"); require(expectedSchemaHash, FIELD_EXPECTED_SCHEMA_HASH);
-        McpServerSnapshot snapshot = requireSnapshot(tenantId, serverKey, snapshotId);
+        McpServerSnapshot snapshot = requireSnapshot(serverKey, snapshotId);
         for (McpPromptDescriptor prompt : snapshot.getPrompts()) {
             if (promptName.equals(prompt.getName())) {
                 requireHash(expectedSchemaHash, prompt.getSchemaHash()); return prompt;
@@ -77,8 +78,8 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
         }
         throw notFound();
     }
-    private McpServerSnapshot requireSnapshot(String tenantId, String serverKey, String snapshotId) {
-        McpServerSnapshot snapshot = get(tenantId, serverKey, snapshotId);
+    private McpServerSnapshot requireSnapshot(String serverKey, String snapshotId) {
+        McpServerSnapshot snapshot = get(serverKey, snapshotId);
         if (snapshot == null) { throw notFound(); }
         return snapshot;
     }
@@ -86,13 +87,6 @@ public final class InMemoryMcpCapabilityCatalog implements IMcpCapabilityCatalog
         if (!expected.equals(actual)) {
             throw McpErrors.error(ErrorCodes.MCP_SCHEMA_MISMATCH, ErrorCategoryEnum.CAPABILITY);
         }
-    }
-    private static String serverKey(String tenantId, String serverKey) {
-        require(tenantId, "tenantId"); require(serverKey, "serverKey");
-        return tenantId + '\u0000' + serverKey;
-    }
-    private static String snapshotKey(String tenantId, String serverKey, String snapshotId) {
-        require(snapshotId, "snapshotId"); return serverKey(tenantId, serverKey) + '\u0000' + snapshotId;
     }
     private static void require(String value, String field) {
         if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(field + " must not be blank"); }

@@ -112,7 +112,7 @@ public final class CodeGraphConsole {
      */
     public String prepare(boolean index) {
         return execute("{\"op\":\"prepare\",\"index\":" + index
-                + ",\"purpose\":\"检查当前工作目录是否已导入代码知识图谱，未导入则按需导入\"}",
+                        + ",\"purpose\":\"检查当前工作目录是否已导入代码知识图谱，未导入则按需导入\"}",
                 STATUS_TIMEOUT_SECONDS);
     }
 
@@ -125,7 +125,7 @@ public final class CodeGraphConsole {
      */
     public String importWorkdir(boolean background) {
         return execute("{\"op\":\"index\",\"background\":" + background
-                + ",\"purpose\":\"把当前工作目录导入代码知识图谱\"}",
+                        + ",\"purpose\":\"把当前工作目录导入代码知识图谱\"}",
                 background ? STATUS_TIMEOUT_SECONDS : IMPORT_TIMEOUT_SECONDS);
     }
 
@@ -157,7 +157,7 @@ public final class CodeGraphConsole {
      * @return 调用结果，非 null；{@code exitCode < 0} 表示 output 已是可以直接打印的说明
      */
     private static Result run(ProcessBuilder builder, String stdinText, long timeoutSeconds, String label,
-            String timeoutHint) {
+                              String timeoutHint) {
         // 脚本把结果写 stdout、把诊断写 stderr；合并读取，出错时错误信息也不会丢。
         builder.redirectErrorStream(true);
         Process process;
@@ -167,14 +167,11 @@ public final class CodeGraphConsole {
             return new Result(-1, "[error] 启动" + label + "失败：" + failure.getMessage());
         }
         try {
-            OutputStream stdin = process.getOutputStream();
-            try {
+            try (OutputStream stdin = process.getOutputStream()) {
                 if (stdinText != null) {
                     stdin.write(stdinText.getBytes(StandardCharsets.UTF_8));
                     stdin.flush();
                 }
-            } finally {
-                stdin.close();
             }
             boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             if (!finished) {
@@ -199,10 +196,14 @@ public final class CodeGraphConsole {
      */
     private static final class Result {
 
-        /** 退出码；负值表示 output 已是可以直接打印的说明。 */
+        /**
+         * 退出码；负值表示 output 已是可以直接打印的说明。
+         */
         private final int exitCode;
 
-        /** 子进程输出（合并 stdout 与 stderr）。 */
+        /**
+         * 子进程输出（合并 stdout 与 stderr）。
+         */
         private final String output;
 
         private Result(int exitCode, String output) {
@@ -285,7 +286,7 @@ public final class CodeGraphConsole {
         List<String> notes = new ArrayList<>();
         for (String line : output.split("\r?\n")) {
             String text = line.trim();
-            if (!text.isEmpty() && text.startsWith(MOUNT_PREFIX)) {
+            if (text.startsWith(MOUNT_PREFIX)) {
                 notes.add(text.substring(MOUNT_PREFIX.length()));
             }
         }

@@ -59,7 +59,7 @@ public final class ResponseToolCallSupport {
         int index = 0;
         for (ResponsesToolCall call : calls) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("index", Integer.valueOf(index++));
+            item.put("index", index++);
             item.put("id", call.getCallId());
             Map<String, Object> function = new LinkedHashMap<>();
             function.put("name", call.getName());

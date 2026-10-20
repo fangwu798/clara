@@ -1,11 +1,14 @@
 package com.clara.mcp.transport.jsonrpc;
 
 import com.clara.mcp.registry.ImmutableValues;
+import lombok.Getter;
+
 import java.util.Map;
 
 /**
  * 表示JSONRPC通知。
  */
+@Getter
 public final class JsonRpcNotification {
     private final String method;
     private final Map<String, Object> params;
@@ -15,8 +18,5 @@ public final class JsonRpcNotification {
         }
         this.method = method; this.params = ImmutableValues.copyMap(params);
     }
-    @SuppressWarnings("java:S3400")
     public String getJsonRpc() { return "2.0"; }
-    public String getMethod() { return method; }
-    public Map<String, Object> getParams() { return params; }
 }

@@ -36,10 +36,10 @@ public final class TokenUsage {
         if (inputTokens < 0 || outputTokens < 0) {
             throw new IllegalArgumentException("token counts must not be negative");
         }
-        if (totalTokens != null && totalTokens.intValue() < 0) {
+        if (totalTokens != null && totalTokens < 0) {
             throw new IllegalArgumentException("total tokens must not be negative");
         }
-        if (cacheTokens != null && cacheTokens.intValue() < 0) {
+        if (cacheTokens != null && cacheTokens < 0) {
             throw new IllegalArgumentException("cache tokens must not be negative");
         }
         this.inputTokens = inputTokens;

@@ -1,8 +1,11 @@
 package com.clara.core.transport.sse;
 
+import lombok.Getter;
+
 /**
  * 一次 Server-Sent Events 事件的不可变值对象。
  */
+@Getter
 public final class SseEvent {
 
     private final String event;
@@ -25,19 +28,4 @@ public final class SseEvent {
         this.retryMillis = retryMillis;
     }
 
-    public String getEvent() {
-        return event;
-    }
-
-    public String getData() {
-        return data;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public Long getRetryMillis() {
-        return retryMillis;
-    }
 }

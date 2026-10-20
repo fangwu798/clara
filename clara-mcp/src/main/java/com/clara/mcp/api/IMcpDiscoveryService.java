@@ -8,7 +8,7 @@ import com.clara.mcp.registry.McpServerSnapshot;
  *
  * <p>是什么、在哪一层：{@code clara-mcp} 注册层的发现入口，串起「注册 → 发现 → 目录 → 调用」闭环的前半段。
  *
- * <p>实现约定：{@link #discover(McpServerRegistration)} 只做发现并返回快照；{@link #refresh(String, String)}
+ * <p>实现约定：{@link #discover(McpServerRegistration)} 只做发现并返回快照；{@link #refresh(String)}
  * 在发现成功后发布快照并把注册状态更新为 ACTIVE，协议不兼容标记 INCOMPATIBLE、身份变化标记 REVIEW_REQUIRED。
  *
  * <p>生命周期与备注：每次 {@code discover} / {@code refresh} 都新建一个客户端，完成后在 {@code finally}
@@ -27,8 +27,7 @@ public interface IMcpDiscoveryService {
     /**
      * 重新发现指定服务端，发布快照并更新注册状态。
      *
-     * @param tenantId  租户标识，不可为空白
      * @param serverKey 服务端标识，不可为空白
      */
-    void refresh(String tenantId, String serverKey);
+    void refresh(String serverKey);
 }

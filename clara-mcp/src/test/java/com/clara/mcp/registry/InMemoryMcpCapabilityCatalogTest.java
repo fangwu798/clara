@@ -27,8 +27,7 @@ import static org.junit.Assert.fail;
  * {@link InMemoryMcpCapabilityCatalog} 的发布 / 最新 / 指定快照与能力解析（含 Schema 不一致）测试。
  */
 public class InMemoryMcpCapabilityCatalogTest {
-    private static final String TENANT = "tenant-1";
-    private static final String SERVER = "echo-server";
+        private static final String SERVER = "echo-server";
     private static final String SNAPSHOT = "snapshot-1";
     private static final String VERSION = "2024-11-05";
     private static final McpServerIdentity IDENTITY = new McpServerIdentity("echo", "1.0.0");
@@ -39,49 +38,49 @@ public class InMemoryMcpCapabilityCatalogTest {
 
     @Test
     public void publishThenLatestAndGet() {
-        McpServerSnapshot snapshot = snapshot(SNAPSHOT, TENANT, SERVER, 1L, tool("echo"));
+        McpServerSnapshot snapshot = snapshot(SNAPSHOT, SERVER, 1L, tool("echo"));
 
         catalog.publish(snapshot);
 
-        assertSame(snapshot, catalog.latest(TENANT, SERVER));
-        assertSame(snapshot, catalog.get(TENANT, SERVER, SNAPSHOT));
+        assertSame(snapshot, catalog.latest(SERVER));
+        assertSame(snapshot, catalog.get(SERVER, SNAPSHOT));
     }
 
     @Test
     public void missingSnapshotReturnsNull() {
-        assertNull(catalog.latest(TENANT, SERVER));
-        assertNull(catalog.get(TENANT, SERVER, SNAPSHOT));
+        assertNull(catalog.latest(SERVER));
+        assertNull(catalog.get(SERVER, SNAPSHOT));
     }
 
     @Test
     public void latestKeepsNewestByDiscoveryTime() {
-        McpServerSnapshot older = snapshot("s1", TENANT, SERVER, 1L, tool("echo"));
-        McpServerSnapshot newer = snapshot("s2", TENANT, SERVER, 2L, tool("echo"));
-        McpServerSnapshot oldest = snapshot("s3", TENANT, SERVER, 0L, tool("echo"));
+        McpServerSnapshot older = snapshot("s1", SERVER, 1L, tool("echo"));
+        McpServerSnapshot newer = snapshot("s2", SERVER, 2L, tool("echo"));
+        McpServerSnapshot oldest = snapshot("s3", SERVER, 0L, tool("echo"));
 
         catalog.publish(older);
         catalog.publish(newer);
         catalog.publish(oldest);
 
-        assertSame(newer, catalog.latest(TENANT, SERVER));
-        assertSame(older, catalog.get(TENANT, SERVER, "s1"));
-        assertSame(oldest, catalog.get(TENANT, SERVER, "s3"));
+        assertSame(newer, catalog.latest(SERVER));
+        assertSame(older, catalog.get(SERVER, "s1"));
+        assertSame(oldest, catalog.get(SERVER, "s3"));
     }
 
     @Test
     public void publishDuplicateSnapshotIdRejected() {
-        catalog.publish(snapshot("s1", TENANT, SERVER, 1L, tool("echo")));
+        catalog.publish(snapshot("s1", SERVER, 1L, tool("echo")));
 
-        McpServerSnapshot duplicate = snapshot("s1", TENANT, SERVER, 2L, tool("echo"));
+        McpServerSnapshot duplicate = snapshot("s1", SERVER, 2L, tool("echo"));
         assertThrows(IllegalArgumentException.class, () -> catalog.publish(duplicate));
     }
 
     @Test
     public void resolveToolReturnsMatchingDescriptor() {
         McpToolDescriptor tool = tool("echo");
-        catalog.publish(snapshot(SNAPSHOT, TENANT, SERVER, 1L, tool));
+        catalog.publish(snapshot(SNAPSHOT, SERVER, 1L, tool));
 
-        McpToolDescriptor resolved = catalog.resolveTool(TENANT, SERVER, SNAPSHOT, "echo",
+        McpToolDescriptor resolved = catalog.resolveTool(SERVER, SNAPSHOT, "echo",
                 tool.getSchemaHash());
 
         assertSame(tool, resolved);
@@ -89,27 +88,27 @@ public class InMemoryMcpCapabilityCatalogTest {
 
     @Test
     public void resolveToolRejectsSchemaMismatch() {
-        catalog.publish(snapshot(SNAPSHOT, TENANT, SERVER, 1L, tool("echo")));
+        catalog.publish(snapshot(SNAPSHOT, SERVER, 1L, tool("echo")));
 
         assertCode(ErrorCodes.MCP_SCHEMA_MISMATCH, new Runnable() {
             public void run() {
-                catalog.resolveTool(TENANT, SERVER, SNAPSHOT, "echo", "deadbeef");
+                catalog.resolveTool(SERVER, SNAPSHOT, "echo", "deadbeef");
             }
         });
     }
 
     @Test
     public void resolveToolRejectsUnknownToolAndUnknownSnapshot() {
-        catalog.publish(snapshot(SNAPSHOT, TENANT, SERVER, 1L, tool("echo")));
+        catalog.publish(snapshot(SNAPSHOT, SERVER, 1L, tool("echo")));
 
         assertCode(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, new Runnable() {
             public void run() {
-                catalog.resolveTool(TENANT, SERVER, SNAPSHOT, "missing", "any-hash");
+                catalog.resolveTool(SERVER, SNAPSHOT, "missing", "any-hash");
             }
         });
         assertCode(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, new Runnable() {
             public void run() {
-                catalog.resolveTool(TENANT, SERVER, "missing-snapshot", "echo", "any-hash");
+                catalog.resolveTool(SERVER, "missing-snapshot", "echo", "any-hash");
             }
         });
     }
@@ -117,17 +116,17 @@ public class InMemoryMcpCapabilityCatalogTest {
     @Test
     public void resolveResourceHitAndMismatch() {
         McpResourceDescriptor resource = new McpResourceDescriptor("file://a.txt", "a", "text/plain");
-        McpServerSnapshot snapshot = new McpServerSnapshot(SNAPSHOT, TENANT, SERVER, 1L, VERSION, IDENTITY,
+        McpServerSnapshot snapshot = new McpServerSnapshot(SNAPSHOT, SERVER, 1L, VERSION, IDENTITY,
                 CAPS, Collections.<McpToolDescriptor>emptyList(), Collections.singletonList(resource),
                 Collections.<McpResourceTemplateDescriptor>emptyList(),
                 Collections.<McpPromptDescriptor>emptyList(), McpHealthStatus.HEALTHY);
         catalog.publish(snapshot);
 
-        assertSame(resource, catalog.resolveResource(TENANT, SERVER, SNAPSHOT, "file://a.txt",
+        assertSame(resource, catalog.resolveResource(SERVER, SNAPSHOT, "file://a.txt",
                 resource.getSchemaHash()));
         assertCode(ErrorCodes.MCP_SCHEMA_MISMATCH, new Runnable() {
             public void run() {
-                catalog.resolveResource(TENANT, SERVER, SNAPSHOT, "file://a.txt", "bad");
+                catalog.resolveResource(SERVER, SNAPSHOT, "file://a.txt", "bad");
             }
         });
     }
@@ -135,17 +134,17 @@ public class InMemoryMcpCapabilityCatalogTest {
     @Test
     public void resolvePromptHitAndMissing() {
         McpPromptDescriptor prompt = new McpPromptDescriptor("greet", "g", Collections.<McpPromptArgument>emptyList());
-        McpServerSnapshot snapshot = new McpServerSnapshot(SNAPSHOT, TENANT, SERVER, 1L, VERSION, IDENTITY,
+        McpServerSnapshot snapshot = new McpServerSnapshot(SNAPSHOT, SERVER, 1L, VERSION, IDENTITY,
                 CAPS, Collections.<McpToolDescriptor>emptyList(),
                 Collections.<McpResourceDescriptor>emptyList(),
                 Collections.<McpResourceTemplateDescriptor>emptyList(),
                 Collections.singletonList(prompt), McpHealthStatus.HEALTHY);
         catalog.publish(snapshot);
 
-        assertSame(prompt, catalog.resolvePrompt(TENANT, SERVER, SNAPSHOT, "greet", prompt.getSchemaHash()));
+        assertSame(prompt, catalog.resolvePrompt(SERVER, SNAPSHOT, "greet", prompt.getSchemaHash()));
         assertCode(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, new Runnable() {
             public void run() {
-                catalog.resolvePrompt(TENANT, SERVER, SNAPSHOT, "missing", "any");
+                catalog.resolvePrompt(SERVER, SNAPSHOT, "missing", "any");
             }
         });
     }
@@ -154,21 +153,21 @@ public class InMemoryMcpCapabilityCatalogTest {
     public void blankArgumentsRejected() {
         assertIllegalArgument(new Runnable() {
             public void run() {
-                catalog.resolveTool(" ", SERVER, SNAPSHOT, "echo", "hash");
+                catalog.resolveTool(" ", SNAPSHOT, "echo", "hash");
             }
         });
         assertIllegalArgument(new Runnable() {
             public void run() {
-                catalog.resolveTool(TENANT, SERVER, SNAPSHOT, "echo", " ");
+                catalog.resolveTool(SERVER, SNAPSHOT, "echo", " ");
             }
         });
     }
 
-    private static McpServerSnapshot snapshot(String snapshotId, String tenantId, String serverKey,
+    private static McpServerSnapshot snapshot(String snapshotId, String serverKey,
             long discoveredAt, McpToolDescriptor tool) {
         List<McpToolDescriptor> tools = new ArrayList<>();
         tools.add(tool);
-        return new McpServerSnapshot(snapshotId, tenantId, serverKey, discoveredAt, VERSION, IDENTITY, CAPS,
+        return new McpServerSnapshot(snapshotId, serverKey, discoveredAt, VERSION, IDENTITY, CAPS,
                 tools, Collections.<McpResourceDescriptor>emptyList(),
                 Collections.<McpResourceTemplateDescriptor>emptyList(),
                 Collections.<McpPromptDescriptor>emptyList(), McpHealthStatus.HEALTHY);

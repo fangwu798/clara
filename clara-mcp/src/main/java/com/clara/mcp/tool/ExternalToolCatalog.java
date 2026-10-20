@@ -58,24 +58,20 @@ public final class ExternalToolCatalog {
     /**
      * 把一次能力快照中的全部工具登记为路由绑定。
      *
-     * <p>每个工具登记为 {@code ExternalToolBinding(tenantId, snapshot.getServerKey(),
+     * <p>每个工具登记为 {@code ExternalToolBinding(snapshot.getServerKey(),
      * snapshot.getSnapshotId(), tool.getSchemaHash())}；同名工具按 {@link #register} 的约定以最后一次为准。
      *
-     * @param tenantId 租户标识，不可为空白
      * @param snapshot 能力快照，不可为 null
      * @return 登记的工具个数，非负
      * @throws IllegalArgumentException 入参非法时
      */
-    public int registerSnapshot(String tenantId, McpServerSnapshot snapshot) {
-        if (tenantId == null || tenantId.trim().isEmpty()) {
-            throw new IllegalArgumentException("tenantId must not be blank");
-        }
+    public int registerSnapshot(McpServerSnapshot snapshot) {
         if (snapshot == null) {
             throw new IllegalArgumentException("snapshot must not be null");
         }
         int registered = 0;
         for (McpToolDescriptor tool : snapshot.getTools()) {
-            register(tool.getName(), new ExternalToolBinding(tenantId, snapshot.getServerKey(),
+            register(tool.getName(), new ExternalToolBinding(snapshot.getServerKey(),
                     snapshot.getSnapshotId(), tool.getSchemaHash()));
             registered++;
         }

@@ -3,6 +3,7 @@ package com.clara.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -30,6 +31,7 @@ import java.util.List;
  *
  * <p>未知字段与非法值一律按默认值处理，不因此启动失败：提示词是增强能力，配错了不该挡住对话。
  */
+@Getter
 public final class AlwaysPromptSettings {
 
     /**
@@ -55,6 +57,12 @@ public final class AlwaysPromptSettings {
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
 
+    /**
+     * -- GETTER --
+     *  常驻提示词标识列表。
+     *
+     * @return 不可变列表，可能为空，非 null
+     */
     private final List<String> ids;
 
     private AlwaysPromptSettings(List<String> ids) {
@@ -104,12 +112,4 @@ public final class AlwaysPromptSettings {
         return new AlwaysPromptSettings(DEFAULT_IDS);
     }
 
-    /**
-     * 常驻提示词标识列表。
-     *
-     * @return 不可变列表，可能为空，非 null
-     */
-    public List<String> getIds() {
-        return ids;
-    }
 }

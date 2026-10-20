@@ -1,10 +1,12 @@
 package com.clara.mcp.tool;
 
+import lombok.Getter;
+
 /**
  * 外部工具路由绑定：把模型返回的工具名映射到某个 MCP 服务端快照上的具体工具。
  *
  * <p>是什么、在哪一层：clara-mcp 的值对象（包 {@code com.clara.mcp.tool}），是「工具名 → 外部工具」的
- * 路由信息载体。一个绑定记录了外部工具所属租户、服务端标识、发现时固化的快照标识与 Schema 哈希，
+ * 路由信息载体。一个绑定记录了服务端标识、发现时固化的快照标识与 Schema 哈希，
  * 足以在调用时构造 {@code McpToolCall}。
  *
  * <p>谁创建谁调用：由宿主 / 能力发现流程在发现到外部工具后创建并登记进
@@ -14,59 +16,43 @@ package com.clara.mcp.tool;
  *
  * <p>失败语义：任一字段为 null 或空白时构造抛 {@link IllegalArgumentException}。
  */
+@Getter
 public final class ExternalToolBinding {
 
-    private final String tenantId;
+    /**
+     * -- GETTER --
+     *
+     * @return 服务端标识，非空白
+     */
     private final String serverKey;
+    /**
+     * -- GETTER --
+     *
+     * @return 发现时固化的快照标识，非空白
+     */
     private final String snapshotId;
+    /**
+     * -- GETTER --
+     *
+     * @return 工具的 Schema 哈希，非空白
+     */
     private final String schemaHash;
 
     /**
      * 创建外部工具路由绑定。
      *
-     * @param tenantId   服务端所属租户标识，不可为空白
      * @param serverKey  服务端标识，不可为空白
      * @param snapshotId 发现时固化的快照标识，不可为空白
      * @param schemaHash 工具的 Schema 哈希，不可为空白
      * @throws IllegalArgumentException 任一字段为 null 或空白时
      */
-    public ExternalToolBinding(String tenantId, String serverKey, String snapshotId, String schemaHash) {
-        require(tenantId, "tenantId");
+    public ExternalToolBinding(String serverKey, String snapshotId, String schemaHash) {
         require(serverKey, "serverKey");
         require(snapshotId, "snapshotId");
         require(schemaHash, "schemaHash");
-        this.tenantId = tenantId;
         this.serverKey = serverKey;
         this.snapshotId = snapshotId;
         this.schemaHash = schemaHash;
-    }
-
-    /**
-     * @return 服务端所属租户标识，非空白
-     */
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    /**
-     * @return 服务端标识，非空白
-     */
-    public String getServerKey() {
-        return serverKey;
-    }
-
-    /**
-     * @return 发现时固化的快照标识，非空白
-     */
-    public String getSnapshotId() {
-        return snapshotId;
-    }
-
-    /**
-     * @return 工具的 Schema 哈希，非空白
-     */
-    public String getSchemaHash() {
-        return schemaHash;
     }
 
     private static void require(String value, String field) {

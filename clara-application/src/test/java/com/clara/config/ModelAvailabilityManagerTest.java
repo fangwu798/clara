@@ -1,5 +1,6 @@
 package com.clara.config;
 
+import com.clara.enums.AvailabilityLevelEnum;
 import com.clara.model.availability.ModelCheckResult;
 import com.clara.model.availability.AvailabilityLine;
 import com.clara.model.availability.api.IModelProbe;
@@ -67,8 +68,8 @@ public class ModelAvailabilityManagerTest {
         assertTrue(root.get("milvus").get("enabled").asBoolean());
         assertTrue(Files.readAllLines(clara, StandardCharsets.UTF_8).contains("# keep this comment"));
         assertTrue(texts(output).stream().anyMatch(line -> line.contains("首字符响应=35ms")));
-        assertEquals(AvailabilityLine.Level.OK, levelOf(output, "deepseek-response"));
-        assertEquals(AvailabilityLine.Level.FAIL, levelOf(output, "kimi-completion"));
+        assertEquals(AvailabilityLevelEnum.OK, levelOf(output, "deepseek-response"));
+        assertEquals(AvailabilityLevelEnum.FAIL, levelOf(output, "kimi-completion"));
     }
 
     @Test
@@ -131,7 +132,7 @@ public class ModelAvailabilityManagerTest {
         assertEquals(0, environmentReads.get());
         assertEquals(0, probes.get());
         assertTrue(texts(output).stream().anyMatch(line -> line.contains("[跳过]") && line.contains("未配置 CHAT 能力")));
-        assertEquals(AvailabilityLine.Level.WARN, levelOf(output, "image-only"));
+        assertEquals(AvailabilityLevelEnum.WARN, levelOf(output, "image-only"));
     }
 
     @Test
@@ -161,7 +162,7 @@ public class ModelAvailabilityManagerTest {
         assertTrue(usable.isEmpty());
         assertFalse(output.isEmpty());
         assertTrue(texts(output).stream().anyMatch(line -> line.contains("[不可用]") && line.contains("invalid")));
-        assertEquals(AvailabilityLine.Level.FAIL, levelOf(output, "invalid"));
+        assertEquals(AvailabilityLevelEnum.FAIL, levelOf(output, "invalid"));
     }
 
     /**
@@ -216,7 +217,7 @@ public class ModelAvailabilityManagerTest {
      * @param alias 模型别名（出现在行文本中即命中）
      * @return 匹配到的级别；没有匹配行时为 null
      */
-    private static AvailabilityLine.Level levelOf(List<AvailabilityLine> lines, String alias) {
+    private static AvailabilityLevelEnum levelOf(List<AvailabilityLine> lines, String alias) {
         return lines.stream()
                 .filter(line -> line.getText().contains(alias))
                 .map(AvailabilityLine::getLevel)

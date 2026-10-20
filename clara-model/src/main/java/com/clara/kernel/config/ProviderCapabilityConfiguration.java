@@ -170,8 +170,8 @@ public final class ProviderCapabilityConfiguration {
         }
         long number = ((Number) value).longValue();
         if (number < Integer.MIN_VALUE || number > Integer.MAX_VALUE
-                || value instanceof Double && ((Double) value).doubleValue() != number
-                || value instanceof Float && ((Float) value).floatValue() != number) {
+                || value instanceof Double && (Double) value != number
+                || value instanceof Float && (Float) value != number) {
             throw new IllegalArgumentException(name + " must be an integer");
         }
         return (int) number;
@@ -189,7 +189,7 @@ public final class ProviderCapabilityConfiguration {
         if (!(value instanceof Boolean)) {
             throw new IllegalArgumentException(name + " must be a boolean");
         }
-        return ((Boolean) value).booleanValue();
+        return (Boolean) value;
     }
 
     /**

@@ -112,6 +112,6 @@ public final class JsonNodeUtils {
         if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()) {
             return null;
         }
-        return Integer.valueOf(value.intValue());
+        return value.intValue();
     }
 }

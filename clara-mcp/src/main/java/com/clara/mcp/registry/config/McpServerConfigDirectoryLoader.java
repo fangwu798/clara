@@ -1,5 +1,7 @@
 package com.clara.mcp.registry.config;
 
+import lombok.Getter;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -35,7 +37,9 @@ public final class McpServerConfigDirectoryLoader {
     public static final String CLASSPATH_DIRECTORY = "config/mcp";
 
     private final McpServerConfigLoader configLoader;
+    @Getter
     private final Path runtimeDirectory;
+    @Getter
     private final boolean includeClasspath;
 
     /**
@@ -87,9 +91,6 @@ public final class McpServerConfigDirectoryLoader {
         mergeInto(merged, Collections.singletonList(runtimeDirectory));
         return Collections.unmodifiableList(new ArrayList<>(merged.values()));
     }
-
-    public Path getRuntimeDirectory() { return runtimeDirectory; }
-    public boolean isIncludeClasspath() { return includeClasspath; }
 
     private void mergeInto(Map<String, McpServerConfig> merged, List<Path> directories) {
         for (Path directory : directories) {

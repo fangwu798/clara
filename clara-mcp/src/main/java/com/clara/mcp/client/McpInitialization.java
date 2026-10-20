@@ -1,8 +1,11 @@
 package com.clara.mcp.client;
 
+import lombok.Getter;
+
 /**
  * 封装MCP的初始化信息。
  */
+@Getter
 public final class McpInitialization {
     private final String protocolVersion;
     private final McpServerIdentity identity;
@@ -19,7 +22,4 @@ public final class McpInitialization {
         this.identity = identity;
         this.capabilities = capabilities;
     }
-    public String getProtocolVersion() { return protocolVersion; }
-    public McpServerIdentity getIdentity() { return identity; }
-    public McpServerCapabilities getCapabilities() { return capabilities; }
 }

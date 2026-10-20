@@ -85,7 +85,7 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
             return Collections.emptyList();
         }
         List<MemoryMatch> filtered = filterMatches(matches, query.getMinScore());
-        Collections.sort(filtered, MilvusSemanticMemoryStore::compareMatches);
+        filtered.sort(MilvusSemanticMemoryStore::compareMatches);
         if (filtered.size() > query.getTopK()) {
             filtered = new ArrayList<>(filtered.subList(0, query.getTopK()));
         }

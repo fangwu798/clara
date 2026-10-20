@@ -18,7 +18,6 @@ import static org.junit.Assert.fail;
  * MCP 调用入参与结果值对象的构造校验与不可变性测试。
  */
 public class McpValueObjectsTest {
-    private static final String TENANT = "tenant-1";
     private static final String SERVER = "echo-server";
     private static final String SNAPSHOT = "snapshot-1";
     private static final String HASH = "hash-1";
@@ -26,19 +25,16 @@ public class McpValueObjectsTest {
     @Test
     public void toolCallRejectsBlankIdentifiers() {
         assertIllegalArgument(new Runnable() {
-            public void run() { newToolCall(" ", SERVER, SNAPSHOT, "echo", HASH); }
+            public void run() { newToolCall("", SNAPSHOT, "echo", HASH); }
         });
         assertIllegalArgument(new Runnable() {
-            public void run() { newToolCall(TENANT, "", SNAPSHOT, "echo", HASH); }
+            public void run() { newToolCall(SERVER, "  ", "echo", HASH); }
         });
         assertIllegalArgument(new Runnable() {
-            public void run() { newToolCall(TENANT, SERVER, "  ", "echo", HASH); }
+            public void run() { newToolCall(SERVER, SNAPSHOT, "", HASH); }
         });
         assertIllegalArgument(new Runnable() {
-            public void run() { newToolCall(TENANT, SERVER, SNAPSHOT, "", HASH); }
-        });
-        assertIllegalArgument(new Runnable() {
-            public void run() { newToolCall(TENANT, SERVER, SNAPSHOT, "echo", " "); }
+            public void run() { newToolCall(SERVER, SNAPSHOT, "echo", " "); }
         });
     }
 
@@ -46,12 +42,12 @@ public class McpValueObjectsTest {
     public void toolCallRejectsNullContexts() {
         assertIllegalArgument(new Runnable() {
             public void run() {
-                new McpToolCall(TENANT, SERVER, SNAPSHOT, "echo", HASH, null, null, call());
+                new McpToolCall(SERVER, SNAPSHOT, "echo", HASH, null, null, call());
             }
         });
         assertIllegalArgument(new Runnable() {
             public void run() {
-                new McpToolCall(TENANT, SERVER, SNAPSHOT, "echo", HASH, null, conversation(), null);
+                new McpToolCall(SERVER, SNAPSHOT, "echo", HASH, null, conversation(), null);
             }
         });
     }
@@ -60,7 +56,7 @@ public class McpValueObjectsTest {
     public void toolCallCopiesArgumentsToReadOnlyView() {
         Map<String, Object> source = new LinkedHashMap<>();
         source.put("text", "hi");
-        McpToolCall call = new McpToolCall(TENANT, SERVER, SNAPSHOT, "echo", HASH, source,
+        McpToolCall call = new McpToolCall(SERVER, SNAPSHOT, "echo", HASH, source,
                 conversation(), call());
         source.put("text", "changed");
 
@@ -71,13 +67,13 @@ public class McpValueObjectsTest {
 
     @Test
     public void resourceRequestValidatesAndExposesFields() {
-        McpResourceRequest request = new McpResourceRequest(TENANT, SERVER, SNAPSHOT, "file://a.txt", HASH,
+        McpResourceRequest request = new McpResourceRequest(SERVER, SNAPSHOT, "file://a.txt", HASH,
                 conversation(), call());
         assertEquals("file://a.txt", request.getUri());
         assertEquals(HASH, request.getSchemaHash());
         assertIllegalArgument(new Runnable() {
             public void run() {
-                new McpResourceRequest(TENANT, SERVER, SNAPSHOT, " ", HASH, conversation(), call());
+                new McpResourceRequest(SERVER, SNAPSHOT, " ", HASH, conversation(), call());
             }
         });
     }
@@ -86,13 +82,13 @@ public class McpValueObjectsTest {
     public void promptRequestCopiesArguments() {
         Map<String, Object> source = new LinkedHashMap<>();
         source.put("topic", "java");
-        McpPromptRequest request = new McpPromptRequest(TENANT, SERVER, SNAPSHOT, "explain", HASH, source,
+        McpPromptRequest request = new McpPromptRequest(SERVER, SNAPSHOT, "explain", HASH, source,
                 conversation(), call());
         source.put("topic", "other");
         assertEquals("java", request.getArguments().get("topic"));
         assertIllegalArgument(new Runnable() {
             public void run() {
-                new McpPromptRequest(TENANT, SERVER, SNAPSHOT, " ", HASH, null, conversation(), call());
+                new McpPromptRequest(SERVER, SNAPSHOT, " ", HASH, null, conversation(), call());
             }
         });
     }
@@ -121,9 +117,9 @@ public class McpValueObjectsTest {
         assertTrue(result.isError());
     }
 
-    private static McpToolCall newToolCall(String tenantId, String serverKey, String snapshotId,
+    private static McpToolCall newToolCall(String serverKey, String snapshotId,
             String toolName, String schemaHash) {
-        return new McpToolCall(tenantId, serverKey, snapshotId, toolName, schemaHash, null,
+        return new McpToolCall(serverKey, snapshotId, toolName, schemaHash, null,
                 conversation(), call());
     }
 

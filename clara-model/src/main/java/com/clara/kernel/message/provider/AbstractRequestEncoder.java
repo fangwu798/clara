@@ -373,8 +373,7 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
      * 合并平台级默认请求头与调用方请求头，并补缺省的内容类型。
      */
     private static Map<String, String> mergedHeaders(Map<String, String> headers, TransportConfig transport) {
-        Map<String, String> merged = new LinkedHashMap<>();
-        merged.putAll(transport.getHeaders());
+        Map<String, String> merged = new LinkedHashMap<>(transport.getHeaders());
         if (headers != null) {
             merged.putAll(headers);
         }

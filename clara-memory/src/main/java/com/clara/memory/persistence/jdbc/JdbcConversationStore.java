@@ -67,13 +67,11 @@ public final class JdbcConversationStore implements ConversationStore {
     public ConversationSnapshot loadSnapshot(ConversationKey key) {
         open();
         requireKey(key);
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(
-                        "SELECT payload FROM " + table + WHERE_STORE_KEY)) {
+        try (Connection connection = dataSource.getConnection(); PreparedStatement statement = connection.prepareStatement("SELECT payload FROM " + table + WHERE_STORE_KEY)) {
             statement.setString(1, key.value());
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
-                    return new ConversationSnapshot(0L, Collections.<IContent>emptyList());
+                    return new ConversationSnapshot(0L, Collections.emptyList());
                 }
                 byte[] payload = resultSet.getBytes(1);
                 return codec.decode(payload);

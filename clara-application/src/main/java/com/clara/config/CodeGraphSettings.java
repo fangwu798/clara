@@ -3,6 +3,7 @@ package com.clara.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,6 +28,7 @@ import java.nio.file.Path;
  *
  * <p>未知字段与非法值一律按默认值处理，不因此启动失败：图谱是增强能力，配错了不该挡住对话。
  */
+@Getter
 public final class CodeGraphSettings {
 
     /**
@@ -46,11 +48,30 @@ public final class CodeGraphSettings {
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
 
+    /**
+     * -- GETTER --
+     *  总开关是否打开。
+     *
+     * @return true 表示允许使用图谱能力
+     */
     private final boolean enabled;
     private final boolean supplement;
     private final boolean autoMount;
     private final boolean autoImport;
+    /**
+     * -- GETTER --
+     *  图谱在
+     *  里的注册键，用于日志与排查。
+     *
+     * @return 注册键，非 null
+     */
     private final String mcpServer;
+    /**
+     * -- GETTER --
+     *  单轮补充信息的字符上限。
+     *
+     * @return 正整数字符数
+     */
     private final int supplementMaxChars;
 
     private CodeGraphSettings(boolean enabled, boolean supplement, boolean autoMount, boolean autoImport,
@@ -100,15 +121,6 @@ public final class CodeGraphSettings {
     }
 
     /**
-     * 总开关是否打开。
-     *
-     * @return true 表示允许使用图谱能力
-     */
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    /**
      * 是否在每轮对话前查询图谱并把命中结果作为补充信息注入提示词。
      *
      * <p>默认关：这笔查询压在每轮模型开始之前，实测大仓库（lippo-life，约 2 万个符号）单次要 20 秒以上
@@ -138,24 +150,6 @@ public final class CodeGraphSettings {
      */
     public boolean isAutoImportEnabled() {
         return autoImport;
-    }
-
-    /**
-     * 图谱在 {@code config/mcp} 里的注册键，用于日志与排查。
-     *
-     * @return 注册键，非 null
-     */
-    public String getMcpServer() {
-        return mcpServer;
-    }
-
-    /**
-     * 单轮补充信息的字符上限。
-     *
-     * @return 正整数字符数
-     */
-    public int getSupplementMaxChars() {
-        return supplementMaxChars;
     }
 
     private static boolean bool(JsonNode node, String field, boolean fallback) {

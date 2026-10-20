@@ -152,13 +152,13 @@ public final class ExecutionPlanValidator {
         if (Integer.valueOf(2).equals(color)) {
             return;
         }
-        colors.put(step.getId(), Integer.valueOf(1));
+        colors.put(step.getId(), 1);
         path.add(step.getId());
         for (String dependency : step.getDependencies()) {
             visit(byId.get(dependency), byId, colors, path);
         }
         path.remove(path.size() - 1);
-        colors.put(step.getId(), Integer.valueOf(2));
+        colors.put(step.getId(), 2);
     }
 
     private static List<String> strings(JsonNode node) {

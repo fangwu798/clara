@@ -1,6 +1,8 @@
 package com.clara.mcp.client.call;
 
 import com.clara.mcp.registry.ImmutableValues;
+import lombok.Getter;
+
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +19,7 @@ import java.util.Map;
  *
  * <p>失败语义：{@code messages} 为 null 或含 null 时构造抛 {@link IllegalArgumentException}。
  */
+@Getter
 public final class McpPromptResult {
     private final String description;
     private final List<Map<String, Object>> messages;
@@ -31,7 +34,4 @@ public final class McpPromptResult {
         this.error = error;
     }
 
-    public String getDescription() { return description; }
-    public List<Map<String, Object>> getMessages() { return messages; }
-    public boolean isError() { return error; }
 }

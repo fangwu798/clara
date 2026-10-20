@@ -39,13 +39,12 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * {@link ApplicationBootstrap#loadMcpServers(String, java.nio.file.Path)} 的接入链路测试：用假工厂 / 假客户端
+ * {@link ApplicationBootstrap#loadMcpServers(java.nio.file.Path)} 的接入链路测试：用假工厂 / 假客户端
  * 返回固定的 initialize 与 tools/list 结果，验证「配置 → 注册 → 发现 → 登记」与单服务端失败隔离，不连网络。
  */
 public class ApplicationBootstrapMcpConfigTest {
 
     private static final int DIMENSION = 1024;
-    private static final String TENANT = "tenant-1";
     private static final String VERSION = "2024-11-05";
 
     @Rule
@@ -58,17 +57,16 @@ public class ApplicationBootstrapMcpConfigTest {
         factory.put("alpha", new FakeClient("alpha", tool("echo")));
         ApplicationBootstrap bootstrap = bootstrap(factory);
         try {
-            int discovered = bootstrap.loadMcpServers(TENANT, folder.getRoot().toPath());
+            int discovered = bootstrap.loadMcpServers(folder.getRoot().toPath());
 
             assertEquals(1, discovered);
-            assertNotNull(bootstrap.mcpServerRegistry().get(TENANT, "alpha"));
-            McpServerSnapshot snapshot = bootstrap.mcpCapabilityCatalog().latest(TENANT, "alpha");
+            assertNotNull(bootstrap.mcpServerRegistry().get("alpha"));
+            McpServerSnapshot snapshot = bootstrap.mcpCapabilityCatalog().latest("alpha");
             assertNotNull(snapshot);
             assertEquals(1, snapshot.getTools().size());
 
             ExternalToolBinding binding = bootstrap.externalToolCatalog().find("echo");
             assertNotNull(binding);
-            assertEquals(TENANT, binding.getTenantId());
             assertEquals("alpha", binding.getServerKey());
             assertEquals(snapshot.getSnapshotId(), binding.getSnapshotId());
             assertEquals(snapshot.getTools().get(0).getSchemaHash(), binding.getSchemaHash());
@@ -85,14 +83,14 @@ public class ApplicationBootstrapMcpConfigTest {
         factory.put("beta", new FailingClient());
         ApplicationBootstrap bootstrap = bootstrap(factory);
         try {
-            int discovered = bootstrap.loadMcpServers(TENANT, folder.getRoot().toPath());
+            int discovered = bootstrap.loadMcpServers(folder.getRoot().toPath());
 
             assertEquals(1, discovered);
-            assertNotNull(bootstrap.mcpCapabilityCatalog().latest(TENANT, "alpha"));
+            assertNotNull(bootstrap.mcpCapabilityCatalog().latest("alpha"));
             assertNotNull(bootstrap.externalToolCatalog().find("echo"));
             // 失败的服务端已注册但未发布快照，也不影响其余服务端
-            assertNotNull(bootstrap.mcpServerRegistry().get(TENANT, "beta"));
-            assertNull(bootstrap.mcpCapabilityCatalog().latest(TENANT, "beta"));
+            assertNotNull(bootstrap.mcpServerRegistry().get("beta"));
+            assertNull(bootstrap.mcpCapabilityCatalog().latest("beta"));
         } finally {
             bootstrap.close();
         }
@@ -103,7 +101,7 @@ public class ApplicationBootstrapMcpConfigTest {
         FakeClientFactory factory = new FakeClientFactory();
         ApplicationBootstrap bootstrap = bootstrap(factory);
         try {
-            int discovered = bootstrap.loadMcpServers(TENANT,
+            int discovered = bootstrap.loadMcpServers(
                     folder.getRoot().toPath().resolve("does-not-exist"));
 
             assertEquals(0, discovered);

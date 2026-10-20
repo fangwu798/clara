@@ -22,7 +22,7 @@ public final class InMemoryConversationStore implements ConversationStore {
         requireKey(key);
         ConversationSnapshot snapshot = snapshots.get(key.value());
         if (snapshot == null) {
-            return new ConversationSnapshot(0L, Collections.<IContent>emptyList());
+            return new ConversationSnapshot(0L, Collections.emptyList());
         }
         return snapshot;
     }

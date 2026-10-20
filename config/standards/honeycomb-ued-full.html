@@ -1441,10 +1441,10 @@ body.dark .tb-ic:hover{background:#1B2250}
 <script>
 (function(){
   /* ---- 顶部 toast（纯前端演示反馈） ---- */
-  var toastEl=null;
+  let toastEl=null;
   function toast(msg,type){
     if(!toastEl){ toastEl=document.createElement('div'); toastEl.className='hc-toast'; document.body.appendChild(toastEl); }
-    var dot=document.createElement('span'); dot.className='dot';
+    let dot=document.createElement('span'); dot.className='dot';
     dot.style.background = type==='success'?'#1CC78D':type==='danger'?'#FF4C4C':type==='warning'?'#FF9902':'#266EFF';
     toastEl.innerHTML=''; toastEl.appendChild(dot); toastEl.appendChild(document.createTextNode(msg));
     toastEl.style.opacity='1';
@@ -1454,13 +1454,13 @@ body.dark .tb-ic:hover{background:#1B2250}
 
   /* ---- 按钮：点击 loading + toast 反馈（纯前端） ---- */
   document.addEventListener('click', function(e){
-    var btn=e.target.closest('.hc-btn');
+    let btn=e.target.closest('.hc-btn');
     if(!btn || btn.disabled || btn.classList.contains('loading')) return;
     if(btn.closest('.hc-dialog') || btn.closest('.hc-transfer') || btn.closest('.hc-richtext')) return; // 由专门处理
-    var txt=(btn.textContent||'').trim().replace(/\s+/g,' ').slice(0,14);
+    let txt=(btn.textContent||'').trim().replace(/\s+/g,' ').slice(0,14);
     if(!btn.classList.contains('link') && !btn.classList.contains('icon')){
       btn.classList.add('loading');
-      var old=btn.innerHTML;
+      let old=btn.innerHTML;
       btn.innerHTML=old+' <span class="hc-spinner" style="width:12px;height:12px;border-width:2px;vertical-align:-2px"></span>';
       setTimeout(function(){ btn.classList.remove('loading'); btn.innerHTML=old; },550);
     }
@@ -1469,9 +1469,9 @@ body.dark .tb-ic:hover{background:#1B2250}
 
   /* ---- Dialog：确认 / 取消 / 关闭 ---- */
   document.addEventListener('click', function(e){
-    var x=e.target;
+    let x=e.target;
     if(x && x.textContent.trim()==='✕' && x.closest('.hc-dialog .hd')){ toast('已关闭弹窗'); return; }
-    var btn=e.target.closest('.hc-dialog .ft .hc-btn');
+    let btn=e.target.closest('.hc-dialog .ft .hc-btn');
     if(btn && !btn.classList.contains('loading')){
       toast(btn.classList.contains('primary')?'已提交（模拟）':'已取消', btn.classList.contains('primary')?'success':'');
     }
@@ -1479,28 +1479,28 @@ body.dark .tb-ic:hover{background:#1B2250}
 
   /* ---- Switch 开关 ---- */
   document.addEventListener('click', function(e){
-    var sw=e.target.closest('.hc-switch');
+    let sw=e.target.closest('.hc-switch');
     if(sw){ sw.classList.toggle('on'); toast(sw.classList.contains('on')?'已开启':'已关闭','success'); }
   });
 
   /* ---- Spinner 数字步进 ---- */
   document.addEventListener('click', function(e){
-    var t=e.target;
+    let t=e.target;
     if(t && t.tagName==='SPAN' && (t.textContent==='−'||t.textContent==='＋')){
-      var wrap=t.parentElement, inp=wrap?wrap.querySelector('input'):null;
-      if(inp && inp.closest('.comp')){ var v=parseFloat(String(inp.value).replace(/,/g,''))||0; inp.value=t.textContent==='−'?(v-1):(v+1); }
+      let wrap=t.parentElement, inp=wrap?wrap.querySelector('input'):null;
+      if(inp && inp.closest('.comp')){ let v=parseFloat(String(inp.value).replace(/,/g,''))||0; inp.value=t.textContent==='−'?(v-1):(v+1); }
     }
   });
 
   /* ---- Tabs 切换 ---- */
   document.addEventListener('click', function(e){
-    var tab=e.target.closest('.hc-tabs .t');
+    let tab=e.target.closest('.hc-tabs .t');
     if(tab){ Array.prototype.forEach.call(tab.parentElement.children,function(x){x.classList.remove('on');}); tab.classList.add('on'); }
   });
 
   /* ---- 分页切换 ---- */
   document.addEventListener('click', function(e){
-    var p=e.target.closest('.hc-pager .p');
+    let p=e.target.closest('.hc-pager .p');
     if(p && !p.classList.contains('ellipsis') && p.textContent.trim()!=='‹' && p.textContent.trim()!=='›'){
       Array.prototype.forEach.call(p.parentElement.children,function(x){x.classList.remove('on');}); p.classList.add('on');
       toast('已跳转到第 '+p.textContent.trim()+' 页');
@@ -1509,17 +1509,17 @@ body.dark .tb-ic:hover{background:#1B2250}
 
   /* ---- 侧边菜单切换 ---- */
   document.addEventListener('click', function(e){
-    var mi=e.target.closest('.hc-menu .mi');
+    let mi=e.target.closest('.hc-menu .mi');
     if(mi){ Array.prototype.forEach.call(mi.parentElement.children,function(x){x.classList.remove('on');}); mi.classList.add('on'); }
   });
 
   /* ---- Tree 展开 / 收起 ---- */
   document.addEventListener('click', function(e){
-    var sw=e.target.closest('.hc-tree .sw');
+    let sw=e.target.closest('.hc-tree .sw');
     if(sw){
-      var nd=sw.parentElement, ch=nd.nextElementSibling;
+      let nd=sw.parentElement, ch=nd.nextElementSibling;
       if(ch && ch.classList.contains('ch')){
-        var hidden=ch.style.display==='none';
+        let hidden=ch.style.display==='none';
         ch.style.display=hidden?'':'none';
         sw.textContent=hidden?'▾':'▸';
       }
@@ -1528,22 +1528,22 @@ body.dark .tb-ic:hover{background:#1B2250}
 
   /* ---- Transfer 穿梭框 ---- */
   document.addEventListener('click', function(e){
-    var b=e.target.closest('.hc-transfer .mid button');
+    let b=e.target.closest('.hc-transfer .mid button');
     if(b){
-      var tf=b.closest('.hc-transfer'), left=tf.children[0], right=tf.children[2];
+      let tf=b.closest('.hc-transfer'), left=tf.children[0], right=tf.children[2];
       if(b.textContent.indexOf('›')>=0){
-        var it=left.querySelector('.it'); if(it){ right.appendChild(it); toast('已添加到已选','success'); }
+        left.querySelector('.it'); if(it){ right.appendChild(it); toast('已添加到已选','success'); }
       } else {
-        var it=right.querySelector('.it'); if(it){ left.appendChild(it); toast('已移回可选'); }
+        right.querySelector('.it'); if(it){ left.appendChild(it); toast('已移回可选'); }
       }
     }
   });
 
   /* ---- DatePicker 面板选日期 ---- */
   document.addEventListener('click', function(e){
-    var d=e.target;
+    let d=e.target;
     if(d && d.tagName==='SPAN' && /^\d{1,2}$/.test(d.textContent.trim())){
-      var g=d.parentElement;
+      let g=d.parentElement;
       if(g && g.style.display==='grid' && g.style.gridTemplateColumns && g.style.gridTemplateColumns.indexOf('repeat(7')>=0){
         Array.prototype.forEach.call(g.children,function(x){x.style.background='';x.style.color='';x.style.borderRadius='';});
         d.style.background='#266EFF'; d.style.color='#fff'; d.style.borderRadius='4px';
@@ -1553,27 +1553,27 @@ body.dark .tb-ic:hover{background:#1B2250}
   });
 
   /* ---- 悬浮工具：目录 / 搜索 / 回顶 / 深色预览 ---- */
-  var hcPanel=document.getElementById('hcPanel');
-  var hcToc=document.getElementById('hcToc');
-  var hcSearch=document.getElementById('hcSearch');
-  var hcList=document.getElementById('hcList');
-  var hcClose=document.getElementById('hcClose');
-  var hcTop=document.getElementById('hcTop');
-  var hcUp=document.getElementById('hcUp');
-  var hcDark=document.getElementById('hcDark');
+  let hcPanel=document.getElementById('hcPanel');
+  let hcToc=document.getElementById('hcToc');
+  let hcSearch=document.getElementById('hcSearch');
+  let hcList=document.getElementById('hcList');
+  let hcClose=document.getElementById('hcClose');
+  let hcTop=document.getElementById('hcTop');
+  let hcUp=document.getElementById('hcUp');
+  let hcDark=document.getElementById('hcDark');
   function buildToc(){
     hcList.innerHTML='';
     document.querySelectorAll('.part-h').forEach(function(h){
-      var b=document.createElement('button'); b.className='pl';
+      let b=document.createElement('button'); b.className='pl';
       b.textContent=(h.querySelector('.tag')?h.querySelector('.tag').textContent+' · ':'')+h.querySelector('h2').textContent;
       b.onclick=function(){ hcPanel.classList.remove('open'); h.scrollIntoView({behavior:'smooth',block:'start'}); };
       hcList.appendChild(b);
     });
-    var grp=document.createElement('div'); grp.className='gr'; grp.textContent='— 组件分组 —'; hcList.appendChild(grp);
+    let grp=document.createElement('div'); grp.className='gr'; grp.textContent='— 组件分组 —'; hcList.appendChild(grp);
     document.querySelectorAll('.part .cat-h').forEach(function(c){
-      var part=c.closest('.part'); if(!part)return;
-      var tag=part.querySelector('.part-h .tag'); if(!tag||tag.textContent!=='C')return;
-      var b=document.createElement('button'); b.className='pl';
+      let part=c.closest('.part'); if(!part)return;
+      let tag=part.querySelector('.part-h .tag'); if(!tag||tag.textContent!=='C')return;
+      let b=document.createElement('button'); b.className='pl';
       b.textContent='▸ '+c.textContent.replace(/\s+/g,' ').trim();
       b.onclick=function(){ hcPanel.classList.remove('open'); c.scrollIntoView({behavior:'smooth',block:'start'}); };
       hcList.appendChild(b);
@@ -1586,57 +1586,60 @@ body.dark .tb-ic:hover{background:#1B2250}
   if(hcUp)hcUp.onclick=scrollTop;
   if(hcDark)hcDark.onclick=function(){
     document.body.classList.toggle('dark');
-    var on=document.body.classList.contains('dark');
+    let on=document.body.classList.contains('dark');
     hcDark.textContent=on?'浅色模式':'深色预览';
     hcDark.classList.toggle('on',on);
     toast(on?'已切换深色预览（科技蓝大屏基调）':'已切回浅色主题', on?'':'');
   };
   if(hcSearch)hcSearch.addEventListener('input',function(){
-    var q=this.value.trim().toLowerCase(),hit=0;
+    let q=this.value.trim().toLowerCase(),hit=0;
     document.querySelectorAll('.comp').forEach(function(c){
-      var m=!q||c.textContent.toLowerCase().indexOf(q)>=0;
+      let m=!q||c.textContent.toLowerCase().indexOf(q)>=0;
       c.style.display=m?'':'none';
       if(m)hit++;
     });
-    var hint=document.getElementById('hcHit');
+    let hint=document.getElementById('hcHit');
     if(q&&!hint){ hint=document.createElement('div'); hint.id='hcHit'; hint.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #ddd;border-radius:4px;padding:6px 14px;font-size:12px;z-index:1200;box-shadow:0 4px 12px rgba(0,0,0,.12)'; document.body.appendChild(hint); }
     if(hint){ hint.textContent=q?('匹配 '+hit+' 个组件'):''; hint.style.display=q?'':'none'; }
   });
 
   /* ---- 代码一键复制 ---- */
   document.querySelectorAll('pre.code').forEach(function(pre){
-    var b=document.createElement('button'); b.className='copy'; b.textContent='复制';
+    let b=document.createElement('button'); b.className='copy'; b.textContent='复制';
     b.onclick=function(){
-      var c=pre.cloneNode(true); var cb=c.querySelector('.copy'); if(cb)cb.remove();
-      var txt=c.textContent;
+      let c=pre.cloneNode(true); let cb=c.querySelector('.copy'); if(cb)cb.remove();
+      let txt=c.textContent;
       function ok(){ toast('已复制代码'); }
       if(navigator.clipboard&&navigator.clipboard.writeText){
-        navigator.clipboard.writeText(txt).then(ok).catch(function(){ fallback(); });
-      } else { fallback(); }
-      function fallback(){
-        var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select();
-        try{ document.execCommand('copy'); ok(); }catch(e){ toast('复制失败，请手动选择'); }
-        document.body.removeChild(ta);
+        navigator.clipboard.writeText(txt).then(ok).catch(selectForManualCopy);
+      } else { selectForManualCopy(); }
+      function selectForManualCopy(){
+        let range=document.createRange();
+        range.selectNodeContents(pre);
+        if(pre.lastChild===b)range.setEndBefore(b);
+        let sel=window.getSelection();
+        if(sel){ sel.removeAllRanges(); sel.addRange(range); }
+        toast('当前环境不支持自动复制，已选中代码，请按 Ctrl+C');
       }
     };
     pre.appendChild(b);
   });
 
   /* ---- Dialog 演示（真实弹出 / 关闭） ---- */
-  var hcDialog=document.getElementById('hcDialog');
+  let hcDialog=document.getElementById('hcDialog');
   function openDialog(){ if(hcDialog)hcDialog.classList.add('open'); }
   function closeDialog(){ if(hcDialog)hcDialog.classList.remove('open'); }
   document.querySelectorAll('.comp').forEach(function(c){
-    var n=c.querySelector('.hd .n'); if(!n)return; var name=n.textContent;
+    let n=c.querySelector('.hd .n'); if(!n)return; let name=n.textContent;
     if(/Dialog/.test(name)){
-      var bb=document.createElement('button'); bb.className='hc-btn sm'; bb.style.marginLeft='auto'; bb.textContent='打开演示';
+      let bb=document.createElement('button'); bb.className='hc-btn sm'; bb.style.marginLeft='auto'; bb.textContent='打开演示';
       bb.onclick=openDialog;
       c.querySelector('.hd').appendChild(bb);
     }
     if(/Message/.test(name)){
-      var row=document.createElement('div'); row.className='demo'; row.style.marginTop='2px';
+      let row=document.createElement('div'); row.className='demo'; row.style.marginTop='2px';
       [['信息',''],['成功','success'],['警告','warning'],['错误','danger']].forEach(function(pair){
-        var b=document.createElement('button'); b.className='hc-btn sm'; b.textContent=pair[0];
+        let b=document.createElement('button'); b.className='hc-btn sm'; b.textContent=pair[0];
         b.onclick=function(){ toast('这是一条'+pair[0]+'提示（演示）',pair[1]); };
         row.appendChild(b);
       });

@@ -72,7 +72,7 @@ public final class LocalConversationStore implements ConversationStore {
         this.maxFileSizeBytes = maxFileSizeBytes;
         Path conversations = baseDirectory.resolve(".clara").resolve("state").resolve("conversations");
         FileChannel channel = null;
-        FileLock acquired = null;
+        FileLock acquired;
         try {
             Files.createDirectories(conversations);
             channel = FileChannel.open(conversations.resolve(LOCK_FILE),
@@ -100,7 +100,7 @@ public final class LocalConversationStore implements ConversationStore {
         requireKey(key);
         Path file = fileFor(key);
         if (!Files.isRegularFile(file)) {
-            return new ConversationSnapshot(0L, Collections.<IContent>emptyList());
+            return new ConversationSnapshot(0L, Collections.emptyList());
         }
         try {
             return codec.decode(Files.readAllBytes(file));
@@ -179,14 +179,15 @@ public final class LocalConversationStore implements ConversationStore {
         if (fileName == null) {
             throw new IllegalArgumentException("target must have a file name");
         }
-        Path temp = target.resolveSibling(fileName.toString() + ".tmp");
+        Path temp = target.resolveSibling(fileName + ".tmp");
         FileChannel channel = null;
         try {
-            channel = FileChannel.open(temp, StandardOpenOption.CREATE,
-                    StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+            channel = FileChannel.open(temp, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             while (buffer.hasRemaining()) {
-                channel.write(buffer);
+                if (channel.write(buffer) <= 0) {
+                    throw new IOException("conversation checkpoint write made no progress");
+                }
             }
             channel.force(true);
         } catch (IOException e) {
@@ -195,8 +196,7 @@ public final class LocalConversationStore implements ConversationStore {
             closeQuietly(channel);
         }
         try {
-            Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING);
+            Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             try {
                 Files.deleteIfExists(temp);
@@ -213,7 +213,7 @@ public final class LocalConversationStore implements ConversationStore {
             byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
             StringBuilder builder = new StringBuilder(bytes.length * 2);
             for (byte b : bytes) {
-                builder.append(String.format("%02x", Integer.valueOf(b & 0xff)));
+                builder.append(String.format("%02x", b & 0xff));
             }
             return builder.toString();
         } catch (NoSuchAlgorithmException e) {

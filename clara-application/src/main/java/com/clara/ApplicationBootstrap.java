@@ -1,6 +1,5 @@
 package com.clara;
 
-import com.clara.api.IBuiltinTool;
 import com.clara.codegraph.CodeGraphSupplement;
 import com.clara.config.AlwaysPromptSettings;
 import com.clara.config.CodeGraphSettings;
@@ -103,6 +102,7 @@ import com.clara.workflow.definition.WorkflowDefinitionRegistry;
 import com.clara.workflow.engine.DefaultWorkflowEngine;
 import com.clara.workflow.runtime.ToolActionFactory;
 import com.clara.workflow.runtime.WorkflowRunner;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -158,7 +158,7 @@ import java.util.logging.Logger;
  * <p>调用记录：{@code ICallRecordSink} 由进程内实现 {@link InMemoryCallRecordSink} 提供，保留最近若干条
  * 记录供上层读取；{@code IWorkflowDefinitionResolver} 本阶段未接入，以 null 注入，编排层已做降级（不影响
  * 调用）。MCP 调用门面与外部工具路由目录已装配，宿主可通过 {@link #mcpGateway()} /
- * {@link #externalToolCatalog()} 登记外部工具；也可由 {@link #loadMcpServers(String, Path)} 完成
+ * {@link #externalToolCatalog()} 登记外部工具；也可由 loadMcpServers(String, Path) 完成
  * 「配置加载 → 注册服务端 → 发现能力 → 登记外部工具」的一站式接入。
  *
  * <p>生命周期：构造本身不访问网络（仅装配各组件，MCP 服务端连接推迟到显式调用 {@link #loadMcpServers}），
@@ -204,11 +204,6 @@ public final class ApplicationBootstrap implements Closeable {
     private static final Path DEFAULT_MCP_CONFIG_DIRECTORY = Paths.get("config", "mcp");
 
     /**
-     * 本机默认 MCP 租户标识：注册、发现、下发与调用必须用同一个租户，否则工具目录取不到快照。
-     */
-    public static final String DEFAULT_MCP_TENANT = "local";
-
-    /**
      * 工作流定义（YAML）的默认加载目录（相对运行目录）。
      */
     private static final Path DEFAULT_WORKFLOW_DIRECTORY = Paths.get("config", "workflow");
@@ -243,7 +238,9 @@ public final class ApplicationBootstrap implements Closeable {
     private final WindowCompressionCoordinator windowCompression;
     private final CodeGraphSettings codeGraphSettings;
     private final InMemoryCallRecordSink callRecordSink;
-    /** 图片 / 视频 / 图谱的独立用量台账，由工作流动作写入、{@code /usage} 读取。 */
+    /**
+     * 图片 / 视频 / 图谱的独立用量台账，由工作流动作写入、{@code /usage} 读取。
+     */
     private final CapabilityUsageLedger capabilityUsage = new CapabilityUsageLedger();
 
     /**
@@ -267,7 +264,7 @@ public final class ApplicationBootstrap implements Closeable {
     /**
      * 指定嵌入客户端与向量维度装配，便于接入真实凭据（如 {@code HttpEmbeddingClient}）。
      *
-     * @param embeddingClient  嵌入客户端，不可为 null
+     * @param embeddingClient    嵌入客户端，不可为 null
      * @param embeddingDimension 向量维度，须与嵌入客户端输出一致，必须为正
      * @throws IllegalArgumentException 参数非法时
      */
@@ -287,7 +284,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @throws IllegalArgumentException 参数非法时
      */
     ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension,
-            IMcpClientFactory mcpClientFactory) {
+                         IMcpClientFactory mcpClientFactory) {
         this(embeddingClient, embeddingDimension, mcpClientFactory, null);
     }
 
@@ -303,7 +300,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @throws IllegalArgumentException 参数非法时
      */
     ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension,
-            IMcpClientFactory mcpClientFactory, IContextTraceSink contextTrace) {
+                         IMcpClientFactory mcpClientFactory, IContextTraceSink contextTrace) {
         if (embeddingClient == null) {
             throw new IllegalArgumentException("embeddingClient must not be null");
         }
@@ -316,15 +313,14 @@ public final class ApplicationBootstrap implements Closeable {
         this.embeddingClient = embeddingClient;
 
         // 语义记忆：clara.yml 配了 milvus 就用 Milvus（对话记录写入并召回），否则维持进程内实现、行为不变。
-        MilvusSettings milvus = MilvusSettings.load(ConfigLocator.claraConfigFile(), embeddingDimension,
-                ConfigLocator.projectName());
+        MilvusSettings milvus = MilvusSettings.load(ConfigLocator.claraConfigFile(), embeddingDimension, ConfigLocator.projectName());
         MilvusSemanticMemoryStore milvusStore = milvus == null ? null : connectMilvus(milvus);
         this.semanticMemoryStore = milvusStore == null ? new LocalSemanticMemoryStore(embeddingDimension) : milvusStore;
         this.conversationIndexing = milvusStore != null;
         this.semanticMemoryDescription = milvusStore == null
                 ? "进程内 local（不写对话记录）"
                 : "milvus " + milvus.getHost() + ":" + milvus.getPort() + "/" + milvus.getCollection()
-                        + "（" + semanticModeOf(milvus) + "，对话记录写入并召回）";
+                + "（" + semanticModeOf(milvus) + "，对话记录写入并召回）";
 
         this.tokenCountEstimator = new TiktokenTokenCountEstimator(TiktokenTokenCountEstimator.DEFAULT_ENCODING);
 
@@ -356,7 +352,7 @@ public final class ApplicationBootstrap implements Closeable {
         ExecutionPlanValidator executionPlanValidator = new ExecutionPlanValidator(intentPlanSettings.getMaxSteps());
         IntentPlanCoordinator intentPlanCoordinator = intentPlanSettings.isEnabled()
                 ? new IntentPlanCoordinator(streamModel, toolInvoker, executionPlanValidator,
-                        intentPlanSettings.getMaxRepairAttempts(), contextTrace)
+                intentPlanSettings.getMaxRepairAttempts(), contextTrace)
                 : null;
 
         // clara-memory：窗口压缩编排（把被淘汰历史交给模型总结为摘要）
@@ -378,7 +374,7 @@ public final class ApplicationBootstrap implements Closeable {
         SkillMatchCoordinator skillMatch = new SkillMatchCoordinator(embeddingClient, semanticMemoryStore, promptProvider,
                 new CompositeToolCatalog(
                         new RegistryToolCatalog(skillRegistry, WorkflowCatalog::decorateToolDescription),
-                        new McpToolCatalog(mcpServerRegistry, mcpCapabilityCatalog, DEFAULT_MCP_TENANT)),
+                        new McpToolCatalog(mcpServerRegistry, mcpCapabilityCatalog)),
                 contextTrace);
         // 常驻提示词：不走向量检索、每轮原样进 system（如「读代码先查知识图谱」这类固定约定）。
         // 为什么要单独一条通道见 {@link AlwaysPromptSettings} 的类注释。
@@ -422,7 +418,7 @@ public final class ApplicationBootstrap implements Closeable {
         this.workflowRunner = new WorkflowRunner(workflowEngine, workflowDefinitionRegistry);
         // 内置工具与本地工具调用共享同一脚本执行器注册表，故可在运行器就绪后再注册内置执行器：
         // run_workflow 负责按标识运行；publish_workflow 负责校验并发布模型生成的自定义工作流
-        scriptExecutors.register(new BuiltinToolExecutor(Arrays.<IBuiltinTool>asList(
+        scriptExecutors.register(new BuiltinToolExecutor(Arrays.asList(
                 new WorkflowRunTool(workflowRunner), new PublishWorkflowTool(workflowDefinitionRegistry),
                 new ValidateExecutionPlanTool(executionPlanValidator))));
     }
@@ -489,7 +485,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @return 多行用量说明，非 null
      */
     public String conversationUsageReport(String conversationId, ProviderConfiguration providerConfiguration,
-            String model) {
+                                          String model) {
         StringBuilder report = new StringBuilder();
         report.append("会话：").append(conversationId);
         appendHistorySummary(report, conversationId, providerConfiguration, model);
@@ -520,7 +516,7 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     private void appendHistorySummary(StringBuilder report, String conversationId,
-            ProviderConfiguration providerConfiguration, String model) {
+                                      ProviderConfiguration providerConfiguration, String model) {
         if (providerConfiguration == null || model == null || model.trim().isEmpty()) {
             report.append('\n').append("历史记录：未知（未绑定模型配置）");
             return;
@@ -643,7 +639,7 @@ public final class ApplicationBootstrap implements Closeable {
      * @return 提示词文本列表，可能为空，非 null
      */
     private static List<String> alwaysPrompts(AlwaysPromptSettings settings, IPromptProvider promptProvider,
-            boolean codeGraphEnabled) {
+                                              boolean codeGraphEnabled) {
         List<String> prompts = new ArrayList<>();
         for (String id : settings.getIds()) {
             if (!AlwaysPromptSettings.CODE_GRAPH_GUIDE.equals(id) || codeGraphEnabled) {
@@ -733,22 +729,21 @@ public final class ApplicationBootstrap implements Closeable {
     /**
      * 从默认目录 {@code config/mcp}（相对运行目录）加载并接入 MCP 服务端。
      *
-     * @param tenantId 租户标识，不可为空白
      * @return 成功发现的服务端数，非负
-     * @throws IllegalArgumentException 租户标识非法或配置加载失败时
+     * @throws IllegalArgumentException 配置目录非法或配置加载失败时
      */
-    public int loadMcpServers(String tenantId) {
-        return loadMcpServers(tenantId, ConfigLocator.locate(DEFAULT_MCP_CONFIG_DIRECTORY));
+    public int loadMcpServers() {
+        return loadMcpServers(ConfigLocator.locate(DEFAULT_MCP_CONFIG_DIRECTORY));
     }
 
     /**
      * 完成「配置加载 → 注册服务端 → 发现能力 → 登记外部工具」的一站式接入链路。
      *
      * <p>流程：用 {@link McpServerConfigDirectoryLoader} 递归加载 {@code configDirectory} 下的 {@code *.json}
-     * 配置；用 {@link McpServerRegistrar#registerAll(String, List)} 把配置注册进 {@link IMcpServerRegistry}；
-     * 对每个已注册服务端调用 {@link IMcpDiscoveryService#refresh(String, String)} 完成发现（发布快照并更新状态）；
-     * 再从 {@link IMcpCapabilityCatalog#latest(String, String)} 取回快照，用
-     * {@link ExternalToolCatalog#registerSnapshot(String, McpServerSnapshot)} 把其工具登记进路由目录。
+     * 配置；用 {@link McpServerRegistrar#registerAll(List)} 把配置注册进 {@link IMcpServerRegistry}；
+     * 对每个已注册服务端调用 {@link IMcpDiscoveryService#refresh(String)} 完成发现（发布快照并更新状态）；
+     * 再从 {@link IMcpCapabilityCatalog#latest(String)} 取回快照，用
+     * {@link ExternalToolCatalog#registerSnapshot(McpServerSnapshot)} 把其工具登记进路由目录。
      *
      * <p>失败隔离：单个服务端的发现失败（协议不兼容、身份变化、连接异常等）会被捕获并跳过，不影响其余服务端，
      * 也不阻断方法返回；返回值只统计发现成功的服务端数。发现失败时注册状态已由发现服务按需更新为
@@ -756,30 +751,26 @@ public final class ApplicationBootstrap implements Closeable {
      *
      * <p>本方法会按需连接配置中的服务端，故不在构造阶段调用。
      *
-     * @param tenantId        租户标识，不可为空白
      * @param configDirectory 配置目录，不可为 null；不存在或无 {@code *.json} 时相当于不接入任何服务端
      * @return 成功发现的服务端数，非负
-     * @throws IllegalArgumentException 租户标识非法、配置目录为 null 或配置加载失败时
+     * @throws IllegalArgumentException 配置目录为 null 或配置加载失败时
      */
-    public int loadMcpServers(String tenantId, Path configDirectory) {
-        if (tenantId == null || tenantId.trim().isEmpty()) {
-            throw new IllegalArgumentException("tenantId must not be blank");
-        }
+    public int loadMcpServers(Path configDirectory) {
         if (configDirectory == null) {
             throw new IllegalArgumentException("configDirectory must not be null");
         }
         List<McpServerConfig> configs = new McpServerConfigDirectoryLoader(
                 new McpServerConfigLoader(), configDirectory).load();
         List<McpServerRegistration> registrations =
-                new McpServerRegistrar(mcpServerRegistry).registerAll(tenantId, configs);
+                new McpServerRegistrar(mcpServerRegistry).registerAll(configs);
         int discovered = 0;
         for (McpServerRegistration registration : registrations) {
             String serverKey = registration.getServerKey();
             try {
-                mcpDiscoveryService.refresh(tenantId, serverKey);
-                McpServerSnapshot snapshot = mcpCapabilityCatalog.latest(tenantId, serverKey);
+                mcpDiscoveryService.refresh(serverKey);
+                McpServerSnapshot snapshot = mcpCapabilityCatalog.latest(serverKey);
                 if (snapshot != null) {
-                    externalToolCatalog.registerSnapshot(tenantId, snapshot);
+                    externalToolCatalog.registerSnapshot(snapshot);
                 }
                 discovered++;
             } catch (RuntimeException ignored) {
@@ -996,7 +987,7 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     private static MilvusSemanticMemoryStore createMilvusStore(MilvusCollectionSpec spec, MilvusBackend backend,
-            MilvusSettings settings) {
+                                                               MilvusSettings settings) {
         try {
             return new MilvusSemanticMemoryStore(spec, backend);
         } catch (RuntimeException mismatch) {
@@ -1004,7 +995,7 @@ public final class ApplicationBootstrap implements Closeable {
                 throw mismatch;
             }
             // 旧集合结构与当前配置不一致（切了检索模式 / 换了嵌入维度）：旧向量与新查询不可比，重建是唯一选项。
-                // 只在配置里显式开了重建才动手（删集合会丢旧记录）；重建失败会被外层兜回进程内实现。
+            // 只在配置里显式开了重建才动手（删集合会丢旧记录）；重建失败会被外层兜回进程内实现。
             System.err.println("[memory] Milvus 集合结构与配置不匹配，按配置重建：" + mismatch.getMessage()); // NOSONAR CLI output by design
             backend.dropCollection(spec.getCollection());
             return new MilvusSemanticMemoryStore(spec, backend);

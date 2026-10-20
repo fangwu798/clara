@@ -8,12 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -91,7 +86,7 @@ public final class WorkflowCatalog {
     public static Map<String, String> descriptions() {
         Map<String, String> result = new LinkedHashMap<>();
         List<Entry> entries = new ArrayList<>(scan());
-        Collections.sort(entries, (left, right) -> left.id.compareTo(right.id));
+        entries.sort(Comparator.comparing(left -> left.id));
         for (Entry entry : entries) {
             result.put(entry.id, entry.description == null ? "" : entry.description);
         }
@@ -128,7 +123,7 @@ public final class WorkflowCatalog {
                 entries.add(entry);
             }
         }
-        Collections.sort(entries, (left, right) -> left.id.compareTo(right.id));
+        entries.sort(Comparator.comparing(left -> left.id));
         List<String> lines = new ArrayList<>();
         for (Entry entry : entries) {
             lines.add(entry.label());
@@ -146,7 +141,7 @@ public final class WorkflowCatalog {
         if (entries.isEmpty()) {
             return "";
         }
-        Collections.sort(entries, (left, right) -> left.id.compareTo(right.id));
+        entries.sort(Comparator.comparing(left -> left.id));
         List<String> builtin = new ArrayList<>();
         List<String> custom = new ArrayList<>();
         for (Entry entry : entries) {

@@ -1,6 +1,6 @@
 package com.clara.adapter.console;
 
-import com.clara.model.availability.AvailabilityLine;
+import com.clara.enums.AvailabilityLevelEnum;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -16,10 +16,10 @@ public class ConsoleViewAvailabilityColorTest {
      */
     @Test
     public void mapsAvailabilityLevelToAnsiColor() {
-        assertEquals(ConsoleView.ANSI_GREEN, ConsoleView.colorOf(AvailabilityLine.Level.OK));
-        assertEquals(ConsoleView.ANSI_YELLOW, ConsoleView.colorOf(AvailabilityLine.Level.WARN));
-        assertEquals(ConsoleView.ANSI_RED, ConsoleView.colorOf(AvailabilityLine.Level.FAIL));
-        assertNull(ConsoleView.colorOf(AvailabilityLine.Level.INFO));
+        assertEquals(ConsoleView.ANSI_GREEN, ConsoleView.colorOf(AvailabilityLevelEnum.OK));
+        assertEquals(ConsoleView.ANSI_YELLOW, ConsoleView.colorOf(AvailabilityLevelEnum.WARN));
+        assertEquals(ConsoleView.ANSI_RED, ConsoleView.colorOf(AvailabilityLevelEnum.FAIL));
+        assertNull(ConsoleView.colorOf(AvailabilityLevelEnum.INFO));
         assertNull(ConsoleView.colorOf(null));
     }
 }

@@ -67,7 +67,7 @@ public class CompositeToolInvokerTest {
         try {
             ExternalToolCatalog catalog = new ExternalToolCatalog();
             catalog.register("remote.tool",
-                    new ExternalToolBinding("tenant-a", "server-a", "snap-1", "hash-1"));
+                    new ExternalToolBinding("server-a", "snap-1", "hash-1"));
             RecordingMcpGateway gateway = new RecordingMcpGateway();
             gateway.result = mcpResult();
             CompositeToolInvoker invoker = new CompositeToolInvoker(skillRegistryWithEcho(),
@@ -79,7 +79,6 @@ public class CompositeToolInvokerTest {
             assertTrue(result.getOutput().contains("hello"));
             McpToolCall received = gateway.received;
             assertNotNull(received);
-            assertEquals("tenant-a", received.getTenantId());
             assertEquals("server-a", received.getServerKey());
             assertEquals("snap-1", received.getSnapshotId());
             assertEquals("remote.tool", received.getToolName());
@@ -121,7 +120,7 @@ public class CompositeToolInvokerTest {
     public void nullGatewayDegradesExternalBranch() throws Exception {
         ExternalToolCatalog catalog = new ExternalToolCatalog();
         catalog.register("remote.tool",
-                new ExternalToolBinding("tenant-a", "server-a", "snap-1", "hash-1"));
+                new ExternalToolBinding("server-a", "snap-1", "hash-1"));
         CompositeToolInvoker invoker = new CompositeToolInvoker(skillRegistryWithEcho(),
                 new RecordingToolInvoker(), null, catalog);
 

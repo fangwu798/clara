@@ -2,11 +2,14 @@ package com.clara.mcp.transport.jsonrpc;
 
 import com.clara.utils.StringUtils;
 import com.clara.mcp.registry.ImmutableValues;
+import lombok.Getter;
+
 import java.util.Map;
 
 /**
  * 封装JSONRPC操作的输入参数。
  */
+@Getter
 public final class JsonRpcRequest {
     private final String id;
     private final String method;
@@ -19,9 +22,5 @@ public final class JsonRpcRequest {
         this.method = method;
         this.params = ImmutableValues.copyMap(params);
     }
-    @SuppressWarnings("java:S3400")
     public String getJsonRpc() { return "2.0"; }
-    public String getId() { return id; }
-    public String getMethod() { return method; }
-    public Map<String, Object> getParams() { return params; }
 }

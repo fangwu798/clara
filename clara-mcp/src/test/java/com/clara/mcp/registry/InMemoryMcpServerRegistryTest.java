@@ -23,41 +23,29 @@ import static org.junit.Assert.fail;
  * {@link InMemoryMcpServerRegistry} 的注册 / 查取 / 状态 / 列表与并发行为测试。
  */
 public class InMemoryMcpServerRegistryTest {
-    private static final String TENANT = "tenant-1";
-    private static final String OTHER_TENANT = "tenant-2";
-
     private final InMemoryMcpServerRegistry registry = new InMemoryMcpServerRegistry();
 
     @Test
     public void registerThenGetReturnsRegistration() {
-        McpServerRegistration registration = registration(TENANT, "echo", McpRegistrationStatus.ACTIVE);
+        McpServerRegistration registration = registration("echo", McpRegistrationStatus.ACTIVE);
 
         registry.register(registration);
 
-        assertSame(registration, registry.get(TENANT, "echo"));
+        assertSame(registration, registry.get("echo"));
     }
 
     @Test
     public void getMissingReturnsNull() {
-        assertNull(registry.get(TENANT, "missing"));
-    }
-
-    @Test
-    public void registerIsTenantScoped() {
-        registry.register(registration(TENANT, "echo", McpRegistrationStatus.ACTIVE));
-        registry.register(registration(OTHER_TENANT, "echo", McpRegistrationStatus.ACTIVE));
-
-        assertEquals(TENANT, registry.get(TENANT, "echo").getTenantId());
-        assertEquals(OTHER_TENANT, registry.get(OTHER_TENANT, "echo").getTenantId());
+        assertNull(registry.get("missing"));
     }
 
     @Test
     public void duplicateRegisterThrowsDomainError() {
-        registry.register(registration(TENANT, "echo", McpRegistrationStatus.ACTIVE));
+        registry.register(registration("echo", McpRegistrationStatus.ACTIVE));
 
         assertCode(ErrorCodes.MCP_SERVER_ALREADY_REGISTERED, new Runnable() {
             public void run() {
-                registry.register(registration(TENANT, "echo", McpRegistrationStatus.ACTIVE));
+                registry.register(registration("echo", McpRegistrationStatus.ACTIVE));
             }
         });
     }
@@ -74,42 +62,43 @@ public class InMemoryMcpServerRegistryTest {
 
     @Test
     public void updateStatusReplacesStatus() {
-        registry.register(registration(TENANT, "echo", McpRegistrationStatus.PENDING_REVIEW));
+        registry.register(registration("echo", McpRegistrationStatus.PENDING_REVIEW));
 
-        registry.updateStatus(TENANT, "echo", McpRegistrationStatus.ACTIVE);
+        registry.updateStatus("echo", McpRegistrationStatus.ACTIVE);
 
-        assertSame(McpRegistrationStatus.ACTIVE, registry.get(TENANT, "echo").getStatus());
+        assertSame(McpRegistrationStatus.ACTIVE, registry.get("echo").getStatus());
     }
 
     @Test
     public void updateStatusOnMissingThrowsDomainError() {
         assertCode(ErrorCodes.MCP_SERVER_NOT_REGISTERED, new Runnable() {
             public void run() {
-                registry.updateStatus(TENANT, "missing", McpRegistrationStatus.ACTIVE);
+                registry.updateStatus("missing", McpRegistrationStatus.ACTIVE);
             }
         });
     }
 
     @Test
-    public void listEnabledFiltersByTenantAndStatusAndSorts() {
-        registry.register(registration(TENANT, "b", McpRegistrationStatus.ACTIVE));
-        registry.register(registration(TENANT, "a", McpRegistrationStatus.ACTIVE));
-        registry.register(registration(TENANT, "c", McpRegistrationStatus.DISABLED));
-        registry.register(registration(OTHER_TENANT, "d", McpRegistrationStatus.ACTIVE));
+    public void listEnabledFiltersByStatusAndSorts() {
+        registry.register(registration("b", McpRegistrationStatus.ACTIVE));
+        registry.register(registration("a", McpRegistrationStatus.ACTIVE));
+        registry.register(registration("c", McpRegistrationStatus.DISABLED));
+        registry.register(registration("d", McpRegistrationStatus.ACTIVE));
 
-        List<McpServerRegistration> enabled = registry.listEnabled(TENANT);
+        List<McpServerRegistration> enabled = registry.listEnabled();
 
-        assertEquals(2, enabled.size());
+        assertEquals(3, enabled.size());
         assertEquals("a", enabled.get(0).getServerKey());
         assertEquals("b", enabled.get(1).getServerKey());
+        assertEquals("d", enabled.get(2).getServerKey());
     }
 
     @Test
     public void listEnabledReturnsReadOnlyList() {
-        registry.register(registration(TENANT, "a", McpRegistrationStatus.ACTIVE));
+        registry.register(registration("a", McpRegistrationStatus.ACTIVE));
 
-        List<McpServerRegistration> enabled = registry.listEnabled(TENANT);
-        McpServerRegistration extra = registration(TENANT, "x", McpRegistrationStatus.ACTIVE);
+        List<McpServerRegistration> enabled = registry.listEnabled();
+        McpServerRegistration extra = registration("x", McpRegistrationStatus.ACTIVE);
         assertThrows(UnsupportedOperationException.class, () -> enabled.add(extra));
     }
 
@@ -126,7 +115,7 @@ public class InMemoryMcpServerRegistryTest {
                 public Void call() throws Exception {
                     start.await();
                     for (int index = 0; index < perThread; index++) {
-                        registry.register(registration(TENANT, "srv-" + id + "-" + index,
+                        registry.register(registration("srv-" + id + "-" + index,
                                 McpRegistrationStatus.ACTIVE));
                     }
                     return null;
@@ -139,13 +128,13 @@ public class InMemoryMcpServerRegistryTest {
         }
         pool.shutdownNow();
 
-        assertEquals(threads * perThread, registry.listEnabled(TENANT).size());
-        assertEquals("srv-0-0", registry.listEnabled(TENANT).get(0).getServerKey());
+        assertEquals(threads * perThread, registry.listEnabled().size());
+        assertEquals("srv-0-0", registry.listEnabled().get(0).getServerKey());
     }
 
-    private static McpServerRegistration registration(String tenantId, String serverKey,
+    private static McpServerRegistration registration(String serverKey,
             McpRegistrationStatus status) {
-        return new McpServerRegistration(tenantId, serverKey, McpTransportProfile.STDIO, "node echo", null,
+        return new McpServerRegistration(serverKey, McpTransportProfile.STDIO, "node echo", null,
                 null, null, status);
     }
 

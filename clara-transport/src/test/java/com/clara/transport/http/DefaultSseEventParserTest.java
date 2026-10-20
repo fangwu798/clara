@@ -1,5 +1,6 @@
 package com.clara.transport.http;
 
+import com.clara.enums.HttpTransportErrorKindEnum;
 import com.clara.exception.HttpTransportException;
 import com.clara.core.transport.IExecutionGuard;
 import com.clara.core.transport.sse.ISseEventListener;
@@ -106,7 +107,7 @@ public class DefaultSseEventParserTest {
             parse("data: 12345\n\n", config);
             fail("expected response too large");
         } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.RESPONSE_TOO_LARGE, expected.getKind());
+            assertEquals(HttpTransportErrorKindEnum.RESPONSE_TOO_LARGE, expected.getKind());
         }
     }
 
@@ -117,7 +118,7 @@ public class DefaultSseEventParserTest {
             parse("data: 12345\n\n", config);
             fail("expected response too large");
         } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.RESPONSE_TOO_LARGE, expected.getKind());
+            assertEquals(HttpTransportErrorKindEnum.RESPONSE_TOO_LARGE, expected.getKind());
         }
     }
 
@@ -128,7 +129,7 @@ public class DefaultSseEventParserTest {
             parse("data: a\n\ndata: b\n\n", config);
             fail("expected response too large");
         } catch (HttpTransportException expected) {
-            assertEquals(HttpTransportException.Kind.RESPONSE_TOO_LARGE, expected.getKind());
+            assertEquals(HttpTransportErrorKindEnum.RESPONSE_TOO_LARGE, expected.getKind());
         }
     }
 
@@ -138,7 +139,7 @@ public class DefaultSseEventParserTest {
         SseParserConfig parserConfig = config(false);
         HttpTransportException expected = assertThrows(HttpTransportException.class,
                 () -> parse(bytes, parserConfig));
-        assertEquals(HttpTransportException.Kind.PROTOCOL_ERROR, expected.getKind());
+        assertEquals(HttpTransportErrorKindEnum.PROTOCOL_ERROR, expected.getKind());
     }
 
     @Test
@@ -157,7 +158,7 @@ public class DefaultSseEventParserTest {
         ISseEventListener listener = collectingListener(new ArrayList<>());
         HttpTransportException expected = assertThrows(HttpTransportException.class,
                 () -> parser.parse(stream, cancelled, listener));
-        assertEquals(HttpTransportException.Kind.CANCELLED, expected.getKind());
+        assertEquals(HttpTransportErrorKindEnum.CANCELLED, expected.getKind());
     }
 
     @Test

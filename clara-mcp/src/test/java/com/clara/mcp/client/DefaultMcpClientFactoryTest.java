@@ -23,7 +23,6 @@ import static org.junit.Assert.fail;
  * {@link DefaultMcpClientFactory} 的行为测试：只验证按传输方式分派与配置校验，不启动进程、不连网络。
  */
 public class DefaultMcpClientFactoryTest {
-    private static final String TENANT = "tenant-1";
 
     @Test
     public void streamableHttpProfileCreatesClient() throws Exception {
@@ -96,13 +95,13 @@ public class DefaultMcpClientFactoryTest {
     }
 
     private static McpServerRegistration registrationWithCommand(String serverKey, List<String> command) {
-        return new McpServerRegistration(TENANT, serverKey, McpTransportProfile.STDIO, serverKey,
+        return new McpServerRegistration(serverKey, McpTransportProfile.STDIO, serverKey,
                 null, null, null, McpRegistrationStatus.ACTIVE, command, null, null);
     }
 
     private static McpServerRegistration registration(String serverKey, McpTransportProfile profile,
             String address) {
-        return new McpServerRegistration(TENANT, serverKey, profile, address, null, null, null,
+        return new McpServerRegistration(serverKey, profile, address, null, null, null,
                 McpRegistrationStatus.ACTIVE);
     }
 

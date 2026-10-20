@@ -90,6 +90,12 @@ public class CodexTuiGenerator {
 
         String turnMetadataJson = objectMapper.writeValueAsString(meta);
 
+        Map<String, String> headers = getStringStringMap(turnMetadataJson, clientRequestId);
+
+        return headers;
+    }
+
+    private Map<String, String> getStringStringMap(String turnMetadataJson, String clientRequestId) {
         Map<String, String> headers = new HashMap<>();
         headers.put("x-codex-beta-features", BETA_FEATURES);
         headers.put(HEADER_WINDOW_ID, windowId);
@@ -102,7 +108,6 @@ public class CodexTuiGenerator {
 
         headers.put("originator", ORIGINATOR);
         headers.put("user-agent", USER_AGENT);
-
         return headers;
     }
 

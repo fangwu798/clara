@@ -1,5 +1,7 @@
 package com.clara.core.media;
 
+import lombok.Getter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -9,18 +11,39 @@ import java.util.Map;
 /**
  * 视频生成结果：任务标识、终态、视频地址与平台用量。
  */
+@Getter
 public final class VideoGenerationResult {
 
-    /** 平台任务标识。 */
+    /** 平台任务标识。
+     * -- GETTER --
+     *  平台任务标识。
+     *
+     * @return 可为 null
+     */
     private final String taskId;
 
-    /** 平台任务终态。 */
+    /** 平台任务终态。
+     * -- GETTER --
+     *  平台任务终态。
+     *
+     * @return 可为 null
+     */
     private final String status;
 
-    /** 视频地址列表，非 null，至少一条。 */
+    /** 视频地址列表，非 null，至少一条。
+     * -- GETTER --
+     *  视频地址列表。
+     *
+     * @return 不可修改列表，非 null 且非空
+     */
     private final List<String> videoUrls;
 
-    /** 平台返回的用量信息，非 null，可为空。 */
+    /** 平台返回的用量信息，非 null，可为空。
+     * -- GETTER --
+     *  平台用量信息。
+     *
+     * @return 不可修改映射，非 null
+     */
     private final Map<String, Object> usage;
 
     /**
@@ -44,39 +67,4 @@ public final class VideoGenerationResult {
                 : Collections.unmodifiableMap(new LinkedHashMap<>(usage));
     }
 
-    /**
-     * 平台任务标识。
-     *
-     * @return 可为 null
-     */
-    public String getTaskId() {
-        return taskId;
-    }
-
-    /**
-     * 平台任务终态。
-     *
-     * @return 可为 null
-     */
-    public String getStatus() {
-        return status;
-    }
-
-    /**
-     * 视频地址列表。
-     *
-     * @return 不可修改列表，非 null 且非空
-     */
-    public List<String> getVideoUrls() {
-        return videoUrls;
-    }
-
-    /**
-     * 平台用量信息。
-     *
-     * @return 不可修改映射，非 null
-     */
-    public Map<String, Object> getUsage() {
-        return usage;
-    }
 }

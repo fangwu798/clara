@@ -77,13 +77,12 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
         try {
             McpInitialization initialization = client.initialize(supportedVersions);
             validateInitialization(registration, initialization);
-            List<McpToolDescriptor> tools = initialization.getCapabilities().supportsTools() ? collect(IMcpClient::listTools, client) : Collections.<McpToolDescriptor>emptyList();
-            List<McpResourceDescriptor> resources = initialization.getCapabilities().supportsResources() ? collect(IMcpClient::listResources, client) : Collections.<McpResourceDescriptor>emptyList();
-            List<McpResourceTemplateDescriptor> resourceTemplates = initialization.getCapabilities().supportsResources() ? collect(IMcpClient::listResourceTemplates, client) : Collections.<McpResourceTemplateDescriptor>emptyList();
-            List<McpPromptDescriptor> prompts = initialization.getCapabilities().supportsPrompts() ? collect(IMcpClient::listPrompts, client) : Collections.<McpPromptDescriptor>emptyList();
+            List<McpToolDescriptor> tools = initialization.getCapabilities().supportsTools() ? collect(IMcpClient::listTools, client) : Collections.emptyList();
+            List<McpResourceDescriptor> resources = initialization.getCapabilities().supportsResources() ? collect(IMcpClient::listResources, client) : Collections.emptyList();
+            List<McpResourceTemplateDescriptor> resourceTemplates = initialization.getCapabilities().supportsResources() ? collect(IMcpClient::listResourceTemplates, client) : Collections.emptyList();
+            List<McpPromptDescriptor> prompts = initialization.getCapabilities().supportsPrompts() ? collect(IMcpClient::listPrompts, client) : Collections.emptyList();
             snapshot = new McpServerSnapshot(
                     snapshotIds.get(),
-                    registration.getTenantId(),
                     registration.getServerKey(),
                     clock.getAsLong(),
                     initialization.getProtocolVersion(),
@@ -113,20 +112,20 @@ public final class DefaultMcpDiscoveryService implements IMcpDiscoveryService {
         }
     }
 
-    public void refresh(String tenantId, String serverKey) {
-        McpServerRegistration registration = registry.get(tenantId, serverKey);
+    public void refresh(String serverKey) {
+        McpServerRegistration registration = registry.get(serverKey);
         if (registration == null) {
             throw McpErrors.error(ErrorCodes.MCP_SERVER_NOT_FOUND, ErrorCategoryEnum.VALIDATION);
         }
         try {
             McpServerSnapshot snapshot = discover(registration);
             catalog.publish(snapshot);
-            registry.updateStatus(tenantId, serverKey, McpRegistrationStatus.ACTIVE);
+            registry.updateStatus(serverKey, McpRegistrationStatus.ACTIVE);
         } catch (ClaraException exception) {
             if (ErrorCodes.MCP_PROTOCOL_INCOMPATIBLE.equals(exception.getError().getCode())) {
-                registry.updateStatus(tenantId, serverKey, McpRegistrationStatus.INCOMPATIBLE);
+                registry.updateStatus(serverKey, McpRegistrationStatus.INCOMPATIBLE);
             } else if (ErrorCodes.MCP_SERVER_IDENTITY_CHANGED.equals(exception.getError().getCode())) {
-                registry.updateStatus(tenantId, serverKey, McpRegistrationStatus.REVIEW_REQUIRED);
+                registry.updateStatus(serverKey, McpRegistrationStatus.REVIEW_REQUIRED);
             }
             throw exception;
         }

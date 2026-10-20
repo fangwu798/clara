@@ -29,7 +29,6 @@ import static org.junit.Assert.fail;
  */
 public class ExternalToolCatalogTest {
 
-    private static final String TENANT = "tenant-1";
     private static final String SERVER = "echo-server";
     private static final String VERSION = "2024-11-05";
 
@@ -38,7 +37,7 @@ public class ExternalToolCatalogTest {
         ExternalToolCatalog catalog = new ExternalToolCatalog();
         assertNull(catalog.find("missing"));
 
-        ExternalToolBinding binding = new ExternalToolBinding("tenant-a", "server-a", "snap-1", "hash-1");
+        ExternalToolBinding binding = new ExternalToolBinding("server-a", "snap-1", "hash-1");
         catalog.register("remote.tool", binding);
 
         assertSame(binding, catalog.find("remote.tool"));
@@ -55,16 +54,16 @@ public class ExternalToolCatalogTest {
     @Test
     public void snapshotIsImmutableCopy() {
         ExternalToolCatalog catalog = new ExternalToolCatalog();
-        catalog.register("remote.tool", new ExternalToolBinding("t", "s", "snap", "hash"));
+        catalog.register("remote.tool", new ExternalToolBinding("s", "snap", "hash"));
         Map<String, ExternalToolBinding> snapshot = catalog.snapshot();
-        ExternalToolBinding extra = new ExternalToolBinding("t", "s", "snap", "hash");
+        ExternalToolBinding extra = new ExternalToolBinding("s", "snap", "hash");
         assertThrows(UnsupportedOperationException.class, () -> snapshot.put("x", extra));
     }
 
     @Test
     public void rejectsInvalidRegistrationArguments() {
         ExternalToolCatalog catalog = new ExternalToolCatalog();
-        ExternalToolBinding binding = new ExternalToolBinding("t", "s", "snap", "hash");
+        ExternalToolBinding binding = new ExternalToolBinding("s", "snap", "hash");
         try {
             catalog.register("  ", binding);
             fail("expected IllegalArgumentException");
@@ -81,10 +80,9 @@ public class ExternalToolCatalogTest {
 
     @Test
     public void bindingRejectsBlankFields() {
-        assertBindingRejected(null, "s", "snap", "hash");
-        assertBindingRejected("t", " ", "snap", "hash");
-        assertBindingRejected("t", "s", null, "hash");
-        assertBindingRejected("t", "s", "snap", " ");
+        assertBindingRejected(" ", "snap", "hash");
+        assertBindingRejected("s", null, "hash");
+        assertBindingRejected("s", "snap", " ");
     }
 
     @Test
@@ -92,12 +90,11 @@ public class ExternalToolCatalogTest {
         ExternalToolCatalog catalog = new ExternalToolCatalog();
         McpServerSnapshot snapshot = snapshot("snap-1", tool("echo"), tool("sum"));
 
-        int count = catalog.registerSnapshot(TENANT, snapshot);
+        int count = catalog.registerSnapshot(snapshot);
 
         assertEquals(2, count);
         ExternalToolBinding echo = catalog.find("echo");
         assertNotNull(echo);
-        assertEquals(TENANT, echo.getTenantId());
         assertEquals(SERVER, echo.getServerKey());
         assertEquals("snap-1", echo.getSnapshotId());
         assertEquals(snapshot.getTools().get(0).getSchemaHash(), echo.getSchemaHash());
@@ -108,7 +105,7 @@ public class ExternalToolCatalogTest {
     public void emptySnapshotRegistersNothing() {
         ExternalToolCatalog catalog = new ExternalToolCatalog();
 
-        int count = catalog.registerSnapshot(TENANT, snapshot("snap-1"));
+        int count = catalog.registerSnapshot(snapshot("snap-1"));
 
         assertEquals(0, count);
         assertTrue(catalog.snapshot().isEmpty());
@@ -118,15 +115,12 @@ public class ExternalToolCatalogTest {
     public void registerSnapshotRejectsInvalidArguments() {
         ExternalToolCatalog catalog = new ExternalToolCatalog();
         McpServerSnapshot snapshot = snapshot("snap-1");
-        assertSnapshotRejected(null, snapshot, catalog);
-        assertSnapshotRejected("  ", snapshot, catalog);
-        assertSnapshotRejected(TENANT, null, catalog);
+        assertSnapshotRejected(null, catalog);
     }
 
-    private static void assertSnapshotRejected(String tenantId, McpServerSnapshot snapshot,
-            ExternalToolCatalog catalog) {
+    private static void assertSnapshotRejected(McpServerSnapshot snapshot, ExternalToolCatalog catalog) {
         try {
-            catalog.registerSnapshot(tenantId, snapshot);
+            catalog.registerSnapshot(snapshot);
             fail("expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
             assertTrue(true);
@@ -142,7 +136,7 @@ public class ExternalToolCatalogTest {
     private static McpServerSnapshot snapshot(String snapshotId, McpToolDescriptor... tools) {
         List<McpToolDescriptor> values = new ArrayList<>();
         Collections.addAll(values, tools);
-        return new McpServerSnapshot(snapshotId, TENANT, SERVER, 1L, VERSION,
+        return new McpServerSnapshot(snapshotId, SERVER, 1L, VERSION,
                 new McpServerIdentity("echo", "1.0.0"),
                 new McpServerCapabilities(true, false, false, false, false, false),
                 values, Collections.<McpResourceDescriptor>emptyList(),
@@ -150,10 +144,10 @@ public class ExternalToolCatalogTest {
                 Collections.<McpPromptDescriptor>emptyList(), McpHealthStatus.HEALTHY);
     }
 
-    private static void assertBindingRejected(String tenantId, String serverKey, String snapshotId,
+    private static void assertBindingRejected(String serverKey, String snapshotId,
             String schemaHash) {
         try {
-            new ExternalToolBinding(tenantId, serverKey, snapshotId, schemaHash);
+            new ExternalToolBinding(serverKey, snapshotId, schemaHash);
             fail("expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
             assertTrue(true);

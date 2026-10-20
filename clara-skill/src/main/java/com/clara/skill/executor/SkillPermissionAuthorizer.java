@@ -23,7 +23,7 @@ public final class SkillPermissionAuthorizer {
      * 创建放行全部工具的校验器。
      */
     public SkillPermissionAuthorizer() {
-        this(Collections.<String>emptySet());
+        this(Collections.emptySet());
     }
 
     /**

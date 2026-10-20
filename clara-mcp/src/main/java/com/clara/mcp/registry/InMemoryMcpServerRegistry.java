@@ -20,37 +20,36 @@ public final class InMemoryMcpServerRegistry implements IMcpServerRegistry {
 
     public void register(McpServerRegistration registration) {
         if (registration == null) { throw new IllegalArgumentException("registration must not be null"); }
-        if (registrations.putIfAbsent(key(registration.getTenantId(), registration.getServerKey()),
+        if (registrations.putIfAbsent(key(registration.getServerKey()),
                 registration) != null) {
             throw McpErrors.error(ErrorCodes.MCP_SERVER_ALREADY_REGISTERED, ErrorCategoryEnum.CONFLICT);
         }
     }
-    public void updateStatus(String tenantId, String serverKey, McpRegistrationStatus status) {
+    public void updateStatus(String serverKey, McpRegistrationStatus status) {
         if (status == null) { throw new IllegalArgumentException("status must not be null"); }
-        String key = key(tenantId, serverKey);
+        String key = key(serverKey);
         for (;;) {
             McpServerRegistration current = registrations.get(key);
             if (current == null) { throw notFound(); }
             if (registrations.replace(key, current, current.withStatus(status))) return;
         }
     }
-    public List<McpServerRegistration> listEnabled(String tenantId) {
-        require(tenantId, "tenantId");
+    public List<McpServerRegistration> listEnabled() {
         List<McpServerRegistration> result = new ArrayList<>();
         for (McpServerRegistration registration : registrations.values()) {
-            if (tenantId.equals(registration.getTenantId()) && registration.isEnabled()) {
+            if (registration.isEnabled()) {
                 result.add(registration);
             }
         }
-        Collections.sort(result, Comparator.comparing(McpServerRegistration::getServerKey));
+        result.sort(Comparator.comparing(McpServerRegistration::getServerKey));
         return Collections.unmodifiableList(result);
     }
-    public McpServerRegistration get(String tenantId, String serverKey) {
-        return registrations.get(key(tenantId, serverKey));
+    public McpServerRegistration get(String serverKey) {
+        return registrations.get(key(serverKey));
     }
-    private static String key(String tenantId, String serverKey) {
-        require(tenantId, "tenantId"); require(serverKey, "serverKey");
-        return tenantId + '\u0000' + serverKey;
+    private static String key(String serverKey) {
+        require(serverKey, "serverKey");
+        return serverKey;
     }
     private static void require(String value, String field) {
         if (value == null || value.trim().isEmpty()) { throw new IllegalArgumentException(field + " must not be blank"); }

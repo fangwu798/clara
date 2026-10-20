@@ -86,7 +86,7 @@ public final class LocalSemanticMemoryStore implements ISemanticMemoryStore {
                 matches.add(new MemoryMatch(entry, score));
             }
         }
-        Collections.sort(matches, (left, right) -> {
+        matches.sort((left, right) -> {
             int byScore = Double.compare(right.getScore(), left.getScore());
             if (byScore != 0) {
                 return byScore;

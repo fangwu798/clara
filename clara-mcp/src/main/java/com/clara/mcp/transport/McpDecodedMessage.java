@@ -3,10 +3,12 @@ package com.clara.mcp.transport;
 import com.clara.mcp.transport.jsonrpc.JsonRpcNotification;
 import com.clara.mcp.transport.jsonrpc.JsonRpcRequest;
 import com.clara.mcp.transport.jsonrpc.JsonRpcResponse;
+import lombok.Getter;
 
 /**
  * 表示MCP解码结果交换的消息。
  */
+@Getter
 public final class McpDecodedMessage {
     /**
      * 定义类型的可选取值。
@@ -30,8 +32,4 @@ public final class McpDecodedMessage {
     public static McpDecodedMessage serverRequest(JsonRpcRequest value) {
         return new McpDecodedMessage(Type.SERVER_REQUEST, null, null, value);
     }
-    public Type getType() { return type; }
-    public JsonRpcResponse getResponse() { return response; }
-    public JsonRpcNotification getNotification() { return notification; }
-    public JsonRpcRequest getRequest() { return request; }
 }

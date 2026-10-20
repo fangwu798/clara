@@ -297,8 +297,7 @@ public final class ArkVideoTaskClient implements IVideoGenerator {
     }
 
     private static boolean isSuccess(String status) {
-        return status != null && ("succeeded".equalsIgnoreCase(status)
-                || "success".equalsIgnoreCase(status) || "completed".equalsIgnoreCase(status));
+        return ("succeeded".equalsIgnoreCase(status) || "success".equalsIgnoreCase(status) || "completed".equalsIgnoreCase(status));
     }
 
     private static boolean isFailure(String status) {

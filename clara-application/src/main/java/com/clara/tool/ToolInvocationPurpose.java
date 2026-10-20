@@ -74,7 +74,7 @@ public final class ToolInvocationPurpose {
             return null;
         }
         JsonNode argv = root.get("argv");
-        if (argv != null && argv.isArray() && argv.size() > 0 && argv.get(0).isTextual()) {
+        if (argv != null && argv.isArray() && !argv.isEmpty() && argv.get(0).isTextual()) {
             return argv.get(0).textValue();
         }
         JsonNode value = root.get("command");

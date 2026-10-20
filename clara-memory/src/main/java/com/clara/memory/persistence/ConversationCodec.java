@@ -44,7 +44,7 @@ public final class ConversationCodec {
             throw new IllegalArgumentException("snapshot must not be null");
         }
         Map<String, Object> root = new LinkedHashMap<>();
-        root.put("version", Long.valueOf(snapshot.version()));
+        root.put("version", snapshot.version());
         List<Map<String, Object>> messages = new ArrayList<>();
         for (IContent message : snapshot.messages()) {
             messages.add(message.toCompletionMessage());

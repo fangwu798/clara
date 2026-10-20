@@ -46,7 +46,6 @@ import static org.junit.Assert.fail;
  * {@link DefaultMcpGateway} 的行为测试：全部依赖用假实现，不依赖真实 MCP 服务端与网络。
  */
 public class DefaultMcpGatewayTest {
-    private static final String TENANT = "tenant-1";
     private static final String SERVER = "echo-server";
     private static final String SNAPSHOT = "snapshot-1";
     private static final String VERSION = "2024-11-05";
@@ -121,7 +120,7 @@ public class DefaultMcpGatewayTest {
 
     @Test
     public void callToolThrowsWhenServerNotActive() {
-        McpServerRegistration disabled = new McpServerRegistration(TENANT, SERVER,
+        McpServerRegistration disabled = new McpServerRegistration(SERVER,
                 McpTransportProfile.STDIO, "node echo", null, IDENTITY.getName(),
                 IDENTITY.getVersion(), McpRegistrationStatus.REVIEW_REQUIRED);
         FakeClientFactory factory = new FakeClientFactory(new FakeClient(initialization()));
@@ -180,7 +179,7 @@ public class DefaultMcpGatewayTest {
         }
     }
 
-    private static final McpServerRegistration ACTIVE_REGISTRATION = new McpServerRegistration(TENANT,
+    private static final McpServerRegistration ACTIVE_REGISTRATION = new McpServerRegistration(
             SERVER, McpTransportProfile.STDIO, "node echo", null, IDENTITY.getName(),
             IDENTITY.getVersion(), McpRegistrationStatus.ACTIVE);
 
@@ -191,11 +190,11 @@ public class DefaultMcpGatewayTest {
     private static IMcpServerRegistry registry(final McpServerRegistration value) {
         return new IMcpServerRegistry() {
             public void register(McpServerRegistration registration) { }
-            public void updateStatus(String tenantId, String serverKey, McpRegistrationStatus status) { }
-            public List<McpServerRegistration> listEnabled(String tenantId) {
+            public void updateStatus(String serverKey, McpRegistrationStatus status) { }
+            public List<McpServerRegistration> listEnabled() {
                 return Collections.emptyList();
             }
-            public McpServerRegistration get(String tenantId, String serverKey) { return value; }
+            public McpServerRegistration get(String serverKey) { return value; }
         };
     }
 
@@ -204,7 +203,7 @@ public class DefaultMcpGatewayTest {
     }
 
     private static McpServerSnapshot snapshot(List<McpToolDescriptor> tools) {
-        return new McpServerSnapshot(SNAPSHOT, TENANT, SERVER, 1L, VERSION, IDENTITY, CAPS, tools,
+        return new McpServerSnapshot(SNAPSHOT, SERVER, 1L, VERSION, IDENTITY, CAPS, tools,
                 Collections.<McpResourceDescriptor>emptyList(),
                 Collections.<McpResourceTemplateDescriptor>emptyList(),
                 Collections.<McpPromptDescriptor>emptyList(), McpHealthStatus.HEALTHY);
@@ -228,7 +227,7 @@ public class DefaultMcpGatewayTest {
                 new CancellationToken());
         Map<String, Object> arguments = new LinkedHashMap<>();
         arguments.put("text", "hi");
-        return new McpToolCall(TENANT, SERVER, SNAPSHOT, toolName, schemaHash, arguments, conversation, call);
+        return new McpToolCall(SERVER, SNAPSHOT, toolName, schemaHash, arguments, conversation, call);
     }
 
     private static List<Map<String, Object>> content() {
@@ -260,18 +259,18 @@ public class DefaultMcpGatewayTest {
         private StubCatalog(McpServerSnapshot snapshot) { this.snapshot = snapshot; }
 
         public void publish(McpServerSnapshot value) { }
-        public McpServerSnapshot latest(String tenantId, String serverKey) { return snapshot; }
-        public McpServerSnapshot get(String tenantId, String serverKey, String snapshotId) { return snapshot; }
-        public McpToolDescriptor resolveTool(String tenantId, String serverKey, String snapshotId,
+        public McpServerSnapshot latest(String serverKey) { return snapshot; }
+        public McpServerSnapshot get(String serverKey, String snapshotId) { return snapshot; }
+        public McpToolDescriptor resolveTool(String serverKey, String snapshotId,
                 String toolName, String expectedSchemaHash) {
             if (toolFailure != null) { throw toolFailure; }
             return descriptor(toolName);
         }
-        public McpResourceDescriptor resolveResource(String tenantId, String serverKey, String snapshotId,
+        public McpResourceDescriptor resolveResource(String serverKey, String snapshotId,
                 String uri, String expectedSchemaHash) {
             return null;
         }
-        public McpPromptDescriptor resolvePrompt(String tenantId, String serverKey, String snapshotId,
+        public McpPromptDescriptor resolvePrompt(String serverKey, String snapshotId,
                 String promptName, String expectedSchemaHash) {
             return null;
         }

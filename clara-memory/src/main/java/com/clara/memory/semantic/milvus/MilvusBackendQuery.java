@@ -1,10 +1,12 @@
 package com.clara.memory.semantic.milvus;
 
 import com.clara.dto.memory.SemanticMemoryQuery;
+import lombok.Getter;
 
 /**
  * Milvus 后端查询封装：携带语义查询条件与候选召回上限，供后端构造向量检索。
  */
+@Getter
 public final class MilvusBackendQuery {
 
     private final SemanticMemoryQuery query;
@@ -25,11 +27,4 @@ public final class MilvusBackendQuery {
         this.candidateLimit = candidateLimit;
     }
 
-    public SemanticMemoryQuery getQuery() {
-        return query;
-    }
-
-    public int getCandidateLimit() {
-        return candidateLimit;
-    }
 }

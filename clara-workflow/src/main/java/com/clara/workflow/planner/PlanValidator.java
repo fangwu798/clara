@@ -8,6 +8,7 @@ import com.clara.dto.planner.TaskPlan;
 import com.clara.enums.planner.PlanStatusEnum;
 import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
+import lombok.Getter;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,6 +18,7 @@ import java.util.Set;
 /**
  * 校验计划是否符合约束（任务数、输出键唯一、依赖合法、无环、预算与能力）。
  */
+@Getter
 public final class PlanValidator {
 
     private final PlanLimits limits;
@@ -81,10 +83,6 @@ public final class PlanValidator {
         }
     }
 
-    public PlanLimits getLimits() {
-        return limits;
-    }
-
     private static void visit(TaskNode task, Map<String, TaskNode> tasks, Map<String, Integer> colors) {
         Integer color = colors.get(task.getTaskId());
         if (Integer.valueOf(1).equals(color)) {
@@ -93,11 +91,11 @@ public final class PlanValidator {
         if (Integer.valueOf(2).equals(color)) {
             return;
         }
-        colors.put(task.getTaskId(), Integer.valueOf(1));
+        colors.put(task.getTaskId(), 1);
         for (String dependency : task.getDependencies()) {
             visit(tasks.get(dependency), tasks, colors);
         }
-        colors.put(task.getTaskId(), Integer.valueOf(2));
+        colors.put(task.getTaskId(), 2);
     }
 
     private static void invalid() {

@@ -156,7 +156,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
         if (call == null) {
             throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION, "外部工具调用缺少调用上下文：" + invocation.name());
         }
-        McpToolCall mcpCall = new McpToolCall(binding.getTenantId(), binding.getServerKey(), binding.getSnapshotId(), invocation.name(), binding.getSchemaHash(), arguments(invocation), conversation, call);
+        McpToolCall mcpCall = new McpToolCall(binding.getServerKey(), binding.getSnapshotId(), invocation.name(), binding.getSchemaHash(), arguments(invocation), conversation, call);
         McpToolResult result = mcpGateway.callTool(mcpCall);
         return new ToolResult(invocation.callId(), output(result));
     }
