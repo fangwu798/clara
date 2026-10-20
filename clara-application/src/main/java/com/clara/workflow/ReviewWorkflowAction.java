@@ -11,6 +11,7 @@ import com.clara.orchestration.DefaultConversationOrchestrator;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
+import com.clara.workflow.runtime.WorkflowProgress;
 import com.clara.workflow.runtime.ReviewNodeOptions;
 import com.clara.workflow.runtime.WorkflowVariableResolver;
 
@@ -79,13 +80,18 @@ public final class ReviewWorkflowAction implements IWorkflowAction {
         StringBuilder discussion = new StringBuilder();
         for (int round = 1; round <= options.rounds(); round++) {
             for (String role : options.roles()) {
+                WorkflowProgress.notice("[workflow] 多角色讨论 第 " + round + "/" + options.rounds()
+                        + " 轮：" + role + " 发言中…");
                 String statement = speak(instanceId, role, round, topic, discussion.toString(), false);
                 discussion.append("\n### ").append(role).append("（第 ").append(round).append(" 轮）\n")
                         .append(statement);
             }
         }
+        WorkflowProgress.notice("[workflow] 讨论结束：" + options.moderator() + " 汇总决议中…");
         String conclusion = speak(instanceId, options.moderator(), options.rounds(), topic,
                 discussion.toString(), true);
+        WorkflowProgress.notice("[workflow] 多角色讨论完成（" + options.roles().size() + " 个角色 × "
+                + options.rounds() + " 轮 + 主持人汇总）");
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("output", conclusion);

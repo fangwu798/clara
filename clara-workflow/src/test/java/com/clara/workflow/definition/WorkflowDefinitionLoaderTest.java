@@ -78,6 +78,24 @@ public class WorkflowDefinitionLoaderTest {
         assertEquals(Arrays.asList("prompt", "video"), loaded.getOutputs());
     }
 
+    @Test
+    public void loadsRepositoryDecisionPanelWorkflow() throws Exception {
+        Path classes = Paths.get(WorkflowDefinitionLoaderTest.class.getProtectionDomain()
+                .getCodeSource().getLocation().toURI());
+        Path file = classes.getParent().getParent().getParent()
+                .resolve("config").resolve("workflow").resolve("custom").resolve("decision_panel.yml");
+        Assume.assumeTrue("未找到工作流配置: " + file.toAbsolutePath(), Files.isRegularFile(file));
+        WorkflowDefinitionLoader loader = new WorkflowDefinitionLoader(
+                Collections.<IWorkflowActionFactory>singletonList(new StubFactory()));
+
+        LoadedWorkflow loaded = loader.load(file);
+
+        assertEquals("decision_panel", loaded.getDefinition().getWorkflowId());
+        assertEquals(Collections.singletonList("conclusion"), loaded.getOutputs());
+        assertTrue(loaded.getDefinition().getNodes().stream()
+                .anyMatch(node -> node.getType() == WorkflowNodeTypeEnum.REVIEW));
+    }
+
     private Path write(String name, String content) throws Exception {
         Path file = folder.newFile(name).toPath();
         Files.write(file, content.getBytes(StandardCharsets.UTF_8));

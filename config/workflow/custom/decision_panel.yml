@@ -1,0 +1,23 @@
+workflowId: decision_panel
+description: 多角色多轮自由讨论并形成共同决议（必填 topic）
+version: "1.0.0"
+outputs: [conclusion]
+inputSchema:
+  type: object
+  required: [topic]
+  properties:
+    topic:
+      type: string
+      description: 需要讨论并决议的任务或问题
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    - id: panel
+      type: REVIEW
+      outputKeys: [conclusion]
+      prompt: decision_panel
+      topic: "${topic}"
+      roles: [architect, reviewer, tester]
+      moderator: architect
+      rounds: 3
