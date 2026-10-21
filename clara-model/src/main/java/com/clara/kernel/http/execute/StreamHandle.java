@@ -116,6 +116,12 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      */
     private final AtomicBoolean failed = new AtomicBoolean();
     /**
+     * 失败终态携带的结构化错误；非 null 时表示本次流以 {@code ERROR} 收尾。
+     *
+     * <p>在 {@link #done} 置位之前写入，保证外部看到 {@code isDone() == true} 时已能读到本字段。
+     */
+    private volatile ClaraError failure;
+    /**
      * 事件序号，由本类统一编号。
      */
     private long sequence;
@@ -301,6 +307,11 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
         return done.get() && !cancelled.get() && !failed.get() ? assembler.result() : null;
     }
 
+    @Override
+    public ClaraError failure() {
+        return failure;
+    }
+
     /**
      * 以完成终态收尾（正常结束或取消）。
      */
@@ -318,11 +329,14 @@ public final class StreamHandle implements IStreamHandle, ISseListener {
      * @param exception 运行期异常，非 null
      */
     private void fail(RuntimeException exception) {
+        ClaraError error = errorOf(exception);
+        this.failure = error;
         if (!done.compareAndSet(false, true)) {
+            this.failure = null;
             return;
         }
         failed.set(true);
-        emit(StreamEventEnum.ERROR, null, null, null, null, errorOf(exception));
+        emit(StreamEventEnum.ERROR, null, null, null, null, error);
         executor.shutdown();
     }
 

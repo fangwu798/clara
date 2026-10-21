@@ -57,6 +57,11 @@ clara-orchestration/src/main/java/com/clara/orchestration/
 - 使用范围：宿主（clara-application）与适配层发起一次对话时；持有各编排协作者。
 - 为什么需要：编排是 orchestration 的唯一核心职责，需要单一入口把各环节按序串起。
 - 业务细节：以 `ConversationRequest` 为输入，按「会话 + 供应商 + 模型」取窗口记忆实例恢复历史；循环执行「`ContextAssembler` 装配 → `CapabilityDispatcher` 调用 → `CallRecordPublisher` 记录 → 追加助手回复 → 若有工具调用则 `ToolRoundTripCoordinator` 往返」；循环以「无工具调用」为终止条件、并有往返次数上限保护；成功返回 `COMPLETED`、命中取消返回 `CANCELLED`、异常返回 `FAILED`；全过程绑定 `ConvContext`，结束时解绑。
+- 超限恢复：调用失败且属于「上下文 / 请求体积超限」（`MODEL_REQUEST_TOO_LARGE`、`MODEL_RESPONSE_TOO_LARGE`，或平台 400/413 且提示包含 context length 等关键词）时，不直接失败，而是由 `ContextOverflowPolicy` 重发同一请求，最多重试 2 次，仍失败才返回 `FAILED`。**流式与同步口径一致**：`StreamHandle` 记录终态错误并提供 `failure()`，`CapabilityDispatcher` 在收到 `ERROR` 终态时还原为 `ClaraException`，避免把失败误判成「模型无响应」。
+- 两类超限分别处理：**请求/上下文超限**收紧输入窗口与工具预算（第一次 24 条 / 256KB / 单条 800 字，第二次 12 条 / 128KB / 单条 400 字）；**响应体超限**属于输出侧失控，不裁剪输入（避免丢掉刚收集的工具结果），只把单次输出上限收敛到 32768 / 16384 tokens。不能压到 4000 这类很小的值：推理模型的思维链同样计入输出，预算太小时思维链会吃满额度，模型来不及给出正文或发起工具调用。压缩只作用于本次下发，不改写已持久化的会话历史。
+- 单次输出上限按“配置值”与“传输体积预算”取小：`maxTokens` 先按 `maxResponseBytes / 512` 收敛（32MB 响应上限对应 65536 tokens），防止一次生成 384K token 时 SSE 事件外壳把 32MB 响应上限撑爆；更长内容由后续轮次继续生成。
+- 平台返回 `finish_reason=length` / `status=incomplete` 时不再当作正常完成：保存已生成的部分，自动追加“从中断处继续、长文档用 file_ops 分段写入”的续写指令，最多续写 2 次。长文档任务因此不会因为单次输出上限而静默留下半截结果。
+- SSE 单行/单事件上限不能沿用 64KB：DeepSeek `/responses` 的 `response.completed` 会把完整 `instructions` 与思维链放进同一条 `data:` 行，64KB 会把正常响应误判为体积超限。模型传输的单行与单事件上限统一为 8MB（仍受 `maxResponseBytes` 总上限约束）。
 - 技术细节：构造器注入 6 个依赖（`WindowMemoryFactory`、`ContextAssembler`、`CapabilityDispatcher`、`ToolRoundTripCoordinator`、`CallRecordPublisher`、`ITokenCountEstimator`），前 5 个非空校验；对外仅 `ConversationResult converse(ConversationRequest)`，无状态、可复用；因 `IWindowMemory` 无工厂契约，定义内嵌 `@FunctionalInterface WindowMemoryFactory`（`create(conversationId, provider, model)`）；工具往返默认上限常量 `DEFAULT_MAX_TOOL_ROUND_TRIPS = 8`；用 `HttpRequest.builder()` 组装请求、经 `CapabilityDispatcher.invoke/extract` 调用与取值；`try/catch(ClaraException)` 归一为终态、`finally` 解绑 `ConvContext`；token 用量由 `TokenUsage(input, output, total, cached)` 组装。
 
 **`ConversationRequest`（`com.clara.orchestration.api`）**
@@ -86,8 +91,8 @@ clara-orchestration/src/main/java/com/clara/orchestration/
 - 作用：装配本轮下发给模型的消息列表（system 指令 + 窗口内历史 + 压缩摘要 + 检索注入 + 技能提示词）。
 - 使用范围：每轮模型调用前。
 - 为什么需要：把「历史恢复、窗口、压缩、检索注入、技能装配」组合成一份请求消息，是编排链路的核心装配点。
-- 业务细节：输入为窗口记忆实例、当前用户输入与 control 配置；依次执行「窗口裁剪（只读，不改底层存储）→ 超限压缩融合摘要 → 技能提示词注入 → 对话知识找回注入」；system 指令始终归一化到消息首位；输出消息列表供 `CapabilityDispatcher` 使用。
-- 技术细节：构造注入 3 个协作者（`WindowCompressionCoordinator` / `SemanticRecallCoordinator` / `SkillMatchCoordinator`）；方法 `AssembledContext assemble(IWindowMemory, ContextControlConfig, ITokenCountEstimator)`；把 control 转为 `WindowPolicy`，用 `windowMemory.messages()`（全量）与 `windowMemory.window(policy, estimator)`（裁剪）的差集求被淘汰消息（`IdentityHashMap` 身份集合，避免 equals 误判）；取历史中最后一条 `UserContent` 文本作为检索/匹配查询；system 文本按「技能提示词 → 压缩摘要 → 检索知识」拼接，非空才构造 `SystemContent` 并置于首位；返回独立不可变 `AssembledContext`（`messages` + `tools`(`ToolContext`)）。
+- 业务细节：输入为窗口记忆实例、当前用户输入与 control 配置；依次执行「窗口裁剪（只读，不改底层存储）→ 工具结果压缩（按总量预算，最近结果优先保留原文）→ 超限压缩融合摘要 → 技能提示词注入 → 对话知识找回注入」；system 指令始终归一化到消息首位；输出消息列表供 `CapabilityDispatcher` 使用。
+- 技术细节：构造注入 3 个协作者（`WindowCompressionCoordinator` / `SemanticRecallCoordinator` / `SkillMatchCoordinator`）；方法 `AssembledContext assemble(IWindowMemory, ContextControlConfig, ITokenCountEstimator)`；把 control 转为 `WindowPolicy`，用 `windowMemory.messages()`（全量）与 `windowMemory.window(policy, estimator)`（裁剪）的差集求被淘汰消息（`IdentityHashMap` 身份集合，避免 equals 误判）；取历史中最后一条 `UserContent` 文本作为检索/匹配查询；工具结果压缩按 `toolOutputMaxChars × 10` 作为单请求总预算：最近一半预算内的结果原样保留，最新一条若超预算单独占一半预算上限，其余结果按剩余预算分摊截断（单条不低于 400 字）；system 文本按「技能提示词 → 压缩摘要 → 检索知识」拼接，非空才构造 `SystemContent` 并置于首位；返回独立不可变 `AssembledContext`（`messages` + `tools`(`ToolContext`)）。
 
 **`WindowCompressionCoordinator`（`com.clara.orchestration.context`）**
 - 作用：历史命中窗口上限时，取出被淘汰消息组、触发压缩、把返回的摘要并入 system 指令。

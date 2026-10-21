@@ -1,5 +1,7 @@
 package com.clara.core.model;
 
+import com.clara.exception.ClaraError;
+
 /**
  * 流式调用句柄：查询状态、取消本次流、取回累积完成的响应。
  *
@@ -38,4 +40,16 @@ public interface IStreamHandle {
      * @return 响应对象；流未结束、已取消或失败时返回 null
      */
     IResponse result();
+
+    /**
+     * 取本次流的终态错误。
+     *
+     * <p>流以 {@code ERROR} 收尾时由实现记录结构化错误；调用方可在 {@link #isDone()} 为 true 后据此
+     * 还原异常，而不是把 {@code result()} 的 null 误判成「模型无响应」。
+     *
+     * @return 终态错误；正常完成、取消或实现未提供错误详情时返回 null
+     */
+    default ClaraError failure() {
+        return null;
+    }
 }

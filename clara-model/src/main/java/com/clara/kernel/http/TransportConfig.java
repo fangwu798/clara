@@ -170,16 +170,23 @@ public final class TransportConfig {
     }
 
     /**
+     * 单个 SSE 事件与单行的体积上限：平台的 {@code response.completed} 会把完整系统指令、思维链与
+     * 最终回答放进一条 {@code data:} 行，64KB 的单行上限会把正常响应误判成体积超限。
+     */
+    private static final int MAX_SSE_EVENT_BYTES = 8 * 1024 * 1024;
+
+    /**
      * 转换为通用传输策略，供 {@code IHttpTransport} 使用。
      *
      * <p>SSE 的单行、单事件与总字节上限都受 {@code maxResponseBytes} 约束，避免流式响应突破配置上限。
+     * 单行与单事件取同一上限：终端事件是一条可能包含完整系统指令与思维链的长行，不能按普通分片的大小限制。
      *
      * @return 通用传输策略，非 null
      */
     public HttpTransportPolicy toHttpTransportPolicy() {
         int maxTotal = maxResponseBytes;
-        int maxEvent = Math.min(SseParserConfig.DEFAULT_MAX_EVENT_BYTES, maxTotal);
-        int maxLine = Math.min(SseParserConfig.DEFAULT_MAX_LINE_BYTES, maxEvent);
+        int maxEvent = Math.min(MAX_SSE_EVENT_BYTES, maxTotal);
+        int maxLine = maxEvent;
         SseParserConfig sse = new SseParserConfig(maxLine, maxEvent,
                 SseParserConfig.DEFAULT_MAX_EVENTS, maxTotal, false);
         return new HttpTransportPolicy(new OriginEndpointPolicy(allowedOrigins, allowHttp),

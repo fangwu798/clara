@@ -7,7 +7,7 @@ transport:
   allowedOrigins:
     - https://new.aicontrol.top/
   connectTimeoutMillis: 10000
-  readTimeoutMillis: 180000
+  readTimeoutMillis: 600000
   maxRequestBytes: 8388608
   maxResponseBytes: 33554432
   allowHttp: false
@@ -20,7 +20,8 @@ capabilities:
     apiProfile: responses-v1
     protocol: RESPONSE
     parameters:
-      maxTokens: 60000
+      # GPT-5.6 Sol：上下文 1,050,000，最大输出 128000 tokens
+      maxTokens: 128000
   IMAGE:
     endpoint: https://new.aicontrol.top/v1/images/generations
     modelId: gpt-image-1

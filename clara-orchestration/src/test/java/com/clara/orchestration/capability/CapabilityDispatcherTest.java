@@ -1,15 +1,19 @@
 package com.clara.orchestration.capability;
 
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.StreamEventEnum;
 import com.clara.core.model.IRequest;
 import com.clara.core.model.IResponse;
 import com.clara.core.model.IStreamModel;
+import com.clara.dto.model.StreamEvent;
+import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ImageItem;
 import com.clara.core.model.IStreamHandle;
 import com.clara.core.model.IStreamObserver;
+import com.clara.utils.ExceptionUtils;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -66,6 +70,17 @@ public class CapabilityDispatcherTest {
 
         assertTrue(model.streamInvoked);
         assertSame(streamed, result);
+    }
+
+    @Test
+    public void invokeWithObserverRethrowsTerminalStreamError() {
+        ClaraError error = ExceptionUtils.responseTooLarge().getError();
+        CapabilityDispatcher dispatcher = new CapabilityDispatcher(new FailingStreamModel(error));
+
+        ClaraException thrown = assertThrows(ClaraException.class,
+                () -> dispatcher.invoke(request(), event -> { }));
+
+        assertSame(error, thrown.getError());
     }
 
     @Test
@@ -179,6 +194,50 @@ public class CapabilityDispatcherTest {
                 @Override
                 public IResponse result() {
                     return result;
+                }
+            };
+        }
+    }
+
+    /**
+     * 以 ERROR 终态收尾、无累积结果的流式模型，用于验证派发器把终态错误还原成异常。
+     */
+    private static final class FailingStreamModel implements IStreamModel {
+
+        private final ClaraError error;
+
+        FailingStreamModel(ClaraError error) {
+            this.error = error;
+        }
+
+        @Override
+        public <R extends IResponse> R chat(IRequest request, Class<R> responseType) {
+            throw new AssertionError("sync path must not be used");
+        }
+
+        @Override
+        public <R extends IResponse> IStreamHandle chat(IRequest request, Class<R> responseType,
+                IStreamObserver observer) {
+            observer.onEvent(new StreamEvent(StreamEventEnum.ERROR, 0, null, null, null, null, error));
+            return new IStreamHandle() {
+                @Override
+                public boolean cancel() {
+                    return false;
+                }
+
+                @Override
+                public boolean isDone() {
+                    return true;
+                }
+
+                @Override
+                public IResponse result() {
+                    return null;
+                }
+
+                @Override
+                public ClaraError failure() {
+                    return error;
                 }
             };
         }

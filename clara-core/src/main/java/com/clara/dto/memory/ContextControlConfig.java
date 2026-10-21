@@ -20,17 +20,26 @@ public final class ContextControlConfig {
     private final int retrievalCount;
     private final double similarityThreshold;
     /**
-     * 历史工具结果单条最大保留字符数，-1 表示不限。
+     * 工具结果单条最大保留字符数（压缩后的上限），-1 表示不限。
      *
-     * <p>只作用于「当前提问之前」的历史工具结果：本轮（最后一条用户消息之后）的工具结果原样保留，
-     * 供模型继续推理；历史工具结果超出该长度时保留首尾、中间以省略标记替代。用户提问与助手回复不压缩。
+     * <p>工具结果超出该长度时保留首尾、中间以省略标记替代；用户提问与助手回复不压缩。
+     * 该值同时决定单次请求的工具结果总预算（见 {@link #getToolOutputBudgetChars()}）。
      */
     private final int toolOutputMaxChars;
 
     /**
-     * 历史工具结果单条默认最大保留字符数。
+     * 工具结果单条默认最大保留字符数。
      */
     public static final int DEFAULT_TOOL_OUTPUT_MAX_CHARS = 4000;
+
+    /**
+     * 单次请求工具结果总预算 = 单条上限 × 该倍数。
+     *
+     * <p>为什么用倍数而不是再暴露一个配置项：单条上限描述「一条结果留多少」，总量预算描述「一次请求
+     * 最多带多少工具输出」。两者按固定倍数绑定，既能约束总体积，又不会让配置项继续膨胀；默认
+     * 4000 × 10 = 40000 字符，约等于 10 条满额结果。
+     */
+    public static final int TOOL_OUTPUT_BUDGET_MULTIPLIER = 10;
 
     /**
      * 通过构建器创建上下文控制配置，并完成字段校验。
@@ -95,6 +104,21 @@ public final class ContextControlConfig {
                 .retrievalCount(3)
                 .similarityThreshold(0.7)
                 .build();
+    }
+
+    /**
+     * 单次请求允许携带的工具结果总字符预算。
+     *
+     * <p>{@code toolOutputMaxChars <= 0}（不压缩）时返回 -1，表示不限制总量。
+     *
+     * @return 总字符预算；-1 表示不限
+     */
+    public int getToolOutputBudgetChars() {
+        if (toolOutputMaxChars <= 0) {
+            return -1;
+        }
+        long budget = (long) toolOutputMaxChars * TOOL_OUTPUT_BUDGET_MULTIPLIER;
+        return budget > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) budget;
     }
 
     /**

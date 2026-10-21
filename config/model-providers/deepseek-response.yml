@@ -7,7 +7,7 @@ transport:
   allowedOrigins:
     - https://api.deepseek.com
   connectTimeoutMillis: 10000
-  readTimeoutMillis: 180000
+  readTimeoutMillis: 600000
   maxRequestBytes: 8388608
   maxResponseBytes: 33554432
   allowHttp: false
@@ -17,4 +17,5 @@ capabilities:
     modelId: deepseek-v4-pro
     apiProfile: RESPONSE
     parameters:
-      maxTokens: 30000
+      # DeepSeek 官方模型规格：最大输出 384K tokens（384 × 1024）
+      maxTokens: 393216

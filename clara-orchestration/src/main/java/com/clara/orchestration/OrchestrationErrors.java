@@ -37,4 +37,19 @@ public final class OrchestrationErrors {
                 .safeMessage("tool round trip limit exceeded: " + limit)
                 .build());
     }
+
+    /**
+     * 创建「模型输出达到长度上限且工具调用参数被截断」错误。
+     *
+     * <p>为什么不继续执行：截断的 JSON 可能仍能解析，但写文件、改代码等带副作用的参数已经不完整，
+     * 直接执行会留下半截结果。这里明确失败，让调用方拆小任务或减少单次输出后重试。
+     *
+     * @return 资源限制类、不可重试的编排错误
+     */
+    public static ClaraException outputTruncated() {
+        return new ClaraException(ClaraError.builder(ErrorCodes.MODEL_OUTPUT_TRUNCATED,
+                ErrorCategoryEnum.RESOURCE_LIMIT)
+                .safeMessage("模型输出达到长度上限，工具调用参数被截断")
+                .build());
+    }
 }

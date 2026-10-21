@@ -7,7 +7,7 @@ transport:
   allowedOrigins:
     - https://ark.cn-beijing.volces.com
   connectTimeoutMillis: 10000
-  readTimeoutMillis: 180000
+  readTimeoutMillis: 600000
   maxRequestBytes: 16777216
   maxResponseBytes: 33554432
   allowHttp: false
@@ -17,4 +17,5 @@ capabilities:
     modelId: doubao-seed-2-1-pro-260628
     apiProfile: ark-v3-chat
     parameters:
-      maxTokens: 20000
+      # 豆包 Seed 2.1 Pro：上下文 256K，最大回答 256K tokens
+      maxTokens: 262144

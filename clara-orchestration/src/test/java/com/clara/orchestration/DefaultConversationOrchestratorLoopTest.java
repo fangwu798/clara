@@ -14,9 +14,18 @@ import com.clara.dto.tool.ToolCall;
 import com.clara.dto.tool.ToolCallFunction;
 import com.clara.dto.tool.ToolResult;
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.FinishReasonEnum;
+import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.StreamEventEnum;
+import com.clara.exception.ClaraError;
+import com.clara.exception.ClaraException;
+import com.clara.exception.ErrorCodes;
+import com.clara.kernel.config.ProviderCapabilityConfiguration;
+import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.credential.ProviderCredentialConfiguration;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
+import com.clara.kernel.http.TransportConfig;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
@@ -27,12 +36,16 @@ import com.clara.orchestration.context.WindowCompressionCoordinator;
 import com.clara.orchestration.record.CallRecordPublisher;
 import com.clara.orchestration.skill.SkillMatchCoordinator;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
+import com.clara.utils.ExceptionUtils;
 import org.junit.Test;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -78,6 +91,117 @@ public class DefaultConversationOrchestratorLoopTest {
         assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
         assertEquals(1, memory.messages().size());
         assertEquals(0, result.getUsage().getOutputTokens());
+    }
+
+    @Test
+    public void retriesWithCompactedContextWhenProviderReportsOverflow() {
+        FakeWindowMemory memory = new FakeWindowMemory("c1");
+        FlakyStreamModel model = new FlakyStreamModel(response("hello", null, 1, 1), 1,
+                ExceptionUtils.providerFailure(ModelProviderEnum.DEEPSEEK, 400,
+                        "This model's maximum context length is 131072 tokens."));
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, memory, invocation -> null);
+
+        ConversationResult result = orchestrator.converse(request("hi", CapabilityKindEnum.CHAT));
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        assertEquals("hello", result.getContent());
+        assertEquals(2, model.requests.size());
+    }
+
+    @Test
+    public void retriesWhenStreamTerminatesWithErrorEvent() {
+        ClaraError error = ExceptionUtils.responseTooLarge().getError();
+        StreamErrorModel model = new StreamErrorModel(response("hello", null, 1, 1), 1, error);
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, new FakeWindowMemory("c1"),
+                invocation -> null);
+
+        ConversationResult result = orchestrator.converse(request("hi", CapabilityKindEnum.CHAT));
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        assertEquals("hello", result.getContent());
+        assertEquals(2, model.requests.size());
+        assertNull(((HttpRequest) model.requests.get(0)).getMaxTokens());
+        assertEquals(Integer.valueOf(32768), ((HttpRequest) model.requests.get(1)).getMaxTokens());
+    }
+
+    @Test
+    public void continuesWhenOutputReachesLengthLimit() {
+        HttpResponse first = response("part1", null, 10, 10);
+        first.setFinishReason(FinishReasonEnum.LENGTH);
+        HttpResponse second = response("part2", null, 12, 8);
+        SequenceStreamModel model = new SequenceStreamModel(Arrays.asList(first, second));
+        FakeWindowMemory memory = new FakeWindowMemory("c1");
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, memory, invocation -> null);
+
+        ConversationResult result = orchestrator.converse(request("hi", CapabilityKindEnum.CHAT));
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        assertEquals("part1part2", result.getContent());
+        assertEquals(2, model.requests.size());
+        assertEquals(3, memory.messages().size());
+    }
+
+    @Test
+    public void capsConfiguredMaxTokensByResponseBudget() {
+        FakeStreamModel model = new FakeStreamModel(response("hi", null, 1, 1));
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, new FakeWindowMemory("c1"),
+                invocation -> null);
+        ConversationRequest request = ConversationRequest.builder()
+                .conversationId("c1")
+                .model("deepseek-v4-pro")
+                .userInput("hi")
+                .capabilityKind(CapabilityKindEnum.CHAT)
+                .providerConfiguration(providerConfiguration(393_216))
+                .build();
+
+        orchestrator.converse(request);
+
+        assertEquals(Integer.valueOf(65_536), ((HttpRequest) model.requests.get(0)).getMaxTokens());
+    }
+
+    @Test
+    public void doesNotExecuteTruncatedToolCalls() {
+        HttpResponse truncated = response(null, null, 10, 10);
+        truncated.setFinishReason(FinishReasonEnum.LENGTH);
+        truncated.setToolCalls(Collections.singletonList(toolCall("t1", "file_ops")));
+        int[] executed = {0};
+        DefaultConversationOrchestrator orchestrator = orchestrator(new FakeStreamModel(truncated),
+                new FakeWindowMemory("c1"), invocation -> {
+                    executed[0]++;
+                    return null;
+                });
+
+        ConversationResult result = orchestrator.converse(request("hi", CapabilityKindEnum.CHAT));
+
+        assertEquals(OrchestrationStatusEnum.FAILED, result.getStatus());
+        assertEquals(ErrorCodes.MODEL_OUTPUT_TRUNCATED, result.getError().getCode());
+        assertEquals(0, executed[0]);
+    }
+
+    @Test
+    public void doesNotRetryUnrelatedProviderFailure() {
+        FakeWindowMemory memory = new FakeWindowMemory("c1");
+        FlakyStreamModel model = new FlakyStreamModel(response("hello", null, 1, 1), 1,
+                ExceptionUtils.providerFailure(ModelProviderEnum.DEEPSEEK, 400, "invalid parameter: temperature"));
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, memory, invocation -> null);
+
+        ConversationResult result = orchestrator.converse(request("hi", CapabilityKindEnum.CHAT));
+
+        assertEquals(OrchestrationStatusEnum.FAILED, result.getStatus());
+        assertEquals(1, model.requests.size());
+    }
+
+    @Test
+    public void failsAfterOverflowRetriesAreExhausted() {
+        FakeWindowMemory memory = new FakeWindowMemory("c1");
+        FlakyStreamModel model = new FlakyStreamModel(null, 99,
+                ExceptionUtils.providerFailure(ModelProviderEnum.DEEPSEEK, 400, "context length exceeded"));
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, memory, invocation -> null);
+
+        ConversationResult result = orchestrator.converse(request("hi", CapabilityKindEnum.CHAT));
+
+        assertEquals(OrchestrationStatusEnum.FAILED, result.getStatus());
+        assertEquals(3, model.requests.size());
     }
 
     @Test
@@ -194,7 +318,7 @@ public class DefaultConversationOrchestratorLoopTest {
         }
     }
 
-    private static DefaultConversationOrchestrator orchestrator(FakeStreamModel model, IWindowMemory memory,
+    private static DefaultConversationOrchestrator orchestrator(IStreamModel model, IWindowMemory memory,
             com.clara.core.skill.IToolInvoker invoker) {
         ContextAssembler assembler = new ContextAssembler(
                 new WindowCompressionCoordinator(null),
@@ -237,6 +361,21 @@ public class DefaultConversationOrchestratorLoopTest {
         call.setType("function");
         call.setFunction(function);
         return call;
+    }
+
+    private static ProviderConfiguration providerConfiguration(int maxTokens) {
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("maxTokens", maxTokens);
+        ProviderCapabilityConfiguration chat = new ProviderCapabilityConfiguration(
+                URI.create("https://api.deepseek.com/responses"), null, "deepseek-v4-pro", "RESPONSE",
+                null, parameters, null);
+        Map<CapabilityKindEnum, ProviderCapabilityConfiguration> capabilities = new LinkedHashMap<>();
+        capabilities.put(CapabilityKindEnum.CHAT, chat);
+        return new ProviderConfiguration(ModelProviderEnum.DEEPSEEK,
+                new ProviderCredentialConfiguration("deepseek", null, "test-key".toCharArray()),
+                new TransportConfig(Collections.singleton("https://api.deepseek.com"),
+                        10_000, 600_000, 8 * 1024 * 1024, 32 * 1024 * 1024, false),
+                capabilities);
     }
 
     /**
@@ -288,6 +427,119 @@ public class DefaultConversationOrchestratorLoopTest {
     }
 
     /**
+     * 按调用顺序返回预置响应的假模型，用于验证输出截断后的自动续写。
+     */
+    private static final class SequenceStreamModel implements IStreamModel {
+
+        private final List<HttpResponse> responses;
+        private final List<IRequest> requests = new ArrayList<>();
+        private int index;
+
+        private SequenceStreamModel(List<HttpResponse> responses) {
+            this.responses = responses;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends IResponse> R chat(IRequest request, Class<R> responseType) {
+            requests.add(request);
+            return (R) next();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends IResponse> IStreamHandle chat(IRequest request, Class<R> responseType,
+                IStreamObserver observer) {
+            requests.add(request);
+            HttpResponse current = next();
+            if (observer != null) {
+                observer.onEvent(new StreamEvent(StreamEventEnum.RESPONSE_COMPLETE, 1L, "", null, null,
+                        current, null));
+            }
+            return new IStreamHandle() {
+                @Override
+                public boolean cancel() {
+                    return false;
+                }
+
+                @Override
+                public boolean isDone() {
+                    return true;
+                }
+
+                @Override
+                public IResponse result() {
+                    return current;
+                }
+            };
+        }
+
+        private HttpResponse next() {
+            return responses.get(Math.min(index++, responses.size() - 1));
+        }
+    }
+
+    /**
+     * 前 N 次调用抛出预置失败、之后返回成功响应的假模型，用于验证超限恢复与重试上限。
+     */
+    private static final class FlakyStreamModel implements IStreamModel {
+
+        private final HttpResponse response;
+        private final int failures;
+        private final ClaraException failure;
+        private final List<IRequest> requests = new ArrayList<>();
+        private int calls;
+
+        private FlakyStreamModel(HttpResponse response, int failures, ClaraException failure) {
+            this.response = response;
+            this.failures = failures;
+            this.failure = failure;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends IResponse> R chat(IRequest request, Class<R> responseType) {
+            requests.add(request);
+            failWhileNeeded();
+            return (R) response;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends IResponse> IStreamHandle chat(IRequest request, Class<R> responseType,
+                IStreamObserver observer) {
+            requests.add(request);
+            failWhileNeeded();
+            if (observer != null) {
+                observer.onEvent(new StreamEvent(StreamEventEnum.RESPONSE_COMPLETE, 1L, "", null, null,
+                        response, null));
+            }
+            return new IStreamHandle() {
+                @Override
+                public boolean cancel() {
+                    return false;
+                }
+
+                @Override
+                public boolean isDone() {
+                    return true;
+                }
+
+                @Override
+                public IResponse result() {
+                    return response;
+                }
+            };
+        }
+
+        private void failWhileNeeded() {
+            if (calls++ < failures) {
+                throw failure;
+            }
+        }
+    }
+
+    /**
      * 内存窗口：按追加顺序保存消息，窗口策略与估算器不参与断言。
      */
     private static final class FakeWindowMemory implements IWindowMemory {
@@ -322,6 +574,64 @@ public class DefaultConversationOrchestratorLoopTest {
         @Override
         public void clear() {
             history.clear();
+        }
+    }
+
+    /**
+     * 前 N 次以流终态 ERROR 失败、之后返回成功响应的假模型，用于验证「异常被吞进事件流」的回归。
+     */
+    private static final class StreamErrorModel implements IStreamModel {
+
+        private final HttpResponse response;
+        private final ClaraError error;
+        private final List<IRequest> requests = new ArrayList<>();
+        private int remainingFailures;
+
+        private StreamErrorModel(HttpResponse response, int failures, ClaraError error) {
+            this.response = response;
+            this.remainingFailures = failures;
+            this.error = error;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends IResponse> R chat(IRequest request, Class<R> responseType) {
+            requests.add(request);
+            if (remainingFailures-- > 0) {
+                throw new ClaraException(error);
+            }
+            return (R) response;
+        }
+
+        @Override
+        public <R extends IResponse> IStreamHandle chat(IRequest request, Class<R> responseType,
+                IStreamObserver observer) {
+            requests.add(request);
+            final boolean failed = remainingFailures-- > 0;
+            observer.onEvent(new StreamEvent(
+                    failed ? StreamEventEnum.ERROR : StreamEventEnum.RESPONSE_COMPLETE, 1L, "",
+                    null, null, failed ? null : response, failed ? error : null));
+            return new IStreamHandle() {
+                @Override
+                public boolean cancel() {
+                    return false;
+                }
+
+                @Override
+                public boolean isDone() {
+                    return true;
+                }
+
+                @Override
+                public IResponse result() {
+                    return failed ? null : response;
+                }
+
+                @Override
+                public ClaraError failure() {
+                    return failed ? error : null;
+                }
+            };
         }
     }
 }

@@ -45,6 +45,10 @@ public final class ErrorCodes {
      */
     public static final String MODEL_RESPONSE_TOO_LARGE = "MODEL_RESPONSE_TOO_LARGE";
     /**
+     * 模型输出达到长度上限，工具调用参数被截断，不能执行。
+     */
+    public static final String MODEL_OUTPUT_TRUNCATED = "MODEL_OUTPUT_TRUNCATED";
+    /**
      * 模型传输层 IO 失败：连接中断、写入或读取失败等，通常可重试。
      */
     public static final String MODEL_TRANSPORT_IO_ERROR = "MODEL_TRANSPORT_IO_ERROR";

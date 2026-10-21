@@ -116,6 +116,8 @@ public class MemoryDtoTest {
         assertEquals(3, defaults.getRetrievalCount());
         assertEquals(0.7, defaults.getSimilarityThreshold(), 0.0);
         assertEquals(ContextControlConfig.DEFAULT_TOOL_OUTPUT_MAX_CHARS, defaults.getToolOutputMaxChars());
+        assertEquals(ContextControlConfig.DEFAULT_TOOL_OUTPUT_MAX_CHARS
+                * ContextControlConfig.TOOL_OUTPUT_BUDGET_MULTIPLIER, defaults.getToolOutputBudgetChars());
         assertFalse(defaults.isCompressEnabled());
         assertFalse(defaults.isVectorizeEnabled());
 
@@ -139,6 +141,11 @@ public class MemoryDtoTest {
         assertEquals(5, config.getRetrievalCount());
         assertEquals(0.9, config.getSimilarityThreshold(), 0.0);
         assertEquals(100, config.getToolOutputMaxChars());
+        assertEquals(100 * ContextControlConfig.TOOL_OUTPUT_BUDGET_MULTIPLIER,
+                config.getToolOutputBudgetChars());
+        assertEquals(-1, ContextControlConfig.builder()
+                .contextWindowTokens(-1).windowMaxMessages(-1).toolOutputMaxChars(-1)
+                .build().getToolOutputBudgetChars());
     }
 
     /**

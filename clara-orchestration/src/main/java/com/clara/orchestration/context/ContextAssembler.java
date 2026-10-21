@@ -116,9 +116,10 @@ public final class ContextAssembler {
 
         List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.messages());
         List<IContent> windowed = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.window(policy, estimator));
-        // 压缩历史工具结果（只压当前提问之前的历史部分，本轮工具结果原样保留），控制请求体膨胀。
+        // 按「总量预算 + 最近优先」压缩工具结果：历史与本轮一视同仁，只保留最近一段原样，其余按预算截断。
         // 注意：淘汰判定仍用未压缩的 windowed（按对象同一性比对），避免压缩后的新对象被误判为淘汰。
-        List<IContent> prepared = ToolOutputCompactor.compact(windowed, effective.getToolOutputMaxChars());
+        List<IContent> prepared = ToolOutputCompactor.compact(windowed,
+                effective.getToolOutputMaxChars(), effective.getToolOutputBudgetChars());
         String userInput = latestUserInput(windowMemory.conversationId(), history);
 
         List<IContent> systemParts = new ArrayList<>();

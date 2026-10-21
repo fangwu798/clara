@@ -7,7 +7,7 @@ transport:
   allowedOrigins:
     - https://api.moonshot.cn
   connectTimeoutMillis: 10000
-  readTimeoutMillis: 180000
+  readTimeoutMillis: 600000
   maxRequestBytes: 8388608
   maxResponseBytes: 33554432
   allowHttp: false
@@ -17,4 +17,5 @@ capabilities:
     modelId: kimi-k2.6
     apiProfile: RESPONSE
     parameters:
-      maxTokens: 8192
+      # Kimi K2.6：上下文 256K，最大输出 235929 tokens
+      maxTokens: 235929

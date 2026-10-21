@@ -5,6 +5,8 @@ import com.clara.enums.StreamEventEnum;
 import com.clara.core.model.IStreamModel;
 import com.clara.core.model.IResponse;
 import com.clara.dto.model.StreamEvent;
+import com.clara.exception.ClaraError;
+import com.clara.exception.ClaraException;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ImageItem;
@@ -59,7 +61,8 @@ public final class CapabilityDispatcher {
      *
      * @param request  请求对象，不可为 null
      * @param observer 领域事件接收方，可为 null
-     * @return 累积响应对象；流式失败或取消时可能为 null
+     * @return 累积响应对象；流式取消时可能为 null
+     * @throws ClaraException 流以 {@code ERROR} 收尾时携带平台/传输层的结构化错误
      */
     public HttpResponse invoke(HttpRequest request, IStreamObserver observer) {
         if (observer == null) {
@@ -76,6 +79,10 @@ public final class CapabilityDispatcher {
             }
         });
         awaitTerminal(handle, terminal);
+        ClaraError failure = handle.failure();
+        if (failure != null) {
+            throw new ClaraException(failure);
+        }
         IResponse result = handle.result();
         return result instanceof HttpResponse ? (HttpResponse) result : null;
     }

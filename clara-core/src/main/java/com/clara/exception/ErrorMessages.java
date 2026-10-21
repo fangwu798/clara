@@ -108,6 +108,8 @@ public final class ErrorMessages {
         messages.put(ErrorCodes.MODEL_ENDPOINT_DENIED, "模型端点被拒绝：目标地址不在允许清单内，或不是安全的 HTTPS 地址");
         messages.put(ErrorCodes.MODEL_REQUEST_TOO_LARGE, "模型请求体过大：超出配置的体积上限，请求未发出");
         messages.put(ErrorCodes.MODEL_RESPONSE_TOO_LARGE, "模型响应体过大：超出配置的体积上限，读取已中止");
+        messages.put(ErrorCodes.MODEL_OUTPUT_TRUNCATED,
+                "模型输出达到长度上限：工具调用参数被截断，已停止执行；请拆分任务或减少单次输出");
         messages.put(ErrorCodes.MODEL_TRANSPORT_IO_ERROR, "模型传输失败：连接中断或读写异常，通常可重试");
         messages.put(ErrorCodes.MODEL_REQUEST_TIMEOUT, "模型调用超时：连接或读取超过截止时间，可重试");
         messages.put(ErrorCodes.MODEL_CREDENTIAL_UNAVAILABLE, "模型凭据不可用：未解析到平台 {provider} 的可用密钥，请检查凭据配置");

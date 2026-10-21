@@ -6,6 +6,7 @@ import com.clara.core.message.IContent;
 import com.clara.dto.memory.ContextControlConfig;
 import com.clara.dto.tool.ToolCall;
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.FinishReasonEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.RoleEnum;
 import com.clara.exception.ClaraError;
@@ -14,6 +15,7 @@ import com.clara.enums.ErrorCategoryEnum;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.config.ProviderCapabilityConfiguration;
 import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.kernel.message.delta.UserContent;
@@ -33,6 +35,7 @@ import com.clara.orchestration.record.CallRecordPublisher;
 import com.clara.orchestration.tool.StreamingToolCallObserver;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -46,6 +49,24 @@ import java.util.List;
  * 令牌，循环体与关键点快速失败；取消后以「已取消」终态收尾。
  */
 public final class DefaultConversationOrchestrator {
+
+    /** 单次模型调用默认允许的输出 token 上限；最终还会按配置与传输体积收敛。 */
+    private static final int MAX_OUTPUT_TOKENS_PER_CALL = 131_072;
+
+    /** 单次模型调用至少保留的输出 token 上限，避免把推理模型的输出预算压到无法给出正文。 */
+    private static final int MIN_OUTPUT_TOKENS_PER_CALL = 1_024;
+
+    /** 估算每个输出 token 在 SSE 流中占用的字节数（含事件外壳与终端事件回显）。 */
+    private static final int BYTES_PER_OUTPUT_TOKEN = 512;
+
+    /** 单轮最多自动续写次数，防止模型反复触发长度上限而无限循环。 */
+    private static final int MAX_OUTPUT_CONTINUATIONS = 2;
+
+    /** 输出被长度上限截断后的续写指令；只作用于紧随其后的那次请求。 */
+    private static final String CONTINUE_PROMPT =
+            "上一条回复因达到单次输出上限被截断。请从中断处继续完成任务，不要重复已经输出的内容。"
+            + "如果需要写长文档，请调用 file_ops 分段写入：先用 op=write 写第一部分，再用 op=append 追加后续部分，"
+            + "每次只写一部分。";
 
     private final WindowMemoryFactory windowMemoryFactory;
     private final ContextAssembler contextAssembler;
@@ -118,7 +139,7 @@ public final class DefaultConversationOrchestrator {
         IWindowMemory windowMemory = windowMemoryFactory.create(request.getConversationId(),
                 provider == null ? null : provider.name(), request.getModel());
         ConversationPlan plan = new ConversationPlan(request, capabilityKind, control, provider,
-                hostObserver, request.getMaxToolRoundTrips());
+                hostObserver, request.getMaxToolRoundTrips(), maxTokensPerCall(request, capabilityKind));
         ConversationState state = new ConversationState(context, windowMemory, new StringBuilder());
         try (ConvContext.Scope ignored = ConvContext.open(context)) {
             appendUserTurn(plan, state);
@@ -136,6 +157,58 @@ public final class DefaultConversationOrchestrator {
         if (request.getModel() == null || request.getUserInput() == null) {
             throw OrchestrationErrors.invalidArgument("model and userInput are required");
         }
+    }
+
+    /**
+     * 计算单次模型调用的输出上限：取配置值，并按传输层响应体积上限收敛。
+     *
+     * <p>为什么不能直接使用平台规格里的最大值：推理平台的 {@code response.completed} 会回显完整系统指令与
+     * 思维链，允许一次输出 384K token 时，仅 SSE 事件外壳就可能超过 32MB 的响应上限。收敛到传输层能承受的
+     * 单次预算后，超长内容由后续轮次继续生成，而不是在一次调用里把连接撑爆。
+     *
+     * @param request 对话请求，非 null
+     * @param kind    能力种类，非 null
+     * @return 单次输出上限；配置未给出或该能力不适用时返回 null
+     */
+    private static Integer maxTokensPerCall(ConversationRequest request, CapabilityKindEnum kind) {
+        if (kind != CapabilityKindEnum.CHAT || request.getProviderConfiguration() == null) {
+            return null;
+        }
+        try {
+            ProviderCapabilityConfiguration capability = request.getProviderConfiguration().getCapability(kind);
+            Integer configured = positiveInt(capability.getParameters().get("maxTokens"));
+            if (configured == null) {
+                return null;
+            }
+            int budgetBytes = request.getProviderConfiguration().getTransport().getMaxResponseBytes();
+            int safe = Math.max(MIN_OUTPUT_TOKENS_PER_CALL,
+                    Math.min(MAX_OUTPUT_TOKENS_PER_CALL, budgetBytes / BYTES_PER_OUTPUT_TOKEN));
+            int effective = Math.min(configured, safe);
+            if (effective < configured) {
+                System.out.println("  [model]    单次输出上限=" + effective + "（配置 " + configured
+                        + "，按响应体积上限收敛）"); // NOSONAR CLI output by design
+            }
+            return effective;
+        } catch (RuntimeException ignored) {
+            // 该能力未配置或参数形状不合法时退回平台默认，不阻断对话。
+            return null;
+        }
+    }
+
+    private static Integer positiveInt(Object value) {
+        if (value instanceof Number) {
+            int number = ((Number) value).intValue();
+            return number > 0 ? number : null;
+        }
+        if (value instanceof String) {
+            try {
+                int number = Integer.parseInt(((String) value).trim());
+                return number > 0 ? number : null;
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static void appendUserTurn(ConversationPlan plan, ConversationState state) {
@@ -167,11 +240,29 @@ public final class DefaultConversationOrchestrator {
         while (true) {
             state.context.throwIfCancelled();
             HttpRequest httpRequest = buildRequest(plan, state);
-            HttpResponse response = invokeModel(plan, state, httpRequest);
+            HttpResponse response;
+            try {
+                response = invokeModel(plan, state, httpRequest);
+            } catch (ClaraException failure) {
+                // 超限不直接失败：按失败类型收紧输入预算或输出上限后，用同一个请求重发。
+                if (retryWithCompactedContext(plan, state, failure)) {
+                    continue;
+                }
+                throw failure;
+            }
             if (response == null) {
                 return missingResponse(plan, state, toolRoundTrips);
             }
+            if (isOutputTruncated(response) && toolRoundTripCoordinator.hasToolCalls(response)) {
+                // 截断的工具参数可能仍能解析，但写文件 / 改代码这类副作用的参数已经不完整，不能执行。
+                throw OrchestrationErrors.outputTruncated();
+            }
             if (!toolRoundTripCoordinator.hasToolCalls(response)) {
+                // 推理平台在达到输出上限时仍会返回一段正文；继续一轮，让模型从中断处接着做，
+                // 避免把半截回答当成已完成结果交给用户。
+                if (isOutputTruncated(response) && continueTruncatedOutput(state, response)) {
+                    continue;
+                }
                 return completedResult(plan, state, response, toolRoundTrips);
             }
             if (plan.maxToolRoundTrips > 0 && toolRoundTrips >= plan.maxToolRoundTrips) {
@@ -194,14 +285,26 @@ public final class DefaultConversationOrchestrator {
         HttpRequest.HttpRequestBuilder<?, ?> requestBuilder = HttpRequest.builder()
                 .model(plan.request.getModel())
                 .stream(plan.request.isStream() || plan.hostObserver != null);
+        Integer maxTokens = state.maxTokensOverride != null ? state.maxTokensOverride : plan.maxTokensPerCall;
+        if (maxTokens != null) {
+            requestBuilder.maxTokens(maxTokens);
+        }
         // 只有对话能力下发 messages 与 tools；图片 / 视频生成等非对话能力以「本轮输入」作为生成
         // 提示词，且不得携带对话工具——如火山方舟生图接口不支持 tools，带上会被平台以
         // InvalidParameter 直接拒绝。
         if (plan.capabilityKind == CapabilityKindEnum.CHAT) {
-            List<String> extra = state.planPrompt == null
-                    ? Collections.emptyList() : Collections.singletonList(state.planPrompt);
+            List<String> extra = new ArrayList<>(2);
+            if (state.planPrompt != null) {
+                extra.add(state.planPrompt);
+            }
+            if (state.continuationPrompt != null) {
+                extra.add(state.continuationPrompt);
+                // 续写指令只作用于紧随其后的这一次请求。
+                state.continuationPrompt = null;
+            }
+            ContextControlConfig control = state.control == null ? plan.control : state.control;
             AssembledContext assembled =
-                    contextAssembler.assemble(state.windowMemory, plan.control, tokenCountEstimator, extra);
+                    contextAssembler.assemble(state.windowMemory, control, tokenCountEstimator, extra);
             requestBuilder.messages(assembled.getMessages())
                     .tools(assembled.getTools().isEmpty() ? null : assembled.getTools());
         } else {
@@ -212,6 +315,36 @@ public final class DefaultConversationOrchestrator {
             requestBuilder.image(plan.request.getAttachments());
         }
         return requestBuilder.build();
+    }
+
+    /**
+     * 上下文 / 请求 / 响应体积超限时的恢复：下一次循环用同一请求重发。
+     *
+     * <p>输入侧超限收紧窗口与工具预算；响应侧超限只收紧单次输出上限，保留已收集的工具结果。
+     * 只增不换模型、不重跑工具，因此不会产生重复副作用；压缩仅作用于本次下发，不改写已持久化历史。
+     *
+     * @return 已切换到压缩配置并应重试时返回 true
+     */
+    private static boolean retryWithCompactedContext(ConversationPlan plan, ConversationState state,
+            ClaraException failure) {
+        if (plan.capabilityKind != CapabilityKindEnum.CHAT
+                || state.overflowRetries >= ContextOverflowPolicy.MAX_RETRIES
+                || !ContextOverflowPolicy.matches(failure)) {
+            return false;
+        }
+        state.overflowRetries++;
+        boolean outputTooLarge = ContextOverflowPolicy.isResponseTooLarge(failure);
+        // 响应体超限是输出侧失控，压缩输入只会丢掉刚收集到的工具结果；此时仅收紧单次输出上限。
+        if (!outputTooLarge) {
+            state.control = ContextOverflowPolicy.compactControl(plan.control, state.overflowRetries);
+        }
+        state.maxTokensOverride = ContextOverflowPolicy.outputTokens(failure, state.overflowRetries,
+                plan.maxTokensPerCall);
+        System.out.println(outputTooLarge
+                ? "  [context] 响应体超限，单次输出上限收紧到 " + state.maxTokensOverride
+                        + " 后重试（第 " + state.overflowRetries + " 次）"
+                : "  [context] 上下文超限，已压缩上下文后重试（第 " + state.overflowRetries + " 次）"); // NOSONAR CLI output by design
+        return true;
     }
 
     private HttpResponse invokeModel(ConversationPlan plan, ConversationState state, HttpRequest httpRequest) {
@@ -233,13 +366,44 @@ public final class DefaultConversationOrchestrator {
                 OrchestrationStatusEnum.FAILED, toolRoundTrips, null, null, state.reasoning.toString());
     }
 
+    private static boolean isOutputTruncated(HttpResponse response) {
+        return response != null && response.getFinishReason() == FinishReasonEnum.LENGTH;
+    }
+
+    /**
+     * 输出被长度上限截断时保存已生成的部分，并安排下一轮续写。
+     *
+     * @param state    本轮状态，非 null
+     * @param response 被截断的响应，非 null
+     * @return 已安排续写时返回 true；达到续写次数上限时返回 false
+     */
+    private static boolean continueTruncatedOutput(ConversationState state, HttpResponse response) {
+        if (state.outputContinuations >= MAX_OUTPUT_CONTINUATIONS) {
+            return false;
+        }
+        String content = response.getContent();
+        if (content != null && !content.trim().isEmpty()) {
+            state.answer.append(content);
+            state.windowMemory.append(Collections.singletonList(new AssistantContent(content)));
+        }
+        state.continuationPrompt = CONTINUE_PROMPT;
+        state.outputContinuations++;
+        System.out.println("  [output] 模型输出达到长度上限，已自动续写（第 "
+                + state.outputContinuations + " 次）"); // NOSONAR CLI output by design
+        return true;
+    }
+
     private ConversationResult completedResult(ConversationPlan plan, ConversationState state,
             HttpResponse response, int toolRoundTrips) {
-        String content = capabilityDispatcher.extract(plan.capabilityKind, response);
+        String finalPart = capabilityDispatcher.extract(plan.capabilityKind, response);
+        String content = finalPart;
+        if (state.answer.length() > 0) {
+            content = finalPart == null ? state.answer.toString() : state.answer + finalPart;
+        }
         // 只记录有正文的助手回复：正文为空且不带工具调用的 assistant 消息会被平台判为非法
         // （Invalid assistant message: content or tool_calls must be set），因此不写入历史。
-        if (content != null && !content.trim().isEmpty()) {
-            state.windowMemory.append(Collections.singletonList(new AssistantContent(content)));
+        if (finalPart != null && !finalPart.trim().isEmpty()) {
+            state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart)));
         }
         ConversationResult result = conversationResult(plan.request.getConversationId(), content,
                 OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
@@ -267,16 +431,18 @@ public final class DefaultConversationOrchestrator {
         private final ModelProviderEnum provider;
         private final IStreamObserver hostObserver;
         private final int maxToolRoundTrips;
+        private final Integer maxTokensPerCall;
 
         private ConversationPlan(ConversationRequest request, CapabilityKindEnum capabilityKind,
                 ContextControlConfig control, ModelProviderEnum provider, IStreamObserver hostObserver,
-                int maxToolRoundTrips) {
+                int maxToolRoundTrips, Integer maxTokensPerCall) {
             this.request = request;
             this.capabilityKind = capabilityKind;
             this.control = control;
             this.provider = provider;
             this.hostObserver = hostObserver;
             this.maxToolRoundTrips = maxToolRoundTrips;
+            this.maxTokensPerCall = maxTokensPerCall;
         }
     }
 
@@ -287,8 +453,20 @@ public final class DefaultConversationOrchestrator {
         private final ConvContext context;
         private final IWindowMemory windowMemory;
         private final StringBuilder reasoning;
+        /** 因输出上限被截断、已生成的部分正文；续写成功后与最终正文拼接。 */
+        private final StringBuilder answer = new StringBuilder();
         /** 本轮已校验的执行计划文本；简单任务或未启用计划时为 null。 */
         private String planPrompt;
+        /** 超限恢复后的上下文控制配置；未触发恢复时为 null（使用本轮原始配置）。 */
+        private ContextControlConfig control;
+        /** 超限恢复时覆盖的单次输出 token 上限；无需覆盖时为 null。 */
+        private Integer maxTokensOverride;
+        /** 本轮已触发的超限恢复次数。 */
+        private int overflowRetries;
+        /** 本轮已自动续写的次数。 */
+        private int outputContinuations;
+        /** 下一次请求要携带的续写指令；只用一次。 */
+        private String continuationPrompt;
 
         private ConversationState(ConvContext context, IWindowMemory windowMemory, StringBuilder reasoning) {
             this.context = context;
