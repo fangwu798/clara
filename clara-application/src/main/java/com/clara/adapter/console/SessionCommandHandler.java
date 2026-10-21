@@ -36,6 +36,7 @@ public final class SessionCommandHandler {
     private static final String HELP_ALIAS = "/help";
     private static final String USAGE_COMMAND = "/usage";
     private static final String USAGE_ALIAS = "/tokens";
+    private static final String HISTORY_COMMAND = "/history";
     private static final String GRAPH_COMMAND = "/graph";
     private static final String GRAPH_IMPORT_COMMAND = "/graph import";
     private static final String INIT_COMMAND = "/init";
@@ -115,6 +116,8 @@ public final class SessionCommandHandler {
         commands.put(USAGE_COMMAND, usage);
         commands.put(USAGE_ALIAS, usage);
 
+        commands.put(HISTORY_COMMAND, () -> runWithControls("当前运行方式不支持查看历史消息。", IConversationControls::showHistory));
+
         commands.put(GRAPH_COMMAND, () -> runWithControls("当前运行方式不支持查看代码知识图谱。", IConversationControls::showCodeGraph));
         commands.put(GRAPH_IMPORT_COMMAND, () -> runWithControls("当前运行方式不支持导入代码知识图谱。", IConversationControls::importCodeGraph));
 
@@ -163,6 +166,7 @@ public final class SessionCommandHandler {
         view.println("  /compress     压缩当前上下文：把历史归纳为摘要（别名 /compact）");
         view.println("  /new          开始新对话：上下文清空，旧历史保留在磁盘");
         view.println("  /usage        统计 token 用量：全部历史记录估算 + 本次进程累计调用（别名 /tokens）");
+        view.println("  /history      查看历史聊天记录（仅用户与助手消息）");
         view.println("  /graph        查看当前工作目录的代码知识图谱状态（是否已导入 / 导入方式 / 可视化地址）");
         view.println("  /graph import 把当前工作目录导入代码知识图谱（同步等待索引完成，大仓库要几分钟）");
         view.println("  /log          切换精简 / 全量日志（别名 /verbose）");

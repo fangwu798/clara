@@ -8,6 +8,7 @@ import com.clara.core.model.IStreamHandle;
 import com.clara.core.model.IStreamModel;
 import com.clara.core.model.IStreamObserver;
 import com.clara.core.model.IRequest;
+import com.clara.core.interaction.IUserInterventionSource;
 import com.clara.dto.memory.WindowPolicy;
 import com.clara.dto.model.StreamEvent;
 import com.clara.dto.tool.ToolCall;
@@ -26,6 +27,7 @@ import com.clara.kernel.credential.ProviderCredentialConfiguration;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.http.TransportConfig;
+import com.clara.kernel.message.delta.UserContent;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
@@ -46,6 +48,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -318,6 +322,61 @@ public class DefaultConversationOrchestratorLoopTest {
         }
     }
 
+    @Test
+    public void injectsInterventionAfterToolRoundTrip() {
+        HttpResponse toolResponse = response(null, null, 5, 2);
+        toolResponse.setToolCalls(Collections.singletonList(toolCall("call-1", "text_search")));
+        SequenceStreamModel model = new SequenceStreamModel(Arrays.asList(toolResponse,
+                response("done", null, 6, 3)));
+        FakeWindowMemory memory = new FakeWindowMemory("c1");
+        FakeInterventionSource intervention = new FakeInterventionSource();
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, memory, invocation -> {
+            intervention.offer("只看 src 目录");
+            return new ToolResult("call-1", "{\"ok\":true}");
+        });
+
+        ConversationResult result = orchestrator.converse(ConversationRequest.builder()
+                .conversationId("c1").model("test-model").userInput("hi")
+                .capabilityKind(CapabilityKindEnum.CHAT).userIntervention(intervention).build());
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        assertEquals("done", result.getContent());
+        assertEquals(2, model.requests.size());
+        assertTrue(containsText(((HttpRequest) model.requests.get(1)).getMessages(), "只看 src 目录"));
+        assertEquals(5, memory.messages().size());
+        assertTrue(memory.messages().get(3) instanceof UserContent);
+        assertTrue(((UserContent) memory.messages().get(3)).getContent().contains("只看 src 目录"));
+    }
+
+    @Test
+    public void replansWhenInterventionArrivesDuringFinalAnswer() {
+        FakeInterventionSource intervention = new FakeInterventionSource();
+        InterventionStreamModel model = new InterventionStreamModel(
+                Arrays.asList(response("v1", null, 1, 1), response("v2", null, 2, 2)), intervention);
+        FakeWindowMemory memory = new FakeWindowMemory("c1");
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, memory, invocation -> null);
+
+        ConversationResult result = orchestrator.converse(ConversationRequest.builder()
+                .conversationId("c1").model("test-model").userInput("hi")
+                .capabilityKind(CapabilityKindEnum.CHAT).userIntervention(intervention).build());
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        assertEquals("v2", result.getContent());
+        assertEquals(2, model.requests.size());
+        assertTrue(containsText(((HttpRequest) model.requests.get(1)).getMessages(), "改成方案B"));
+        assertEquals(4, memory.messages().size());
+        assertTrue(memory.messages().get(2) instanceof UserContent);
+    }
+
+    private static boolean containsText(List<IContent> messages, String text) {
+        for (IContent message : messages) {
+            if (message instanceof UserContent && ((UserContent) message).getContent().contains(text)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static DefaultConversationOrchestrator orchestrator(IStreamModel model, IWindowMemory memory,
             com.clara.core.skill.IToolInvoker invoker) {
         ContextAssembler assembler = new ContextAssembler(
@@ -536,6 +595,90 @@ public class DefaultConversationOrchestratorLoopTest {
             if (calls++ < failures) {
                 throw failure;
             }
+        }
+    }
+
+    /**
+     * 可在测试中主动写入的补充来源，用于模拟「模型思考 / 工具执行期间用户输入」。
+     */
+    private static final class FakeInterventionSource implements IUserInterventionSource {
+
+        private final Queue<String> pending = new ConcurrentLinkedQueue<String>();
+
+        private void offer(String text) {
+            pending.offer(text);
+        }
+
+        @Override
+        public boolean hasPending() {
+            return !pending.isEmpty();
+        }
+
+        @Override
+        public List<String> drain() {
+            List<String> drained = new ArrayList<String>();
+            String item;
+            while ((item = pending.poll()) != null) {
+                drained.add(item);
+            }
+            return drained;
+        }
+    }
+
+    /**
+     * 首次模型调用期间写入补充，用于验证「最终答复生成中被打断」后的增量重请求。
+     */
+    private static final class InterventionStreamModel implements IStreamModel {
+
+        private final List<HttpResponse> responses;
+        private final FakeInterventionSource intervention;
+        private final List<IRequest> requests = new ArrayList<IRequest>();
+        private int index;
+
+        private InterventionStreamModel(List<HttpResponse> responses, FakeInterventionSource intervention) {
+            this.responses = responses;
+            this.intervention = intervention;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends IResponse> R chat(IRequest request, Class<R> responseType) {
+            requests.add(request);
+            if (index == 0) {
+                intervention.offer("改成方案B");
+            }
+            return (R) responses.get(index++);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends IResponse> IStreamHandle chat(IRequest request, Class<R> responseType,
+                IStreamObserver observer) {
+            requests.add(request);
+            if (index == 0) {
+                intervention.offer("改成方案B");
+            }
+            final HttpResponse response = responses.get(index++);
+            if (observer != null) {
+                observer.onEvent(new StreamEvent(StreamEventEnum.RESPONSE_COMPLETE, 1L, "", null, null,
+                        response, null));
+            }
+            return new IStreamHandle() {
+                @Override
+                public boolean cancel() {
+                    return false;
+                }
+
+                @Override
+                public boolean isDone() {
+                    return true;
+                }
+
+                @Override
+                public IResponse result() {
+                    return response;
+                }
+            };
         }
     }
 

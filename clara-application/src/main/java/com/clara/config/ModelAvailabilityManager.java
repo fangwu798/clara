@@ -80,7 +80,7 @@ public final class ModelAvailabilityManager {
      * 依次检查全部模型配置，并把检查结果持久化到 {@code clara.yml}。
      *
      * <p>配置引用的环境变量不存在或为空时直接跳过，不会发起模型请求。成功产生正文字符的模型视为可用，
-     * 可用结果按首字符响应时间排序，并以最快模型作为 {@code defaultModel}。
+     * 可用结果按首字符响应时间排序；配置的 {@code defaultModel} 仍可用时保持不变，否则才以最快模型作为 {@code defaultModel}。
      *
      * <p>输出时机：每个模型的结论在该模型检查结束后**立即**发送给输出接收器（为 null 时静默执行），
      * 不等其余模型检查完；各行的状态、别名、平台与模型、结论四列仍按预扫描确定的列宽对齐，并带上状态级别：
@@ -119,16 +119,16 @@ public final class ModelAvailabilityManager {
             }
         }
         available.sort(Comparator.comparingLong(ModelCheckResult::getFirstCharacterMillis));
+        ModelCheckResult preferred = preferred(available, readDefaultModel(claraConfig));
         try {
-            persist(claraConfig, available);
+            persist(claraConfig, available, preferred == null ? null : preferred.getAlias());
         } catch (IOException failure) {
             throw new IllegalStateException("无法更新 " + claraConfig + ": " + failure.getMessage(), failure);
         }
         if (available.isEmpty()) {
             sink.accept(AvailabilityLine.fail("未发现可用模型。"));
         } else {
-            ModelCheckResult fastest = available.get(0);
-            sink.accept(AvailabilityLine.ok("默认模型：" + fastest.getAlias() + "（首字符响应 " + fastest.getFirstCharacterMillis() + "ms）"));
+            sink.accept(AvailabilityLine.ok("默认模型：" + preferred.getAlias() + "（首字符响应 " + preferred.getFirstCharacterMillis() + "ms）"));
         }
         List<Path> paths = new ArrayList<>();
         for (ModelCheckResult result : available) {
@@ -210,18 +210,70 @@ public final class ModelAvailabilityManager {
     }
 
     /**
-     * 把可用模型清单和最快模型写入 {@code clara.yml}，保留文件中的其他顶层配置。
+     * Reads the configured default model alias from clara.yml.
+     */
+    private static String readDefaultModel(Path file) {
+        if (file == null || !Files.isRegularFile(file)) {
+            return null;
+        }
+        try {
+            for (String raw : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+                String line = raw.trim();
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                int colon = line.indexOf(':');
+                if (colon <= 0 || !"defaultModel".equals(line.substring(0, colon).trim())) {
+                    continue;
+                }
+                String value = line.substring(colon + 1).trim();
+                if (value.length() >= 2 && (value.startsWith("\"") && value.endsWith("\"")
+                        || value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.substring(1, value.length() - 1);
+                }
+                return value.isEmpty() ? null : value;
+            }
+        } catch (IOException ignored) {
+            // An unreadable file is treated as having no configured default.
+        }
+        return null;
+    }
+
+    /**
+     * Chooses the configured default when it is still available, otherwise the fastest model.
+     */
+    private static ModelCheckResult preferred(List<ModelCheckResult> available, String configuredDefault) {
+        if (available.isEmpty()) {
+            return null;
+        }
+        if (StringUtils.isNotBlank(configuredDefault)) {
+            for (ModelCheckResult result : available) {
+                Path path = result.getPath();
+                String fileName = path == null || path.getFileName() == null
+                        ? "" : path.getFileName().toString();
+                if (result.getAlias().equalsIgnoreCase(configuredDefault)
+                        || fileName.equalsIgnoreCase(configuredDefault)) {
+                    return result;
+                }
+            }
+        }
+        return available.get(0);
+    }
+
+    /**
+     * 把可用模型清单和选定的默认模型写入 {@code clara.yml}，保留文件中的其他顶层配置。
      *
      * <p>先写入同目录临时文件，再优先使用原子移动替换目标文件；文件系统不支持原子移动时退化为普通替换。
      * 当没有可用模型时写入空的 {@code enabledProviders}，并把 {@code defaultModel} 写为空值。
      *
      * @param file      {@code clara.yml} 文件路径
-     * @param available 已按响应时间排序的可用模型结果
+     * @param available    已按响应时间排序的可用模型结果
+     * @param defaultAlias 选定的默认模型别名；无可用模型时为 null
      * @throws IOException 读取、创建目录、写入或移动文件失败时抛出
      */
-    private static void persist(Path file, List<ModelCheckResult> available) throws IOException {
+    private static void persist(Path file, List<ModelCheckResult> available, String defaultAlias) throws IOException {
         List<String> original = Files.isRegularFile(file) ? Files.readAllLines(file, StandardCharsets.UTF_8) : Collections.emptyList();
-        String defaultLine = "defaultModel:" + (available.isEmpty() ? "" : " " + available.get(0).getAlias());
+        String defaultLine = "defaultModel:" + (defaultAlias == null ? "" : " " + defaultAlias);
         StringBuilder enabledLine = new StringBuilder("enabledProviders: [");
         for (int index = 0; index < available.size(); index++) {
             if (index > 0) {

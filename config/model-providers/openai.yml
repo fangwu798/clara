@@ -8,7 +8,7 @@ transport:
     - https://new.aicontrol.top/
   connectTimeoutMillis: 10000
   readTimeoutMillis: 600000
-  maxRequestBytes: 8388608
+  maxRequestBytes: 33554432
   maxResponseBytes: 33554432
   allowHttp: false
   headers:
@@ -22,11 +22,26 @@ capabilities:
     parameters:
       # GPT-5.6 Sol：上下文 1,050,000，最大输出 128000 tokens
       maxTokens: 128000
+  # Image generation defaults to OpenAI; keep this capability as the preferred route for
+  # text-to-image requests because it is much cheaper than Volcengine Seedream.
+  #
+  # Why gpt-image-2: on new.aicontrol.top, gpt-image-1 returns HTTP 400 with
+  # "Tool choice 'image_generation' must be specified with 'tools' parameter."
+  # gpt-image-2 has been verified against this proxy with the exact parameters the host
+  # sends (size/n/quality/background/moderation/output_format) and returns HTTP 200.
+  # Re-verify with a minimal request before changing the model id again.
+  # The request body defaults size=1024x1024 and n=1 via the OPENAI adapters on
+  # ImageParameters. The scalar values below are metadata for the host and are not
+  # merged into the HTTP request automatically.
+  # 文生图与图生图共用本节点：有参考图时编码器自动改用 multipart /v1/images/edits，
+  # 无参考图时仍走 JSON /v1/images/generations。
   IMAGE:
     endpoint: https://new.aicontrol.top/v1/images/generations
-    modelId: gpt-image-1
+    modelId: gpt-image-2
     apiProfile: images-v1
     parameters:
       maxPromptChars: 12000
       maxInputBytes: 33554432
       maxOutputs: 1
+      # gpt-image-1/2 的编辑接口最多接收 16 张参考图。
+      maxSourceImages: 16

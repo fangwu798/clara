@@ -15,6 +15,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
@@ -120,6 +122,64 @@ public class AgentWorkflowActionTest {
     }
 
     @Test
+    public void imageGenerationFallsBackWhenPrimaryFails() throws Exception {
+        registry.close();
+        Path root = folder.getRoot().toPath();
+        Path primary = imageProvider(root, "openai", "OPENAI", "gpt-image-1", "https://openai.test");
+        Path fallback = imageProvider(root, "volcengine-response", "VOLCENGINE",
+                "doubao-seedream", "https://volcengine.test");
+        registry = new ModelRegistry(Arrays.asList(primary, fallback),
+                Collections.<String, String>emptyMap());
+        registry.select(primary);
+        ledger = new CapabilityUsageLedger();
+
+        com.clara.kernel.http.HttpResponse response = WorkflowActionTestSupport.response(null, 1, 1);
+        response.setImages(Collections.singletonList(image("https://cdn/a.png")));
+        WorkflowActionTestSupport.FakeModel model = WorkflowActionTestSupport.orchestrator(response);
+        model.failOnce(new IllegalStateException("primary unavailable"));
+
+        Map<String, Object> attributes = attributes("prompt", "p");
+        attributes.put("capability", "IMAGE");
+        attributes.put("model", "openai");
+        attributes.put("fallbackModel", "volcengine-response");
+
+        Map<String, Object> output = action(model, spec("n1", attributes)).execute(scope());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> media = (Map<String, Object>) output.get("output");
+        assertEquals("IMAGE", media.get("mediaType"));
+        assertEquals(1, ((List<?>) media.get("references")).size());
+        assertEquals("https://cdn/a.png", ((List<?>) media.get("references")).get(0));
+        assertEquals(2, model.requests().size());
+    }
+
+    private static Path imageProvider(Path directory, String alias, String provider, String modelId,
+            String origin) throws Exception {
+        String yaml = "provider: " + provider + "\n"
+                + "credential:\n"
+                + "  secretRef: " + alias + "\n"
+                + "  apiKey: test-key\n"
+                + "transport:\n"
+                + "  allowedOrigins:\n"
+                + "    - " + origin + "\n"
+                + "  connectTimeoutMillis: 10000\n"
+                + "  readTimeoutMillis: 60000\n"
+                + "  maxRequestBytes: 8388608\n"
+                + "  maxResponseBytes: 33554432\n"
+                + "  allowHttp: false\n"
+                + "capabilities:\n"
+                + "  IMAGE:\n"
+                + "    endpoint: " + origin + "/v1/images/generations\n"
+                + "    modelId: " + modelId + "\n"
+                + "    apiProfile: images-v1\n"
+                + "    parameters:\n"
+                + "      maxPromptChars: 1000\n"
+                + "      maxOutputs: 1\n";
+        Path file = directory.resolve(alias + ".yml");
+        Files.write(file, yaml.getBytes(StandardCharsets.UTF_8));
+        return file;
+    }
+    @Test
     public void blankImageOutputFails() {
         WorkflowActionTestSupport.FakeModel model = WorkflowActionTestSupport.orchestrator(
                 WorkflowActionTestSupport.response("  ", 1, 0));
@@ -130,6 +190,22 @@ public class AgentWorkflowActionTest {
             fail("expected IllegalStateException");
         } catch (IllegalStateException expected) {
             assertTrue(expected.getMessage().contains("媒体生成结果为空"));
+        }
+    }
+
+    @Test
+    public void imageNodeWithDeclaredAttachmentFailsWhenReferenceIsMissing() {
+        WorkflowActionTestSupport.FakeModel model = WorkflowActionTestSupport.orchestrator(
+                WorkflowActionTestSupport.response("ok", 1, 1));
+        Map<String, Object> attributes = attributes("prompt", "p");
+        attributes.put("capability", "IMAGE");
+        attributes.put("attachments", Collections.singletonList("${reference}"));
+        try {
+            action(model, spec("edit-image", attributes))
+                    .execute(new ExecutionScope(Collections.singletonMap("reference", "")));
+            fail("expected IllegalStateException");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage().contains("缺少参考图"));
         }
     }
 

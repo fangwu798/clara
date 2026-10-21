@@ -21,7 +21,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 本地文件会话存储：把会话历史写入 {@code .clara/state/conversations}，采用目录级排他锁与原子写。
@@ -150,6 +153,34 @@ public final class LocalConversationStore implements ConversationStore {
         }
     }
 
+    /**
+     * 读取目录下全部会话快照：按文件最后修改时间从早到晚排序，损坏的单个文件跳过，不影响其他历史。
+     *
+     * @return 全部可读快照，非 null
+     */
+    @Override
+    public synchronized List<ConversationSnapshot> loadAllSnapshots() {
+        open();
+        List<Path> files;
+        try (Stream<Path> stream = Files.list(directory)) {
+            files = stream.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".bin"))
+                    .sorted(Comparator.comparingLong(LocalConversationStore::lastModifiedMillis))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw ConversationStoreErrors.io();
+        }
+        List<ConversationSnapshot> snapshots = new ArrayList<>(files.size());
+        for (Path file : files) {
+            try {
+                snapshots.add(codec.decode(Files.readAllBytes(file)));
+            } catch (IOException | RuntimeException ignored) {
+                // 单个文件损坏或正在被替换时跳过，保证历史查看不受影响
+            }
+        }
+        return snapshots;
+    }
+
     @Override
     public synchronized void close() {
         if (closed) {
@@ -218,6 +249,17 @@ public final class LocalConversationStore implements ConversationStore {
             return builder.toString();
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /**
+     * 读取文件最后修改时间；读取失败时排到最前，避免一个坏文件阻断排序。
+     */
+    private static long lastModifiedMillis(Path path) {
+        try {
+            return Files.getLastModifiedTime(path).toMillis();
+        } catch (IOException ignored) {
+            return 0L;
         }
     }
 

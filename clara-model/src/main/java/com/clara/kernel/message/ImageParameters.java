@@ -50,6 +50,7 @@ public abstract class ImageParameters extends BasicParameters {
      */
     @JsonProperty("image")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, maxCount = 14, note = "不传=文生图、单张=单图生图、多张=多图融合；4.5/4.0/5.0 lite 最多 14 张，5.0 pro 最多 10 张；参考图张数 + 生成张数 ≤ 15")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, maxCount = 16, note = "多图编辑最多 16 张；有参考图时改走 multipart /v1/images/edits")
     private List<String> image;
 
     /**
@@ -61,7 +62,7 @@ public abstract class ImageParameters extends BasicParameters {
      */
     @JsonProperty("size")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "2048x2048", note = "档位或宽x高二选一；总像素 [921600, 16777216]、宽高比 [1/16, 16] 需同时满足")
-    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, allowed = {"1024x1024", "1536x1024", "1024x1536", "auto"}, note = "gpt-image-1 系列支持 auto；dall-e-3 为 1024x1024/1792x1024/1024x1792")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, defaultValue = "1024x1024", allowed = {"1024x1024", "1536x1024", "1024x1536", "auto"}, note = "gpt-image-1 系列支持 auto；dall-e-3 为 1024x1024/1792x1024/1024x1792")
     private String size;
 
     /**
@@ -144,7 +145,7 @@ public abstract class ImageParameters extends BasicParameters {
      * <p>gpt-image-1 / gpt-image-1-mini 支持一次生成多张；dall-e-3 仅支持 1 张。
      */
     @JsonProperty("n")
-    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, min = 1d, max = 10d, note = "gpt-image-1 系列支持 1-10；dall-e-3 仅 1")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, defaultValue = "1", min = 1d, max = 10d, note = "gpt-image-1 系列支持 1-10；dall-e-3 仅 1")
     private Integer n;
 
     /**

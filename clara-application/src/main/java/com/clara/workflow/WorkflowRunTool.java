@@ -1,6 +1,7 @@
 package com.clara.workflow;
 
 import com.clara.api.IBuiltinTool;
+import com.clara.context.ConvContext;
 import com.clara.workflow.runtime.WorkflowRunner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +26,9 @@ public final class WorkflowRunTool implements IBuiltinTool {
 
     private final WorkflowRunner runner;
 
+    /** 会话级待确认工作流登记表；用于在故障转移或历史压缩后仍能提示模型正确续接。 */
+    private final PendingWorkflowRegistry pendingWorkflows;
+
     /**
      * 创建内置工具。
      *
@@ -32,10 +36,22 @@ public final class WorkflowRunTool implements IBuiltinTool {
      * @throws IllegalArgumentException runner 为 null 时
      */
     public WorkflowRunTool(WorkflowRunner runner) {
+        this(runner, new PendingWorkflowRegistry());
+    }
+
+    /**
+     * 创建内置工具，并把暂停实例登记到指定的会话级登记表。
+     *
+     * @param runner          工作流运行器，不可为 null
+     * @param pendingWorkflows 待确认工作流登记表，为 null 时使用独立实例
+     * @throws IllegalArgumentException runner 为 null 时
+     */
+    public WorkflowRunTool(WorkflowRunner runner, PendingWorkflowRegistry pendingWorkflows) {
         if (runner == null) {
             throw new IllegalArgumentException("runner must not be null");
         }
         this.runner = runner;
+        this.pendingWorkflows = pendingWorkflows == null ? new PendingWorkflowRegistry() : pendingWorkflows;
     }
 
     @Override
@@ -55,10 +71,30 @@ public final class WorkflowRunTool implements IBuiltinTool {
         String inputsJson = inputsNode == null || inputsNode.isNull() ? null : inputsNode.toString();
         JsonNode instanceNode = root.get("instanceId");
         String instanceId = instanceNode != null && instanceNode.isTextual() ? instanceNode.textValue() : null;
-        if (instanceId != null && !instanceId.trim().isEmpty()) {
-            return runner.resume(workflow.trim(), instanceId.trim(), inputsJson);
+        boolean resuming = instanceId != null && !instanceId.trim().isEmpty();
+        String conversationId = conversationId();
+        String output;
+        try {
+            output = resuming
+                    ? runner.resume(workflow.trim(), instanceId.trim(), inputsJson)
+                    : runner.run(workflow.trim(), inputsJson);
+        } catch (RuntimeException failure) {
+            // 新任务失败时清掉旧登记，避免下一轮提示模型续接一个已经失效的实例；续接失败则保留，便于重试。
+            if (!resuming) {
+                pendingWorkflows.clear(conversationId);
+            }
+            throw failure;
         }
-        return runner.run(workflow.trim(), inputsJson);
+        pendingWorkflows.update(conversationId, workflow.trim(), output);
+        return output;
+    }
+
+    /**
+     * 当前会话标识；工具不在会话上下文中执行时返回 null，此时不登记待确认状态。
+     */
+    private static String conversationId() {
+        ConvContext current = ConvContext.current();
+        return current == null ? null : current.getConvId();
     }
 
     private static JsonNode parse(String argumentsJson) {

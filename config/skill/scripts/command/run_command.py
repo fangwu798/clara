@@ -33,13 +33,13 @@ _TOOL = {
         "encoding(输出解码编码，缺省自动识别，中文 Windows 下可自动识别 GBK)。"
         "示例：{\"argv\":[\"mvn\",\"-v\"],\"cwd\":\"@repo\"}、{\"command\":\"git status --short\"}、"
         "{\"argv\":[\"powershell\",\"-NoProfile\",\"-Command\",\"Get-ChildItem\"],\"cwd\":\"@repo\"}。"
-        "生成图片/视频：调用 clara.jar 内置的生图/生视频能力（已配置的字节 Seedream 文生图 / Seedance 文生视频），"
-        "如 {\"argv\":[\"java\",\"-jar\",\"clara.jar\",\"image\",\"--prompt\",\"夕阳下的海边灯塔\"],\"cwd\":\"@repo\","
-        "\"timeout_seconds\":180} 或 "
-        "{\"argv\":[\"java\",\"-jar\",\"clara.jar\",\"video\",\"--prompt\",\"一只在草地上奔跑的小狗\"],\"cwd\":\"@repo\","
-        "\"timeout_seconds\":600}；命令返回单行 JSON，其中 file 为生成文件的绝对路径"
-        "（缺省落在工作目录的 clara-output/ 下），可直接把该路径告知用户。"
-        "当用户的意图是「生成/画一张图片」或「生成一段视频」时，优先用这种方式，不要回答「无法生成图片/视频」。"
+        "生成图片/视频：必须调用 run_workflow，不要执行 java -jar clara.jar image 或 video"
+        "（clara.jar 只有交互式对话入口，没有 image / video 子命令；执行会被当成模型别名而报「模型别名不存在」）。"
+        "文生图用 run_workflow(workflow=image_generation, inputs={subject: 画面描述})；"
+        "图生图用 image_edit（inputs={reference, instruction}）；文生视频用 video_generation（inputs={subject}）。"
+        "这些工作流会先暂停等待人工确认：返回 status=WAITING_INPUT 时必须把提示词展示给用户；"
+        "用户回复确认或修改意见后，用同一 instanceId 再次调用 run_workflow 续接，确认时 inputs={promptFeedback:\"approve\"}。"
+        "不要回答「无法生成图片/视频」。"
     ),
     "parameters": {
         "type": "object",
@@ -200,6 +200,20 @@ def feed_stdin(process, stdin_bytes):
             pass
 
 
+def reject_removed_image_video_cli(argv):
+    # clara.jar 只有交互式对话入口（见 readme）；image / video 子命令早已删除。
+    # 模型仍可能照旧提示执行，这里直接给出可操作的替代方案，避免把「模型别名不存在」当成生图失败。
+    lowered = [str(item).lower() for item in argv]
+    if not any(item.endswith("clara.jar") for item in lowered):
+        return
+    for index, item in enumerate(lowered):
+        if item in ("image", "video") and index > 0:
+            raise ValueError(
+                "clara.jar 没有 image / video 子命令（它只有交互式对话入口），继续执行只会报「模型别名不存在」。"
+                "生成图片请调用 run_workflow：workflow=image_generation，inputs={\"subject\":\"画面描述\"}；"
+                "生成视频请调用 run_workflow：workflow=video_generation，inputs={\"subject\":\"画面描述\"}。"
+            )
+
 def execute(spec, argv, cwd):
     timeout = timeout_of(spec)
     max_bytes = int(spec.get("max_output_bytes") or DEFAULT_MAX_OUTPUT_BYTES)
@@ -251,6 +265,7 @@ def main():
     try:
         argv = build_argv(spec)
         cwd = resolve_cwd(spec.get("cwd"))
+        reject_removed_image_video_cli(argv)
         result["command"] = " ".join(argv)
         result["cwd"] = cwd
         result.update(execute(spec, argv, cwd))

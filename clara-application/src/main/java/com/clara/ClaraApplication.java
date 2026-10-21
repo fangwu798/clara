@@ -3,7 +3,10 @@ package com.clara;
 import com.clara.adapter.console.CancelKeyMonitor;
 import com.clara.adapter.console.CancelKeySession;
 import com.clara.adapter.console.ConsoleContextTrace;
+import com.clara.adapter.console.ConsoleInput;
+import com.clara.adapter.console.ConsoleTerminalFactory;
 import com.clara.adapter.console.ConsoleView;
+import com.clara.adapter.console.ConversationHistoryFormatter;
 import com.clara.adapter.console.LaunchOptions;
 import com.clara.adapter.console.SessionCommandHandler;
 import com.clara.adapter.console.UsageTrendChart;
@@ -15,20 +18,22 @@ import com.clara.config.ModelFailover;
 import com.clara.config.ModelRegistry;
 import com.clara.context.CancellationToken;
 import com.clara.core.interaction.IConversationControls;
+import com.clara.core.message.IContent;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.interaction.SessionCommandOutcomeEnum;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.delta.TokenUsage;
+import com.clara.interaction.UserInterventionBuffer;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
 import com.clara.workflow.WorkflowCatalog;
 import com.clara.workflow.runtime.WorkflowProgress;
+import org.jline.terminal.Terminal;
+
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
@@ -58,6 +63,7 @@ import java.util.List;
  * <p>使用方法：主（默认）模型由 {@code config/clara.yml} 的 {@code defaultModel} 指定；未配置或未匹配到时，
  * 若存在多个模型配置会列出编号供选择，也可用首个命令行参数直接指定配置文件。进入对话后逐行输入回车发送，
  * {@code /model} 重新选择模型，{@code /init} 重新检测模型可用性并重建配置 / 技能 / MCP 连接（保留当前会话），
+ * {@code /history} 查看历史聊天记录，{@code Enter} 发送、{@code Shift+Enter} / {@code Ctrl+Enter} 换行、上 / 下方向键召回历史输入，
  * {@code /graph} 查看代码知识图谱状态、{@code /graph import} 把当前工作目录导入图谱，
  * {@code /log} 切换日志模式，{@code /color} 开关颜色，{@code exit} / {@code quit} 结束；
  * 一轮执行过程中按 ESC 两次可取消本轮正在进行的模型调用与工具执行（首次 ESC 仅提示，避开误触）。
@@ -88,6 +94,11 @@ public final class ClaraApplication {
     /** 图谱技能脚本结果的首行前缀：步骤名已经说明是「结果」，打印时去掉这个重复前缀。 */
     private static final String RESULT_PREFIX = "结果：";
 
+    /**
+     * 启动时回顾的聊天记录条数：只展示最近几条，完整记录由 {@code /history} 查看。
+     */
+    private static final int RECENT_HISTORY_MESSAGES = 3;
+
     private static final CodeGraphConsole codeGraphConsole = new CodeGraphConsole();
 
     /**
@@ -100,10 +111,12 @@ public final class ClaraApplication {
     public static void main(String[] args) throws Exception {
         // 会话标识由工作目录推导：同一目录再次进入即续接上次的对话历史（历史落盘位置见启动横幅）。
         conversationId = ConfigLocator.cliSessionId();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         LaunchOptions options = LaunchOptions.parse(args);
 
-        try (ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(), options.forcedColor()); CancelKeyMonitor monitor = CancelKeyMonitor.create(view)) {
+        try (Terminal terminal = ConsoleTerminalFactory.open();
+             ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(), options.forcedColor());
+             ConsoleInput reader = ConsoleInput.create(terminal);
+             CancelKeyMonitor monitor = CancelKeyMonitor.create(view, terminal)) {
             List<Path> candidates = new ModelAvailabilityManager().checkAndPersist(ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(), line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
             ModelChoice choice = selectModelConfig(view, reader, options, candidates);
             runSession(view, reader, options, candidates, choice, monitor);
@@ -121,8 +134,9 @@ public final class ClaraApplication {
      * @param monitor    ESC 取消监听器，非 null
      * @throws IOException 读取标准输入失败时
      */
-    private static void runSession(ConsoleView view, BufferedReader reader, LaunchOptions options,
+    private static void runSession(ConsoleView view, ConsoleInput reader, LaunchOptions options,
             List<Path> candidates, ModelChoice choice, CancelKeyMonitor monitor) throws IOException {
+        view.setInterruptHintAvailable(monitor.isAvailable());
         List<Path> sessionCandidates = candidates;
         ModelChoice sessionChoice = choice;
         while (true) {
@@ -130,6 +144,7 @@ public final class ClaraApplication {
             try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(new ConsoleContextTrace(view))) {
                 ModelRegistry registry = bootstrap.modelRegistry();
                 registry.select(sessionChoice.configPath());
+                reader.setStatusLine(() -> inputStatusLine(registry));
                 SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry,
                         sessionCandidates, contextControls(view, bootstrap, registry));
 
@@ -138,7 +153,11 @@ public final class ClaraApplication {
                 printMcpStatus(view, bootstrap);
                 prepareCodeGraph(view, bootstrap);
                 view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
+                printRecentHistory(view, bootstrap, registry, reader);
                 view.printHints(WorkflowCatalog.customSummaries());
+                if (!reader.isLineEditingAvailable()) {
+                    view.emit("输入：Enter 发送（当前终端不支持行编辑，方向键与多行换行不可用）。", ConsoleView.ANSI_GRAY);
+                }
                 if (monitor.isAvailable()) {
                     view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
                 }
@@ -156,6 +175,8 @@ public final class ClaraApplication {
             view.emit("", ConsoleView.ANSI_GRAY);
             view.emit("正在重新初始化：重新检测模型可用性，并重建配置 / 技能 / MCP / 图谱连接...",
                     ConsoleView.ANSI_GRAY);
+            // 重新装配会创建新的调用台账，旧趋势的累计基数已不存在，重置后从新台账重新累计。
+            usageTrend.reset();
             sessionCandidates = new ModelAvailabilityManager().checkAndPersist(
                     ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(),
                     line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
@@ -311,6 +332,7 @@ public final class ClaraApplication {
             public void newConversation() {
                 conversationId = newConversationId();
                 usageTrend.reset();
+                bootstrap.callRecordSink().clear();
                 bootstrap.capabilityUsage().reset();
                 view.emit("已开始新对话，会话标识：" + conversationId, ConsoleView.ANSI_GRAY);
             }
@@ -342,20 +364,91 @@ public final class ClaraApplication {
                     view.emit("[error] 统计用量失败：" + failure.getMessage(), ConsoleView.ANSI_RED);
                 }
             }
+
+            @Override
+            public void showHistory() {
+                List<IContent> messages = loadHistory(view, bootstrap, registry);
+                int count = ConversationHistoryFormatter.count(messages);
+                if (count == 0) {
+                    view.emit("暂无历史聊天记录。", ConsoleView.ANSI_GRAY);
+                    return;
+                }
+                view.emit("历史聊天记录（共 " + count + " 条，含 .clara 中的全部会话，仅用户与助手消息，每条最多 "
+                        + ConversationHistoryFormatter.DEFAULT_MAX_CHARS + " 字符）：", ConsoleView.ANSI_GRAY);
+                for (String line : ConversationHistoryFormatter.render(messages, 0)) {
+                    view.println(line);
+                }
+                view.println("");
+            }
         };
     }
 
     /**
-     * 记录本轮用量到趋势：优先取平台返回的总量，缺失时按输入加输出推导；无用量时跳过。
+     * 启动回顾：打印最近 {@value #RECENT_HISTORY_MESSAGES} 条聊天记录，并把历史用户输入喂给行编辑历史，
+     * 使用户可以直接按上 / 下方向键召回上次输入。
      *
-     * @param usage 本轮 token 用量，可为 null
+     * @param view      控制台视图，非 null
+     * @param bootstrap 已装配的引导器，非 null
+     * @param registry  模型注册表，非 null
+     * @param input     控制台输入器，可为 null（测试或降级场景）
      */
-    private static void recordUsageTrend(TokenUsage usage) {
+    private static void printRecentHistory(ConsoleView view, ApplicationBootstrap bootstrap,
+            ModelRegistry registry, ConsoleInput input) {
+        List<IContent> messages = loadHistory(view, bootstrap, registry);
+        if (input != null) {
+            input.seedHistory(ConversationHistoryFormatter.userInputs(messages));
+        }
+        List<String> lines = ConversationHistoryFormatter.render(messages, RECENT_HISTORY_MESSAGES);
+        if (lines.isEmpty()) {
+            view.emit("最近聊天记录：无（当前目录首次对话）", ConsoleView.ANSI_GRAY);
+            return;
+        }
+        view.emit("最近 " + lines.size() + " 条聊天记录（含 .clara 历史，/history 查看全部）：", ConsoleView.ANSI_GRAY);
+        for (String line : lines) {
+            view.println(line);
+        }
+    }
+
+    /**
+     * 读取当前会话的持久化历史消息；读取失败时只提示，不影响对话。
+     *
+     * @param view      控制台视图，非 null
+     * @param bootstrap 已装配的引导器，非 null
+     * @param registry  模型注册表，非 null
+     * @return 历史消息，非 null；失败时为空列表
+     */
+    private static List<IContent> loadHistory(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry) {
+        try {
+            ProviderConfiguration configuration = registry.currentConfiguration();
+            return bootstrap.conversationMessages(conversationId, configuration,
+                    configuration.toConfig(CapabilityKindEnum.CHAT).getModelId());
+        } catch (RuntimeException failure) {
+            view.emit("[error] 读取历史消息失败：" + failure.getMessage(), ConsoleView.ANSI_RED);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * 记录本轮用量到趋势：优先取调用台账的全部平台累计总量，台账无数据时退回本轮用量。
+     *
+     * <p>趋势图要表达的是「总 token 消耗」，因此不能只取本轮最后一次模型调用的用量：一次对话可能包含
+     * 多轮工具往返，也可能切换平台。调用台账按平台累计且不受记录容量淘汰，正好作为总量来源。
+     *
+     * @param bootstrap 已装配的引导器，非 null
+     * @param usage     本轮最后一次模型调用的用量，可为 null
+     */
+    private static void recordUsageTrend(ApplicationBootstrap bootstrap, TokenUsage usage) {
+        long total = bootstrap.callRecordSink().totalUsage().getTotalTokens();
+        if (total > 0L) {
+            usageTrend.addCumulative(total);
+            return;
+        }
         if (usage == null) {
             return;
         }
-        long total = usage.getTotalTokens() != null ? usage.getTotalTokens().longValue() : (long) usage.getInputTokens() + usage.getOutputTokens();
-        usageTrend.addSample(total);
+        long fallback = usage.getTotalTokens() != null ? usage.getTotalTokens().longValue()
+                : (long) usage.getInputTokens() + usage.getOutputTokens();
+        usageTrend.addSample(fallback);
     }
 
     /**
@@ -389,6 +482,9 @@ public final class ClaraApplication {
             if (input.isEmpty()) {
                 continue;
             }
+            if (reader instanceof ConsoleInput) {
+                ((ConsoleInput) reader).addHistory(input);
+            }
             SessionCommandOutcomeEnum outcome = commands.handle(input);
             if (outcome == SessionCommandOutcomeEnum.EXIT || outcome == SessionCommandOutcomeEnum.REINIT) {
                 return outcome;
@@ -399,6 +495,28 @@ public final class ClaraApplication {
             }
         }
         return SessionCommandOutcomeEnum.EXIT;
+    }
+
+    /**
+     * 输入框下方状态行：当前模型别名、模型 ID 与工作目录。
+     *
+     * <p>模型别名用黄色、模型 ID 用灰色、工作目录用绿色，便于在输入时快速确认当前会话环境。
+     * 读取失败时只显示工作目录，不影响输入。
+     *
+     * @param registry 模型注册表，非 null
+     * @return 带 ANSI 颜色的状态行文本，非 null
+     */
+    private static String inputStatusLine(ModelRegistry registry) {
+        String workDir = ConfigLocator.workspaceRoot().toString();
+        try {
+            String alias = registry.currentAlias();
+            String model = registry.currentConfiguration().toConfig(CapabilityKindEnum.CHAT).getModelId();
+            return ConsoleView.ANSI_YELLOW + alias + ConsoleView.ANSI_RESET
+                    + ConsoleView.ANSI_GRAY + " · " + model + " · " + ConsoleView.ANSI_RESET
+                    + ConsoleView.ANSI_GREEN + workDir + ConsoleView.ANSI_RESET;
+        } catch (RuntimeException ignored) {
+            return ConsoleView.ANSI_GREEN + workDir + ConsoleView.ANSI_RESET;
+        }
     }
 
     /**
@@ -558,7 +676,9 @@ public final class ClaraApplication {
             // 极端情况：候选清单为空且当前模型没解析出别名——仍然要跑一轮，别把用户输入吞掉（此时不换模型）。
             plan = Collections.singletonList(registry.currentConfigPath());
         }
-        try (CancelKeySession ignored = monitor.watch(cancellationToken)) {
+        // 执行期补充通道：监听线程写入，本轮所有模型尝试共享；换模型重试时补充不会丢。
+        UserInterventionBuffer intervention = new UserInterventionBuffer();
+        try (CancelKeySession ignored = monitor.watch(cancellationToken, intervention)) {
             for (int index = 0; index < plan.size(); index++) {
                 Path configPath = plan.get(index);
                 if (index > 0) {
@@ -566,7 +686,7 @@ public final class ClaraApplication {
                     view.emit("  [failover] 上一个模型不可用，已切到 " + ConfigLocator.aliasOf(configPath) + " 重试（会话历史按模型隔离，切回原模型即恢复原上下文）", ConsoleView.ANSI_YELLOW);
                 }
                 ConversationResult result = converseOnce(view, bootstrap, registry.currentConfiguration(), input,
-                        cancellationToken);
+                        cancellationToken, intervention);
                 if (result == null
                         || result.getStatus() != OrchestrationStatusEnum.FAILED
                         || !ModelFailover.isUnavailable(result.getError())) {
@@ -593,13 +713,16 @@ public final class ClaraApplication {
      * @param providerConfig    本次尝试使用的模型配置，非 null
      * @param input             用户输入，非空白
      * @param cancellationToken 本轮取消令牌，非 null
+     * @param intervention      执行期用户补充通道，非 null
      * @return 编排结果；非预期异常已就地报告时返回 null（调用方据此停止本轮，不再换模型）
      */
     private static ConversationResult converseOnce(ConsoleView view, ApplicationBootstrap bootstrap,
-            ProviderConfiguration providerConfig, String input, CancellationToken cancellationToken) {
+            ProviderConfiguration providerConfig, String input, CancellationToken cancellationToken,
+            UserInterventionBuffer intervention) {
         long started = System.currentTimeMillis();
         // 传入工具用途解析器：调用工具时在日志里附一句「这次调用是为了什么」（结合本次入参推导）。
         ConsoleView.ConsoleStreamObserver observer = view.newObserver(bootstrap::describeToolInvocation);
+        view.startWorking();
         // 轮流式观察者与提示通道注册到线程：工作流节点执行时可复用（文本节点实时显示思考、各节点输出进度）。
         try (WorkflowProgress.Scope ignored1 = WorkflowProgress.open(observer, text -> {
                     observer.endStream();
@@ -615,6 +738,9 @@ public final class ClaraApplication {
                     .stream(true)
                     .observer(observer)
                     .cancellationToken(cancellationToken)
+                    .userIntervention(intervention)
+                    // 工作流暂停后即使发生模型故障转移，也要把「用哪个 instanceId 续接」提示给当前模型。
+                    .runtimeHint(bootstrap.pendingWorkflows().hint(conversationId))
                     .build());
             // 思考与正文已实时流式展示，这里只把完整记录写进详细日志文件（控制台不重复打印）。
             view.logTurn(result);
@@ -623,16 +749,18 @@ public final class ClaraApplication {
             if (result.isPausedForUserInput() && result.getContent() != null
                     && !result.getContent().trim().isEmpty()) {
                 observer.endStream();
-                view.emit(result.getContent(), ConsoleView.ANSI_GREEN);
+                // 需要人工确认的暂停是阻塞点：黄色 + 文字标记，关闭颜色时也能一眼看出。
+                view.emit("[需确认] " + result.getContent(), ConsoleView.ANSI_YELLOW);
             }
             // 记录本轮用量，形成 /usage 的累计趋势。
-            recordUsageTrend(result.getUsage());
+            recordUsageTrend(bootstrap, result.getUsage());
             // 回复段结束后空一行，避免状态行紧贴助手回复。
             if (observer.printed()) {
                 view.println();
             }
             if (result.getToolRoundTrips() > 0) {
-                view.emit("  [tool] 工具调用往返 " + result.getToolRoundTrips() + " 次", ConsoleView.ANSI_GRAY);
+                view.emit("  [tool] 工具调用往返 " + result.getToolRoundTrips() + " 次",
+                        ConsoleView.ANSI_LIGHT_BLUE);
             }
             view.emit("  (status=" + result.getStatus() + (result.getUsage() == null ? "" : ", tokens=" + result.getUsage()) + ", 用时=" + (System.currentTimeMillis() - started) + "ms)", ConsoleView.ANSI_GRAY);
             if (result.getError() != null) {
@@ -645,6 +773,7 @@ public final class ClaraApplication {
             view.emit("[error] " + turnFailure.getClass().getSimpleName() + ": " + turnFailure.getMessage(), ConsoleView.ANSI_RED);
             return null;
         } finally {
+            view.stopWorking();
             view.println();
         }
     }

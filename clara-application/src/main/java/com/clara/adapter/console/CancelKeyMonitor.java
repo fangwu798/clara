@@ -1,15 +1,15 @@
 package com.clara.adapter.console;
 
 import com.clara.context.CancellationToken;
+import com.clara.core.interaction.IUserInterventionSink;
 import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 
 import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * 控制台单键 ESC 取消监听：在一轮对话执行期间，以原始模式监听 ESC，经二次确认后置位本轮取消令牌，从而终止
- * 正在进行的模型调用与工具执行。
+ * 控制台执行期按键监听：ESC 经二次确认后置位本轮取消令牌，终止正在进行的模型调用与工具执行；
+ * Tab 进入补充说明输入，提交内容由编排层在下一次模型请求前注入。
  *
  * <p>是什么、在哪一层：application 边界适配层（{@code com.clara.adapter.console}）的输入监听器；它只负责
  * 「把按键变成对取消令牌的置位」，取消本身由内核的 {@link CancellationToken}（模型调用逐字节检查、脚本工具
@@ -36,10 +36,15 @@ public final class CancelKeyMonitor implements Closeable {
      * JLine 系统终端；不可用时为 null（降级为不支持 ESC 取消）。
      */
     private final Terminal terminal;
+    /**
+     * 终端是否由本类创建：自建终端由本类关闭；宿主传入的共享终端由宿主关闭，避免提前关闭后行编辑无法还原。
+     */
+    private final boolean ownsTerminal;
 
-    private CancelKeyMonitor(ConsoleView view, Terminal terminal) {
+    private CancelKeyMonitor(ConsoleView view, Terminal terminal, boolean ownsTerminal) {
         this.view = view;
         this.terminal = terminal;
+        this.ownsTerminal = ownsTerminal;
     }
 
     /**
@@ -52,19 +57,21 @@ public final class CancelKeyMonitor implements Closeable {
         if (view == null) {
             throw new IllegalArgumentException("view must not be null");
         }
-        Terminal terminal = null;
-        try {
-            Terminal candidate = TerminalBuilder.builder().system(true).build();
-            String type = candidate.getType();
-            if (type != null && !"dumb".equals(type)) {
-                terminal = candidate;
-            } else {
-                candidate.close();
-            }
-        } catch (IOException | RuntimeException ignored) {
-            // 终端不可用时静默降级为不支持 ESC 取消
+        return new CancelKeyMonitor(view, ConsoleTerminalFactory.open(), true);
+    }
+
+    /**
+     * 使用宿主已打开的终端创建监听器：与行编辑共用同一个终端实例，避免两套原始模式互相覆盖。
+     *
+     * @param view     控制台视图，不可为 null
+     * @param terminal 宿主打开的系统终端，可为 null（降级为不支持 ESC 取消）
+     * @return 监听器，非 null
+     */
+    public static CancelKeyMonitor create(ConsoleView view, Terminal terminal) {
+        if (view == null) {
+            throw new IllegalArgumentException("view must not be null");
         }
-        return new CancelKeyMonitor(view, terminal);
+        return new CancelKeyMonitor(view, terminal, false);
     }
 
     /**
@@ -83,7 +90,22 @@ public final class CancelKeyMonitor implements Closeable {
      * @return 监听会话，非 null
      */
     public CancelKeySession watch(CancellationToken cancellationToken) {
-        CancelKeySession session = new CancelKeySession(view, terminal, cancellationToken);
+        return watch(cancellationToken, null);
+    }
+
+    /**
+     * 开始一轮监听，并接入执行期用户补充通道。
+     *
+     * <p>执行中按 Tab 进入补充输入；提交内容写入 {@code interventionSink}，由编排层在下一次模型请求前消费。
+     * 只有补充通道、没有取消令牌时同样可以监听（ESC 取消需要令牌）。
+     *
+     * @param cancellationToken 本轮取消令牌，可为 null
+     * @param interventionSink  用户补充写入端，可为 null（不启用 Tab 补充）
+     * @return 监听会话，非 null
+     */
+    public CancelKeySession watch(CancellationToken cancellationToken,
+            IUserInterventionSink interventionSink) {
+        CancelKeySession session = new CancelKeySession(view, terminal, cancellationToken, interventionSink);
         session.start();
         return session;
     }
@@ -93,7 +115,7 @@ public final class CancelKeyMonitor implements Closeable {
      */
     @Override
     public void close() {
-        if (terminal == null) {
+        if (terminal == null || !ownsTerminal) {
             return;
         }
         try {

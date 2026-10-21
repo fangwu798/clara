@@ -11,6 +11,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -69,5 +71,23 @@ public class LocalConversationStoreTest {
         ConversationSnapshot snapshot = store.loadSnapshot(key);
         assertEquals(0L, snapshot.version());
         assertTrue(snapshot.messages().isEmpty());
+    }
+
+    /**
+     * 枚举全部快照：跨「供应商 + 模型」分文件的历史都能读到，损坏文件跳过。
+     */
+    @Test
+    public void loadsAllSnapshotsAcrossKeys() throws Exception {
+        store.append(key, messages(), 0L);
+        Thread.sleep(20L);
+        ConversationKey other = new ConversationKey("conv-1", "provider", "model-2");
+        store.append(other, Collections.singletonList(new UserContent("from other model")), 0L);
+        Path directory = tempFolder.getRoot().toPath().resolve(".clara").resolve("state").resolve("conversations");
+        Files.write(directory.resolve("broken.bin"), new byte[]{1, 2, 3});
+
+        List<ConversationSnapshot> snapshots = store.loadAllSnapshots();
+        assertEquals(2, snapshots.size());
+        assertEquals(2, snapshots.get(0).messages().size());
+        assertEquals("from other model", ((UserContent) snapshots.get(1).messages().get(0)).getContent());
     }
 }

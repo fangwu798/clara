@@ -10,6 +10,7 @@ import com.clara.core.model.IRequest;
 import com.clara.kernel.api.execute.IRequestEncoder;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.message.ImageParameters;
 import com.clara.core.transport.RawHttpRequest;
 import com.clara.kernel.http.TransportConfig;
 import com.clara.kernel.message.delta.Thinking;
@@ -60,11 +61,16 @@ public abstract class AbstractRequestEncoder implements IRequestEncoder {
             throw new IllegalArgumentException("values must not be null");
         }
         ModelProviderEnum provider = config.getProvider();
-        Map<String, String> authorization = providerConfiguration.authorizationHeaders(config.getCapabilityEnum(), Boolean.TRUE.equals(request.getStream()));
-        Map<String, Object> body = bodyOf(request, provider, config.getCapabilityEnum());
+        CapabilityKindEnum capability = config.getCapabilityEnum();
+        Map<String, String> authorization = providerConfiguration.authorizationHeaders(capability, Boolean.TRUE.equals(request.getStream()));
+        Map<String, Object> body = bodyOf(request, provider, capability);
         postProcessBody(body, request, provider, authorization);
+        Map<String, String> headers = mergedHeaders(authorization, transport);
+        if (OpenAiImageEditRequest.supports(provider, capability, request)) {
+            return OpenAiImageEditRequest.build(config, headers, body, ((ImageParameters) request).getImage());
+        }
         byte[] bodyBytes = serialize(body, provider);
-        return new RawHttpRequest("POST", config.getEndpoint(), mergedHeaders(authorization, transport), bodyBytes);
+        return new RawHttpRequest("POST", config.getEndpoint(), headers, bodyBytes);
     }
 
     /**

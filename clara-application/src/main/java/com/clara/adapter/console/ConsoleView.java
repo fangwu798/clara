@@ -9,10 +9,12 @@ import com.clara.core.model.IStreamObserver;
 import com.clara.enums.AvailabilityLevelEnum;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.orchestration.api.ConversationResult;
+import com.clara.tool.ToolInvocationPurpose;
 import com.clara.utils.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
@@ -52,9 +54,14 @@ public final class ConsoleView implements Closeable {
     public static final String ANSI_GREEN = "\u001B[92m";
 
     /**
-     * ANSI 控制码：灰色（过程 / 工具调用 / 状态行）。
+     * ANSI 控制码：灰色（过程 / 状态行）。
      */
     public static final String ANSI_GRAY = "\u001B[90m";
+
+    /**
+     * ANSI 控制码：浅蓝色（工具调用提示）。
+     */
+    public static final String ANSI_LIGHT_BLUE = "\u001B[94m";
 
     /**
      * ANSI 控制码：红色（错误）。
@@ -113,20 +120,20 @@ public final class ConsoleView implements Closeable {
      */
     private static final int HINT_USAGE_WIDTH = 28;
 
-    /**
-     * 丢弃输出的流：精简模式下接管框架的标准输出。
-     */
-    private static final OutputStream SINK = new OutputStream() {
-        @Override
-        public void write(int value) {
-            // 精简模式下丢弃框架写入标准输出的内容。
-        }
+    /** 命令行输出块的缩进竖线。 */
+    private static final String OUTPUT_PREFIX = "  │ ";
 
-        @Override
-        public void write(byte @NotNull [] buffer, int offset, int length) {
-            // 精简模式下丢弃框架写入标准输出的内容。
-        }
-    };
+    /** 工具子进程日志前缀，与 {@code AbstractScriptExecutor} 保持一致。 */
+    private static final String TOOL_LOG_PREFIX = "[tool] ";
+
+    /** run_command 的标准输出标签。 */
+    private static final String STDOUT_TAG = "[out] ";
+
+    /** run_command 的标准错误标签。 */
+    private static final String STDERR_TAG = "[err] ";
+
+    /** Working 行刷新间隔（毫秒）。 */
+    private static final long WORKING_TICK_MILLIS = 250L;
 
     /**
      * 应用自身输出流（UTF-8），始终可见、不受日志模式影响。
@@ -148,6 +155,18 @@ public final class ConsoleView implements Closeable {
      */
     private final String logFilePath;
 
+    /** 详细日志中是否有一个尚未换行的流式段（思考 / 正文）。 */
+    private boolean logStreamOpen;
+
+    /** 当前流式段的日志前缀（如 {@code "[thinking] "}）；段被其它日志行打断后据此重新起段。 */
+    private String logStreamPrefix;
+
+    /** 本轮是否已把思考实时写入日志；已写入时 {@link #logTurn} 不再重复整段思考。 */
+    private boolean logStreamedReasoning;
+
+    /** 本轮是否已把正文实时写入日志；已写入时 {@link #logTurn} 不再重复整段正文。 */
+    private boolean logStreamedContent;
+
     /**
      * 是否全量日志；默认精简。
      */
@@ -157,6 +176,39 @@ public final class ConsoleView implements Closeable {
      * 是否启用 ANSI 颜色。
      */
     private boolean colorsEnabled;
+
+    /** 控制台输出锁：Working 行、流式正文与工具输出可能来自不同线程。 */
+    private final Object outputLock = new Object();
+
+    /** 是否支持原地刷新 Working 行；测试与非交互环境关闭。 */
+    private final boolean workingEnabled = System.console() != null;
+
+    /** Working 行是否处于活动状态。 */
+    private volatile boolean workingActive;
+
+    /** Working 行代次：停止后旧线程即使醒来也不会继续绘制。 */
+    private volatile long workingGeneration;
+
+    /** Working 行开始时间。 */
+    private volatile long workingStartedAt;
+
+    /** Working 行标题。 */
+    private volatile String workingLabel = "Working";
+    /** 是否暂停 Working 行刷新（执行期补充输入时避免覆盖输入行）；受 {@code outputLock} 保护。 */
+    private boolean workingPaused;
+    /** 执行期补充输入是否进行中：为 true 时所有控制台输出先暂存，避免覆盖输入行。 */
+    private boolean interactiveInputActive;
+    /** 输入期间暂存的控制台输出（保留 ANSI 片段），输入结束后一次性回放。 */
+    private final StringBuilder deferredConsole = new StringBuilder();
+
+    /** 是否显示 ESC 取消提示。 */
+    private volatile boolean interruptHintAvailable = true;
+
+    /** Working 行后台线程。 */
+    private Thread workingThread;
+
+    /** Working 行当前已绘制的字符宽度，用于原地清除。 */
+    private int workingRenderedWidth;
 
     /**
      * 创建控制台视图：接管应用输出、打开详细日志、按参数初始化颜色与日志模式。
@@ -207,17 +259,238 @@ public final class ConsoleView implements Closeable {
     }
 
     /**
+     * 设置 ESC 取消提示是否可见。
+     *
+     * @param available 当前终端是否支持 ESC 取消
+     */
+    public void setInterruptHintAvailable(boolean available) {
+        this.interruptHintAvailable = available;
+    }
+
+    /**
+     * 启动 Working 进度行（默认标题 {@code Working}）。
+     */
+    public void startWorking() {
+        startWorking("Working");
+    }
+
+    /**
+     * 启动 Working 进度行：在终端底部原地刷新已用时间。
+     *
+     * <p>非交互环境（测试、管道输出）下不启动，避免污染日志；已在运行时只更新标题，不重置计时。
+     *
+     * @param label 进度标题，可为 null（回退为 Working）
+     */
+    public void startWorking(String label) {
+        if (!workingEnabled) {
+            return;
+        }
+        synchronized (outputLock) {
+            workingLabel = label == null || label.trim().isEmpty() ? "Working" : label.trim();
+            workingPaused = interactiveInputActive;
+            if (workingActive) {
+                return;
+            }
+            workingGeneration++;
+            long generation = workingGeneration;
+            workingStartedAt = System.currentTimeMillis();
+            workingActive = true;
+            workingThread = new Thread(() -> runWorkingLoop(generation), "clara-working");
+            workingThread.setDaemon(true);
+            workingThread.start();
+        }
+    }
+
+    /**
+     * 进入执行期补充输入：暂停 Working 行并暂存后续输出，保证输入行不被流式内容覆盖。
+     *
+     * @param prompt 提示文案，非 null
+     */
+    public void beginInterventionInput(String prompt) {
+        synchronized (outputLock) {
+            clearWorkingLineLocked();
+            workingPaused = true;
+            interactiveInputActive = true;
+            out.println();
+            out.println(wrapColor(ANSI_YELLOW, prompt));
+            out.flush();
+        }
+    }
+
+    /**
+     * 结束执行期补充输入：一次性回放暂存输出，并恢复 Working 行刷新。
+     */
+    public void endInterventionInput() {
+        synchronized (outputLock) {
+            interactiveInputActive = false;
+            if (deferredConsole.length() > 0) {
+                out.print(deferredConsole);
+                deferredConsole.setLength(0);
+                out.flush();
+            }
+            workingPaused = false;
+        }
+    }
+
+    /**
+     * 当前是否处于执行期补充输入。
+     *
+     * @return 输入中返回 true
+     */
+    public boolean isInterventionInputActive() {
+        synchronized (outputLock) {
+            return interactiveInputActive;
+        }
+    }
+
+    /**
+     * 停止 Working 进度行并清除当前行。
+     */
+    public void stopWorking() {
+        Thread thread;
+        synchronized (outputLock) {
+            workingGeneration++;
+            workingActive = false;
+            workingPaused = interactiveInputActive;
+            if (!interactiveInputActive) {
+                clearWorkingLineLocked();
+            }
+            thread = workingThread;
+            workingThread = null;
+        }
+        if (thread != null && thread != Thread.currentThread()) {
+            thread.interrupt();
+        }
+    }
+
+    /**
+     * Working 行后台刷新循环：每 {@value #WORKING_TICK_MILLIS} 毫秒重绘一次已用时间。
+     *
+     * @param generation 启动时的代次，用于避免停止后旧线程继续绘制
+     */
+    private void runWorkingLoop(long generation) {
+        while (workingActive && generation == workingGeneration) {
+            synchronized (outputLock) {
+                if (!workingActive || generation != workingGeneration) {
+                    return;
+                }
+                renderWorkingLineLocked();
+            }
+            try {
+                Thread.sleep(WORKING_TICK_MILLIS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
+    /**
+     * 绘制 Working 行：覆盖上一次内容，避免残影。
+     */
+    private void renderWorkingLineLocked() {
+        if (workingPaused) {
+            return;
+        }
+        long elapsedSeconds = Math.max(0L, (System.currentTimeMillis() - workingStartedAt) / 1000L);
+        String hint = interruptHintAvailable ? " • esc cancel • Tab steer" : "";
+        String line = "• " + workingLabel + " (" + elapsedSeconds + "s" + hint + ")";
+        StringBuilder rendered = new StringBuilder();
+        rendered.append('\r');
+        if (colorsEnabled) {
+            rendered.append(ANSI_LIGHT_BLUE);
+        }
+        rendered.append(line);
+        for (int index = line.length(); index < workingRenderedWidth; index++) {
+            rendered.append(' ');
+        }
+        if (colorsEnabled) {
+            rendered.append(ANSI_RESET);
+        }
+        out.print(rendered);
+        out.flush();
+        workingRenderedWidth = line.length();
+    }
+
+    /**
+     * 清除当前 Working 行（若有），让后续输出从行首开始。
+     */
+    private void clearWorkingLineLocked() {
+        if (workingRenderedWidth <= 0) {
+            return;
+        }
+        out.print('\r');
+        for (int index = 0; index < workingRenderedWidth; index++) {
+            out.print(' ');
+        }
+        out.print('\r');
+        out.flush();
+        workingRenderedWidth = 0;
+    }
+
+    /**
+     * 输出一行工具子进程内容：默认标准输出，标准错误用红色。
+     *
+     * @param line 已去掉 {@code [tool] } 前缀的单行内容，非 null
+     */
+    void printToolProcessLine(String line) {
+        String text = line == null ? "" : line;
+        String color = null;
+        if (text.startsWith(STDERR_TAG)) {
+            color = ANSI_RED;
+            text = text.substring(STDERR_TAG.length());
+        } else if (text.startsWith(STDOUT_TAG)) {
+            text = text.substring(STDOUT_TAG.length());
+        }
+        synchronized (outputLock) {
+            if (interactiveInputActive) {
+                deferredConsole.append(OUTPUT_PREFIX).append(text).append('\n');
+                return;
+            }
+            clearWorkingLineLocked();
+            if (colorsEnabled) {
+                out.print(ANSI_GRAY);
+            }
+            out.print(OUTPUT_PREFIX);
+            if (colorsEnabled) {
+                out.print(ANSI_RESET);
+                if (color != null) {
+                    out.print(color);
+                }
+            }
+            out.println(text);
+            if (colorsEnabled && color != null) {
+                out.print(ANSI_RESET);
+            }
+        }
+    }
+
+    /**
      * 输出一行到控制台（不写入详细日志文件）。
      */
     public void println(String text) {
-        out.println(text);
+        synchronized (outputLock) {
+            if (interactiveInputActive) {
+                deferredConsole.append(text).append('\n');
+                return;
+            }
+            clearWorkingLineLocked();
+            out.println(text);
+        }
     }
 
     /**
      * 输出一个空行到控制台（不写入详细日志文件）。
      */
     public void println() {
-        out.println();
+        synchronized (outputLock) {
+            if (interactiveInputActive) {
+                deferredConsole.append('\n');
+                return;
+            }
+            clearWorkingLineLocked();
+            out.println();
+        }
     }
 
     /**
@@ -236,9 +509,20 @@ public final class ConsoleView implements Closeable {
      * @param colorCode ANSI 颜色码；null 表示不染色
      */
     public void emit(String text, String colorCode) {
-        out.println(wrapColor(colorCode, text));
-        if (fileOut != null) {
-            fileOut.println(text);
+        synchronized (outputLock) {
+            String rendered = wrapColor(colorCode, text);
+            // 流式段尚未换行时先收尾，避免工具 / 进度日志粘在思考正文后面。
+            closeLogStreamLineLocked();
+            if (fileOut != null) {
+                fileOut.println(text);
+                fileOut.flush();
+            }
+            if (interactiveInputActive) {
+                deferredConsole.append(rendered).append('\n');
+                return;
+            }
+            clearWorkingLineLocked();
+            out.println(rendered);
         }
     }
 
@@ -248,9 +532,16 @@ public final class ConsoleView implements Closeable {
      * @param input 用户输入，非 null
      */
     public void logUserInput(String input) {
-        if (fileOut != null) {
-            fileOut.println();
-            fileOut.println("[user] " + input);
+        synchronized (outputLock) {
+            closeLogStreamLineLocked();
+            logStreamPrefix = null;
+            logStreamedReasoning = false;
+            logStreamedContent = false;
+            if (fileOut != null) {
+                fileOut.println();
+                fileOut.println("[user] " + input);
+                fileOut.flush();
+            }
         }
     }
 
@@ -263,12 +554,19 @@ public final class ConsoleView implements Closeable {
         if (fileOut == null) {
             return;
         }
-        if (result.getReasoning() != null && !result.getReasoning().trim().isEmpty()) {
-            fileOut.println("[thinking] " + result.getReasoning().trim());
-        }
-        if (result.getContent() != null) {
-            fileOut.println("[assistant]");
-            fileOut.println("            " + result.getContent());
+        synchronized (outputLock) {
+            closeLogStreamLineLocked();
+            logStreamPrefix = null;
+            // 流式阶段已实时落盘的内容不再整段重复；仅无流式输出（同步调用）时补写。
+            if (!logStreamedReasoning
+                    && result.getReasoning() != null && !result.getReasoning().trim().isEmpty()) {
+                fileOut.println("[thinking] " + result.getReasoning().trim());
+            }
+            if (!logStreamedContent && result.getContent() != null) {
+                fileOut.println("[assistant]");
+                fileOut.println("            " + result.getContent());
+            }
+            fileOut.flush();
         }
     }
 
@@ -366,6 +664,7 @@ public final class ConsoleView implements Closeable {
         println(hint("/compress", "压缩当前上下文"));
         println(hint("/new", "开始新对话"));
         println(hint("/usage", "统计 token 用量"));
+        println(hint("/history", "查看历史聊天记录"));
         println(hint("/log", "切换精简 / 全量日志"));
         println(hint("/color", "开关彩色输出"));
         println(hint("exit | quit", "结束会话"));
@@ -385,6 +684,7 @@ public final class ConsoleView implements Closeable {
             }
         }
         println();
+        println("执行中按 Tab 输入补充说明，Enter 提交，空行取消；补充会在下一次模型请求前生效。");
         println("直接输入内容回车即发送。");
         println();
     }
@@ -492,7 +792,7 @@ public final class ConsoleView implements Closeable {
         if (fullLogging) {
             consoleSide = new GrayLineOutputStream(out, colorsEnabled ? ANSI_GRAY : "");
         } else {
-            consoleSide = SINK;
+            consoleSide = new CompactProcessOutputStream(this);
         }
         OutputStream target = fileOut == null ? consoleSide : new TeeOutputStream(consoleSide, fileOut);
         try {
@@ -584,6 +884,115 @@ public final class ConsoleView implements Closeable {
     }
 
     /**
+     * 输出流式文本：执行期补充输入期间先暂存，避免覆盖用户正在输入的内容。
+     *
+     * @param text 文本片段，非 null
+     */
+    void printStream(String text) {
+        synchronized (outputLock) {
+            if (fileOut != null) {
+                // 若上一行日志把流式段打断了，按原前缀重新起段，保证思考仍可读。
+                if (!logStreamOpen && logStreamPrefix != null) {
+                    beginLogStreamLineLocked(logStreamPrefix);
+                }
+                fileOut.print(text);
+                fileOut.flush();
+            }
+            if (interactiveInputActive) {
+                deferredConsole.append(text);
+                return;
+            }
+            out.print(text);
+            out.flush();
+        }
+    }
+
+    /**
+     * 开始一个流式展示段：换行并输出前缀；输入期间改为暂存。
+     *
+     * @param prefix 段前缀，非 null
+     * @param color  段颜色码，可为 null
+     */
+    void beginStreamSegment(String prefix, String color) {
+        synchronized (outputLock) {
+            beginLogStreamLineLocked(prefix);
+            if (interactiveInputActive) {
+                deferredConsole.append('\n');
+                if (colorsEnabled && color != null) {
+                    deferredConsole.append(color);
+                }
+                deferredConsole.append(prefix);
+                return;
+            }
+            clearWorkingLineLocked();
+            out.println();
+            if (colorsEnabled && color != null) {
+                out.print(color);
+            }
+            out.print(prefix);
+            out.flush();
+        }
+    }
+
+    /**
+     * 结束当前流式展示段：复位颜色并换行；输入期间改为暂存。
+     */
+    void endStreamSegment() {
+        synchronized (outputLock) {
+            closeLogStreamLineLocked();
+            logStreamPrefix = null;
+            if (interactiveInputActive) {
+                if (colorsEnabled) {
+                    deferredConsole.append(ANSI_RESET);
+                }
+                deferredConsole.append('\n');
+                return;
+            }
+            if (colorsEnabled) {
+                out.print(ANSI_RESET);
+            }
+            out.println();
+            out.flush();
+        }
+    }
+
+    /**
+     * 在详细日志里开始一个流式段：先收尾上一段，再写入前缀；段内容由 {@link #printStream} 原样追加。
+     *
+     * <p>思考（{@code [thinking] }）与正文（{@code [assistant] }）都走这里，因此工作流节点的思考也会
+     * 与主对话一样实时落盘。
+     *
+     * @param prefix 段前缀，非 null
+     */
+    private void beginLogStreamLineLocked(String prefix) {
+        if (fileOut == null) {
+            return;
+        }
+        closeLogStreamLineLocked();
+        fileOut.print(prefix);
+        fileOut.flush();
+        logStreamOpen = true;
+        logStreamPrefix = prefix;
+        if (prefix.contains("thinking")) {
+            logStreamedReasoning = true;
+        }
+        if (prefix.contains("assistant")) {
+            logStreamedContent = true;
+        }
+    }
+
+    /**
+     * 收尾当前流式段：只补一个换行并保留前缀，便于被其它日志行打断后继续同一段。
+     */
+    private void closeLogStreamLineLocked() {
+        if (fileOut != null && logStreamOpen) {
+            fileOut.println();
+            fileOut.flush();
+        }
+        logStreamOpen = false;
+    }
+
+    /**
      * 按当前颜色开关给文本包色。
      */
     private String wrapColor(String color, String text) {
@@ -637,13 +1046,11 @@ public final class ConsoleView implements Closeable {
             switch (event.getType()) {
                 case REASONING_DELTA:
                     begin(MODE_THINKING, "[thinking] ", ANSI_GRAY);
-                    view.out.print(event.getPayload());
-                    view.out.flush();
+                    view.printStream(event.getPayload());
                     break;
                 case TEXT_DELTA:
                     begin(MODE_ANSWER, "[assistant] ", ANSI_GREEN);
-                    view.out.print(event.getPayload());
-                    view.out.flush();
+                    view.printStream(event.getPayload());
                     break;
                 case TOOL_ARGUMENT_DELTA:
                     // 参数分片期间只做展示准备，不打印：等参数拼装完整（TOOL_CALL_COMPLETE）才发出提示，
@@ -656,6 +1063,7 @@ public final class ConsoleView implements Closeable {
                     end();
                     break;
                 case ERROR:
+                    view.stopWorking();
                     end();
                     view.emit(errorLine(event.getError()), ANSI_RED);
                     break;
@@ -687,19 +1095,15 @@ public final class ConsoleView implements Closeable {
             if (mode == nextMode) {
                 return;
             }
+            view.stopWorking();
             end();
             mode = nextMode;
             printed = true;
-            view.out.println();
-            if (view.colorsEnabled && color != null) {
-                view.out.print(color);
-            }
-            view.out.print(prefix);
-            view.out.flush();
+            view.beginStreamSegment(prefix, color);
         }
 
         /**
-         * 打印一条灰色「调用工具」提示：工具名 +（本次调用的用途）。
+         * 打印一条浅蓝色「调用工具」提示：工具名 +（本次调用的用途）。
          *
          * <p>由 {@code TOOL_CALL_COMPLETE} 触发（参数已拼装完整，能拿到完整入参），按调用标识去重，
          * 因此同一轮里多次调用同一工具也会各打印一条。
@@ -714,19 +1118,25 @@ public final class ConsoleView implements Closeable {
             if (!notedCalls.add(key)) {
                 return;
             }
+            view.stopWorking();
             end();
-            view.emit(toolLine(name, event.getPayload()), ANSI_GRAY);
+            view.emit(toolLine(name, event.getPayload()), ANSI_LIGHT_BLUE);
+            view.startWorking();
         }
 
         /**
-         * 组装「调用工具」日志行：工具名 +（用途短句）。
+         * 组装工具调用标题：命令类工具显示完整命令行，其余工具显示名称 +（用途短句）。
          */
         private String toolLine(String name, String argumentsJson) {
+            String command = ToolInvocationPurpose.displayCommand(name, argumentsJson);
+            if (command != null && !command.isEmpty()) {
+                return "● 执行 " + command;
+            }
             String purpose = toolPurpose == null
                     ? "" : briefToolPurpose(toolPurpose.purpose(name, argumentsJson));
             return purpose.isEmpty()
-                    ? "  [tool] 调用工具：" + name
-                    : "  [tool] 调用工具：" + name + "（" + purpose + "）";
+                    ? "● 调用 " + name
+                    : "● 调用 " + name + "（" + purpose + "）";
         }
 
         /**
@@ -735,11 +1145,58 @@ public final class ConsoleView implements Closeable {
         private void end() {
             if (mode != MODE_IDLE) {
                 mode = MODE_IDLE;
-                if (view.colorsEnabled) {
-                    view.out.print(ANSI_RESET);
-                }
-                view.out.println();
-                view.out.flush();
+                view.endStreamSegment();
+            }
+        }
+    }
+
+    /**
+     * 精简模式下的框架输出过滤器：只保留工具子进程日志，按「竖线缩进输出块」渲染，其余框架日志丢弃。
+     *
+     * <p>工具子进程日志由 {@code AbstractScriptExecutor} 以 {@code [tool] } 开头写入标准输出；
+     * run_command 的 stdout / stderr 再分别带 {@code [out] } / {@code [err] } 标签。
+     */
+    private static final class CompactProcessOutputStream extends OutputStream {
+
+        private final ConsoleView view;
+        private final ByteArrayOutputStream pending = new ByteArrayOutputStream();
+
+        CompactProcessOutputStream(ConsoleView view) {
+            this.view = view;
+        }
+
+        @Override
+        public synchronized void write(int value) {
+            if (value == '\n') {
+                flushLine();
+            } else if (value != '\r') {
+                pending.write(value);
+            }
+        }
+
+        @Override
+        public synchronized void write(byte @NotNull [] buffer, int offset, int length) {
+            for (int index = offset; index < offset + length; index++) {
+                write(buffer[index]);
+            }
+        }
+
+        @Override
+        public synchronized void flush() {
+            // 只按整行渲染，半行内容等待换行后再显示。
+        }
+
+        /**
+         * 把已完成的一行交给视图渲染；非工具日志直接丢弃。
+         */
+        private void flushLine() {
+            if (pending.size() == 0) {
+                return;
+            }
+            String line = new String(pending.toByteArray(), StandardCharsets.UTF_8);
+            pending.reset();
+            if (line.startsWith(TOOL_LOG_PREFIX)) {
+                view.printToolProcessLine(line.substring(TOOL_LOG_PREFIX.length()));
             }
         }
     }

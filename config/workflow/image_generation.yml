@@ -26,7 +26,8 @@ root:
         id: draw
         type: AGENT
         outputKeys: [image]
-        model: volcengine-response
+        model: openai
+        fallbackModel: volcengine-response
         capability: IMAGE
         prompt: image_render
         promptVars:
@@ -49,7 +50,8 @@ root:
           - id: draw_after_feedback
             type: AGENT
             outputKeys: [image]
-            model: volcengine-response
+            model: openai
+            fallbackModel: volcengine-response
             capability: IMAGE
             prompt: image_render
             promptVars:

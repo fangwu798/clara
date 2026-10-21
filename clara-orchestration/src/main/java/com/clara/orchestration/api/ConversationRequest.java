@@ -6,6 +6,7 @@ import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.core.model.IStreamObserver;
+import com.clara.core.interaction.IUserInterventionSource;
 import lombok.Builder;
 import lombok.Data;
 
@@ -47,6 +48,19 @@ public final class ConversationRequest {
     private Boolean planningEnabled;
     /** 单轮对话允许的最大工具往返次数；非正时使用编排默认值。 */
     private int maxToolRoundTrips;
+    /**
+     * 本轮临时系统提示：由宿主按运行期状态注入（如「上一轮工作流停在人工确认，确认后必须用同一
+     * instanceId 续接」），只作用于本轮请求，不写入对话历史。
+     */
+    private String runtimeHint;
     /** 本会话的取消令牌；非空时编排层复用它，外部置位即可取消本轮模型调用与工具执行；为 null 时编排层自建。 */
     private CancellationToken cancellationToken;
+
+    /**
+     * 执行期用户补充信息来源；为 null 时不启用实时干预。
+     *
+     * <p>宿主在模型思考 / 工具执行期间把用户输入写入该来源，编排层会在下一次请求模型前取走并追加为
+     * user 消息，使模型能按补充说明校准方向；补充不会中断当前正在进行的模型调用。
+     */
+    private IUserInterventionSource userIntervention;
 }

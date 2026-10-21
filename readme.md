@@ -386,7 +386,7 @@ clara-workflow 提供工作流定义、DAG 执行、预算控制、检查点与�
 | review_panel | 多角色多轮评审后由主持人汇总结论 | topic |
 | image_generation | 文生图，产物落成媒体资产 | subject |
 | image_understanding | 图 → 文，图片随对话消息下发给多模态模型 | image |
-| image_edit | 图生图（参考图 + 编辑指令） | reference、instruction |
+| image_edit | 图生图（OpenAI 主用、火山回退；参考图支持本地路径 / URL / data URI） | reference、instruction |
 
 交互式对话中用自然语言让助手调用内置工具 run_workflow 即可，例如：
 

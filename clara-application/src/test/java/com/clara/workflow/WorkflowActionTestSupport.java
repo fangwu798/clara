@@ -155,6 +155,7 @@ final class WorkflowActionTestSupport {
         private final HttpResponse response;
         private final List<IRequest> requests = new ArrayList<>();
         private DefaultConversationOrchestrator orchestrator;
+        private RuntimeException firstFailure;
 
         private FakeModel(HttpResponse response) {
             this.response = response;
@@ -168,10 +169,23 @@ final class WorkflowActionTestSupport {
             return requests;
         }
 
+        void failOnce(RuntimeException failure) {
+            this.firstFailure = failure;
+        }
+
+        private void failIfNeeded() {
+            if (firstFailure != null) {
+                RuntimeException failure = firstFailure;
+                firstFailure = null;
+                throw failure;
+            }
+        }
+
         @Override
         @SuppressWarnings("unchecked")
         public <R extends IResponse> R chat(IRequest request, Class<R> responseType) {
             requests.add(request);
+            failIfNeeded();
             return (R) response;
         }
 
@@ -179,6 +193,7 @@ final class WorkflowActionTestSupport {
         public <R extends IResponse> IStreamHandle chat(IRequest request, Class<R> responseType,
                 IStreamObserver observer) {
             requests.add(request);
+            failIfNeeded();
             return new IStreamHandle() {
                 @Override
                 public boolean cancel() {

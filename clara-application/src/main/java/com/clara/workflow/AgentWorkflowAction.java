@@ -10,6 +10,8 @@ import com.clara.dto.workflow.ExecutionScope;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.core.model.IStreamObserver;
+import com.clara.media.ImageReferenceNormalizer;
+import com.clara.media.ImageStore;
 import com.clara.model.video.VideoGeneratorFactory;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
@@ -122,66 +124,138 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         if (scope == null) {
             throw new IllegalArgumentException("scope must not be null");
         }
-        try(ProviderConfiguration configuration = context.modelRegistry().resolve(options.role(), options.modelAlias())) {
-            CapabilityKindEnum capability = options.capability();
-            // 高成本能力保护：视频生成必须发生在 HUMAN 节点之后，且该节点收到的是明确批准，
-            // 避免自定义工作流或后续改动绕过「先确认参数再生成」。
-            if (capability == CapabilityKindEnum.VIDEO
-                    && StringUtils.isBlank(scope.control(ExecutionScope.CONTROL_HUMAN_APPROVED))) {
-                throw new IllegalStateException("视频生成必须先经工作流人工确认并批准（节点 " + nodeId + "）");
-            }
-            // 节点声明的能力在该平台未配置时立即失败（配置问题，不静默降级）
-            configuration.getCapability(capability);
-            String model = configuration.toConfig(capability).getModelId();
-            Object instanceValue = scope.get("instanceId");
-            String instanceId = instanceValue == null ? nodeId : String.valueOf(instanceValue);
-            Map<String, String> resolved = resolveVars(scope);
-            String userInput = userInput(resolved);
-            // 工作流节点调用是同步的；图片生成约 1 分钟，期间若无过程信息用户会以为卡住。这里先打一行进度，
-            // 说明「哪个节点、调用什么能力、用哪个模型」，下一行给出本次实际输入（如精炼后的画面描述）。
-            progress("节点 " + nodeId + "：调用" + capabilityLabel(capability) + "能力（model=" + model + "）");
-            String preview = inputPreview(resolved);
-            if (!preview.isEmpty()) {
-                progressDetail("提示词：" + preview);
-            }
-            if (capability == CapabilityKindEnum.VIDEO) {
-                return executeVideo(configuration, userInput, attachments(scope));
-            }
-            // 文本类节点复用当轮对话的流式观察者，实时显示思考 / 正文；图片 / 视频接口本身不产生思考、也不支持
-            // 流式，故只保留前后进度行。
-            IStreamObserver observer = WorkflowProgress.observer();
-            boolean streaming = capability == CapabilityKindEnum.CHAT && observer != null;
-
-            ConversationResult result = context.orchestrator().converse(ConversationRequest.builder()
-                    .conversationId(conversationId(instanceId))
-                    .provider(configuration.getProvider())
-                    .model(model)
-                    .capabilityKind(capability)
-                    .userInput(userInput)
-                    .attachments(attachments(scope))
-                    .planningEnabled(false)
-                    .providerConfiguration(configuration)
-                    .stream(streaming)
-                    .observer(streaming ? observer : null)
-                    .cancellationToken(currentCancellationToken())
-                    .build());
-
-            if (result.getStatus() != OrchestrationStatusEnum.COMPLETED) {
-                throw new IllegalStateException("工作流 AGENT 节点调用未成功（节点 " + nodeId + "，状态 "
-                        + result.getStatus() + (result.getError() == null
-                        ? "" : "，错误 " + result.getError().getSafeMessage()) + "）");
-            }
-            Object output = output(capability, result.getContent());
-            if (capability == CapabilityKindEnum.IMAGE) {
-                context.usageLedger().recordImage(result.getUsage(), result.getGeneratedImages());
-                progress("节点 " + nodeId + "：图片用量 "
-                        + CapabilityUsageLedger.describeImage(result.getUsage(), result.getGeneratedImages()));
-            }
-            progress("节点 " + nodeId + "：完成");
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("output", output);
-            return response;
+        // 不能 try-with-resources：配置由 ModelRegistry 缓存并共享，关闭后下一轮意图识别与对话都会报
+        // credential configuration is closed。生命周期统一由 ModelRegistry.close() 负责。
+        ProviderConfiguration configuration = context.modelRegistry().resolve(options.role(), options.modelAlias());
+        CapabilityKindEnum capability = options.capability();
+        // 高成本能力保护：视频生成必须发生在 HUMAN 节点之后，且该节点收到的是明确批准，
+        // 避免自定义工作流或后续改动绕过「先确认参数再生成」。
+        if (capability == CapabilityKindEnum.VIDEO
+                && StringUtils.isBlank(scope.control(ExecutionScope.CONTROL_HUMAN_APPROVED))) {
+            throw new IllegalStateException("视频生成必须先经工作流人工确认并批准（节点 " + nodeId + "）");
         }
+        // 节点声明的能力在该平台未配置时立即失败（配置问题，不静默降级）
+        configuration.getCapability(capability);
+        String model = configuration.toConfig(capability).getModelId();
+        Object instanceValue = scope.get("instanceId");
+        String instanceId = instanceValue == null ? nodeId : String.valueOf(instanceValue);
+        Map<String, String> resolved = resolveVars(scope);
+        String userInput = userInput(resolved);
+        // 工作流节点调用是同步的；图片生成约 1 分钟，期间若无过程信息用户会以为卡住。这里先打一行进度，
+        // 说明「哪个节点、调用什么能力、用哪个模型」，下一行给出本次实际输入（如精炼后的画面描述）。
+        progress("节点 " + nodeId + "：调用" + capabilityLabel(capability) + "能力（model=" + model + "）");
+        String preview = inputPreview(resolved);
+        if (!preview.isEmpty()) {
+            progressDetail("提示词：" + preview);
+        }
+        if (capability == CapabilityKindEnum.VIDEO) {
+            return executeVideo(configuration, userInput, attachments(scope));
+        }
+        // 文本类节点复用当轮对话的流式观察者，实时显示思考 / 正文；图片 / 视频接口本身不产生思考、也不支持
+        // 流式，故只保留前后进度行。
+        IStreamObserver observer = WorkflowProgress.observer();
+        boolean streaming = capability == CapabilityKindEnum.CHAT && observer != null;
+
+        List<String> references = attachments(scope);
+        requireReferenceWhenDeclared(capability, references);
+        ConversationResult result;
+        try {
+            result = invoke(configuration, model, capability, userInput, instanceId, references, streaming, observer);
+        } catch (RuntimeException failure) {
+            result = invokeWithFallback(failure, capability, userInput, instanceId, references, streaming, observer);
+        }
+
+        Object output = output(capability, result.getContent());
+        if (capability == CapabilityKindEnum.IMAGE) {
+            context.usageLedger().recordImage(result.getUsage(), result.getGeneratedImages());
+            progress("节点 " + nodeId + "：图片用量 "
+                    + CapabilityUsageLedger.describeImage(result.getUsage(), result.getGeneratedImages()));
+        }
+        progress("节点 " + nodeId + "：完成");
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("output", output);
+        return response;
+    }
+
+    /**
+     * 声明了 attachments 的图片节点必须解析出至少一张参考图，避免静默退化成文生图。
+     *
+     * @param capability 当前能力，非 null
+     * @param references 已解析的参考图，可为 null
+     */
+    private void requireReferenceWhenDeclared(CapabilityKindEnum capability, List<String> references) {
+        if (capability != CapabilityKindEnum.IMAGE || options.attachments().isEmpty()) {
+            return;
+        }
+        if (references == null || references.isEmpty()) {
+            throw new IllegalStateException("工作流节点缺少参考图（节点 " + nodeId
+                    + "）：reference 需为本地图片路径、公网 URL 或 data URI");
+        }
+    }
+
+    /**
+     * Invokes the model for one workflow AGENT node and requires a completed result.
+     */
+    private ConversationResult invoke(ProviderConfiguration configuration, String model,
+            CapabilityKindEnum capability, String userInput, String instanceId, List<String> references,
+            boolean streaming, IStreamObserver observer) {
+        ConversationResult result = context.orchestrator().converse(ConversationRequest.builder()
+                .conversationId(conversationId(instanceId))
+                .provider(configuration.getProvider())
+                .model(model)
+                .capabilityKind(capability)
+                .userInput(userInput)
+                .attachments(references)
+                .planningEnabled(false)
+                .providerConfiguration(configuration)
+                .stream(streaming)
+                .observer(streaming ? observer : null)
+                .cancellationToken(currentCancellationToken())
+                .build());
+        if (result.getStatus() != OrchestrationStatusEnum.COMPLETED) {
+            throw new IllegalStateException("工作流 AGENT 节点调用未成功（节点 " + nodeId + "，状态 "
+                    + result.getStatus() + (result.getError() == null
+                    ? "" : "，错误 " + result.getError().getSafeMessage()) + "）");
+        }
+        return result;
+    }
+
+    /**
+     * Retries an image generation node with the configured fallback model.
+     *
+     * <p>平台配置由 {@code ModelRegistry} 缓存并共享，这里只取用、不关闭；关闭会让后续模型调用报
+     * {@code credential configuration is closed}。
+     */
+    private ConversationResult invokeWithFallback(RuntimeException failure, CapabilityKindEnum capability,
+            String userInput, String instanceId, List<String> references,
+            boolean streaming, IStreamObserver observer) {
+        String fallbackAlias = options.fallbackModel();
+        if (capability != CapabilityKindEnum.IMAGE || StringUtils.isBlank(fallbackAlias)) {
+            throw failure;
+        }
+        progress("节点 " + nodeId + "：图片生成失败，切换到备用模型 " + fallbackAlias
+                + "（" + reason(failure) + "）");
+        ProviderConfiguration fallback = context.modelRegistry().resolve(options.role(), fallbackAlias);
+        try {
+            fallback.getCapability(capability);
+            String fallbackModel = fallback.toConfig(capability).getModelId();
+            return invoke(fallback, fallbackModel, capability, userInput, instanceId, references, streaming, observer);
+        } catch (RuntimeException fallbackFailure) {
+            fallbackFailure.addSuppressed(failure);
+            throw new IllegalStateException("图片生成失败：主模型 " + reason(failure) + "；备用模型 " + fallbackAlias
+                    + " 也不可用：" + reason(fallbackFailure) + "（节点 " + nodeId + "）", fallbackFailure);
+        }
+    }
+
+    /**
+     * 取异常的可读原因：优先 message，其次类名；让主模型与备用模型的失败原因都能回传给用户。
+     */
+    private static String reason(Throwable failure) {
+        if (failure == null) {
+            return "未知错误";
+        }
+        String message = failure.getMessage();
+        return StringUtils.isBlank(message) ? failure.getClass().getSimpleName() : message.trim();
     }
 
     /**
@@ -319,9 +393,16 @@ public final class AgentWorkflowAction implements IWorkflowAction {
         }
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("mediaType", capability == CapabilityKindEnum.VIDEO ? "VIDEO" : "IMAGE");
-        output.put("references", references);
         if (capability == CapabilityKindEnum.VIDEO) {
+            output.put("references", references);
             downloadVideos(output, references);
+        } else {
+            List<String> materialized = new ImageStore().materialize(references);
+            output.put("references", materialized);
+            List<String> localFiles = localFiles(materialized);
+            if (!localFiles.isEmpty()) {
+                output.put("localFiles", localFiles);
+            }
         }
         return output;
     }
@@ -353,6 +434,24 @@ public final class AgentWorkflowAction implements IWorkflowAction {
     /**
      * 解析图片附件模板为实际引用（支持 {@code ${...}} 变量）；无附件时返回 null。
      */
+    /**
+     * Extracts local file paths from materialized image references.
+     */
+    private static List<String> localFiles(List<String> references) {
+        List<String> files = new ArrayList<>();
+        for (String reference : references) {
+            if (reference != null && !isRemoteReference(reference)) {
+                files.add(reference);
+            }
+        }
+        return files;
+    }
+
+    private static boolean isRemoteReference(String reference) {
+        return reference.regionMatches(true, 0, "http://", 0, 7)
+                || reference.regionMatches(true, 0, "https://", 0, 8);
+    }
+
     private List<String> attachments(ExecutionScope scope) {
         if (options.attachments().isEmpty()) {
             return Collections.emptyList();
@@ -365,7 +464,7 @@ public final class AgentWorkflowAction implements IWorkflowAction {
                 resolved.add(reference.trim());
             }
         }
-        return resolved.isEmpty() ? null : resolved;
+        return resolved.isEmpty() ? null : ImageReferenceNormalizer.normalize(resolved);
     }
 
     /**

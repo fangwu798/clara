@@ -95,11 +95,13 @@ public class ApplicationConsoleTest {
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/new"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/usage"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/tokens"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/graph"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/graph import"));
         assertEquals(2, controls.compressed.get());
         assertEquals(1, controls.newConversation.get());
         assertEquals(2, controls.usage.get());
+        assertEquals(1, controls.history.get());
         assertEquals(1, controls.showGraph.get());
         assertEquals(1, controls.importGraph.get());
         assertEquals(0, controls.unsupported.get());
@@ -115,6 +117,7 @@ public class ApplicationConsoleTest {
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/compress"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/new"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/usage"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/graph"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/graph import"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/model"));
@@ -219,6 +222,7 @@ public class ApplicationConsoleTest {
         private final AtomicInteger compressed = new AtomicInteger();
         private final AtomicInteger newConversation = new AtomicInteger();
         private final AtomicInteger usage = new AtomicInteger();
+        private final AtomicInteger history = new AtomicInteger();
         private final AtomicInteger showGraph = new AtomicInteger();
         private final AtomicInteger importGraph = new AtomicInteger();
         private final AtomicInteger unsupported = new AtomicInteger();
@@ -236,6 +240,11 @@ public class ApplicationConsoleTest {
         @Override
         public void showUsage() {
             usage.incrementAndGet();
+        }
+
+        @Override
+        public void showHistory() {
+            history.incrementAndGet();
         }
 
         @Override

@@ -26,7 +26,7 @@ public class CapabilityUsageLedgerTest {
         ledger.recordGraph(1234L);
 
         String report = ledger.report();
-        assertTrue(report.contains("视频：1 个任务；completion=108900，total=108900"));
+        assertTrue(report.contains("视频：1 个任务；completion=10.89万，total=10.89万"));
         assertTrue(report.contains("图片：2 张；平台未返回 token"));
         assertTrue(report.contains("图谱：1 次查询，返回 1234 字符"));
     }

@@ -14,18 +14,15 @@ import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.memory.IWindowMemory;
 import com.clara.core.message.IContent;
-import com.clara.core.model.IResponse;
 import com.clara.core.model.IStreamModel;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowEngine;
-import com.clara.dto.record.CallRecord;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
 import com.clara.mcp.api.IMcpCapabilityCatalog;
 import com.clara.mcp.api.IMcpClientFactory;
@@ -47,6 +44,7 @@ import com.clara.mcp.registry.config.McpServerRegistrar;
 import com.clara.mcp.tool.ExternalToolCatalog;
 import com.clara.mcp.transport.JacksonMcpJsonCodec;
 import com.clara.memory.persistence.ConversationStore;
+import com.clara.memory.persistence.ConversationSnapshot;
 import com.clara.memory.persistence.InMemoryConversationStore;
 import com.clara.memory.persistence.local.LocalConversationStore;
 import com.clara.memory.semantic.local.LocalSemanticMemoryStore;
@@ -89,9 +87,13 @@ import com.clara.tool.CompositeToolCatalog;
 import com.clara.tool.CompositeToolInvoker;
 import com.clara.media.VideoDownloader;
 import com.clara.usage.CapabilityUsageLedger;
+import com.clara.usage.ProviderTokenUsage;
+import com.clara.usage.TokenCountFormatter;
+import com.clara.utils.StringUtils;
 import com.clara.tool.McpToolCatalog;
 import com.clara.tool.ToolInvocationPurpose;
 import com.clara.workflow.AgentActionFactory;
+import com.clara.workflow.PendingWorkflowRegistry;
 import com.clara.workflow.PublishWorkflowTool;
 import com.clara.workflow.ReviewActionFactory;
 import com.clara.workflow.WorkflowCatalog;
@@ -116,6 +118,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -156,8 +159,8 @@ import java.util.logging.Logger;
  * {@link #conversationHistoryDescription()} 查看。
  *
  * <p>调用记录：{@code ICallRecordSink} 由进程内实现 {@link InMemoryCallRecordSink} 提供，保留最近若干条
- * 记录供上层读取；{@code IWorkflowDefinitionResolver} 本阶段未接入，以 null 注入，编排层已做降级（不影响
- * 调用）。MCP 调用门面与外部工具路由目录已装配，宿主可通过 {@link #mcpGateway()} /
+ * 记录供上层读取，同时按平台累计 token 用量（{@code /usage} 的平台明细即来自这里）；
+ * {@code IWorkflowDefinitionResolver} 本阶段未接入，以 null 注入，编排层已做降级（不影响调用）。MCP 调用门面与外部工具路由目录已装配，宿主可通过 {@link #mcpGateway()} /
  * {@link #externalToolCatalog()} 登记外部工具；也可由 loadMcpServers(String, Path) 完成
  * 「配置加载 → 注册服务端 → 发现能力 → 登记外部工具」的一站式接入。
  *
@@ -176,6 +179,11 @@ public final class ApplicationBootstrap implements Closeable {
      * 供应商缺省标识：窗口记忆要求供应商非 null，未指定时以此占位。
      */
     private static final String DEFAULT_PROVIDER = "default";
+
+    /**
+     * {@code /usage} 平台列宽：平台名按此宽度右侧补空格，纵向对齐。
+     */
+    private static final int PROVIDER_COLUMN_WIDTH = 12;
 
     /**
      * MCP 客户端单次请求超时（毫秒）：装配期给出的默认值，随宿主登记服务端后生效。
@@ -233,6 +241,8 @@ public final class ApplicationBootstrap implements Closeable {
     private final ModelRegistry modelRegistry;
     private final WorkflowDefinitionRegistry workflowDefinitionRegistry;
     private final WorkflowRunner workflowRunner;
+    /** 会话级待确认工作流登记表：工作流暂停后由宿主注入续接提示，不依赖模型记住上一条工具结果。 */
+    private final PendingWorkflowRegistry pendingWorkflows = new PendingWorkflowRegistry();
     private final DefaultConversationOrchestrator orchestrator;
     private final DefaultConversationOrchestrator.WindowMemoryFactory windowMemoryFactory;
     private final WindowCompressionCoordinator windowCompression;
@@ -419,7 +429,7 @@ public final class ApplicationBootstrap implements Closeable {
         // 内置工具与本地工具调用共享同一脚本执行器注册表，故可在运行器就绪后再注册内置执行器：
         // run_workflow 负责按标识运行；publish_workflow 负责校验并发布模型生成的自定义工作流
         scriptExecutors.register(new BuiltinToolExecutor(Arrays.asList(
-                new WorkflowRunTool(workflowRunner), new PublishWorkflowTool(workflowDefinitionRegistry),
+                new WorkflowRunTool(workflowRunner, pendingWorkflows), new PublishWorkflowTool(workflowDefinitionRegistry),
                 new ValidateExecutionPlanTool(executionPlanValidator))));
     }
 
@@ -471,12 +481,45 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     /**
+     * 读取指定会话的历史消息（供启动回顾、{@code /history} 与方向键历史输入使用）。
+     *
+     * <p>为什么只读不写：展示与行编辑属于观测能力，不能改变上下文；真正参与请求的历史仍由编排层按窗口策略筛选。
+     * 返回前会净化非法助手消息，避免半截工具调用之类的脏数据出现在展示里。
+     *
+     * @param conversationId        会话标识，不可为空白
+     * @param providerConfiguration 当前平台配置，可为 null（返回空列表）
+     * @param model                 当前模型标识，可为 null（返回空列表）
+     * @return 历史消息，非 null；无历史或参数非法时为空列表
+     */
+    public List<IContent> conversationMessages(String conversationId, ProviderConfiguration providerConfiguration,
+                                               String model) {
+        if (conversationId == null || conversationId.trim().isEmpty()
+                || providerConfiguration == null || model == null || model.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        IWindowMemory memory = windowMemoryFactory.create(conversationId,
+                providerConfiguration.getProvider().name(), model);
+        List<IContent> current = HistorySanitizer.dropInvalidAssistantMessages(memory.messages());
+        List<ConversationSnapshot> snapshots = conversationStore().loadAllSnapshots();
+        if (snapshots.isEmpty()) {
+            return current;
+        }
+        // .clara 下的历史按「会话 + 供应商 + 模型」分文件：切换模型或 /new 之前的记录不会出现在当前键里，
+        // 历史查看需要把它们一并带上，按文件最后写入时间拼接。
+        List<IContent> merged = new ArrayList<>();
+        for (ConversationSnapshot snapshot : snapshots) {
+            merged.addAll(snapshot.messages());
+        }
+        return HistorySanitizer.dropInvalidAssistantMessages(merged);
+    }
+
+    /**
      * 统计 token 用量说明（供交互端 {@code /usage} 展示）。
      *
      * <p>统计两类口径：
      * <ol>
      *   <li>当前会话全部历史记录占用的 token 估算（基于持久化历史 + token 估算器，跨重启有效）；</li>
-     *   <li>本次进程内已发生的模型调用累计用量（从调用记录汇总，进程内保留最近若干条）。</li>
+     *   <li>本次会话内已发生的模型调用累计用量，并按平台拆分（累计值不受调用记录容量淘汰影响）。</li>
      * </ol>
      *
      * @param conversationId        会话标识，不可为空白
@@ -490,28 +533,25 @@ public final class ApplicationBootstrap implements Closeable {
         report.append("会话：").append(conversationId);
         appendHistorySummary(report, conversationId, providerConfiguration, model);
 
-        long input = 0L;
-        long output = 0L;
-        long total = 0L;
-        int calls = 0;
-        for (CallRecord callRecord : callRecordSink.snapshot()) {
-            IResponse response = callRecord.getResponse();
-            if (!(response instanceof HttpResponse)) {
-                continue;
-            }
-            HttpResponse http = (HttpResponse) response;
-            long in = http.getInputTokens() == null ? 0L : http.getInputTokens().longValue();
-            long out = http.getOutputTokens() == null ? 0L : http.getOutputTokens().longValue();
-            long sum = http.getTotalTokens() == null
-                    ? in + out : http.getTotalTokens().longValue();
-            calls++;
-            input += in;
-            output += out;
-            total += sum == 0L ? in + out : sum;
+        ProviderTokenUsage total = callRecordSink.totalUsage();
+        report.append('\n').append("本次会话累计调用：").append(total.getCalls()).append(" 次")
+                .append("（输入 ").append(TokenCountFormatter.format(total.getInputTokens()))
+                .append(" / 输出 ").append(TokenCountFormatter.format(total.getOutputTokens()))
+                .append(" / 合计 ").append(TokenCountFormatter.format(total.getTotalTokens())).append(" tokens）");
+        report.append('\n').append("按平台统计：");
+        Map<ModelProviderEnum, ProviderTokenUsage> byProvider = callRecordSink.usageByProvider();
+        if (byProvider.isEmpty()) {
+            report.append('\n').append("  （暂无模型调用）");
+            return report.toString();
         }
-        report.append('\n').append("本次进程累计调用：").append(calls).append(" 次")
-                .append("（输入 ").append(input).append(" / 输出 ").append(output)
-                .append(" / 合计 ").append(total).append(" tokens）");
+        for (Map.Entry<ModelProviderEnum, ProviderTokenUsage> entry : byProvider.entrySet()) {
+            ProviderTokenUsage usage = entry.getValue();
+            report.append('\n').append("  ").append(StringUtils.padRight(entry.getKey().name(), PROVIDER_COLUMN_WIDTH))
+                    .append(" 调用 ").append(usage.getCalls()).append(" 次")
+                    .append("，输入 ").append(TokenCountFormatter.format(usage.getInputTokens()))
+                    .append("，输出 ").append(TokenCountFormatter.format(usage.getOutputTokens()))
+                    .append("，合计 ").append(TokenCountFormatter.format(usage.getTotalTokens())).append(" tokens");
+        }
         return report.toString();
     }
 
@@ -526,7 +566,7 @@ public final class ApplicationBootstrap implements Closeable {
         List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(memory.messages());
         long tokens = tokenCountEstimator == null ? 0L : tokenCountEstimator.estimate(history);
         report.append('\n').append("历史记录：").append(history.size()).append(" 条")
-                .append("，估算 token：").append(tokens);
+                .append("，估算 token：").append(TokenCountFormatter.format(tokens));
     }
 
     /**
@@ -616,6 +656,18 @@ public final class ApplicationBootstrap implements Closeable {
      */
     public WorkflowRunner workflowRunner() {
         return workflowRunner;
+    }
+
+    /**
+     * 返回会话级待确认工作流登记表。
+     *
+     * <p>交互端在每轮请求前用 {@link PendingWorkflowRegistry#hint(String)} 取提示，注入为临时系统提示，
+     * 使工作流暂停后即使发生模型故障转移，也能继续用同一实例标识续接。
+     *
+     * @return 登记表，非 null
+     */
+    public PendingWorkflowRegistry pendingWorkflows() {
+        return pendingWorkflows;
     }
 
     /**

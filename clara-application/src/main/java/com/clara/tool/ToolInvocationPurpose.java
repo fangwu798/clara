@@ -50,6 +50,24 @@ public final class ToolInvocationPurpose {
         return declaredDescription;
     }
 
+    /**
+     * 取本次命令调用的可展示命令行。
+     *
+     * <p>非 {@code run_command} 调用返回 null；{@code argv} 优先，其次取 {@code command} 原文，
+     * 供控制台以「● 执行 &lt;命令&gt;」的形式展示。
+     *
+     * @param toolName      工具名，可为 null
+     * @param argumentsJson 工具入参 JSON，可为 null
+     * @return 可展示命令行；不是命令调用或无法解析时返回 null
+     */
+    public static String displayCommand(String toolName, String argumentsJson) {
+        if (!RUN_COMMAND.equals(toolName)) {
+            return null;
+        }
+        String command = commandLine(parse(argumentsJson));
+        return StringUtils.isBlank(command) ? null : command.trim();
+    }
+
     private static String commandPurpose(JsonNode root) {
         String command = command(root);
         if (StringUtils.isBlank(command)) {

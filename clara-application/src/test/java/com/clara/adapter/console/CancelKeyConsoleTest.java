@@ -1,6 +1,7 @@
 package com.clara.adapter.console;
 
 import com.clara.context.CancellationToken;
+import com.clara.interaction.UserInterventionBuffer;
 import org.jline.terminal.impl.DumbTerminal;
 import org.junit.Rule;
 import org.junit.Test;
@@ -10,7 +11,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -82,6 +85,57 @@ public class CancelKeyConsoleTest {
             idle.start();
             idle.close();
         } finally {
+            terminal.close();
+            view.close();
+        }
+    }
+
+    /**
+     * 执行中按 Tab 输入补充后，应按回车提交并继续响应 ESC 取消。
+     */
+    @Test
+    public void collectsInterventionThenStillCancels() throws Exception {
+        ConsoleView view = new ConsoleView(folder.newFolder("logs-intervene").toPath(), false, "never");
+        DumbTerminal terminal = new DumbTerminal(
+                new ByteArrayInputStream(new byte[]{9, 'f', 'o', 'c', 'u', 's', 13, 27, 27}),
+                new ByteArrayOutputStream());
+        UserInterventionBuffer buffer = new UserInterventionBuffer();
+        CancellationToken token = new CancellationToken();
+        CancelKeySession session = new CancelKeySession(view, terminal, token, buffer);
+        try {
+            session.start();
+            for (int attempt = 0; attempt < 60 && !token.isCancellationRequested(); attempt++) {
+                Thread.sleep(50L);
+            }
+            assertTrue(token.isCancellationRequested());
+            assertEquals(Collections.singletonList("focus"), buffer.drain());
+        } finally {
+            session.close();
+            terminal.close();
+            view.close();
+        }
+    }
+
+    /**
+     * 空行提交应取消本次补充，不写入缓冲区。
+     */
+    @Test
+    public void blankInterventionIsDiscarded() throws Exception {
+        ConsoleView view = new ConsoleView(folder.newFolder("logs-blank").toPath(), false, "never");
+        DumbTerminal terminal = new DumbTerminal(
+                new ByteArrayInputStream(new byte[]{9, 13, 27, 27}), new ByteArrayOutputStream());
+        UserInterventionBuffer buffer = new UserInterventionBuffer();
+        CancellationToken token = new CancellationToken();
+        CancelKeySession session = new CancelKeySession(view, terminal, token, buffer);
+        try {
+            session.start();
+            for (int attempt = 0; attempt < 60 && !token.isCancellationRequested(); attempt++) {
+                Thread.sleep(50L);
+            }
+            assertTrue(token.isCancellationRequested());
+            assertTrue(buffer.drain().isEmpty());
+        } finally {
+            session.close();
             terminal.close();
             view.close();
         }

@@ -26,7 +26,7 @@ capabilities:
     parameters:
       maxPromptChars: 32000
       maxOutputs: 1
-      maxSourceImages: 0
+      maxSourceImages: 2
       watermark: false
   # 文生视频（异步任务）：endpoint 为提交地址，taskQueryEndpoint 为按任务标识查询状态的地址。
   # 供 video_generation 工作流使用；需已设置 CLARA_VOLCENGINE_API_KEY。工作流会先等待人工确认，

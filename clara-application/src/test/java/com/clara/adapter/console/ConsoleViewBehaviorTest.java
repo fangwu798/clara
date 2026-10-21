@@ -105,7 +105,13 @@ public class ConsoleViewBehaviorTest {
         view.printHints(Arrays.asList("decision_panel（讨论）", "other（其它）"));
         view.println("plain");
         view.println();
-        assertTrue(true);
+        view.beginInterventionInput("prompt");
+        assertTrue(view.isInterventionInputActive());
+        view.emit("deferred");
+        view.printStream("stream");
+        view.println("line");
+        view.endInterventionInput();
+        assertFalse(view.isInterventionInputActive());
     }
 
     @Test
@@ -123,7 +129,7 @@ public class ConsoleViewBehaviorTest {
     }
 
     @Test
-    public void streamObserverRendersThinkingAnswerAndToolCalls() {
+    public void streamObserverRendersThinkingAnswerAndToolCalls() throws Exception {
         ConsoleView.ConsoleStreamObserver observer = view.newObserver(
                 (name, arguments) -> name.equals("text_search") ? "查询符号。" : null);
 
@@ -140,6 +146,33 @@ public class ConsoleViewBehaviorTest {
         observer.onEvent(event(StreamEventEnum.RESPONSE_COMPLETE, null, null, null));
 
         assertTrue(observer.printed());
+        view.close();
+        String log = new String(Files.readAllBytes(logFile), StandardCharsets.UTF_8);
+        assertTrue(log.contains("● 调用 text_search"));
+        assertTrue(log.contains("● 调用 run_command"));
+    }
+
+    @Test
+    public void writesStreamedThinkingAndAnswerToLogWithoutDuplication() throws Exception {
+        view.logUserInput("问题");
+        ConsoleView.ConsoleStreamObserver observer = view.newObserver(null);
+        observer.onEvent(event(StreamEventEnum.REASONING_DELTA, "第一步", null, null));
+        observer.onEvent(event(StreamEventEnum.REASONING_DELTA, "第二步", null, null));
+        observer.onEvent(event(StreamEventEnum.TEXT_DELTA, "答案", null, null));
+        observer.onEvent(event(StreamEventEnum.RESPONSE_COMPLETE, null, null, null));
+        view.logTurn(com.clara.orchestration.api.ConversationResult.builder()
+                .conversationId("c1")
+                .content("答案")
+                .reasoning("第一步第二步")
+                .status(com.clara.orchestration.api.OrchestrationStatusEnum.COMPLETED)
+                .build());
+        view.close();
+
+        String log = new String(Files.readAllBytes(logFile), StandardCharsets.UTF_8);
+        assertTrue(log.contains("[thinking] 第一步第二步"));
+        assertEquals(1, occurrences(log, "[thinking]"));
+        assertTrue(log.contains("[assistant] 答案"));
+        assertEquals(1, occurrences(log, "[assistant]"));
     }
 
     @Test
@@ -157,6 +190,16 @@ public class ConsoleViewBehaviorTest {
         observer.onEvent(new StreamEvent(StreamEventEnum.ERROR, 3L, null, null, null, null, withProvider));
 
         assertFalse(observer.printed());
+    }
+
+    private static int occurrences(String text, String needle) {
+        int count = 0;
+        int index = 0;
+        while ((index = text.indexOf(needle, index)) >= 0) {
+            count++;
+            index += needle.length();
+        }
+        return count;
     }
 
     private static BufferedReader reader(String content) {

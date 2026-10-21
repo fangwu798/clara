@@ -101,6 +101,12 @@
                 <artifactId>jline-terminal</artifactId>
                 <version>${jline.version}</version>
             </dependency>
+            <!-- 控制台行编辑：方向键切换历史输入、Ctrl+Enter 换行、多行编辑。 -->
+            <dependency>
+                <groupId>org.jline</groupId>
+                <artifactId>jline-reader</artifactId>
+                <version>${jline.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.jline</groupId>
                 <artifactId>jline-terminal-jna</artifactId>

@@ -3,6 +3,7 @@ package com.clara.orchestration;
 import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.memory.IWindowMemory;
 import com.clara.core.message.IContent;
+import com.clara.core.interaction.IUserInterventionSource;
 import com.clara.dto.memory.ContextControlConfig;
 import com.clara.dto.tool.ToolCall;
 import com.clara.enums.CapabilityKindEnum;
@@ -61,6 +62,9 @@ public final class DefaultConversationOrchestrator {
 
     /** 单轮最多自动续写次数，防止模型反复触发长度上限而无限循环。 */
     private static final int MAX_OUTPUT_CONTINUATIONS = 2;
+
+    /** 单轮对话因执行期补充而重新请求模型的最大次数，避免用户持续输入导致无限循环。 */
+    private static final int MAX_INTERVENTION_ROUNDS = 2;
 
     /** 输出被长度上限截断后的续写指令；只作用于紧随其后的那次请求。 */
     private static final String CONTINUE_PROMPT =
@@ -140,7 +144,8 @@ public final class DefaultConversationOrchestrator {
                 provider == null ? null : provider.name(), request.getModel());
         ConversationPlan plan = new ConversationPlan(request, capabilityKind, control, provider,
                 hostObserver, request.getMaxToolRoundTrips(), maxTokensPerCall(request, capabilityKind));
-        ConversationState state = new ConversationState(context, windowMemory, new StringBuilder());
+        ConversationState state = new ConversationState(context, windowMemory, new StringBuilder(),
+                request.getUserIntervention());
         try (ConvContext.Scope ignored = ConvContext.open(context)) {
             appendUserTurn(plan, state);
             prepareIntent(plan, state);
@@ -239,6 +244,8 @@ public final class DefaultConversationOrchestrator {
         int toolRoundTrips = 0;
         while (true) {
             state.context.throwIfCancelled();
+            // 上一轮工具执行或流式思考期间收到的用户补充，必须先进入历史再装配请求。
+            appendInterventions(state);
             HttpRequest httpRequest = buildRequest(plan, state);
             HttpResponse response;
             try {
@@ -263,6 +270,9 @@ public final class DefaultConversationOrchestrator {
                 if (isOutputTruncated(response) && continueTruncatedOutput(state, response)) {
                     continue;
                 }
+                if (replanForIntervention(plan, state, response)) {
+                    continue;
+                }
                 return completedResult(plan, state, response, toolRoundTrips);
             }
             if (plan.maxToolRoundTrips > 0 && toolRoundTrips >= plan.maxToolRoundTrips) {
@@ -271,6 +281,8 @@ public final class DefaultConversationOrchestrator {
             List<IContent> toolMessages = toolRoundTripCoordinator.perform(response);
             state.windowMemory.append(toolMessages);
             toolRoundTrips++;
+            // 工具执行期间用户可能补了新的约束：写入历史，下一次模型请求即可看到。
+            appendInterventions(state);
             String userInputRequest = toolRoundTripCoordinator.userInputRequest(toolMessages);
             if (userInputRequest != null) {
                 state.windowMemory.append(Collections.singletonList(new AssistantContent(userInputRequest)));
@@ -279,6 +291,65 @@ public final class DefaultConversationOrchestrator {
                         state.reasoning.toString(), true);
             }
         }
+    }
+
+    /**
+     * 把执行期补充写入窗口记忆；每条补充独立成为一条 user 消息，保持提交顺序。
+     *
+     * @param state 本轮状态，非 null
+     * @return 实际写入的补充条数
+     */
+    private static int appendInterventions(ConversationState state) {
+        if (state.userIntervention == null) {
+            return 0;
+        }
+        int applied = 0;
+        for (String supplement : state.userIntervention.drain()) {
+            if (supplement == null || supplement.trim().isEmpty()) {
+                continue;
+            }
+            state.windowMemory.append(Collections.singletonList(
+                    new UserContent(interventionText(supplement.trim()))));
+            applied++;
+        }
+        return applied;
+    }
+
+    /**
+     * 包装用户补充文本，明确告知模型这是执行中追加的纠偏指令。
+     */
+    private static String interventionText(String supplement) {
+        return "[用户实时补充] " + supplement + "\n"
+                + "（用户在模型思考或工具执行期间追加的说明。请立即校准后续思路与工具调用；"
+                + "若与先前方向冲突，以本补充为准；不要重做已完成且未偏离目标的部分。）";
+    }
+
+    /**
+     * 最终答复生成期间收到补充时，再请求一次模型，避免补充因本轮结束而丢失。
+     *
+     * <p>只对对话能力生效，且最多重请求 {@value #MAX_INTERVENTION_ROUNDS} 次。重请求前先把当前答复写入
+     * 历史，模型看到的是「已有答复 + 用户纠偏」，因此可以做增量修正而不是重新回答。
+     *
+     * @return 已安排重请求时返回 true
+     */
+    private boolean replanForIntervention(ConversationPlan plan, ConversationState state, HttpResponse response) {
+        if (plan.capabilityKind != CapabilityKindEnum.CHAT || state.userIntervention == null
+                || state.interventionRounds >= MAX_INTERVENTION_ROUNDS
+                || !state.userIntervention.hasPending()) {
+            return false;
+        }
+        String finalPart = capabilityDispatcher.extract(plan.capabilityKind, response);
+        if (finalPart != null && !finalPart.trim().isEmpty()) {
+            state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart)));
+        }
+        int applied = appendInterventions(state);
+        if (applied == 0) {
+            return false;
+        }
+        state.interventionRounds++;
+        System.out.println("  [intervene] 收到执行期补充 " + applied + " 条，已重新请求模型校准方向（第 "
+                + state.interventionRounds + " 次）"); // NOSONAR CLI output by design
+        return true;
     }
 
     private HttpRequest buildRequest(ConversationPlan plan, ConversationState state) {
@@ -296,6 +367,11 @@ public final class DefaultConversationOrchestrator {
             List<String> extra = new ArrayList<>(2);
             if (state.planPrompt != null) {
                 extra.add(state.planPrompt);
+            }
+            // 宿主注入的本轮临时提示（如待确认工作流续接指令）：只影响本轮，不写入历史。
+            String runtimeHint = plan.request.getRuntimeHint();
+            if (runtimeHint != null && !runtimeHint.trim().isEmpty()) {
+                extra.add(runtimeHint);
             }
             if (state.continuationPrompt != null) {
                 extra.add(state.continuationPrompt);
@@ -402,13 +478,18 @@ public final class DefaultConversationOrchestrator {
         }
         // 只记录有正文的助手回复：正文为空且不带工具调用的 assistant 消息会被平台判为非法
         // （Invalid assistant message: content or tool_calls must be set），因此不写入历史。
-        if (finalPart != null && !finalPart.trim().isEmpty()) {
+        if (plan.capabilityKind == CapabilityKindEnum.CHAT
+                && finalPart != null && !finalPart.trim().isEmpty()) {
             state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart)));
         }
         ConversationResult result = conversationResult(plan.request.getConversationId(), content,
                 OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
                 state.reasoning.toString());
-        result.setGeneratedImages(response.getGeneratedImages());
+        Integer generatedImages = response.getGeneratedImages();
+        if (generatedImages == null && response.getImages() != null && !response.getImages().isEmpty()) {
+            generatedImages = response.getImages().size();
+        }
+        result.setGeneratedImages(generatedImages);
         return result;
     }
 
@@ -467,11 +548,17 @@ public final class DefaultConversationOrchestrator {
         private int outputContinuations;
         /** 下一次请求要携带的续写指令；只用一次。 */
         private String continuationPrompt;
+        /** 执行期用户补充来源；未启用实时干预时为 null。 */
+        private final IUserInterventionSource userIntervention;
+        /** 已因执行期补充重新请求模型的次数。 */
+        private int interventionRounds;
 
-        private ConversationState(ConvContext context, IWindowMemory windowMemory, StringBuilder reasoning) {
+        private ConversationState(ConvContext context, IWindowMemory windowMemory, StringBuilder reasoning,
+                IUserInterventionSource userIntervention) {
             this.context = context;
             this.windowMemory = windowMemory;
             this.reasoning = reasoning;
+            this.userIntervention = userIntervention;
         }
     }
 

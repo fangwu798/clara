@@ -162,7 +162,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, name = "response_format.type", defaultValue = "text", allowed = {"text", "json_object", "json_schema"})
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, name = "response_format.type", defaultValue = "text", allowed = {"text", "json_object"})
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "url", allowed = {"url", "b64_json"}, note = "图片返回形式；url 链接 24 小时内有效，需自行转存；生成的图片固定为 jpeg 格式")
-    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, defaultValue = "b64_json", allowed = {"url", "b64_json"}, note = "gpt-image-1 系列仅返回 b64_json；dall-e-3 支持 url")
+    @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, allowed = {"url", "b64_json"}, note = "gpt-image-1 系列仅返回 b64_json；dall-e-3 支持 url")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private String responseFormat;
 

@@ -79,6 +79,21 @@ public class WorkflowRunnerTest {
         assertTrue(result.contains("SUCCEEDED"));
     }
 
+    @Test
+    public void waitingResultCarriesResumeInstruction() throws Exception {
+        Path directory = folder.newFolder("workflow").toPath();
+        WorkflowDefinitionRegistry registry = registry(directory);
+        write(directory, "wait_flow.yml", definition("wait_flow"));
+        WorkflowRunner runner = new WorkflowRunner(new WaitingEngine(), registry);
+
+        String result = runner.run("wait_flow", "{\"subject\":\"夕阳\"}");
+
+        assertTrue(result.contains("\"status\":\"WAITING_INPUT\""));
+        assertTrue(result.contains("\"nextAction\""));
+        assertTrue(result.contains("\"promptFeedback\":\"approve\""));
+        assertTrue(result.contains("run_workflow"));
+    }
+
     private static WorkflowDefinitionRegistry registry(Path directory) {
         return new WorkflowDefinitionRegistry(directory, new WorkflowDefinitionLoader(
                 Collections.<IWorkflowActionFactory>singletonList(new StubFactory())));
@@ -134,6 +149,45 @@ public class WorkflowRunnerTest {
         public WorkflowResult start(WorkflowDefinition definition, String instanceId, Map<String, Object> inputs) {
             return new WorkflowResult(instanceId, WorkflowInstanceStatusEnum.SUCCEEDED,
                     new ExecutionScope(inputs), 1L);
+        }
+
+        @Override
+        public WorkflowResult resume(WorkflowDefinition definition, String instanceId, Map<String, Object> inputs) {
+            return start(definition, instanceId, inputs);
+        }
+
+        @Override
+        public WorkflowResult resume(WorkflowDefinition definition, String instanceId, Map<String, Object> inputs,
+                long expectedCheckpointVersion) {
+            return start(definition, instanceId, inputs);
+        }
+
+        @Override
+        public WorkflowResult cancel(String instanceId) {
+            return new WorkflowResult(instanceId, WorkflowInstanceStatusEnum.CANCELLED,
+                    new ExecutionScope(Collections.<String, Object>emptyMap()), 1L);
+        }
+
+        @Override
+        public WorkflowResult suspend(String instanceId) {
+            return cancel(instanceId);
+        }
+
+        @Override
+        public void close() {
+            // 无外部资源需要释放
+        }
+    }
+
+    /**
+     * 返回暂停状态的测试引擎：用于验证运行器把「如何续接」的结构化指令带给模型。
+     */
+    private static final class WaitingEngine implements IWorkflowEngine {
+
+        @Override
+        public WorkflowResult start(WorkflowDefinition definition, String instanceId, Map<String, Object> inputs) {
+            return new WorkflowResult(instanceId, WorkflowInstanceStatusEnum.WAITING_INPUT,
+                    new ExecutionScope(inputs), 1L, "review", "promptFeedback");
         }
 
         @Override

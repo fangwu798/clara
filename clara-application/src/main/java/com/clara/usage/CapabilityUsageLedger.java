@@ -116,16 +116,16 @@ public final class CapabilityUsageLedger {
         StringBuilder text = new StringBuilder("能力用量（本次会话）：");
         text.append('\n').append("  图片：").append(imageCount).append(" 张");
         if (imageTotalTokens > 0L || imageInputTokens > 0L || imageOutputTokens > 0L) {
-            text.append("；tokens input=").append(imageInputTokens)
-                    .append("，output=").append(imageOutputTokens)
-                    .append("，total=").append(imageTotalTokens);
+            text.append("；tokens input=").append(TokenCountFormatter.format(imageInputTokens))
+                    .append("，output=").append(TokenCountFormatter.format(imageOutputTokens))
+                    .append("，total=").append(TokenCountFormatter.format(imageTotalTokens));
         } else {
             text.append("；平台未返回 token");
         }
         text.append('\n').append("  视频：").append(videoTasks).append(" 个任务");
         if (videoTotalTokens > 0L || videoInputTokens > 0L || videoOutputTokens > 0L) {
-            text.append("；completion=").append(videoOutputTokens)
-                    .append("，total=").append(videoTotalTokens);
+            text.append("；completion=").append(TokenCountFormatter.format(videoOutputTokens))
+                    .append("，total=").append(TokenCountFormatter.format(videoTotalTokens));
         } else {
             text.append("；平台未返回 token");
         }
@@ -147,9 +147,10 @@ public final class CapabilityUsageLedger {
         if (usage == null || total(usage.getInputTokens(), usage.getOutputTokens(), usage.getTotalTokens()) <= 0L) {
             return text.append("，平台未返回 token").toString();
         }
-        return text.append("，tokens input=").append(usage.getInputTokens())
-                .append("，output=").append(usage.getOutputTokens())
-                .append("，total=").append(total(usage.getInputTokens(), usage.getOutputTokens(), usage.getTotalTokens()))
+        return text.append("，tokens input=").append(TokenCountFormatter.format(usage.getInputTokens()))
+                .append("，output=").append(TokenCountFormatter.format(usage.getOutputTokens()))
+                .append("，total=").append(TokenCountFormatter.format(
+                        total(usage.getInputTokens(), usage.getOutputTokens(), usage.getTotalTokens())))
                 .toString();
     }
 
@@ -168,7 +169,8 @@ public final class CapabilityUsageLedger {
         if (output <= 0L && total <= 0L) {
             return "平台未返回 token";
         }
-        return "completion=" + output + "，total=" + (total > 0L ? total : output);
+        return "completion=" + TokenCountFormatter.format(output)
+                + "，total=" + TokenCountFormatter.format(total > 0L ? total : output);
     }
 
     private static long total(int input, int output, Integer total) {

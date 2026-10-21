@@ -1,6 +1,7 @@
 package com.clara;
 
 import com.clara.adapter.console.CancelKeyMonitor;
+import com.clara.adapter.console.ConsoleInput;
 import com.clara.adapter.console.ConsoleView;
 import com.clara.adapter.console.LaunchOptions;
 import com.clara.adapter.console.SessionCommandHandler;
@@ -162,7 +163,10 @@ public class ClaraApplicationInternalsTest {
                 view, bootstrap, registry);
         controls.compressContext();
         controls.showUsage();
+        controls.showHistory();
         controls.newConversation();
+        call("printRecentHistory", new Class<?>[]{ConsoleView.class, ApplicationBootstrap.class,
+                ModelRegistry.class, ConsoleInput.class}, view, bootstrap, registry, null);
         assertNotNull(controls);
     }
 

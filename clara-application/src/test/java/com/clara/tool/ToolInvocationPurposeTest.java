@@ -66,6 +66,16 @@ public class ToolInvocationPurposeTest {
     }
 
     @Test
+    public void exposesFullCommandForConsoleHeader() {
+        String quote = String.valueOf((char) 34);
+        String arguments = "{" + quote + "argv" + quote + ":[" + quote + "mvn" + quote + ","
+                + quote + "-v" + quote + "]}";
+
+        assertEquals("mvn -v", ToolInvocationPurpose.displayCommand("run_command", arguments));
+        assertEquals(null, ToolInvocationPurpose.displayCommand("file_ops", arguments));
+    }
+
+    @Test
     public void toleratesUnparsableArguments() {
         assertEquals(DECLARED, ToolInvocationPurpose.describe("run_command", "not-json", DECLARED));
         assertEquals(DECLARED, ToolInvocationPurpose.describe("run_command", null, DECLARED));

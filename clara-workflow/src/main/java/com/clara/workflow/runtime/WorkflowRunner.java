@@ -133,12 +133,38 @@ public final class WorkflowRunner {
         payload.put("waitingForUser", waitingForUser);
         if (waitingForUser) {
             payload.put("display", waitingDisplay(outputs));
+            payload.put("nextAction", nextAction(workflowId, instanceId, result.getWaitingInputKey()));
         }
         try {
             return JSON.writeValueAsString(payload);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("工作流结果序列化失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 组装「如何续接」的结构化指令：模型下一轮必须按此调用 run_workflow，而不是把确认当成新任务，
+     * 也不是去执行 {@code java -jar clara.jar image}（该子命令不存在）。
+     *
+     * @param workflowId 工作流标识，非空白
+     * @param instanceId 暂停实例标识，非空白
+     * @param inputKey   待填输入键，为 null 时按 promptFeedback 处理
+     * @return 续接指令，非 null
+     */
+    private static Map<String, Object> nextAction(String workflowId, String instanceId, String inputKey) {
+        String key = inputKey == null || inputKey.trim().isEmpty() ? "promptFeedback" : inputKey.trim();
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        inputs.put(key, "approve");
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        arguments.put("workflow", workflowId);
+        arguments.put("instanceId", instanceId);
+        arguments.put("inputs", inputs);
+        Map<String, Object> action = new LinkedHashMap<>();
+        action.put("tool", "run_workflow");
+        action.put("arguments", arguments);
+        action.put("rule", "用户确认时按此参数续接；若用户提出修改意见，把 approve 换成用户原文。"
+                + "不要执行 clara.jar image / video（没有该子命令），也不要把确认当成新任务重新开始。");
+        return action;
     }
 
     /**

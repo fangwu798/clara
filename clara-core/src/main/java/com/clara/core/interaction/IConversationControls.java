@@ -15,6 +15,9 @@ public interface IConversationControls {
     /** 显示 token 用量统计（全部历史记录估算 + 本次进程累计调用）。 */
     void showUsage();
 
+    /** 显示当前会话的历史聊天记录（仅用户与助手消息）。 */
+    void showHistory();
+
     /** 显示当前工作目录的代码知识图谱状态（是否已导入、怎么导入、可视化地址）。 */
     void showCodeGraph();
 

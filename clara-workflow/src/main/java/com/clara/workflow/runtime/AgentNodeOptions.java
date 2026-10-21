@@ -25,18 +25,21 @@ public final class AgentNodeOptions {
     private static final String ATTRIBUTE_MODEL = "model";
     private static final String ATTRIBUTE_CAPABILITY = "capability";
     private static final String ATTRIBUTE_ATTACHMENTS = "attachments";
+    private static final String ATTRIBUTE_FALLBACK_MODEL = "fallbackModel";
 
     private final String role;
     private final String modelAlias;
     private final CapabilityKindEnum capability;
     private final List<String> attachments;
+    private final String fallbackModel;
 
     private AgentNodeOptions(String role, String modelAlias, CapabilityKindEnum capability,
-            List<String> attachments) {
+            List<String> attachments, String fallbackModel) {
         this.role = role;
         this.modelAlias = modelAlias;
         this.capability = capability;
         this.attachments = attachments;
+        this.fallbackModel = fallbackModel;
     }
 
     /**
@@ -51,7 +54,8 @@ public final class AgentNodeOptions {
             throw new IllegalArgumentException("spec must not be null");
         }
         return new AgentNodeOptions(text(spec.getAttribute(ATTRIBUTE_ROLE)),
-                text(spec.getAttribute(ATTRIBUTE_MODEL)), capability(spec), attachments(spec));
+                text(spec.getAttribute(ATTRIBUTE_MODEL)), capability(spec), attachments(spec),
+                text(spec.getAttribute(ATTRIBUTE_FALLBACK_MODEL)));
     }
 
     /**
@@ -88,6 +92,15 @@ public final class AgentNodeOptions {
      */
     public List<String> attachments() {
         return attachments;
+    }
+
+    /**
+     * Fallback model alias used when the primary model call fails.
+     *
+     * @return fallback model alias, or null when not configured
+     */
+    public String fallbackModel() {
+        return fallbackModel;
     }
 
     private static CapabilityKindEnum capability(WorkflowActionSpec spec) {

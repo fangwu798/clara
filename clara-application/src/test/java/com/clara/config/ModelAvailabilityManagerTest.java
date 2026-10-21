@@ -73,6 +73,29 @@ public class ModelAvailabilityManagerTest {
     }
 
     @Test
+    public void keepsConfiguredDefaultWhenAvailable() throws Exception {
+        Path clara = temporary.newFile("keep-default.yml").toPath();
+        Files.write(clara, Arrays.asList(
+                "defaultModel: deepseek-completion",
+                "enabledProviders: [deepseek-completion, deepseek-response]"),
+                StandardCharsets.UTF_8);
+        List<Path> configs = Arrays.asList(config("deepseek-completion.yml"),
+                config("deepseek-response.yml"));
+        IModelProbe probe = (path, alias, provider, chat, timeout) -> ModelCheckResult.available(
+                path, alias, provider.getProvider().name(), chat.getModelId(),
+                alias.equals("deepseek-response") ? 35L : 120L);
+        List<AvailabilityLine> output = new ArrayList<>();
+
+        List<Path> usable = new ModelAvailabilityManager(name -> "test-key", probe, 1000L)
+                .checkAndPersist(configs, clara, output::add);
+
+        assertEquals(Arrays.asList(configs.get(1), configs.get(0)), usable);
+        JsonNode root = new ObjectMapper(new YAMLFactory()).readTree(Files.readAllBytes(clara));
+        assertEquals("deepseek-completion", root.get("defaultModel").asText());
+        assertTrue(texts(output).stream().anyMatch(line ->
+                line.contains("默认模型：deepseek-completion") && line.contains("120ms")));
+    }
+    @Test
     public void skipsMissingCredentialWithoutProbingAndWritesEmptyList() throws Exception {
         Path clara = temporary.newFile("empty.yml").toPath();
         Files.write(clara, Collections.singletonList("milvus:\n  enabled: false"), StandardCharsets.UTF_8);
