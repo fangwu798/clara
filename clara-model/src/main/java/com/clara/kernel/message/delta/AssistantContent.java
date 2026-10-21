@@ -33,12 +33,29 @@ public final class AssistantContent implements IContent {
     private final String content;
 
     /**
+     * 本次模型调用的 token 用量；仅用于历史展示与持久化，不参与协议渲染。
+     */
+    @JsonIgnore
+    private final TokenUsage usage;
+
+    /**
      * 创建助手消息。
      *
      * @param content 正文文本，可为 null
      */
     public AssistantContent(String content) {
+        this(content, null);
+    }
+
+    /**
+     * 创建带 token 用量的助手消息。
+     *
+     * @param content 正文文本，可为 null
+     * @param usage   本次模型调用用量，可为 null
+     */
+    public AssistantContent(String content, TokenUsage usage) {
         this.content = content;
+        this.usage = usage;
     }
 
     /**

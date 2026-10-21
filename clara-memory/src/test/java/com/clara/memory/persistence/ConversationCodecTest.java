@@ -7,6 +7,7 @@ import com.clara.dto.tool.ToolCallFunction;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.SystemContent;
+import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.kernel.message.delta.ToolContent;
 import com.clara.kernel.message.delta.UserContent;
 import org.junit.Test;
@@ -17,6 +18,8 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -69,6 +72,31 @@ public class ConversationCodecTest {
         assertEquals(2, decoded.messages().size());
         assertTrue(decoded.messages().get(0) instanceof AssistantContent);
         assertEquals("c", ((ToolCallContent) decoded.messages().get(1)).getToolCalls().get(0).getId());
+    }
+
+    @Test
+    public void roundTripsAssistantTokenUsageWithoutPollutingProtocol() {
+        TokenUsage usage = new TokenUsage(1200, 300, 1500, 40);
+        ConversationSnapshot decoded = codec.decode(codec.encode(
+                new ConversationSnapshot(1L, Collections.singletonList(new AssistantContent("hi", usage)))));
+
+        AssistantContent assistant = (AssistantContent) decoded.messages().get(0);
+        assertEquals("hi", assistant.getContent());
+        assertEquals(1200, assistant.getUsage().getInputTokens());
+        assertEquals(300, assistant.getUsage().getOutputTokens());
+        assertEquals(Integer.valueOf(1500), assistant.getUsage().getTotalTokens());
+        assertEquals(Integer.valueOf(40), assistant.getUsage().getCacheTokens());
+        assertFalse(assistant.toCompletionMessage().containsKey("clara_usage"));
+    }
+
+    @Test
+    public void decodesLegacyAssistantMessageWithoutUsage() {
+        ConversationSnapshot decoded = codec.decode(
+                "{\"version\":1,\"messages\":[{\"role\":\"assistant\",\"content\":\"old\"}]}"
+                        .getBytes(StandardCharsets.UTF_8));
+        AssistantContent assistant = (AssistantContent) decoded.messages().get(0);
+        assertEquals("old", assistant.getContent());
+        assertNull(assistant.getUsage());
     }
 
     @Test

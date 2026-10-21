@@ -27,6 +27,7 @@ import com.clara.kernel.credential.ProviderCredentialConfiguration;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.http.TransportConfig;
+import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
@@ -81,6 +82,9 @@ public class DefaultConversationOrchestratorLoopTest {
         assertEquals(7, result.getUsage().getOutputTokens());
         assertEquals(1, model.requests.size());
         assertEquals(2, memory.messages().size());
+        AssistantContent assistant = (AssistantContent) memory.messages().get(1);
+        assertEquals(11, assistant.getUsage().getInputTokens());
+        assertEquals(7, assistant.getUsage().getOutputTokens());
         assertFalse(result.isPausedForUserInput());
     }
 
@@ -143,6 +147,24 @@ public class DefaultConversationOrchestratorLoopTest {
         assertEquals("part1part2", result.getContent());
         assertEquals(2, model.requests.size());
         assertEquals(3, memory.messages().size());
+    }
+
+    @Test
+    public void accumulatesTokenUsageAcrossToolRoundTrips() {
+        HttpResponse toolResponse = response(null, null, 5, 2);
+        toolResponse.setToolCalls(Collections.singletonList(toolCall("call-1", "text_search")));
+        SequenceStreamModel model = new SequenceStreamModel(
+                Arrays.asList(toolResponse, response("done", null, 6, 3)));
+        FakeWindowMemory memory = new FakeWindowMemory("c1");
+        DefaultConversationOrchestrator orchestrator = orchestrator(model, memory,
+                invocation -> new ToolResult("call-1", "{\"ok\":true}"));
+
+        ConversationResult result = orchestrator.converse(request("hi", CapabilityKindEnum.CHAT));
+
+        assertEquals(OrchestrationStatusEnum.COMPLETED, result.getStatus());
+        AssistantContent assistant = (AssistantContent) memory.messages().get(memory.messages().size() - 1);
+        assertEquals(11, assistant.getUsage().getInputTokens());
+        assertEquals(5, assistant.getUsage().getOutputTokens());
     }
 
     @Test

@@ -260,6 +260,7 @@ public final class DefaultConversationOrchestrator {
             if (response == null) {
                 return missingResponse(plan, state, toolRoundTrips);
             }
+            accumulateUsage(state, response);
             if (isOutputTruncated(response) && toolRoundTripCoordinator.hasToolCalls(response)) {
                 // 截断的工具参数可能仍能解析，但写文件 / 改代码这类副作用的参数已经不完整，不能执行。
                 throw OrchestrationErrors.outputTruncated();
@@ -285,7 +286,7 @@ public final class DefaultConversationOrchestrator {
             appendInterventions(state);
             String userInputRequest = toolRoundTripCoordinator.userInputRequest(toolMessages);
             if (userInputRequest != null) {
-                state.windowMemory.append(Collections.singletonList(new AssistantContent(userInputRequest)));
+                state.windowMemory.append(Collections.singletonList(new AssistantContent(userInputRequest, takePendingUsage(state))));
                 return conversationResult(plan.request.getConversationId(), userInputRequest,
                         OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
                         state.reasoning.toString(), true);
@@ -340,7 +341,7 @@ public final class DefaultConversationOrchestrator {
         }
         String finalPart = capabilityDispatcher.extract(plan.capabilityKind, response);
         if (finalPart != null && !finalPart.trim().isEmpty()) {
-            state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart)));
+            state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart, takePendingUsage(state))));
         }
         int applied = appendInterventions(state);
         if (applied == 0) {
@@ -460,7 +461,7 @@ public final class DefaultConversationOrchestrator {
         String content = response.getContent();
         if (content != null && !content.trim().isEmpty()) {
             state.answer.append(content);
-            state.windowMemory.append(Collections.singletonList(new AssistantContent(content)));
+            state.windowMemory.append(Collections.singletonList(new AssistantContent(content, takePendingUsage(state))));
         }
         state.continuationPrompt = CONTINUE_PROMPT;
         state.outputContinuations++;
@@ -480,7 +481,7 @@ public final class DefaultConversationOrchestrator {
         // （Invalid assistant message: content or tool_calls must be set），因此不写入历史。
         if (plan.capabilityKind == CapabilityKindEnum.CHAT
                 && finalPart != null && !finalPart.trim().isEmpty()) {
-            state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart)));
+            state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart, takePendingUsage(state))));
         }
         ConversationResult result = conversationResult(plan.request.getConversationId(), content,
                 OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
@@ -552,6 +553,8 @@ public final class DefaultConversationOrchestrator {
         private final IUserInterventionSource userIntervention;
         /** 已因执行期补充重新请求模型的次数。 */
         private int interventionRounds;
+        /** 尚未归属到某条历史消息的 token 用量（工具往返会先累计，最终答复一并写入）。 */
+        private TokenUsage pendingUsage;
 
         private ConversationState(ConvContext context, IWindowMemory windowMemory, StringBuilder reasoning,
                 IUserInterventionSource userIntervention) {
@@ -706,6 +709,60 @@ public final class DefaultConversationOrchestrator {
                 .reasoning(reasoning)
                 .pausedForUserInput(pausedForUserInput)
                 .build();
+    }
+
+    /**
+     * 累计本轮模型调用的 token 用量；工具往返期间暂存，最终答复写入历史时一并带上。
+     *
+     * @param state    本轮状态，非 null
+     * @param response 模型响应，非 null
+     */
+    private static void accumulateUsage(ConversationState state, HttpResponse response) {
+        state.pendingUsage = addUsage(state.pendingUsage, usage(response));
+    }
+
+    /**
+     * 取走并清空待归属的用量，避免同一次调用被重复计入后续消息。
+     *
+     * @param state 本轮状态，非 null
+     * @return 待归属用量；尚无记录时为 null
+     */
+    private static TokenUsage takePendingUsage(ConversationState state) {
+        TokenUsage pending = state.pendingUsage;
+        state.pendingUsage = null;
+        return pending;
+    }
+
+    /**
+     * 合并两次调用的用量；平台未返回 total/cache 时保持 null，不臆造数值。
+     *
+     * @param first  先发生的用量，可为 null
+     * @param second 后发生的用量，可为 null
+     * @return 合并后的用量；两者都为 null 时返回 null
+     */
+    private static TokenUsage addUsage(TokenUsage first, TokenUsage second) {
+        if (first == null) {
+            return second;
+        }
+        if (second == null) {
+            return first;
+        }
+        int input = first.getInputTokens() + second.getInputTokens();
+        int output = first.getOutputTokens() + second.getOutputTokens();
+        Integer total = sumNullable(first.getTotalTokens(), second.getTotalTokens(),
+                first.getInputTokens() + first.getOutputTokens(),
+                second.getInputTokens() + second.getOutputTokens());
+        Integer cache = sumNullable(first.getCacheTokens(), second.getCacheTokens(), 0, 0);
+        return new TokenUsage(input, output, total, cache);
+    }
+
+    private static Integer sumNullable(Integer first, Integer second, int firstFallback, int secondFallback) {
+        if (first == null && second == null) {
+            return null;
+        }
+        int left = first == null ? firstFallback : first;
+        int right = second == null ? secondFallback : second;
+        return left + right;
     }
 
     private static TokenUsage usage(HttpResponse response) {

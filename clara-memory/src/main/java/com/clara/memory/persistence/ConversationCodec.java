@@ -3,6 +3,7 @@ package com.clara.memory.persistence;
 import com.clara.core.message.IContent;
 import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.SystemContent;
+import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.kernel.message.delta.ToolContent;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.dto.tool.ToolCall;
@@ -28,6 +29,11 @@ public final class ConversationCodec {
 
     private static final String FIELD_CONTENT = "content";
 
+    /**
+     * 持久化专用的 token 用量字段；不进入协议渲染。
+     */
+    private static final String FIELD_USAGE = "clara_usage";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP_TYPE =
             new TypeReference<Map<String, Object>>() {
@@ -47,7 +53,9 @@ public final class ConversationCodec {
         root.put("version", snapshot.version());
         List<Map<String, Object>> messages = new ArrayList<>();
         for (IContent message : snapshot.messages()) {
-            messages.add(message.toCompletionMessage());
+            Map<String, Object> wire = new LinkedHashMap<>(message.toCompletionMessage());
+            attachUsage(wire, message);
+            messages.add(wire);
         }
         root.put("messages", messages);
         try {
@@ -114,7 +122,7 @@ public final class ConversationCodec {
                 return new ToolCallContent(text(message.get(FIELD_CONTENT)),
                         decodeToolCalls((List<Object>) toolCalls));
             }
-            return new AssistantContent(text(message.get(FIELD_CONTENT)));
+            return new AssistantContent(text(message.get(FIELD_CONTENT)), decodeUsage(message.get(FIELD_USAGE)));
         }
         throw ConversationStoreErrors.corrupted();
     }
@@ -141,6 +149,61 @@ public final class ConversationCodec {
             calls.add(call);
         }
         return calls;
+    }
+
+
+    /**
+     * 把助手消息的 token 用量写入持久化副本，协议渲染（{@code toCompletionMessage()}）不包含该字段。
+     *
+     * @param wire    持久化消息副本，非 null
+     * @param message 原始消息，非 null
+     */
+    private static void attachUsage(Map<String, Object> wire, IContent message) {
+        if (!(message instanceof AssistantContent)) {
+            return;
+        }
+        TokenUsage usage = ((AssistantContent) message).getUsage();
+        if (usage == null) {
+            return;
+        }
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("input", usage.getInputTokens());
+        value.put("output", usage.getOutputTokens());
+        if (usage.getTotalTokens() != null) {
+            value.put("total", usage.getTotalTokens());
+        }
+        if (usage.getCacheTokens() != null) {
+            value.put("cache", usage.getCacheTokens());
+        }
+        wire.put(FIELD_USAGE, value);
+    }
+
+    /**
+     * 还原持久化的 token 用量；字段缺失或非法时返回 null，兼容旧历史文件。
+     *
+     * @param value 持久化字段值，可为 null
+     * @return 用量，无法还原时为 null
+     */
+    @SuppressWarnings("unchecked")
+    private static TokenUsage decodeUsage(Object value) {
+        if (!(value instanceof Map)) {
+            return null;
+        }
+        Map<String, Object> usage = (Map<String, Object>) value;
+        Integer input = integer(usage.get("input"));
+        Integer output = integer(usage.get("output"));
+        if (input == null || output == null) {
+            return null;
+        }
+        try {
+            return new TokenUsage(input, output, integer(usage.get("total")), integer(usage.get("cache")));
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static Integer integer(Object value) {
+        return value instanceof Number ? ((Number) value).intValue() : null;
     }
 
     private static String text(Object value) {

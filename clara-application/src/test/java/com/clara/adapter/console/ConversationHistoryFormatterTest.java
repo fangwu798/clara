@@ -3,6 +3,7 @@ package com.clara.adapter.console;
 import com.clara.core.message.IContent;
 import com.clara.dto.tool.ToolResult;
 import com.clara.kernel.message.delta.AssistantContent;
+import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.kernel.message.delta.UserContent;
 import org.junit.Test;
 
@@ -36,6 +37,21 @@ public class ConversationHistoryFormatterTest {
         assertEquals("  [1] 用户：第一问", lines.get(0));
         assertEquals("  [2] 助手：第一答", lines.get(1));
         assertEquals("  [3] 用户：第二 问", lines.get(2));
+    }
+
+    /**
+     * 助手消息展示本轮 token 用量，用户消息不展示。
+     */
+    @Test
+    public void rendersAssistantTokenUsage() {
+        List<IContent> messages = Arrays.asList(
+                new UserContent("问"),
+                new AssistantContent("答", new TokenUsage(1200, 300, 1500, null)));
+
+        List<String> lines = ConversationHistoryFormatter.render(messages, 0);
+
+        assertEquals("  [1] 用户：问", lines.get(0));
+        assertEquals("  [2] 助手：答  [tokens 输入=1200，输出=300，合计=1500]", lines.get(1));
     }
 
     /**

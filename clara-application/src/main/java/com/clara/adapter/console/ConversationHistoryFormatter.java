@@ -2,6 +2,9 @@ package com.clara.adapter.console;
 
 import com.clara.core.message.IContent;
 import com.clara.enums.RoleEnum;
+import com.clara.kernel.message.delta.AssistantContent;
+import com.clara.kernel.message.delta.TokenUsage;
+import com.clara.usage.TokenCountFormatter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -72,7 +75,8 @@ public final class ConversationHistoryFormatter {
             if (text.isEmpty()) {
                 continue;
             }
-            lines.add(LINE_PREFIX + (index + 1) + "] " + labelOf(message.getRoleType()) + "：" + text);
+            lines.add(LINE_PREFIX + (index + 1) + "] " + labelOf(message.getRoleType()) + "：" + text
+                    + usageSuffix(message));
         }
         return lines;
     }
@@ -175,6 +179,32 @@ public final class ConversationHistoryFormatter {
             return text;
         }
         return text.substring(0, maxChars) + "…";
+    }
+
+    /**
+     * 助手消息的 token 用量后缀；用户消息或旧历史没有用量时返回空串。
+     *
+     * @param message 历史消息，非 null
+     * @return 形如 {@code [tokens 输入=12，输出=34，合计=46]} 的后缀，或空串
+     */
+    private static String usageSuffix(IContent message) {
+        if (!(message instanceof AssistantContent)) {
+            return "";
+        }
+        TokenUsage usage = ((AssistantContent) message).getUsage();
+        if (usage == null) {
+            return "";
+        }
+        long input = usage.getInputTokens();
+        long output = usage.getOutputTokens();
+        long total = usage.getTotalTokens() == null || usage.getTotalTokens() <= 0
+                ? input + output : usage.getTotalTokens();
+        if (total <= 0L) {
+            return "";
+        }
+        return "  [tokens 输入=" + TokenCountFormatter.format(input)
+                + "，输出=" + TokenCountFormatter.format(output)
+                + "，合计=" + TokenCountFormatter.format(total) + "]";
     }
 
     /**
