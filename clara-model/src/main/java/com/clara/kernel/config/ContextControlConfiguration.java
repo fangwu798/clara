@@ -65,21 +65,6 @@ public final class ContextControlConfiguration {
     private final int toolOutputMaxChars;
 
     /**
-     * 创建上下文历史处理控制配置，缺失字段按默认值回填并校验取值。
-     *
-     * @param contextWindowTokens    平台上下文窗口 token 上限（YAML 键 {@code contextWindowTokens}），可为 null
-     * @param windowMaxMessages      历史最大条数（YAML 键 {@code windowMaxMessages}），可为 null
-     * @param windowMaxSizeBytes     历史最大字节数（YAML 键 {@code windowMaxSizeBytes}），可为 null
-     * @param windowMaxTokensPercent 历史占上下文窗口最大百分比（YAML 键 {@code windowMaxTokensPercent}），可为 null
-     * @param recentTurnsKept        最近至少保留的对话轮数（YAML 键 {@code recentTurnsKept}），可为 null
-     * @param compressEnabled        是否启用超限压缩（YAML 键 {@code compressEnabled}），可为 null
-     * @param vectorizeEnabled       是否启用向量化入库（YAML 键 {@code vectorizeEnabled}），可为 null
-     * @param retrievalCount         每次检索返回条数（YAML 键 {@code retrievalCount}），可为 null
-     * @param similarityThreshold    检索相似度阈值（YAML 键 {@code similarityThreshold}），可为 null
-     * @param toolOutputMaxChars     历史工具结果单条最大保留字符数（YAML 键 {@code toolOutputMaxChars}），可为 null
-     * @throws IllegalArgumentException 任一字段取值不合法时
-     */
-    /**
      * 兼容旧调用方的 9 参数构造器：{@code recentTurnsKept} 使用默认值 10。
      *
      * @param contextWindowTokens    平台上下文窗口 token 上限，可为 null
