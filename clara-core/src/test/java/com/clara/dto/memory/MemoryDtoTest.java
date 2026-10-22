@@ -136,6 +136,7 @@ public class MemoryDtoTest {
         assertEquals(10, config.getWindowMaxMessages());
         assertEquals(2048L, config.getWindowMaxSizeBytes());
         assertEquals(50, config.getWindowMaxTokensPercent());
+        assertEquals(10, config.getRecentTurnsKept());
         assertTrue(config.isCompressEnabled());
         assertTrue(config.isVectorizeEnabled());
         assertEquals(5, config.getRetrievalCount());
@@ -222,13 +223,16 @@ public class MemoryDtoTest {
         assertEquals(-1, policy.getMaxMessages());
         assertEquals(-1L, policy.getMaxSizeBytes());
         assertEquals(80, policy.getMaxTokensPercent());
+        assertEquals(10, policy.getRecentTurnsKept());
 
         WindowPolicy custom = new WindowPolicy(100L, 10, 1024L, 50);
         assertEquals(100L, custom.getContextWindowTokens());
         assertEquals(10, custom.getMaxMessages());
         assertEquals(1024L, custom.getMaxSizeBytes());
         assertEquals(50, custom.getMaxTokensPercent());
+        assertEquals(0, custom.getRecentTurnsKept());
         assertEquals(custom, new WindowPolicy(100L, 10, 1024L, 50));
+        assertEquals(4, new WindowPolicy(100L, 10, 1024L, 50, 4).getRecentTurnsKept());
         assertFalse(custom.equals(null));
 
         assertThrows(IllegalArgumentException.class, () -> new WindowPolicy(0L, 1, 1L, 1));
@@ -238,6 +242,7 @@ public class MemoryDtoTest {
         assertThrows(IllegalArgumentException.class, () -> new WindowPolicy(1L, 1, -2L, 1));
         assertThrows(IllegalArgumentException.class, () -> new WindowPolicy(1L, 1, 1L, -1));
         assertThrows(IllegalArgumentException.class, () -> new WindowPolicy(1L, 1, 1L, 101));
+        assertThrows(IllegalArgumentException.class, () -> new WindowPolicy(1L, 1, 1L, 1, -1));
     }
 
     /**

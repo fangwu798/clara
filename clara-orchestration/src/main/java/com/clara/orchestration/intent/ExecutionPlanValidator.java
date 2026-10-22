@@ -4,6 +4,7 @@ import com.clara.dto.planner.ExecutionPlan;
 import com.clara.dto.planner.ExecutionStep;
 import com.clara.utils.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,9 +20,12 @@ import java.util.Set;
  * <p>校验逻辑同时被编排层的规划流程与内置工具 {@code validate_execution_plan} 使用：
  * 模型生成计划后先过这一关，通过后才注入 system 指令并按步骤执行。
  */
+@Data
 public final class ExecutionPlanValidator {
 
-    /** 计划最大步骤数的默认值。 */
+    /**
+     * 计划最大步骤数的默认值。
+     */
     public static final int DEFAULT_MAX_STEPS = 12;
 
     private final int maxSteps;
@@ -39,14 +43,6 @@ public final class ExecutionPlanValidator {
         this.maxSteps = maxSteps;
     }
 
-    /**
-     * 最大步骤数。
-     *
-     * @return 正整数的步骤上限
-     */
-    int maxSteps() {
-        return maxSteps;
-    }
 
     /**
      * 校验计划 JSON 并转换为值对象。
@@ -143,7 +139,7 @@ public final class ExecutionPlanValidator {
     }
 
     private static void visit(ExecutionStep step, Map<String, ExecutionStep> byId,
-            Map<String, Integer> colors, List<String> path) {
+                              Map<String, Integer> colors, List<String> path) {
         Integer color = colors.get(step.getId());
         if (Integer.valueOf(1).equals(color)) {
             path.add(step.getId());
@@ -176,7 +172,6 @@ public final class ExecutionPlanValidator {
 
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
-        return value != null && value.isTextual() && !StringUtils.isBlank(value.asText())
-                ? value.asText().trim() : null;
+        return value != null && value.isTextual() && !StringUtils.isBlank(value.asText()) ? value.asText().trim() : null;
     }
 }

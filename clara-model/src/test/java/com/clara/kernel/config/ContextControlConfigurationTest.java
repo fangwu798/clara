@@ -21,6 +21,7 @@ public class ContextControlConfigurationTest {
         assertEquals(-1, configuration.getWindowMaxMessages());
         assertEquals(-1L, configuration.getWindowMaxSizeBytes());
         assertEquals(80, configuration.getWindowMaxTokensPercent());
+        assertEquals(10, configuration.getRecentTurnsKept());
         assertFalse(configuration.isCompressEnabled());
         assertFalse(configuration.isVectorizeEnabled());
         assertEquals(3, configuration.getRetrievalCount());
@@ -37,6 +38,7 @@ public class ContextControlConfigurationTest {
         assertEquals(20, configuration.getWindowMaxMessages());
         assertEquals(1024L, configuration.getWindowMaxSizeBytes());
         assertEquals(60, configuration.getWindowMaxTokensPercent());
+        assertEquals(10, configuration.getRecentTurnsKept());
         assertTrue(configuration.isCompressEnabled());
         assertTrue(configuration.isVectorizeEnabled());
         assertEquals(7, configuration.getRetrievalCount());
@@ -48,6 +50,7 @@ public class ContextControlConfigurationTest {
         assertEquals(20, dto.getWindowMaxMessages());
         assertEquals(1024L, dto.getWindowMaxSizeBytes());
         assertEquals(60, dto.getWindowMaxTokensPercent());
+        assertEquals(10, dto.getRecentTurnsKept());
         assertTrue(dto.isCompressEnabled());
         assertTrue(dto.isVectorizeEnabled());
         assertEquals(7, dto.getRetrievalCount());
@@ -107,6 +110,16 @@ public class ContextControlConfigurationTest {
     @Test
     public void rejectsInvalidToolOutputMaxChars() {
         assertRejected(null, null, null, null, null, null, null, null, -2);
+    }
+
+    @Test
+    public void rejectsInvalidRecentTurns() {
+        try {
+            new ContextControlConfiguration(null, null, null, null, -1, null, null, null, null, null);
+            throw new AssertionError("expected IllegalArgumentException");
+        } catch (IllegalArgumentException expected) {
+            // expected
+        }
     }
 
     private static void assertRejected(Long windowTokens, Integer maxMessages, Long maxSize, Integer percent,

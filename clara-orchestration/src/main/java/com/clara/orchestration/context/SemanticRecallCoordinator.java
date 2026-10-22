@@ -25,8 +25,9 @@ import java.util.Set;
  *
  * <p>可观测性：每次检索都把「命中几条 / 耗时 / 阈值与候选数 / 命中片段（带相似度）」报给可选的
  * {@link IContextTraceSink}，供控制台观察；未接入宿主时不上报。
- * <p>判重：命中内容若本轮请求里已经带着（本轮提问、刚返回的工具结果），直接丢弃、不进补充信息——
- * 与写入端共用 {@link ConversationMemoryText} 折算文本，一个字不差才算重复。
+ * <p>判重：命中内容若本轮请求里已经带着（本轮提问、最近窗口内的历史、刚返回的工具结果），直接静默丢弃、
+ * 不进补充信息，也不产生逐条「丢弃」日志——最近 {@code recentTurnsKept} 轮由窗口保证可见，本类只补充
+ * 窗口外的历史。与写入端共用 {@link ConversationMemoryText} 折算文本，一个字不差才算重复。
  */
 public final class SemanticRecallCoordinator {
 
@@ -40,6 +41,12 @@ public final class SemanticRecallCoordinator {
      * 「有记录但分数不够」——前者要查写入链路，后者要查嵌入质量或阈值，故障方向完全相反。
      */
     private static final double NO_PRE_FILTER = -1.0d;
+
+    /**
+     * 查询候选上限。召回时会把「本轮可见消息数」加进 topK，避免最近窗口内的重复命中占满候选位，
+     * 导致真正需要补回的旧知识根本进不了候选集；同时用一个上限约束极端长窗口的查询成本。
+     */
+    private static final int MAX_CANDIDATES = 100;
 
     private final IEmbeddingClient embeddingClient;
     private final ISemanticMemoryStore semanticMemoryStore;
@@ -104,7 +111,7 @@ public final class SemanticRecallCoordinator {
         long started = System.nanoTime();
         float[] vector = embeddingClient.embed(userInput);
         SemanticMemoryQuery query = SemanticMemoryQuery.builder(vector,
-                control.getRetrievalCount(), NO_PRE_FILTER, System.currentTimeMillis())
+                candidateLimit(control, visibleMessages), NO_PRE_FILTER, System.currentTimeMillis())
                 .sourceType(MemorySourceTypeEnum.CONVERSATION)
                 .conversationId(conversationId)
                 .queryText(userInput)
@@ -113,56 +120,71 @@ public final class SemanticRecallCoordinator {
         Set<String> visible = visibleTexts(visibleMessages);
         List<String> knowledge = new ArrayList<>();
         List<String> details = new ArrayList<>();
-        List<String> duplicates = new ArrayList<>();
+        int considered = 0;
         int aboveThreshold = 0;
         double bestScore = Double.NEGATIVE_INFINITY;
         for (MemoryMatch match : matches) {
             String content = match.getEntry().getContent();
-            if (content != null && visible.contains(content)) {
-                duplicates.add(String.format(Locale.ROOT, "丢弃 score=%.3f  %s", match.getScore(),
-                        preview(content)));
+            if (content == null || visible.contains(content)) {
+                // 最近窗口里已经有的内容：静默跳过，不产生「丢弃」日志。
                 continue;
             }
+            considered++;
             bestScore = Math.max(bestScore, match.getScore());
-            if (match.getScore() >= control.getSimilarityThreshold() && content != null) {
+            if (match.getScore() >= control.getSimilarityThreshold()) {
                 aboveThreshold++;
                 knowledge.add(content);
                 details.add(String.format(Locale.ROOT, "score=%.3f  %s", match.getScore(),
                         preview(content)));
             }
         }
-        details.add(0, summary(control, matches.size(), duplicates.size(), aboveThreshold, bestScore));
-        details.addAll(duplicates);
+        details.add(0, summary(control, matches.size(), considered, aboveThreshold, bestScore));
         trace(knowledge.size(), started, details);
         return knowledge;
     }
 
     /**
-     * 汇总一行：「召回几条、其中几条因已在本轮上下文被丢弃、几条过阈值」。
+     * 汇总一行：只报告「窗口外候选」的条数与过阈值条数；窗口内重复候选完全静默。
      *
-     * @param control    上下文控制配置，不可为 null
-     * @param recalled   存储层实际召回的条数
-     * @param duplicated 因「已在本轮上下文」被丢弃的条数
-     * @param above      其中达到相似度阈值的条数
-     * @param bestScore  参与判定的召回结果里最高分；无结果可判定时为负无穷
+     * @param control   上下文控制配置，不可为 null
+     * @param storeHits 存储层返回的候选条数
+     * @param considered 去掉窗口内重复后的窗口外候选条数
+     * @param above     窗口外候选中达到相似度阈值的条数
+     * @param bestScore 窗口外候选中的最高分；无候选时为负无穷
      * @return 一行可读的汇总文本，非 null
      */
-    private static String summary(ContextControlConfig control, int recalled, int duplicated, int above,
+    private static String summary(ContextControlConfig control, int storeHits, int considered, int above,
             double bestScore) {
         int topK = control.getRetrievalCount();
         double threshold = control.getSimilarityThreshold();
-        if (recalled <= 0) {
+        if (storeHits <= 0) {
             return String.format(Locale.ROOT,
                     "召回 0 条（阈值 %.2f，topK %d）——语义库里没有本会话可检索的记录", threshold, topK);
         }
-        if (duplicated >= recalled) {
+        if (considered <= 0) {
             return String.format(Locale.ROOT,
-                    "召回 %d 条（阈值 %.2f，topK %d）——全部已在本轮上下文，已丢弃", recalled, threshold, topK);
+                    "窗口外召回 0 条（阈值 %.2f，topK %d）——最近窗口已覆盖全部候选", threshold, topK);
         }
-        String duplicatePart = duplicated > 0
-                ? String.format(Locale.ROOT, " / 丢弃 %d 条（已在本轮上下文）", duplicated) : "";
-        return String.format(Locale.ROOT, "召回 %d 条%s / 过阈值 %d 条（阈值 %.2f，最高分 %.3f）",
-                recalled, duplicatePart, above, threshold, bestScore);
+        return String.format(Locale.ROOT, "窗口外召回 %d 条 / 过阈值 %d 条（阈值 %.2f，最高分 %.3f）",
+                considered, above, threshold, bestScore);
+    }
+
+    /**
+     * 计算本次查询的候选条数：基础 topK 之外，再为「本轮可见消息」预留同样多的候选位。
+     *
+     * <p>窗口里已有的消息会被静默去重；如果 topK 只取 retrievalCount，最近几条高相似度命中会把候选位
+     * 全部占满，旧知识无法进入结果集。预留候选位后，去重仍然只保留真正需要补回的内容。
+     *
+     * @param control         上下文控制配置，不可为 null
+     * @param visibleMessages 本轮可见消息，可为 null
+     * @return 候选条数，至少为 retrievalCount
+     */
+    private static int candidateLimit(ContextControlConfig control, List<IContent> visibleMessages) {
+        int base = control.getRetrievalCount();
+        int visible = visibleMessages == null ? 0 : visibleMessages.size();
+        long expanded = (long) base + visible;
+        int cap = Math.max(base, MAX_CANDIDATES);
+        return (int) Math.min(Math.max(expanded, base), cap);
     }
 
     /**

@@ -539,5 +539,6 @@ clara/
 - 技术设计：docs/technical-design/ 下各模块设计文档
 - 业务设计：docs/business-design/ 下各模块业务文档
 - clara-mcp 模块学习指南（设计思想与类架构）：docs/architecture-design/clara-mcp-module-learning-guide.md
+- Clara 项目总览学习指南（架构、主链路与扩展点）：docs/architecture-design/clara-project-learning-guide.md
 
 仓库当前未附带完整许可证合规材料。分发或商用前应补齐许可证、NOTICE 与第三方归属清单。

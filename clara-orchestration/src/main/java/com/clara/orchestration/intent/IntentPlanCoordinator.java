@@ -58,6 +58,7 @@ public final class IntentPlanCoordinator {
 
     private static final String ROUTER_PROMPT = String.join("\n",
             "你是 Clara 的任务复杂度路由器。先判断用户本轮请求属于简单任务还是复杂任务，再决定是否生成执行计划。",
+            "判定只看本轮 user 消息：不要携带、引用或猜测任何历史对话；未提供的历史一律视为不存在。",
             "",
             "复杂任务（需要计划）：需要两个以上步骤、跨多个文件或工具、先分析再修改再验证，",
             "或用户明确要求方案 / 计划 / 重构 / 实现 / 迁移 / 排查。",
@@ -168,7 +169,7 @@ public final class IntentPlanCoordinator {
 
     private IntentDecision requestDecision(String userInput, String modelId, String previousRaw, String repairError) {
         List<IContent> messages = new ArrayList<>();
-        messages.add(new SystemContent(String.format(Locale.ROOT, ROUTER_PROMPT, validator.maxSteps())));
+        messages.add(new SystemContent(String.format(Locale.ROOT, ROUTER_PROMPT, validator.getMaxSteps())));
         messages.add(new UserContent(userInput));
         if (repairError != null) {
             if (!StringUtils.isBlank(previousRaw)) {

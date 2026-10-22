@@ -117,8 +117,7 @@ public final class CapabilityDispatcher {
      * @return {@code RESPONSE_COMPLETE} 或 {@code ERROR} 时返回 true
      */
     private static boolean isTerminal(StreamEvent event) {
-        return event != null && (event.getType() == StreamEventEnum.RESPONSE_COMPLETE
-                || event.getType() == StreamEventEnum.ERROR);
+        return event != null && (event.getType() == StreamEventEnum.RESPONSE_COMPLETE || event.getType() == StreamEventEnum.ERROR);
     }
 
     /**

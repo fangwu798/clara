@@ -8,6 +8,9 @@ import com.clara.core.model.IStreamModel;
 import com.clara.core.model.IStreamObserver;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.dto.tool.ToolResult;
+import com.clara.enums.RoleEnum;
+import com.clara.kernel.http.HttpRequest;
+import com.clara.kernel.message.delta.UserContent;
 import com.clara.kernel.http.HttpResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,6 +56,20 @@ public class IntentPlanCoordinatorTest {
         assertNull(prepared.prompt());
         assertEquals(0, toolCalls.get());
         assertEquals(1, model.calls);
+    }
+
+    @Test
+    public void intentDecisionCarriesOnlyRouterPromptAndCurrentInput() {
+        FakeModel model = new FakeModel(SIMPLE);
+        IntentPlanCoordinator coordinator = coordinator(model, tool(new AtomicInteger()), 0);
+
+        coordinator.prepare("只判断这一句", "m1");
+
+        HttpRequest request = model.requests.get(0);
+        assertEquals(2, request.getMessages().size());
+        assertEquals(RoleEnum.SYSTEM, request.getMessages().get(0).getRoleType());
+        assertEquals(RoleEnum.USER, request.getMessages().get(1).getRoleType());
+        assertEquals("只判断这一句", ((UserContent) request.getMessages().get(1)).getContent());
     }
 
     @Test
@@ -170,6 +187,7 @@ public class IntentPlanCoordinatorTest {
     private static final class FakeModel implements IStreamModel {
 
         private final Deque<String> responses = new ArrayDeque<>();
+        private final List<HttpRequest> requests = new ArrayList<>();
         private int calls;
 
         private FakeModel(String... responses) {
@@ -181,6 +199,7 @@ public class IntentPlanCoordinatorTest {
         @Override
         public <R extends IResponse> R chat(IRequest request, Class<R> responseType) {
             calls++;
+            requests.add((HttpRequest) request);
             HttpResponse response = new HttpResponse();
             response.setContent(responses.isEmpty() ? "" : responses.poll());
             return responseType.cast(response);

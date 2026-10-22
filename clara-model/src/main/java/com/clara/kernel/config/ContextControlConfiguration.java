@@ -18,7 +18,7 @@ import lombok.Getter;
  *
  * <p>生命周期与线程安全：字段全部 final、无连接无缓冲，实例可跨线程共享。
  *
- * <p>失败语义：任一字段取值越界时构造期抛 {@link IllegalArgumentException}，配置问题在加载期暴露。
+ * <p>失败语义：字段取值越界时构造期抛 {@link IllegalArgumentException}，配置问题在加载期暴露。
  */
 @Getter
 public final class ContextControlConfiguration {
@@ -39,6 +39,10 @@ public final class ContextControlConfiguration {
      * 历史占上下文窗口最大百分比（0-100），0 表示不按百分比。
      */
     private final int windowMaxTokensPercent;
+    /**
+     * 最近至少保留在历史中的对话轮数；默认 10，0 表示不启用。
+     */
+    private final int recentTurnsKept;
     /**
      * 是否启用超限压缩。
      */
@@ -67,6 +71,7 @@ public final class ContextControlConfiguration {
      * @param windowMaxMessages      历史最大条数（YAML 键 {@code windowMaxMessages}），可为 null
      * @param windowMaxSizeBytes     历史最大字节数（YAML 键 {@code windowMaxSizeBytes}），可为 null
      * @param windowMaxTokensPercent 历史占上下文窗口最大百分比（YAML 键 {@code windowMaxTokensPercent}），可为 null
+     * @param recentTurnsKept        最近至少保留的对话轮数（YAML 键 {@code recentTurnsKept}），可为 null
      * @param compressEnabled        是否启用超限压缩（YAML 键 {@code compressEnabled}），可为 null
      * @param vectorizeEnabled       是否启用向量化入库（YAML 键 {@code vectorizeEnabled}），可为 null
      * @param retrievalCount         每次检索返回条数（YAML 键 {@code retrievalCount}），可为 null
@@ -74,12 +79,34 @@ public final class ContextControlConfiguration {
      * @param toolOutputMaxChars     历史工具结果单条最大保留字符数（YAML 键 {@code toolOutputMaxChars}），可为 null
      * @throws IllegalArgumentException 任一字段取值不合法时
      */
+    /**
+     * 兼容旧调用方的 9 参数构造器：{@code recentTurnsKept} 使用默认值 10。
+     *
+     * @param contextWindowTokens    平台上下文窗口 token 上限，可为 null
+     * @param windowMaxMessages      历史最大条数，可为 null
+     * @param windowMaxSizeBytes     历史最大字节数，可为 null
+     * @param windowMaxTokensPercent 历史占上下文窗口最大百分比，可为 null
+     * @param compressEnabled        是否启用超限压缩，可为 null
+     * @param vectorizeEnabled       是否启用向量化入库，可为 null
+     * @param retrievalCount         每次检索返回条数，可为 null
+     * @param similarityThreshold    检索相似度阈值，可为 null
+     * @param toolOutputMaxChars     历史工具结果单条最大保留字符数，可为 null
+     */
+    public ContextControlConfiguration(Long contextWindowTokens, Integer windowMaxMessages,
+            Long windowMaxSizeBytes, Integer windowMaxTokensPercent, Boolean compressEnabled,
+            Boolean vectorizeEnabled, Integer retrievalCount, Double similarityThreshold,
+            Integer toolOutputMaxChars) {
+        this(contextWindowTokens, windowMaxMessages, windowMaxSizeBytes, windowMaxTokensPercent, null,
+                compressEnabled, vectorizeEnabled, retrievalCount, similarityThreshold, toolOutputMaxChars);
+    }
+
     @JsonCreator
     public ContextControlConfiguration(
             @JsonProperty("contextWindowTokens") Long contextWindowTokens,
             @JsonProperty("windowMaxMessages") Integer windowMaxMessages,
             @JsonProperty("windowMaxSizeBytes") Long windowMaxSizeBytes,
             @JsonProperty("windowMaxTokensPercent") Integer windowMaxTokensPercent,
+            @JsonProperty("recentTurnsKept") Integer recentTurnsKept,
             @JsonProperty("compressEnabled") Boolean compressEnabled,
             @JsonProperty("vectorizeEnabled") Boolean vectorizeEnabled,
             @JsonProperty("retrievalCount") Integer retrievalCount,
@@ -89,6 +116,7 @@ public final class ContextControlConfiguration {
         this.windowMaxMessages = windowMaxMessages != null ? windowMaxMessages : -1;
         this.windowMaxSizeBytes = windowMaxSizeBytes != null ? windowMaxSizeBytes : -1L;
         this.windowMaxTokensPercent = windowMaxTokensPercent != null ? windowMaxTokensPercent : 80;
+        this.recentTurnsKept = recentTurnsKept != null ? recentTurnsKept : 10;
         this.compressEnabled = compressEnabled != null && compressEnabled;
         this.vectorizeEnabled = vectorizeEnabled != null && vectorizeEnabled;
         this.retrievalCount = retrievalCount != null ? retrievalCount : 3;
@@ -114,6 +142,9 @@ public final class ContextControlConfiguration {
         if (windowMaxTokensPercent < 0 || windowMaxTokensPercent > 100) {
             throw new IllegalArgumentException("windowMaxTokensPercent must be within [0, 100]");
         }
+        if (recentTurnsKept < 0) {
+            throw new IllegalArgumentException("recentTurnsKept must not be negative");
+        }
         if (retrievalCount < 0) {
             throw new IllegalArgumentException("retrievalCount must not be negative");
         }
@@ -136,6 +167,7 @@ public final class ContextControlConfiguration {
                 .windowMaxMessages(windowMaxMessages)
                 .windowMaxSizeBytes(windowMaxSizeBytes)
                 .windowMaxTokensPercent(windowMaxTokensPercent)
+                .recentTurnsKept(recentTurnsKept)
                 .compressEnabled(compressEnabled)
                 .vectorizeEnabled(vectorizeEnabled)
                 .retrievalCount(retrievalCount)

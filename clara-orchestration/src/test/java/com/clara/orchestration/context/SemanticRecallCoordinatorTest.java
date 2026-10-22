@@ -145,9 +145,13 @@ public class SemanticRecallCoordinatorTest {
 
         assertTrue(knowledge.isEmpty());
         assertEquals(Collections.singletonList(0), trace.hits);
-        // 上报要写明是「已在本轮上下文」丢的，而不是「分数不够」——两者的排查方向完全相反
-        assertTrue(trace.details.get(0).get(0).contains("全部已在本轮上下文，已丢弃"));
-        assertTrue(trace.details.get(0).get(1).contains("丢弃 score=0.970"));
+        // 去重是静默的：只报「召回几条 / 过阈值几条」，不再逐条打印"丢弃"
+        List<String> details = trace.details.get(0);
+        assertEquals(1, details.size());
+        assertTrue(details.get(0).contains("窗口外召回 0 条"));
+        assertTrue(details.get(0).contains("最近窗口已覆盖全部候选"));
+        assertTrue(!details.get(0).contains("丢弃"));
+        assertTrue(!details.get(0).contains("0.970"));
     }
 
     @Test
@@ -164,11 +168,22 @@ public class SemanticRecallCoordinatorTest {
 
         assertEquals(Arrays.asList("tool: 旧的工具结果"), knowledge);
         List<String> details = trace.details.get(0);
-        assertEquals(3, details.size());
-        assertTrue(details.get(0).contains("召回 2 条"));
-        assertTrue(details.get(0).contains("丢弃 1 条（已在本轮上下文）"));
+        assertEquals(2, details.size());
+        assertTrue(details.get(0).contains("窗口外召回 1 条"));
         assertTrue(details.get(0).contains("过阈值 1 条"));
+        assertTrue(!details.get(0).contains("丢弃"));
         assertTrue(details.get(1).contains("score=0.910"));
+    }
+
+    @Test
+    public void recallExpandsCandidateLimitByVisibleMessages() {
+        RecordingStore store = new RecordingStore(Collections.<MemoryMatch>emptyList());
+        new SemanticRecallCoordinator(text -> new float[] {1f, 0f}, store)
+                .recall("c1", "query text", control(3, 0.5),
+                        Arrays.<IContent>asList(new UserContent("a"), new UserContent("b"), new UserContent("c")));
+
+        // 基础 topK=3，再为 3 条可见消息预留候选位，避免重复命中占满 topK
+        assertEquals(6, store.queries.get(0).getTopK());
     }
 
     // ---- helpers -----------------------------------------------------------

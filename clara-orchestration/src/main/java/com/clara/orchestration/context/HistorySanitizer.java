@@ -48,8 +48,7 @@ public final class HistorySanitizer {
      * @return 非法时返回 true
      */
     public static boolean isInvalidAssistant(IContent message) {
-        if (message == null || message.getRoleType() != RoleEnum.ASSISTANT
-                || !(message instanceof AssistantContent)) {
+        if (message == null || message.getRoleType() != RoleEnum.ASSISTANT || !(message instanceof AssistantContent)) {
             return false;
         }
         String content = ((AssistantContent) message).getContent();

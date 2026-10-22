@@ -112,7 +112,7 @@ public final class ContextAssembler {
         ContextControlConfig effective = control == null ? ContextControlConfig.defaults() : control;
         WindowPolicy policy = new WindowPolicy(effective.getContextWindowTokens(),
                 effective.getWindowMaxMessages(), effective.getWindowMaxSizeBytes(),
-                effective.getWindowMaxTokensPercent());
+                effective.getWindowMaxTokensPercent(), effective.getRecentTurnsKept());
 
         List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.messages());
         List<IContent> windowed = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.window(policy, estimator));

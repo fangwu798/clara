@@ -22,7 +22,8 @@ public final class WindowSupport {
     }
 
     /**
-     * 按窗口策略裁剪历史：system 指令永居首位、不被淘汰；其余消息以「完整工具往返」为一组从最旧开始整组淘汰。
+     * 按窗口策略裁剪历史：system 指令永居首位、不被淘汰；其余消息按「对话轮次」从最旧开始整组淘汰，
+     * 并至少保留最近 {@link WindowPolicy#getRecentTurnsKept()} 轮。
      *
      * @param messages  完整历史，不可为 null
      * @param policy    窗口策略，不可为 null
@@ -43,8 +44,15 @@ public final class WindowSupport {
                 body.add(message);
             }
         }
-        List<List<IContent>> remaining = new ArrayList<>(groupRoundTrips(body));
-        while (!remaining.isEmpty() && !within(system, remaining, policy, estimator)) {
+        List<List<IContent>> remaining = new ArrayList<>(groupConversationTurns(body));
+        int userTurns = 0;
+        for (List<IContent> group : remaining) {
+            if (containsUser(group)) {
+                userTurns++;
+            }
+        }
+        int minGroups = Math.min(Math.max(policy.getRecentTurnsKept(), 0), userTurns);
+        while (remaining.size() > minGroups && !within(system, remaining, policy, estimator)) {
             remaining.remove(0);
         }
         List<IContent> result = new ArrayList<>(system.size());
@@ -107,6 +115,55 @@ public final class WindowSupport {
             }
         }
         return groups;
+    }
+
+    /**
+     * 把正文消息按「对话轮次」分组：每条用户消息开启一轮，随后的助手消息、工具调用与工具结果都归入该轮。
+     *
+     * <p>与 {@link #groupRoundTrips(List)} 的区别：工具往返只是轮次内部的一部分，不能把一轮拆成多组，
+     * 否则「最近 N 轮必留」会退化成「最近 N 组必留」。
+     *
+     * @param body 非 system 消息，不可为 null
+     * @return 有序轮次列表；首条用户消息之前的孤立消息单独成组，非 null
+     */
+    public static List<List<IContent>> groupConversationTurns(List<IContent> body) {
+        List<List<IContent>> groups = new ArrayList<>();
+        if (body == null) {
+            return groups;
+        }
+        List<IContent> leading = new ArrayList<>();
+        List<IContent> current = null;
+        for (IContent message : body) {
+            if (message != null && message.getRoleType() == RoleEnum.USER) {
+                if (current != null) {
+                    groups.add(current);
+                }
+                current = new ArrayList<>();
+            } else if (current == null) {
+                leading.add(message);
+                continue;
+            }
+            current.add(message);
+        }
+        if (current != null) {
+            groups.add(current);
+        }
+        if (!leading.isEmpty()) {
+            groups.add(0, leading);
+        }
+        return groups;
+    }
+
+    /**
+     * 判断一组消息里是否含用户消息；不含用户的孤立组不享受「最近 N 轮必留」的保护。
+     */
+    private static boolean containsUser(List<IContent> group) {
+        for (IContent message : group) {
+            if (message != null && message.getRoleType() == RoleEnum.USER) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

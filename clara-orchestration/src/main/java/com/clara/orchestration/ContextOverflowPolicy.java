@@ -119,6 +119,7 @@ final class ContextOverflowPolicy {
                 .windowMaxMessages(limit(base.getWindowMaxMessages(), messageLimit))
                 .windowMaxSizeBytes(limit(base.getWindowMaxSizeBytes(), byteLimit))
                 .windowMaxTokensPercent(base.getWindowMaxTokensPercent())
+                .recentTurnsKept(base.getRecentTurnsKept())
                 .compressEnabled(base.isCompressEnabled())
                 .vectorizeEnabled(base.isVectorizeEnabled())
                 .retrievalCount(base.getRetrievalCount())

@@ -15,6 +15,12 @@ public final class ContextControlConfig {
     private final int windowMaxMessages;
     private final long windowMaxSizeBytes;
     private final int windowMaxTokensPercent;
+    /**
+     * 最近至少保留在历史中的对话轮数；默认 10，0 表示不启用。
+     *
+     * <p>优先于条数 / 字节数 / 百分比限制：最近 N 轮不会被窗口裁掉。
+     */
+    private final int recentTurnsKept;
     private final boolean compressEnabled;
     private final boolean vectorizeEnabled;
     private final int retrievalCount;
@@ -60,6 +66,9 @@ public final class ContextControlConfig {
         if (builder.windowMaxTokensPercent < 0 || builder.windowMaxTokensPercent > 100) {
             throw new IllegalArgumentException("windowMaxTokensPercent must be within [0, 100]");
         }
+        if (builder.recentTurnsKept < 0) {
+            throw new IllegalArgumentException("recentTurnsKept must not be negative");
+        }
         if (builder.retrievalCount < 0) {
             throw new IllegalArgumentException("retrievalCount must not be negative");
         }
@@ -74,6 +83,7 @@ public final class ContextControlConfig {
         this.windowMaxMessages = builder.windowMaxMessages;
         this.windowMaxSizeBytes = builder.windowMaxSizeBytes;
         this.windowMaxTokensPercent = builder.windowMaxTokensPercent;
+        this.recentTurnsKept = builder.recentTurnsKept;
         this.compressEnabled = builder.compressEnabled;
         this.vectorizeEnabled = builder.vectorizeEnabled;
         this.retrievalCount = builder.retrievalCount;
@@ -101,6 +111,7 @@ public final class ContextControlConfig {
                 .windowMaxMessages(-1)
                 .windowMaxSizeBytes(-1L)
                 .windowMaxTokensPercent(80)
+                .recentTurnsKept(10)
                 .retrievalCount(3)
                 .similarityThreshold(0.7)
                 .build();
@@ -130,6 +141,7 @@ public final class ContextControlConfig {
         private int windowMaxMessages;
         private long windowMaxSizeBytes;
         private int windowMaxTokensPercent;
+        private int recentTurnsKept = 10;
         private boolean compressEnabled;
         private boolean vectorizeEnabled;
         private int retrievalCount;
@@ -156,6 +168,11 @@ public final class ContextControlConfig {
 
         public Builder windowMaxTokensPercent(int windowMaxTokensPercent) {
             this.windowMaxTokensPercent = windowMaxTokensPercent;
+            return this;
+        }
+
+        public Builder recentTurnsKept(int recentTurnsKept) {
+            this.recentTurnsKept = recentTurnsKept;
             return this;
         }
 

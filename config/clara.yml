@@ -12,7 +12,7 @@ defaultModel: deepseek-response
 #   启动脚本（clara.bat / clara.sh）会逐个检查这些供应商凭据声明的环境变量
 #   （config/model-providers/<别名>.yml 的 credential.environmentVariable），缺失时提示输入。
 #   写法：单行方括号列表（启动脚本按此格式解析）；本行也兼容 YAML 块式序列。
-enabledProviders: [deepseek-response, deepseek-completion, volcengine-response, volcengine-completion, kimi-completion, kimi-response, openai]
+enabledProviders: [deepseek-response, kimi-completion, volcengine-response, deepseek-completion, volcengine-completion, kimi-response, openai]
 
 # 代码知识图谱（可选，需要先按 deploy/codebase-memory-mcp/readme.md 部署：
 #   容器部署 deploy\codebase-memory-mcp\install-docker.ps1；宿主安装 deploy\codebase-memory-mcp\install.ps1）。
@@ -74,7 +74,7 @@ intentPlanning:
 # 服务端可用 deploy/docker-compose.yml 起（etcd + MinIO + milvus standalone，gRPC 端口 19530）。
 milvus:
   # 当前关闭：语义记忆退回进程内实现，不写 Milvus、也不做召回。要用改回 true（并确认 Milvus 已起）。
-  enabled: false
+  enabled: true
   host: 127.0.0.1
   port: 19530
   # mode：检索模式，二选一。

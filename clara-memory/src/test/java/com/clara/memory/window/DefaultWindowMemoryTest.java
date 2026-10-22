@@ -13,6 +13,7 @@ import com.clara.dto.tool.ToolCallContent;
 import com.clara.dto.tool.ToolCallFunction;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -103,6 +104,27 @@ public class DefaultWindowMemoryTest {
         assertEquals(RoleEnum.SYSTEM, window.get(0).getRoleType());
         assertEquals(RoleEnum.USER, window.get(1).getRoleType());
         assertEquals("last", ((UserContent) window.get(1)).getContent());
+    }
+
+    @Test
+    public void windowAlwaysKeepsRecentTenTurns() {
+        DefaultWindowMemory memory = memory();
+        List<IContent> messages = new ArrayList<>();
+        messages.add(system("sys"));
+        for (int index = 1; index <= 12; index++) {
+            messages.add(user("u" + index));
+            messages.add(assistant("a" + index));
+        }
+        memory.append(messages);
+
+        // 条数限制为 4，但最近 10 轮必须保留：system + 10 轮 × 2 条
+        WindowPolicy policy = new WindowPolicy(-1L, 4, -1L, 0, 10);
+        List<IContent> window = memory.window(policy, null);
+        assertEquals(21, window.size());
+        assertEquals(RoleEnum.SYSTEM, window.get(0).getRoleType());
+        assertEquals("u3", ((UserContent) window.get(1)).getContent());
+        assertEquals("u12", ((UserContent) window.get(19)).getContent());
+        assertEquals("a12", ((AssistantContent) window.get(20)).getContent());
     }
 
     @Test
