@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 756" width="1240" height="756" font-family="'Segoe UI Variable','Segoe UI','Microsoft YaHei UI','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8FBFF"/><stop offset="0.55" stop-color="#F5F8FC"/><stop offset="1" stop-color="#F2F6FB"/>
+    </linearGradient>
+    <linearGradient id="topLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2563EB"/><stop offset="0.55" stop-color="#06B6D4"/><stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="divider" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#BFD3EC"/><stop offset="1" stop-color="#E4EDF7" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="1.4" cy="1.4" r="1.2" fill="#AFC3DB" opacity="0.42"/>
+    </pattern>
+    <filter id="cardShadow" x="-12%" y="-18%" width="124%" height="142%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#22324A" flood-opacity="0.075"/>
+    </filter>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8A9AAE"/></marker>
+    <marker id="arrowDark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#64748B"/></marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#3B82F6"/></marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#10B981"/></marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F59E0B"/></marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8B5CF6"/></marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F43F5E"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1240" height="756" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="1240" height="756" fill="url(#dotGrid)"/>
+  <rect x="0" y="0" width="1240" height="4" fill="url(#topLine)"/>
+  <g>
+    <rect x="50" y="17" width="154" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+    <circle cx="65" cy="29" r="3.2" fill="#2563EB"/>
+    <text x="75" y="33" font-size="9.6" font-weight="700" fill="#2563EB" letter-spacing="1.25">CLARA · LEARNING</text>
+    <rect x="1084" y="17" width="106" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+    <text x="1137" y="33" font-size="9.6" font-weight="700" fill="#64748B" text-anchor="middle" letter-spacing="1.2">CHAPTER 03</text>
+  </g>
+  <rect x="36" y="51" width="4" height="28" rx="2" fill="#2563EB"/>
+  <text x="50" y="68" font-size="25" font-weight="700" fill="#0F172A" letter-spacing="0.2">Core 契约地图：模块只依赖接口</text>
+  <text x="50" y="90" font-size="12.6" font-weight="400" fill="#64748B">clara-core 不实现业务；它定义“能力长什么样、数据怎么流动、失败如何表达”。</text>
+  <line x1="50" y1="104" x2="1190" y2="104" stroke="url(#divider)" stroke-width="1"/>
+  <g transform="translate(0,28)">
+
+  <rect x="50" y="92" width="286" height="470" rx="10" fill="#F3F7FF" stroke="#C9DCF7" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="105.0" width="3" height="444.0" rx="1.5" fill="#3B82F6" opacity="0.9"/>
+  <text x="68" y="118" font-size="14" font-weight="700" fill="#1D4ED8" text-anchor="start">core 的三条底线</text>
+  <text x="68" y="148" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">1. 不依赖任何能力模块</text>
+  <text x="68" y="168" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">model / memory / skill / mcp / workflow</text>
+  <text x="68" y="184" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">都只能反向依赖 core。</text>
+  <text x="68" y="214" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">2. 接口以 I 开头，集中定义</text>
+  <text x="68" y="234" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">实现类不反向暴露给调用方，</text>
+  <text x="68" y="250" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">替换实现只改 application 装配。</text>
+  <text x="68" y="280" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">3. 错误是结构化数据</text>
+  <text x="68" y="300" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">ClaraError / ErrorCodes /</text>
+  <text x="68" y="316" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">ErrorCategoryEnum 贯穿全链路。</text>
+
+  <rect x="68" y="356" width="250" height="180" rx="8" fill="#FFFFFF" stroke="#D8E4F2" filter="url(#cardShadow)" stroke-width="1" /><rect x="68.5" y="369.0" width="3" height="154.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="82" y="379" font-size="11.5" font-weight="700" fill="#28407A" text-anchor="start">读接口时的三个问题</text>
+  <text x="82" y="403" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">谁创建它？—— application 装配</text>
+  <text x="82" y="423" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">谁调用它？—— orchestration / workflow</text>
+  <text x="82" y="443" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">失败怎么表达？—— 异常或结果对象</text>
+  <text x="82" y="463" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">是否线程安全？—— 看 Javadoc 约束</text>
+  <text x="82" y="483" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">是否可取消？—— CancellationToken</text>
+  <text x="82" y="510" font-size="9.9" font-weight="400" fill="#94A3B8" text-anchor="start">接口是边界，不是“为了多实现”。</text>
+
+  <rect x="372" y="92" width="500" height="82" rx="12" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="372.5" y="105.0" width="3" height="56.0" rx="1.5" fill="#10B981" opacity="0.9"/>
+  <text x="388" y="116" font-size="13.5" font-weight="700" fill="#047857" text-anchor="start">能力契约：业务模块向外提供什么</text>
+  <text x="388" y="138" font-size="10.4" font-weight="400" fill="#1E293B" text-anchor="start">IStreamModel · IToolInvoker · IToolCatalog · IWorkflowEngine</text>
+  <text x="388" y="156" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">IEmbeddingClient · ISemanticMemoryStore · IVideoGenerator</text>
+
+  <rect x="372" y="188" width="500" height="82" rx="12" fill="#FFF8EC" stroke="#F1D6AC" filter="url(#cardShadow)" stroke-width="1" /><rect x="372.5" y="201.0" width="3" height="56.0" rx="1.5" fill="#F59E0B" opacity="0.9"/>
+  <text x="388" y="212" font-size="13.5" font-weight="700" fill="#B45309" text-anchor="start">数据契约：跨模块传递的对象</text>
+  <text x="388" y="234" font-size="10.4" font-weight="400" fill="#1E293B" text-anchor="start">IContent · UserContent · AssistantContent · ToolCall / ToolResult</text>
+  <text x="388" y="252" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">ConversationRequest / Result · WorkflowDefinition · MemoryEntry</text>
+
+  <rect x="372" y="284" width="500" height="82" rx="12" fill="#EAF0FB" stroke="#C9D6F0" filter="url(#cardShadow)" stroke-width="1" /><rect x="372.5" y="297.0" width="3" height="56.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="388" y="308" font-size="13.5" font-weight="700" fill="#28407A" text-anchor="start">传输契约：HTTP / SSE 的最小抽象</text>
+  <text x="388" y="330" font-size="10.4" font-weight="400" fill="#1E293B" text-anchor="start">IHttpTransport · IHttpCall · RawHttpRequest / Response</text>
+  <text x="388" y="348" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">HttpTransportPolicy · IExecutionGuard · ISseEventParser</text>
+
+  <rect x="372" y="380" width="500" height="82" rx="12" fill="#F8F3FF" stroke="#DEC9F1" filter="url(#cardShadow)" stroke-width="1" /><rect x="372.5" y="393.0" width="3" height="56.0" rx="1.5" fill="#8B5CF6" opacity="0.9"/>
+  <text x="388" y="404" font-size="13.5" font-weight="700" fill="#6D28D9" text-anchor="start">交互与计划契约：长流程的状态边界</text>
+  <text x="388" y="426" font-size="10.4" font-weight="400" fill="#1E293B" text-anchor="start">IInteractionService · IUserInteractionGateway · IUserInterventionSource</text>
+  <text x="388" y="444" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">ITaskPlanEngine · IBudgetLedger · ICheckpointStore</text>
+
+  <rect x="372" y="476" width="500" height="86" rx="12" fill="#FFF3F4" stroke="#EBC7CA" filter="url(#cardShadow)" stroke-width="1" /><rect x="372.5" y="489.0" width="3" height="60.0" rx="1.5" fill="#F43F5E" opacity="0.9"/>
+  <text x="388" y="500" font-size="13.5" font-weight="700" fill="#BE123C" text-anchor="start">观测契约：链路不绑定具体后端</text>
+  <text x="388" y="522" font-size="10.4" font-weight="400" fill="#1E293B" text-anchor="start">ITelemetrySink · Telemetry · TelemetrySpan · TelemetryContext</text>
+  <text x="388" y="540" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">Telemetry 只在 core，JSONL / Prometheus / OTLP 都在 application。</text>
+
+  <rect x="900" y="92" width="290" height="470" rx="10" fill="#F8F9FB" stroke="#DDE1E6" filter="url(#cardShadow)" stroke-width="1" /><rect x="900.5" y="105.0" width="3" height="444.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="916" y="118" font-size="13.5" font-weight="700" fill="#475569" text-anchor="start">实现者 / 装配点</text>
+  <text x="916" y="150" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">CompatibleStream → IStreamModel</text>
+  <text x="916" y="176" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">DefaultToolInvoker → IToolInvoker</text>
+  <text x="916" y="202" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">DefaultWorkflowEngine → IWorkflowEngine</text>
+  <text x="916" y="228" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">LocalConversationStore → ConversationStore</text>
+  <text x="916" y="254" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">Jdk8HttpTransport → IHttpExecute</text>
+  <text x="916" y="280" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">JdkHttpTransport → IHttpTransport</text>
+  <text x="916" y="306" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">DefaultMcpGateway → IMcpGateway</text>
+  <text x="916" y="332" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">TelemetryRuntime → ITelemetrySink</text>
+  <rect x="916" y="360" width="258" height="168" rx="8" fill="#FFFFFF" stroke="#E3E6EA" filter="url(#cardShadow)" stroke-width="1" /><rect x="916.5" y="373.0" width="3" height="142.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="930" y="383" font-size="11.25" font-weight="700" fill="#BE123C" text-anchor="start">为什么要单独看 core</text>
+  <text x="930" y="405" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">先读接口，能快速回答：</text>
+  <text x="930" y="423" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">“模块之间到底怎么协作？”</text>
+  <text x="930" y="447" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">再读实现，才知道：</text>
+  <text x="930" y="465" font-size="10.4" font-weight="400" fill="#475569" text-anchor="start">“这一步具体做了什么？”</text>
+  <text x="930" y="495" font-size="9.9" font-weight="400" fill="#94A3B8" text-anchor="start">接口稳定，实现可替换。</text>
+
+  <rect x="50" y="592" width="1140" height="92" rx="12" fill="#F3F7FF" stroke="#C9DCF7" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="605.0" width="3" height="66.0" rx="1.5" fill="#3B82F6" opacity="0.9"/>
+  <text x="66" y="616" font-size="13.5" font-weight="700" fill="#1D4ED8" text-anchor="start">阅读顺序建议</text>
+  <text x="66" y="640" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">先看能力契约与数据契约 → 再看 ConversationRequest / ConversationResult → 最后看传输、交互、观测契约。</text>
+  <text x="66" y="660" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">读每个接口时，顺手用 IDE “Find Usages” 找装配点；装配点比方法实现更能说明设计意图。</text>
+  
+</g>
+  <line x1="50" y1="702" x2="1190" y2="702" stroke="#DCE6F1" stroke-width="1"/>
+  <text x="50" y="739" font-size="10.8" font-weight="400" fill="#7C8DA6">图 3-1 Core 契约地图：契约在 core，实现在各模块，选择在 application。</text>
+  <text x="1190" y="739" font-size="9.4" font-weight="600" fill="#A6B4C7" text-anchor="end" letter-spacing="1.1">CLARA · LEARNING MANUAL</text>
+</svg>

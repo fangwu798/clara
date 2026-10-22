@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" width="1240" height="780" font-family="'Segoe UI',Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4C566A"/>
+    </marker>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9AA0A6"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="780" fill="#FFFFFF"/>
+
+  <text x="40" y="30" font-size="20" font-weight="700" fill="#2E3440">Clara 架构总览</text>
+  <text x="40" y="50" font-size="12" fill="#6B7280">分层：运行入口 → 装配层 → 能力模块 → 基础模块；右侧为外部系统。箭头表示调用与组合方向，右侧总线表示受控的外部访问。</text>
+
+  <!-- 运行入口 -->
+  <rect x="40" y="64" width="860" height="104" rx="12" fill="#F3F8FD" stroke="#C6DDF2"/>
+  <text x="56" y="88" font-size="13" font-weight="700" fill="#2B6CB0">运行入口 / 宿主</text>
+  <text x="220" y="88" font-size="10.5" fill="#7A8A99">可执行 jar + 交互式 CLI；REST / SSE 等 Web 接入由宿主应用自行实现。</text>
+  <rect x="190" y="100" width="560" height="52" rx="8" fill="#FFFFFF" stroke="#5B9BD5"/>
+  <text x="470" y="121" font-size="13" font-weight="700" fill="#24425E" text-anchor="middle">交互式对话控制台（当前唯一运行模式）</text>
+  <text x="470" y="139" font-size="10.5" fill="#5A6B7B" text-anchor="middle">ClaraApplication · ConsoleView · 命令处理 · 任务由 run_workflow / publish_workflow 承担</text>
+
+  <line x1="470" y1="168" x2="470" y2="184" stroke="#4C566A" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <!-- 装配层 -->
+  <rect x="40" y="184" width="860" height="164" rx="12" fill="#FFF8EE" stroke="#F0D2A8"/>
+  <text x="56" y="208" font-size="13" font-weight="700" fill="#B26A00">装配层 · clara-application</text>
+  <rect x="60" y="220" width="820" height="40" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
+  <text x="470" y="245" font-size="13" font-weight="700" fill="#7A4A00" text-anchor="middle">ApplicationBootstrap —— 唯一装配点：把 core 契约绑定到各模块实现</text>
+
+  <rect x="60" y="272" width="196" height="56" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
+  <text x="158" y="293" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">ModelRegistry</text>
+  <text x="158" y="309" font-size="10" fill="#8A6A3A" text-anchor="middle">模型选择 / 平台配置</text>
+  <text x="158" y="322" font-size="10" fill="#8A6A3A" text-anchor="middle">可用性探测 / 自动降级</text>
+
+  <rect x="268" y="272" width="196" height="56" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
+  <text x="366" y="293" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">WorkflowCatalog · Runner</text>
+  <text x="366" y="309" font-size="10" fill="#8A6A3A" text-anchor="middle">流程清单 / 自定义流程热加载</text>
+  <text x="366" y="322" font-size="10" fill="#8A6A3A" text-anchor="middle">工作流执行 / 媒体资产运行时</text>
+
+  <rect x="476" y="272" width="196" height="56" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
+  <text x="574" y="293" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">CompositeToolInvoker</text>
+  <text x="574" y="309" font-size="10" fill="#8A6A3A" text-anchor="middle">本地技能优先</text>
+  <text x="574" y="322" font-size="10" fill="#8A6A3A" text-anchor="middle">MCP 工具兜底 / 统一结果</text>
+
+  <rect x="684" y="272" width="196" height="56" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
+  <text x="782" y="293" font-size="12" font-weight="700" fill="#7A4A00" text-anchor="middle">CodeGraph · Telemetry</text>
+  <text x="782" y="309" font-size="10" fill="#8A6A3A" text-anchor="middle">图谱导入 / 状态 / 可视化入口</text>
+  <text x="782" y="322" font-size="10" fill="#8A6A3A" text-anchor="middle">链路 Span / 指标 / OTLP 导出</text>
+
+  <line x1="470" y1="348" x2="470" y2="364" stroke="#4C566A" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <!-- 能力模块 -->
+  <rect x="40" y="364" width="860" height="236" rx="12" fill="#F4FBF4" stroke="#CFE6CF"/>
+  <text x="56" y="388" font-size="13" font-weight="700" fill="#2F7D32">能力模块（仅通过 core 契约交互）</text>
+
+  <rect x="60" y="400" width="264" height="80" rx="8" fill="#E8F5E9" stroke="#5AA45D"/>
+  <text x="74" y="422" font-size="13" font-weight="700" fill="#23572B">clara-orchestration</text>
+  <text x="74" y="442" font-size="10.5" fill="#3C5A42">DefaultConversationOrchestrator（Agent Loop）</text>
+  <text x="74" y="457" font-size="10.5" fill="#3C5A42">ContextAssembler · ToolRoundTripCoordinator</text>
+  <text x="74" y="472" font-size="10.5" fill="#3C5A42">意图判定 · 动态计划 · 技能匹配</text>
+
+  <rect x="338" y="400" width="264" height="80" rx="8" fill="#EAF0FB" stroke="#5B7FCB"/>
+  <text x="352" y="422" font-size="13" font-weight="700" fill="#28407A">clara-model</text>
+  <text x="352" y="442" font-size="10.5" fill="#3B4E70">IStreamModel 统一调用 · Provider 协议适配</text>
+  <text x="352" y="457" font-size="10.5" fill="#3B4E70">Completion / Responses · Token 估算</text>
+  <text x="352" y="472" font-size="10.5" fill="#3B4E70">Embedding · 图片 / 视频媒体模型</text>
+
+  <rect x="616" y="400" width="264" height="80" rx="8" fill="#F4EAF9" stroke="#8E5BB5"/>
+  <text x="630" y="422" font-size="13" font-weight="700" fill="#5A2E77">clara-memory</text>
+  <text x="630" y="442" font-size="10.5" fill="#5E4670">窗口记忆（按会话隔离）· 会话持久化</text>
+  <text x="630" y="457" font-size="10.5" fill="#5E4670">语义召回（本地 / Milvus）</text>
+  <text x="630" y="472" font-size="10.5" fill="#5E4670">历史压缩与摘要</text>
+
+  <rect x="60" y="492" width="264" height="80" rx="8" fill="#FDF1E6" stroke="#D98A2B"/>
+  <text x="74" y="514" font-size="13" font-weight="700" fill="#8A5410">clara-skill</text>
+  <text x="74" y="534" font-size="10.5" fill="#6B4A22">技能注册表（内置 + 运行期目录）</text>
+  <text x="74" y="549" font-size="10.5" fill="#6B4A22">工具执行 · Schema 校验</text>
+  <text x="74" y="564" font-size="10.5" fill="#6B4A22">权限控制与热加载</text>
+
+  <rect x="338" y="492" width="264" height="80" rx="8" fill="#E6F6F4" stroke="#2E9E96"/>
+  <text x="352" y="514" font-size="13" font-weight="700" fill="#1B5F5A">clara-mcp（可选）</text>
+  <text x="352" y="534" font-size="10.5" fill="#2F5855">MCP 客户端 · 服务注册与能力发现</text>
+  <text x="352" y="549" font-size="10.5" fill="#2F5855">stdio / Streamable HTTP</text>
+  <text x="352" y="564" font-size="10.5" fill="#2F5855">未配置 MCP 服务时不启用</text>
+
+  <rect x="616" y="492" width="264" height="80" rx="8" fill="#FBEAEA" stroke="#C0504D"/>
+  <text x="630" y="514" font-size="13" font-weight="700" fill="#7A2E2C">clara-workflow</text>
+  <text x="630" y="534" font-size="10.5" fill="#6B3A38">工作流定义 · DAG 执行 · 预算台账</text>
+  <text x="630" y="549" font-size="10.5" fill="#6B3A38">检查点与人工交互（WAITING_INPUT）</text>
+  <text x="630" y="564" font-size="10.5" fill="#6B3A38">多角色评审 · 自定义流程发布</text>
+
+  <line x1="470" y1="600" x2="470" y2="616" stroke="#4C566A" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <!-- 基础模块 -->
+  <rect x="40" y="616" width="860" height="128" rx="12" fill="#F2F4F7" stroke="#D5DAE2"/>
+  <text x="56" y="640" font-size="13" font-weight="700" fill="#4C566A">基础模块</text>
+
+  <rect x="60" y="652" width="264" height="56" rx="8" fill="#FFFFFF" stroke="#8792A2"/>
+  <text x="192" y="674" font-size="12" font-weight="700" fill="#3A4250" text-anchor="middle">clara-core</text>
+  <text x="192" y="690" font-size="10" fill="#6B7280" text-anchor="middle">契约接口 · DTO · 枚举</text>
+  <text x="192" y="703" font-size="10" fill="#6B7280" text-anchor="middle">结构化错误 · 通用工具</text>
+
+  <rect x="338" y="652" width="264" height="56" rx="8" fill="#FFFFFF" stroke="#8792A2"/>
+  <text x="470" y="674" font-size="12" font-weight="700" fill="#3A4250" text-anchor="middle">clara-transport</text>
+  <text x="470" y="690" font-size="10" fill="#6B7280" text-anchor="middle">HTTP / SSE 传输 · 超时控制</text>
+  <text x="470" y="703" font-size="10" fill="#6B7280" text-anchor="middle">体积上限 · 有界流</text>
+
+  <rect x="616" y="652" width="264" height="56" rx="8" fill="#FFFFFF" stroke="#8792A2"/>
+  <text x="748" y="674" font-size="12" font-weight="700" fill="#3A4250" text-anchor="middle">clara-bom</text>
+  <text x="748" y="690" font-size="10" fill="#6B7280" text-anchor="middle">统一版本清单</text>
+  <text x="748" y="703" font-size="10" fill="#6B7280" text-anchor="middle">对外发布依赖治理</text>
+
+  <!-- 外部系统 -->
+  <text x="920" y="88" font-size="13" font-weight="700" fill="#5A5A5A">外部系统 / 依赖</text>
+
+  <rect x="920" y="104" width="280" height="64" rx="8" fill="#FAFAFA" stroke="#9AA0A6" stroke-dasharray="4 3"/>
+  <text x="934" y="126" font-size="12" font-weight="700" fill="#3A4250">模型平台</text>
+  <text x="934" y="144" font-size="10" fill="#6B7280">OpenAI · DeepSeek · 火山方舟 · Kimi</text>
+  <text x="934" y="158" font-size="10" fill="#6B7280">Anthropic · 阿里通义</text>
+
+  <rect x="920" y="184" width="280" height="64" rx="8" fill="#FAFAFA" stroke="#9AA0A6" stroke-dasharray="4 3"/>
+  <text x="934" y="206" font-size="12" font-weight="700" fill="#3A4250">MCP 服务端（可选）</text>
+  <text x="934" y="224" font-size="10" fill="#6B7280">stdio（受控子进程）</text>
+  <text x="934" y="238" font-size="10" fill="#6B7280">Streamable HTTP（HTTPS）</text>
+
+  <rect x="920" y="264" width="280" height="64" rx="8" fill="#FAFAFA" stroke="#9AA0A6" stroke-dasharray="4 3"/>
+  <text x="934" y="286" font-size="12" font-weight="700" fill="#3A4250">代码知识图谱（可选）</text>
+  <text x="934" y="304" font-size="10" fill="#6B7280">codebase-memory-mcp 容器</text>
+  <text x="934" y="318" font-size="10" fill="#6B7280">HTTP MCP 调用 · 图谱可视化页面</text>
+
+  <rect x="920" y="344" width="280" height="64" rx="8" fill="#FAFAFA" stroke="#9AA0A6" stroke-dasharray="4 3"/>
+  <text x="934" y="366" font-size="12" font-weight="700" fill="#3A4250">Milvus 向量库（可选）</text>
+  <text x="934" y="384" font-size="10" fill="#6B7280">对话记录入库与语义召回</text>
+  <text x="934" y="398" font-size="10" fill="#6B7280">未启用时回退本地实现</text>
+
+  <rect x="920" y="424" width="280" height="64" rx="8" fill="#FAFAFA" stroke="#9AA0A6" stroke-dasharray="4 3"/>
+  <text x="934" y="446" font-size="12" font-weight="700" fill="#3A4250">可观测栈（可选）</text>
+  <text x="934" y="464" font-size="10" fill="#6B7280">Prometheus · Tempo · Grafana</text>
+  <text x="934" y="478" font-size="10" fill="#6B7280">OTLP 导出与本地 JSONL</text>
+
+  <rect x="920" y="504" width="280" height="64" rx="8" fill="#FAFAFA" stroke="#9AA0A6" stroke-dasharray="4 3"/>
+  <text x="934" y="526" font-size="12" font-weight="700" fill="#3A4250">本地文件与配置</text>
+  <text x="934" y="544" font-size="10" fill="#6B7280">工作区文件 · .clara 会话状态</text>
+  <text x="934" y="558" font-size="10" fill="#6B7280">config · logs · 媒体资产</text>
+
+  <line x1="900" y1="136" x2="920" y2="136" stroke="#9AA0A6" stroke-width="1.2" marker-end="url(#arrowGray)"/>
+  <line x1="900" y1="216" x2="920" y2="216" stroke="#9AA0A6" stroke-width="1.2" marker-end="url(#arrowGray)"/>
+  <line x1="900" y1="296" x2="920" y2="296" stroke="#9AA0A6" stroke-width="1.2" marker-end="url(#arrowGray)"/>
+  <line x1="900" y1="376" x2="920" y2="376" stroke="#9AA0A6" stroke-width="1.2" marker-end="url(#arrowGray)"/>
+  <line x1="900" y1="456" x2="920" y2="456" stroke="#9AA0A6" stroke-width="1.2" marker-end="url(#arrowGray)"/>
+  <line x1="900" y1="536" x2="920" y2="536" stroke="#9AA0A6" stroke-width="1.2" marker-end="url(#arrowGray)"/>
+  <line x1="910" y1="136" x2="910" y2="536" stroke="#9AA0A6" stroke-width="1.2"/>
+
+  <text x="920" y="600" font-size="10.5" font-weight="700" fill="#6B7280">外部依赖访问协议（非独立模块）</text>
+  <text x="920" y="617" font-size="9.5" fill="#9AA0A6">HTTP/HTTPS：模型、MCP、Milvus、OTLP</text>
+  <text x="920" y="632" font-size="9.5" fill="#9AA0A6">stdio：本地 MCP 子进程</text>
+  <text x="920" y="647" font-size="9.5" fill="#9AA0A6">gRPC：Milvus SDK 内部</text>
+  <text x="920" y="662" font-size="9.5" fill="#9AA0A6">文件：工作区 / config / .clara / logs</text>
+  <text x="40" y="764" font-size="10" fill="#9AA0A6">说明：能力模块之间不直接耦合，统一通过 clara-core 契约交互；所有模型、MCP、向量库、图谱与观测能力均可按配置启用。</text>
+</svg>

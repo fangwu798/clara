@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 850" width="1240" height="850" font-family="'Noto Sans SC','Microsoft YaHei UI','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F8FBFF"/><stop offset="0.55" stop-color="#F5F8FC"/><stop offset="1" stop-color="#F2F6FB"/></linearGradient>
+  <linearGradient id="topLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2563EB"/><stop offset="0.55" stop-color="#06B6D4"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
+  <linearGradient id="divider" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#BFD3EC"/><stop offset="1" stop-color="#E4EDF7" stop-opacity="0"/></linearGradient>
+  <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B82F6"/><stop offset="0.35" stop-color="#8B5CF6"/><stop offset="0.65" stop-color="#10B981"/><stop offset="1" stop-color="#F43F5E"/></linearGradient>
+  <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.4" cy="1.4" r="1.2" fill="#AFC3DB" opacity="0.42"/></pattern>
+  <filter id="cardShadow" x="-12%" y="-18%" width="124%" height="142%"><feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#22324A" flood-opacity="0.075"/></filter>
+  <filter id="softShadow" x="-15%" y="-25%" width="130%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#22324A" flood-opacity="0.08"/></filter>
+  <marker id="arrowGray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8A9AAE"/></marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#3B82F6"/></marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#10B981"/></marker>
+  <marker id="arrowRose" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F43F5E"/></marker>
+</defs>
+  <rect x="0" y="0" width="1240" height="850" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="1240" height="850" fill="url(#dotGrid)"/>
+  
+  <rect x="0" y="0" width="1240" height="4" fill="url(#topLine)"/>
+  <rect x="50" y="17" width="154" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+  <circle cx="65" cy="29" r="3.2" fill="#2563EB"/>
+  <text x="75" y="33" font-size="9.6" font-weight="700" fill="#2563EB" letter-spacing="1.25">CLARA · LEARNING</text>
+  <rect x="1084" y="17" width="106" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+  <text x="1137" y="33" font-size="9.6" font-weight="700" fill="#64748B" text-anchor="middle" letter-spacing="1.2">CHAPTER 14</text>
+  <rect x="36" y="51" width="4" height="28" rx="2" fill="#2563EB"/>
+  <text x="50" y="68" font-size="25" font-weight="700" fill="#0F172A" letter-spacing="0.2">测试与质量门禁</text>
+  <text x="50" y="90" font-size="12.6" font-weight="400" fill="#64748B">从单元测试到覆盖率、Sonar 与打包：每一道门禁都应该在最短路径上拦住问题。</text>
+  <line x1="50" y1="104" x2="1190" y2="104" stroke="url(#divider)" stroke-width="1"/>
+  
+  <text x="50" y="122" font-size="11" font-weight="700" fill="#8A9AAE" letter-spacing="1.4">QUALITY PIPELINE</text>
+  <rect x="50" y="136" width="176" height="64" rx="12" fill="#F3F7FF" stroke="#D5E3F7" filter="url(#cardShadow)"/>
+    <rect x="50" y="136" width="176" height="4" rx="2" fill="#3B82F6"/>
+    <text x="64" y="161" font-size="12.2" font-weight="700" fill="#3B82F6">mvn test</text>
+    <text x="64" y="182" font-size="10.2" fill="#64748B">单元测试</text><line x1="228" y1="168" x2="240" y2="168" stroke="#8A9AAE" stroke-width="1.8" marker-end="url(#arrowGray)"/><rect x="242.8" y="136" width="176" height="64" rx="12" fill="#F2FBF5" stroke="#CBE8D3" filter="url(#cardShadow)"/>
+    <rect x="242.8" y="136" width="176" height="4" rx="2" fill="#10B981"/>
+    <text x="256.8" y="161" font-size="12.2" font-weight="700" fill="#10B981">JaCoCo</text>
+    <text x="256.8" y="182" font-size="10.2" fill="#64748B">生成 jacoco.xml</text><line x1="420.8" y1="168" x2="432.8" y2="168" stroke="#8A9AAE" stroke-width="1.8" marker-end="url(#arrowGray)"/><rect x="435.6" y="136" width="176" height="64" rx="12" fill="#FFF9EE" stroke="#F1D9B0" filter="url(#cardShadow)"/>
+    <rect x="435.6" y="136" width="176" height="4" rx="2" fill="#F59E0B"/>
+    <text x="449.6" y="161" font-size="12.2" font-weight="700" fill="#F59E0B">check-coverage</text>
+    <text x="449.6" y="182" font-size="10.2" fill="#64748B">行覆盖率 ≥ 80%</text><line x1="613.6" y1="168" x2="625.6" y2="168" stroke="#8A9AAE" stroke-width="1.8" marker-end="url(#arrowGray)"/><rect x="628.4000000000001" y="136" width="176" height="64" rx="12" fill="#FAF5FF" stroke="#E2CDF2" filter="url(#cardShadow)"/>
+    <rect x="628.4000000000001" y="136" width="176" height="4" rx="2" fill="#8B5CF6"/>
+    <text x="642.4000000000001" y="161" font-size="12.2" font-weight="700" fill="#8B5CF6">Sonar Scan</text>
+    <text x="642.4000000000001" y="182" font-size="10.2" fill="#64748B">导入覆盖率 + 规则</text><line x1="806.4000000000001" y1="168" x2="818.4000000000001" y2="168" stroke="#8A9AAE" stroke-width="1.8" marker-end="url(#arrowGray)"/><rect x="821.2" y="136" width="176" height="64" rx="12" fill="#FFF4F5" stroke="#EFC9CD" filter="url(#cardShadow)"/>
+    <rect x="821.2" y="136" width="176" height="4" rx="2" fill="#F43F5E"/>
+    <text x="835.2" y="161" font-size="12.2" font-weight="700" fill="#F43F5E">Quality Gate</text>
+    <text x="835.2" y="182" font-size="10.2" fill="#64748B">阻断不合格提交</text><line x1="999.2" y1="168" x2="1011.2" y2="168" stroke="#8A9AAE" stroke-width="1.8" marker-end="url(#arrowGray)"/><rect x="1014" y="136" width="176" height="64" rx="12" fill="#EFFBF8" stroke="#C6E4E1" filter="url(#cardShadow)"/>
+    <rect x="1014" y="136" width="176" height="4" rx="2" fill="#0891B2"/>
+    <text x="1028" y="161" font-size="12.2" font-weight="700" fill="#0891B2">package</text>
+    <text x="1028" y="182" font-size="10.2" fill="#64748B">生成 clara.jar</text>
+  <text x="50" y="256" font-size="15.2" font-weight="700" fill="#0F172A">测试金字塔</text>
+  <text x="50" y="276" font-size="11.2" fill="#64748B">越靠下越快、越稳定、数量越多；越靠上越接近真实环境，成本也越高。</text>
+  <rect x="150" y="294" width="6" height="330" rx="3" fill="url(#rail)" opacity="0.85"/>
+  <text x="170" y="312" font-size="10.2" fill="#94A3B8">更真实</text>
+  <text x="170" y="606" font-size="10.2" fill="#94A3B8">更稳定</text>
+  <polygon points="480,292 720,292 770,382 430,382" fill="#FFF4F5" stroke="#EFC9CD" stroke-width="1.2" filter="url(#softShadow)"/>
+  <polygon points="430,394 770,394 830,504 370,504" fill="#FFF9EE" stroke="#F1D9B0" stroke-width="1.2" filter="url(#softShadow)"/>
+  <polygon points="370,516 830,516 900,636 300,636" fill="#F2FBF5" stroke="#CBE8D3" stroke-width="1.2" filter="url(#softShadow)"/>
+  <text x="600" y="326" font-size="14" font-weight="700" fill="#BE123C" text-anchor="middle">真实平台测试</text>
+  <text x="600" y="348" font-size="10.8" fill="#475569" text-anchor="middle">模型可用性探测</text>
+  <text x="600" y="366" font-size="10.8" fill="#475569" text-anchor="middle">Completion / Responses · 媒体能力</text>
+  <text x="600" y="438" font-size="14" font-weight="700" fill="#B45309" text-anchor="middle">模块集成测试</text>
+  <text x="600" y="462" font-size="10.8" fill="#475569" text-anchor="middle">MCP 握手 · Milvus BM25</text>
+  <text x="600" y="480" font-size="10.8" fill="#475569" text-anchor="middle">工作流执行 · 技能热加载</text>
+  <text x="600" y="560" font-size="14" font-weight="700" fill="#047857" text-anchor="middle">单元测试</text>
+  <text x="600" y="584" font-size="10.8" fill="#475569" text-anchor="middle">Core 契约 · DTO · 解析器 · 窗口</text>
+  <text x="600" y="602" font-size="10.8" fill="#475569" text-anchor="middle">DAG · 意图校验</text>
+  <rect x="960" y="292" width="230" height="344" rx="14" fill="#FFFFFF" stroke="#DCE7F4" filter="url(#cardShadow)"/>
+  <text x="982" y="322" font-size="14" font-weight="700" fill="#1D4ED8">怎么读这张图</text>
+  
+    <circle cx="988" cy="348" r="3" fill="#3B82F6"/>
+    <text x="1000" y="352" font-size="11.2" fill="#334155">越靠下：越快、越稳定</text>
+    <text x="1000" y="369" font-size="11.2" fill="#334155">数量最多</text>
+    <circle cx="988" cy="406" r="3" fill="#3B82F6"/>
+    <text x="1000" y="410" font-size="11.2" fill="#334155">越靠上：越慢、越贵</text>
+    <text x="1000" y="427" font-size="11.2" fill="#334155">越接近真实环境</text>
+    <circle cx="988" cy="464" r="3" fill="#3B82F6"/>
+    <text x="1000" y="468" font-size="11.2" fill="#334155">提交前至少保证</text>
+    <text x="1000" y="485" font-size="11.2" fill="#334155">单元测试与覆盖率门禁</text>
+    <circle cx="988" cy="522" r="3" fill="#3B82F6"/>
+    <text x="1000" y="526" font-size="11.2" fill="#334155">真实平台测试按需触发</text>
+    <text x="1000" y="543" font-size="11.2" fill="#334155">不放进每次构建</text>  <line x1="982" y1="566" x2="1168" y2="566" stroke="#DCE6F1" stroke-width="1"/>
+  <text x="982" y="588" font-size="10.6" font-weight="700" fill="#64748B">推荐执行顺序</text>
+  <text x="982" y="608" font-size="10.8" fill="#334155">单元 → 集成 → 真实平台</text>
+  <text x="982" y="626" font-size="10.2" fill="#94A3B8">按成本从低到高推进</text>
+  <text x="50" y="674" font-size="11.2" fill="#7C8DA6">测试分层的目的不是“多写测试”，而是把失败尽量留在最快、最便宜的一层。</text>
+  <rect x="50" y="700" width="1140" height="76" rx="14" fill="#F3F7FF" stroke="#D5E3F7" filter="url(#cardShadow)"/>
+  <rect x="50" y="700" width="5" height="76" rx="2.5" fill="#3B82F6"/>
+  <text x="74" y="728" font-size="13.2" font-weight="700" fill="#1D4ED8">常用命令</text>
+  <text x="74" y="753" font-size="10.8" fill="#334155" font-family="Consolas,monospace">mvn -B -Dmaven.repo.local=m2/repository test | node tools/coverage/check-coverage.mjs 0.80 | deploy\sonar\scan.cmd</text>
+  
+  <line x1="50" y1="812" x2="1190" y2="812" stroke="#DCE6F1" stroke-width="1"/>
+  <text x="50" y="833" font-size="10.8" font-weight="400" fill="#7C8DA6">图 14-1 测试与质量门禁：单元测试、覆盖率、Sonar 与打包的完整链路。</text>
+  <text x="1190" y="833" font-size="9.4" font-weight="600" fill="#A6B4C7" text-anchor="end" letter-spacing="1.1">CLARA · LEARNING MANUAL</text>
+</svg>

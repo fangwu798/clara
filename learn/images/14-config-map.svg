@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 796" width="1240" height="796" font-family="'Segoe UI Variable','Segoe UI','Microsoft YaHei UI','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8FBFF"/><stop offset="0.55" stop-color="#F5F8FC"/><stop offset="1" stop-color="#F2F6FB"/>
+    </linearGradient>
+    <linearGradient id="topLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2563EB"/><stop offset="0.55" stop-color="#06B6D4"/><stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="divider" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#BFD3EC"/><stop offset="1" stop-color="#E4EDF7" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="1.4" cy="1.4" r="1.2" fill="#AFC3DB" opacity="0.42"/>
+    </pattern>
+    <filter id="cardShadow" x="-12%" y="-18%" width="124%" height="142%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#22324A" flood-opacity="0.075"/>
+    </filter>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8A9AAE"/></marker>
+    <marker id="arrowDark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#64748B"/></marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#3B82F6"/></marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#10B981"/></marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F59E0B"/></marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8B5CF6"/></marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F43F5E"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1240" height="796" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="1240" height="796" fill="url(#dotGrid)"/>
+  <rect x="0" y="0" width="1240" height="4" fill="url(#topLine)"/>
+  <g>
+    <rect x="50" y="17" width="154" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+    <circle cx="65" cy="29" r="3.2" fill="#2563EB"/>
+    <text x="75" y="33" font-size="9.6" font-weight="700" fill="#2563EB" letter-spacing="1.25">CLARA · LEARNING</text>
+    <rect x="1084" y="17" width="106" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+    <text x="1137" y="33" font-size="9.6" font-weight="700" fill="#64748B" text-anchor="middle" letter-spacing="1.2">CHAPTER 02</text>
+  </g>
+  <rect x="36" y="51" width="4" height="28" rx="2" fill="#2563EB"/>
+  <text x="50" y="68" font-size="25" font-weight="700" fill="#0F172A" letter-spacing="0.2">配置地图：目录即扩展协议</text>
+  <text x="50" y="90" font-size="12.6" font-weight="400" fill="#64748B">Clara 的很多能力通过“往目录里放文件”扩展；先记住谁扫描哪里、改动何时生效。</text>
+  <line x1="50" y1="104" x2="1190" y2="104" stroke="url(#divider)" stroke-width="1"/>
+  <g transform="translate(0,28)">
+
+  <rect x="430" y="92" width="380" height="96" rx="10" fill="#F3F7FF" stroke="#C9DCF7" filter="url(#cardShadow)" stroke-width="1" /><rect x="430.5" y="105.0" width="3" height="70.0" rx="1.5" fill="#3B82F6" opacity="0.9"/>
+  <text x="446" y="118" font-size="15" font-weight="700" fill="#1D4ED8" text-anchor="start">config/</text>
+  <text x="446" y="142" font-size="10.8" font-weight="400" fill="#475569" text-anchor="start">运行期配置根目录；从当前工作目录向上回溯 6 层定位。</text>
+  <text x="446" y="162" font-size="10.8" font-weight="400" fill="#475569" text-anchor="start">共同约束：UTF-8；密钥不要写进会提交的文件。</text>
+
+  <rect x="50" y="100" width="320" height="72" rx="8" fill="#FFF8EC" stroke="#F1D6AC" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="113.0" width="3" height="46.0" rx="1.5" fill="#F59E0B" opacity="0.9"/>
+  <text x="66" y="124" font-size="12.2" font-weight="700" fill="#B45309" text-anchor="start">clara.yml</text>
+  <text x="66" y="144" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">defaultModel / enabledProviders / codeGraph</text>
+  <text x="66" y="160" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">milvus / telemetry / intentPlanning / context</text>
+  <line x1="370" y1="136" x2="430" y2="136" stroke="#B45309" stroke-width="1.5" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="50" y="188" width="320" height="78" rx="8" fill="#EAF0FB" stroke="#C9D6F0" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="201.0" width="3" height="52.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="66" y="212" font-size="12.2" font-weight="700" fill="#28407A" text-anchor="start">model-providers/</text>
+  <text x="66" y="232" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">provider / credential / transport / capabilities</text>
+  <text x="66" y="248" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">文件名去掉扩展名 = 模型别名</text>
+  <line x1="370" y1="226" x2="430" y2="226" stroke="#1D4ED8" stroke-width="1.5" marker-end="url(#arrowBlue)" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="50" y="282" width="320" height="66" rx="8" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="295.0" width="3" height="40.0" rx="1.5" fill="#10B981" opacity="0.9"/>
+  <text x="66" y="306" font-size="12.2" font-weight="700" fill="#047857" text-anchor="start">model-roles.yml</text>
+  <text x="66" y="326" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">角色名 → 模型别名（AGENT / REVIEW 节点）</text>
+  <line x1="370" y1="314" x2="430" y2="314" stroke="#047857" stroke-width="1.5" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="50" y="364" width="320" height="72" rx="8" fill="#EFFBF8" stroke="#C4E4E0" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="377.0" width="3" height="46.0" rx="1.5" fill="#14B8A6" opacity="0.9"/>
+  <text x="66" y="388" font-size="12.2" font-weight="700" fill="#0F766E" text-anchor="start">mcp/</text>
+  <text x="66" y="408" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">*.json；mcpServers 结构</text>
+  <text x="66" y="424" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">command（stdio）或 url（Streamable HTTP）</text>
+  <line x1="370" y1="400" x2="430" y2="400" stroke="#0F766E" stroke-width="1.5" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="870" y="100" width="320" height="80" rx="8" fill="#F8F3FF" stroke="#DEC9F1" filter="url(#cardShadow)" stroke-width="1" /><rect x="870.5" y="113.0" width="3" height="54.0" rx="1.5" fill="#8B5CF6" opacity="0.9"/>
+  <text x="886" y="124" font-size="12.2" font-weight="700" fill="#6D28D9" text-anchor="start">skill/</text>
+  <text x="886" y="144" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">prompt/ 提示词；tools/ JSON 工具声明；</text>
+  <text x="886" y="160" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">scripts/ 自描述 Python 工具（--describe）</text>
+  <line x1="810" y1="140" x2="870" y2="140" stroke="#6D28D9" stroke-width="1.5" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="870" y="194" width="320" height="80" rx="8" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="870.5" y="207.0" width="3" height="54.0" rx="1.5" fill="#10B981" opacity="0.9"/>
+  <text x="886" y="218" font-size="12.2" font-weight="700" fill="#047857" text-anchor="start">workflow/</text>
+  <text x="886" y="238" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">内置 *.yml；custom/ 放模型生成的工作流</text>
+  <text x="886" y="254" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">按文件签名热加载，无需重启</text>
+  <line x1="810" y1="234" x2="870" y2="234" stroke="#047857" stroke-width="1.5" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="870" y="288" width="320" height="72" rx="8" fill="#FFF3F4" stroke="#EBC7CA" filter="url(#cardShadow)" stroke-width="1" /><rect x="870.5" y="301.0" width="3" height="46.0" rx="1.5" fill="#F43F5E" opacity="0.9"/>
+  <text x="886" y="312" font-size="12.2" font-weight="700" fill="#BE123C" text-anchor="start">standards/</text>
+  <text x="886" y="332" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">开发规范（Java / 前端 / UED）</text>
+  <text x="886" y="348" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">被方案与计划工作流整体读取</text>
+  <line x1="810" y1="324" x2="870" y2="324" stroke="#BE123C" stroke-width="1.5" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="870" y="374" width="320" height="62" rx="8" fill="#F8F9FB" stroke="#DDE1E6" filter="url(#cardShadow)" stroke-width="1" /><rect x="870.5" y="387.0" width="3" height="36.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="886" y="398" font-size="12.2" font-weight="700" fill="#475569" text-anchor="start">sonar/ · static-analysis/</text>
+  <text x="886" y="418" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">质量门禁与 SpotBugs 排除规则</text>
+  <line x1="810" y1="405" x2="870" y2="405" stroke="#475569" stroke-width="1.5" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <line x1="620" y1="188" x2="620" y2="466" stroke="#C9DCF7" stroke-width="1.2" stroke-dasharray="4 4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="630" y="454" font-size="9.9" font-weight="400" fill="#94A3B8" text-anchor="start">目录约定发现</text>
+
+  <text x="50" y="500" font-size="13.5" font-weight="700" fill="#1E293B" text-anchor="start">谁读取这些目录</text>
+  <rect x="50" y="516" width="214" height="70" rx="8" fill="#FFF8EC" stroke="#F1D6AC" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="529.0" width="3" height="44.0" rx="1.5" fill="#F59E0B" opacity="0.9"/>
+  <text x="64" y="540" font-size="10.8" font-weight="700" fill="#B45309" text-anchor="start">ConfigLocator</text>
+  <text x="64" y="558" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">定位 config/、扫描模型清单</text>
+  <text x="64" y="574" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">读取 defaultModel / enabledProviders</text>
+
+  <rect x="282" y="516" width="214" height="70" rx="8" fill="#EAF0FB" stroke="#C9D6F0" filter="url(#cardShadow)" stroke-width="1" /><rect x="282.5" y="529.0" width="3" height="44.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="296" y="540" font-size="10.8" font-weight="700" fill="#28407A" text-anchor="start">ProviderYamlConfigurationLoader</text>
+  <text x="296" y="558" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">严格绑定模型 YAML</text>
+  <text x="296" y="574" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">非法字段 fail-fast</text>
+
+  <rect x="514" y="516" width="214" height="70" rx="8" fill="#EFFBF8" stroke="#C4E4E0" filter="url(#cardShadow)" stroke-width="1" /><rect x="514.5" y="529.0" width="3" height="44.0" rx="1.5" fill="#14B8A6" opacity="0.9"/>
+  <text x="528" y="540" font-size="10.8" font-weight="700" fill="#0F766E" text-anchor="start">McpServerConfigDirectoryLoader</text>
+  <text x="528" y="558" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">递归扫描 mcp/*.json</text>
+  <text x="528" y="574" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">注册服务端并发现能力</text>
+
+  <rect x="746" y="516" width="214" height="70" rx="8" fill="#F8F3FF" stroke="#DEC9F1" filter="url(#cardShadow)" stroke-width="1" /><rect x="746.5" y="529.0" width="3" height="44.0" rx="1.5" fill="#8B5CF6" opacity="0.9"/>
+  <text x="760" y="540" font-size="10.8" font-weight="700" fill="#6D28D9" text-anchor="start">SkillRegistry</text>
+  <text x="760" y="558" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">扫描 prompt / tools / scripts</text>
+  <text x="760" y="574" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">文件签名变化后热加载</text>
+
+  <rect x="978" y="516" width="212" height="70" rx="8" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="978.5" y="529.0" width="3" height="44.0" rx="1.5" fill="#10B981" opacity="0.9"/>
+  <text x="992" y="540" font-size="10.8" font-weight="700" fill="#047857" text-anchor="start">WorkflowDefinitionRegistry</text>
+  <text x="992" y="558" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">递归扫描 workflow/*.yml</text>
+  <text x="992" y="574" font-size="9.9" font-weight="400" fill="#64748B" text-anchor="start">新增 custom 流程即时可用</text>
+
+  <rect x="50" y="616" width="1140" height="112" rx="12" fill="#F3F7FF" stroke="#C9DCF7" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="629.0" width="3" height="86.0" rx="1.5" fill="#3B82F6" opacity="0.9"/>
+  <text x="66" y="640" font-size="13.5" font-weight="700" fill="#1D4ED8" text-anchor="start">生效时机速查</text>
+  <text x="66" y="664" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">启动读取：clara.yml、model-providers、model-roles、mcp、内置 workflow；改这些通常要重启或执行 /init。</text>
+  <text x="66" y="684" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">热加载：skill/prompt、skill/scripts、workflow/custom；文件签名变化后下一次使用自动刷新。</text>
+  <text x="66" y="704" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">只影响工具链：standards、sonar、static-analysis；不会改变运行时装配，但会改变工作流产出与质量门禁。</text>
+  
+</g>
+  <line x1="50" y1="742" x2="1190" y2="742" stroke="#DCE6F1" stroke-width="1"/>
+  <text x="50" y="779" font-size="10.8" font-weight="400" fill="#7C8DA6">图 2-2 配置地图：目录即扩展协议，先判断文件属于哪一类。</text>
+  <text x="1190" y="779" font-size="9.4" font-weight="600" fill="#A6B4C7" text-anchor="end" letter-spacing="1.1">CLARA · LEARNING MANUAL</text>
+</svg>

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 776" width="1240" height="776" font-family="'Segoe UI Variable','Segoe UI','Microsoft YaHei UI','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8FBFF"/><stop offset="0.55" stop-color="#F5F8FC"/><stop offset="1" stop-color="#F2F6FB"/>
+    </linearGradient>
+    <linearGradient id="topLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2563EB"/><stop offset="0.55" stop-color="#06B6D4"/><stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="divider" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#BFD3EC"/><stop offset="1" stop-color="#E4EDF7" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="1.4" cy="1.4" r="1.2" fill="#AFC3DB" opacity="0.42"/>
+    </pattern>
+    <filter id="cardShadow" x="-12%" y="-18%" width="124%" height="142%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#22324A" flood-opacity="0.075"/>
+    </filter>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8A9AAE"/></marker>
+    <marker id="arrowDark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#64748B"/></marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#3B82F6"/></marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#10B981"/></marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F59E0B"/></marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8B5CF6"/></marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F43F5E"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1240" height="776" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="1240" height="776" fill="url(#dotGrid)"/>
+  <rect x="0" y="0" width="1240" height="4" fill="url(#topLine)"/>
+  <g>
+    <rect x="50" y="17" width="154" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+    <circle cx="65" cy="29" r="3.2" fill="#2563EB"/>
+    <text x="75" y="33" font-size="9.6" font-weight="700" fill="#2563EB" letter-spacing="1.25">CLARA · LEARNING</text>
+    <rect x="1084" y="17" width="106" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+    <text x="1137" y="33" font-size="9.6" font-weight="700" fill="#64748B" text-anchor="middle" letter-spacing="1.2">CHAPTER 04</text>
+  </g>
+  <rect x="36" y="51" width="4" height="28" rx="2" fill="#2563EB"/>
+  <text x="50" y="68" font-size="25" font-weight="700" fill="#0F172A" letter-spacing="0.2">HTTP / SSE 传输分层</text>
+  <text x="50" y="90" font-size="12.6" font-weight="400" fill="#64748B">传输层只负责“把字节安全地送出去、按上限收回来”，协议语义在 model / mcp 层。</text>
+  <line x1="50" y1="104" x2="1190" y2="104" stroke="url(#divider)" stroke-width="1"/>
+  <g transform="translate(0,28)">
+
+  <rect x="50" y="82" width="280" height="72" rx="12" fill="#F8F3FF" stroke="#DEC9F1" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="95.0" width="3" height="46.0" rx="1.5" fill="#8B5CF6" opacity="0.9"/>
+  <text x="66" y="106" font-size="12.5" font-weight="700" fill="#6D28D9" text-anchor="start">ConvContext</text>
+  <text x="66" y="126" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">provider / capability / cancel / traceId</text>
+  <text x="66" y="142" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">绑定“这一次调用”的线程上下文</text>
+
+  <rect x="360" y="82" width="250" height="72" rx="12" fill="#FFF8EC" stroke="#F1D6AC" filter="url(#cardShadow)" stroke-width="1" /><rect x="360.5" y="95.0" width="3" height="46.0" rx="1.5" fill="#F59E0B" opacity="0.9"/>
+  <text x="376" y="106" font-size="12.5" font-weight="700" fill="#B45309" text-anchor="start">CallContextGuard</text>
+  <text x="376" y="126" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">取消令牌 / 超时 / trace 透传</text>
+  <text x="376" y="142" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">在阻塞点快速失败</text>
+
+  <rect x="640" y="82" width="250" height="72" rx="12" fill="#EAF0FB" stroke="#C9D6F0" filter="url(#cardShadow)" stroke-width="1" /><rect x="640.5" y="95.0" width="3" height="46.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="656" y="106" font-size="12.5" font-weight="700" fill="#28407A" text-anchor="start">HttpTransportPolicy</text>
+  <text x="656" y="126" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">origin 白名单 / 超时 / 体积上限</text>
+  <text x="656" y="142" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">来自模型配置，不写死在代码</text>
+
+  <rect x="920" y="82" width="270" height="72" rx="12" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="920.5" y="95.0" width="3" height="46.0" rx="1.5" fill="#10B981" opacity="0.9"/>
+  <text x="936" y="106" font-size="12.5" font-weight="700" fill="#047857" text-anchor="start">两条使用方</text>
+  <text x="936" y="126" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">model：模型平台 HTTP / SSE</text>
+  <text x="936" y="142" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">mcp：Streamable HTTP 传输</text>
+
+  <text x="50" y="198" font-size="13.5" font-weight="700" fill="#1E293B" text-anchor="start">请求方向</text>
+  <rect x="50" y="214" width="196" height="76" rx="12" fill="#EAF0FB" stroke="#C9D6F0" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="227.0" width="3" height="50.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="64" y="238" font-size="11.5" font-weight="700" fill="#28407A" text-anchor="start">ProviderRequestEncoder</text>
+  <text x="64" y="258" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">@ProviderAdapter 字段规则</text>
+  <text x="64" y="274" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">Completion / Response 两套协议</text>
+  <line x1="246" y1="252" x2="276" y2="252" stroke="#1D4ED8" stroke-width="1.8" marker-end="url(#arrowBlue)" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="276" y="214" width="196" height="76" rx="12" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="276.5" y="227.0" width="3" height="50.0" rx="1.5" fill="#10B981" opacity="0.9"/>
+  <text x="290" y="238" font-size="11.5" font-weight="700" fill="#047857" text-anchor="start">Jdk8HttpTransport</text>
+  <text x="290" y="258" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">IHttpExecute 入口</text>
+  <text x="290" y="274" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">选择编码器 / 解码器</text>
+  <line x1="472" y1="252" x2="502" y2="252" stroke="#047857" stroke-width="1.8" marker-end="url(#arrowBlue)" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="502" y="214" width="196" height="76" rx="12" fill="#FFF8EC" stroke="#F1D6AC" filter="url(#cardShadow)" stroke-width="1" /><rect x="502.5" y="227.0" width="3" height="50.0" rx="1.5" fill="#F59E0B" opacity="0.9"/>
+  <text x="516" y="238" font-size="11.5" font-weight="700" fill="#B45309" text-anchor="start">JdkHttpTransport</text>
+  <text x="516" y="258" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">IHttpTransport 实现</text>
+  <text x="516" y="274" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">只创建 HttpCall</text>
+  <line x1="698" y1="252" x2="728" y2="252" stroke="#B45309" stroke-width="1.8" marker-end="url(#arrowOrange)" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="728" y="214" width="196" height="76" rx="12" fill="#FFF3F4" stroke="#EBC7CA" filter="url(#cardShadow)" stroke-width="1" /><rect x="728.5" y="227.0" width="3" height="50.0" rx="1.5" fill="#F43F5E" opacity="0.9"/>
+  <text x="742" y="238" font-size="11.5" font-weight="700" fill="#BE123C" text-anchor="start">HttpCall</text>
+  <text x="742" y="258" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">HttpURLConnection</text>
+  <text x="742" y="274" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">连接 / 写请求 / 读响应</text>
+  <line x1="924" y1="252" x2="954" y2="252" stroke="#BE123C" stroke-width="1.8" marker-end="url(#arrowRed)" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="954" y="214" width="236" height="76" rx="12" fill="#F8F9FB" stroke="#DDE1E6" filter="url(#cardShadow)" stroke-width="1" /><rect x="954.5" y="227.0" width="3" height="50.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="968" y="238" font-size="11.5" font-weight="700" fill="#475569" text-anchor="start">模型平台 / MCP 服务端</text>
+  <text x="968" y="258" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">OpenAI / DeepSeek / Kimi / 火山</text>
+  <text x="968" y="274" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">Streamable HTTP MCP</text>
+
+  <text x="50" y="344" font-size="13.5" font-weight="700" fill="#1E293B" text-anchor="start">响应方向</text>
+  <rect x="50" y="360" width="196" height="86" rx="12" fill="#FFF3F4" stroke="#EBC7CA" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="373.0" width="3" height="60.0" rx="1.5" fill="#F43F5E" opacity="0.9"/>
+  <text x="64" y="384" font-size="11.5" font-weight="700" fill="#BE123C" text-anchor="start">HttpCall 读取</text>
+  <text x="64" y="404" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">状态码 / 响应头 / 响应体</text>
+  <text x="64" y="420" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">受 maxResponseBytes 限制</text>
+  <line x1="246" y1="403" x2="276" y2="403" stroke="#BE123C" stroke-width="1.8" marker-end="url(#arrowRed)" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="276" y="360" width="216" height="86" rx="12" fill="#FFF8EC" stroke="#F1D6AC" filter="url(#cardShadow)" stroke-width="1" /><rect x="276.5" y="373.0" width="3" height="60.0" rx="1.5" fill="#F59E0B" opacity="0.9"/>
+  <text x="290" y="384" font-size="11.5" font-weight="700" fill="#B45309" text-anchor="start">BoundedStreams / SSE Parser</text>
+  <text x="290" y="404" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">有界读取，防止无限流</text>
+  <text x="290" y="420" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">按行拆 event / data</text>
+  <line x1="492" y1="403" x2="522" y2="403" stroke="#B45309" stroke-width="1.8" marker-end="url(#arrowOrange)" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="522" y="360" width="216" height="86" rx="12" fill="#EAF0FB" stroke="#C9D6F0" filter="url(#cardShadow)" stroke-width="1" /><rect x="522.5" y="373.0" width="3" height="60.0" rx="1.5" fill="#94A3B8" opacity="0.9"/>
+  <text x="536" y="384" font-size="11.5" font-weight="700" fill="#28407A" text-anchor="start">ProviderResponseDecoder</text>
+  <text x="536" y="404" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">平台字段 → 统一 HttpResponse</text>
+  <text x="536" y="420" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">流式事件 → StreamEvent</text>
+  <line x1="738" y1="403" x2="768" y2="403" stroke="#1D4ED8" stroke-width="1.8" marker-end="url(#arrowBlue)" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="768" y="360" width="216" height="86" rx="12" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="768.5" y="373.0" width="3" height="60.0" rx="1.5" fill="#10B981" opacity="0.9"/>
+  <text x="782" y="384" font-size="11.5" font-weight="700" fill="#047857" text-anchor="start">IStreamObserver</text>
+  <text x="782" y="404" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">TEXT_DELTA / REASONING_DELTA</text>
+  <text x="782" y="420" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">RESPONSE_COMPLETE / ERROR</text>
+  <rect x="1004" y="360" width="186" height="86" rx="12" fill="#F8F3FF" stroke="#DEC9F1" filter="url(#cardShadow)" stroke-width="1" /><rect x="1004.5" y="373.0" width="3" height="60.0" rx="1.5" fill="#8B5CF6" opacity="0.9"/>
+  <text x="1018" y="384" font-size="11.5" font-weight="700" fill="#6D28D9" text-anchor="start">编排层消费</text>
+  <text x="1018" y="404" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">首字符耗时</text>
+  <text x="1018" y="420" font-size="10.4" font-weight="400" fill="#64748B" text-anchor="start">工具调用 / 正文</text>
+
+  <rect x="50" y="494" width="1140" height="150" rx="12" fill="#F3F7FF" stroke="#C9DCF7" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="507.0" width="3" height="124.0" rx="1.5" fill="#3B82F6" opacity="0.9"/>
+  <text x="66" y="518" font-size="13.5" font-weight="700" fill="#1D4ED8" text-anchor="start">这一层必须守住的四件事</text>
+  <text x="66" y="544" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">1. 端点白名单：只允许配置声明的 origin，防止把密钥发到意外地址。</text>
+  <text x="66" y="566" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">2. 有界传输：请求体、响应体、SSE 单行都有上限；超限转为结构化错误，不把内存撑爆。</text>
+  <text x="66" y="588" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">3. 可取消：取消令牌贯穿连接、读取与 SSE 循环；ESC 取消后不再继续消费网络流。</text>
+  <text x="66" y="610" font-size="11.25" font-weight="400" fill="#1E293B" text-anchor="start">4. 资源释放：HttpCall、流句柄、SSE 读取器都用 try-with-resources，异常路径同样关闭。</text>
+  
+
+  <rect x="50" y="666" width="1140" height="38" rx="8" fill="#FFF8EC" stroke="#F1D6AC" filter="url(#cardShadow)" stroke-width="1" /><rect x="50.5" y="679.0" width="3" height="12.0" rx="1.5" fill="#F59E0B" opacity="0.9"/>
+  <text x="66" y="690" font-size="10.8" font-weight="400" fill="#6B5A3E" text-anchor="start">排查网络问题时，先确认失败发生在哪一层：编码错（400）、端点/凭据错（401/403）、超时（连接/读取）、体积超限（本地错误）、SSE 解析错（协议）。</text>
+</g>
+  <line x1="50" y1="722" x2="1190" y2="722" stroke="#DCE6F1" stroke-width="1"/>
+  <text x="50" y="759" font-size="10.8" font-weight="400" fill="#7C8DA6">图 4-1 传输分层：请求编码、网络发送、响应解析、事件消费各自独立。</text>
+  <text x="1190" y="759" font-size="9.4" font-weight="600" fill="#A6B4C7" text-anchor="end" letter-spacing="1.1">CLARA · LEARNING MANUAL</text>
+</svg>

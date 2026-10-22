@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 744" width="1240" height="744" font-family="'Noto Sans SC','Microsoft YaHei UI','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F8FBFF"/><stop offset="0.55" stop-color="#F5F8FC"/><stop offset="1" stop-color="#F2F6FB"/></linearGradient>
+  <linearGradient id="topLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2563EB"/><stop offset="0.55" stop-color="#06B6D4"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
+  <linearGradient id="divider" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#BFD3EC"/><stop offset="1" stop-color="#E4EDF7" stop-opacity="0"/></linearGradient>
+  <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.4" cy="1.4" r="1.2" fill="#AFC3DB" opacity="0.42"/></pattern>
+  <filter id="cardShadow" x="-12%" y="-18%" width="124%" height="142%"><feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#22324A" flood-opacity="0.075"/></filter>
+  <marker id="arrowGray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8A9AAE"/></marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#3B82F6"/></marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#10B981"/></marker>
+  <marker id="arrowOrange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F59E0B"/></marker>
+  <marker id="arrowPurple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8B5CF6"/></marker>
+</defs>
+  <rect x="0" y="0" width="1240" height="744" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="1240" height="744" fill="url(#dotGrid)"/>
+  
+  <rect x="0" y="0" width="1240" height="4" fill="url(#topLine)"/>
+  <rect x="50" y="17" width="154" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+  <circle cx="65" cy="29" r="3.2" fill="#2563EB"/>
+  <text x="75" y="33" font-size="9.6" font-weight="700" fill="#2563EB" letter-spacing="1.25">CLARA · LEARNING</text>
+  <rect x="1084" y="17" width="106" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+  <text x="1137" y="33" font-size="9.6" font-weight="700" fill="#64748B" text-anchor="middle" letter-spacing="1.2">CHAPTER 09</text>
+  <rect x="36" y="51" width="4" height="28" rx="2" fill="#2563EB"/>
+  <text x="50" y="68" font-size="25" font-weight="700" fill="#0F172A" letter-spacing="0.2">工作流引擎：定义、执行与人工确认</text>
+  <text x="50" y="90" font-size="12.6" font-weight="400" fill="#64748B">工作流把“模型 + 工具”组合成可复用、可恢复的执行计划。</text>
+  <line x1="50" y1="104" x2="1190" y2="104" stroke="url(#divider)" stroke-width="1"/>
+  
+  <rect x="50" y="126" width="250" height="64" rx="12" fill="#F3F7FF" stroke="#D5E3F7" filter="url(#cardShadow)"/>
+  <text x="70" y="153" font-size="13" font-weight="700" fill="#1D4ED8">内置工作流</text>
+  <text x="70" y="174" font-size="10.4" fill="#64748B">config/workflow/*.yml · 随应用发布</text>
+  <rect x="50" y="206" width="250" height="64" rx="12" fill="#FFF9EE" stroke="#F1D9B0" filter="url(#cardShadow)"/>
+  <text x="70" y="233" font-size="13" font-weight="700" fill="#B45309">自定义工作流</text>
+  <text x="70" y="254" font-size="10.4" fill="#64748B">config/workflow/custom/*.yml · 热加载</text>
+  <line x1="300" y1="158" x2="350" y2="180" stroke="#3B82F6" stroke-width="1.8" marker-end="url(#arrowBlue)"/>
+  <line x1="300" y1="238" x2="350" y2="200" stroke="#F59E0B" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrowOrange)"/>
+  <rect x="350" y="148" width="250" height="84" rx="12" fill="#F2FBF5" stroke="#CBE8D3" filter="url(#cardShadow)"/>
+  <text x="370" y="174" font-size="12.6" font-weight="700" fill="#047857">WorkflowDefinitionLoader</text>
+  <text x="370" y="194" font-size="10.4" fill="#475569">YAML → 节点树</text>
+  <text x="370" y="212" font-size="10.4" fill="#475569">校验 id 唯一 / 无环</text>
+  <line x1="600" y1="190" x2="650" y2="190" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrowGreen)"/>
+  <rect x="650" y="148" width="220" height="84" rx="12" fill="#FAF5FF" stroke="#E2CDF2" filter="url(#cardShadow)"/>
+  <text x="670" y="174" font-size="12.6" font-weight="700" fill="#6D28D9">DefinitionRegistry</text>
+  <text x="670" y="194" font-size="10.4" fill="#475569">按文件签名刷新</text>
+  <text x="670" y="212" font-size="10.4" fill="#475569">workflowId → definition</text>
+  <line x1="870" y1="190" x2="920" y2="190" stroke="#8B5CF6" stroke-width="1.8" marker-end="url(#arrowPurple)"/>
+  <rect x="920" y="148" width="270" height="84" rx="12" fill="#FFF4F5" stroke="#EFC9CD" filter="url(#cardShadow)"/>
+  <text x="940" y="174" font-size="12.6" font-weight="700" fill="#BE123C">WorkflowRunner / Engine</text>
+  <text x="940" y="194" font-size="10.4" fill="#475569">创建实例、执行节点</text>
+  <text x="940" y="212" font-size="10.4" fill="#475569">返回 COMPLETED / WAITING_INPUT</text>
+  <path d="M1055,232 L1055,280 Q1055,288 1047,288 L628,288 Q620,288 620,296 L620,310" fill="none" stroke="#8A9AAE" stroke-width="1.8" stroke-linecap="round" marker-end="url(#arrowGray)"/>
+  <text x="780" y="282" font-size="10.4" fill="#7C8DA6">按节点类型分派</text>
+  <rect x="150" y="310" width="940" height="190" rx="14" fill="#F8FAFD" stroke="#DCE7F4" stroke-width="1.2"/>
+  <text x="170" y="338" font-size="13.4" font-weight="700" fill="#334155">节点类型 · 由引擎按定义调度</text>
+  
+  <rect x="170" y="354" width="200" height="58" rx="10" fill="#F3F7FF" stroke="#D5E3F7" filter="url(#cardShadow)"/>
+  <rect x="170" y="354" width="4" height="58" rx="2" fill="#3B82F6"/>
+  <text x="186" y="377" font-size="11.4" font-weight="700" fill="#3B82F6">SEQUENCE</text>
+  <text x="186" y="397" font-size="10.2" fill="#475569">顺序执行</text>
+  <rect x="390" y="354" width="200" height="58" rx="10" fill="#EFFBF8" stroke="#C6E4E1" filter="url(#cardShadow)"/>
+  <rect x="390" y="354" width="4" height="58" rx="2" fill="#0891B2"/>
+  <text x="406" y="377" font-size="11.4" font-weight="700" fill="#0891B2">PARALLEL</text>
+  <text x="406" y="397" font-size="10.2" fill="#475569">并行分支</text>
+  <rect x="610" y="354" width="200" height="58" rx="10" fill="#FFF9EE" stroke="#F1D9B0" filter="url(#cardShadow)"/>
+  <rect x="610" y="354" width="4" height="58" rx="2" fill="#F59E0B"/>
+  <text x="626" y="377" font-size="11.4" font-weight="700" fill="#F59E0B">CONDITION</text>
+  <text x="626" y="397" font-size="10.2" fill="#475569">条件分支</text>
+  <rect x="830" y="354" width="200" height="58" rx="10" fill="#FAF5FF" stroke="#E2CDF2" filter="url(#cardShadow)"/>
+  <rect x="830" y="354" width="4" height="58" rx="2" fill="#8B5CF6"/>
+  <text x="846" y="377" font-size="11.4" font-weight="700" fill="#8B5CF6">AGENT</text>
+  <text x="846" y="397" font-size="10.2" fill="#475569">调用模型</text>
+  <rect x="170" y="436" width="280" height="58" rx="10" fill="#F2FBF5" stroke="#CBE8D3" filter="url(#cardShadow)"/>
+  <rect x="170" y="436" width="4" height="58" rx="2" fill="#10B981"/>
+  <text x="186" y="459" font-size="11.4" font-weight="700" fill="#10B981">TOOL</text>
+  <text x="186" y="479" font-size="10.2" fill="#475569">调用工具</text>
+  <rect x="470" y="436" width="280" height="58" rx="10" fill="#FFF9EE" stroke="#F1D9B0" filter="url(#cardShadow)"/>
+  <rect x="470" y="436" width="4" height="58" rx="2" fill="#F59E0B"/>
+  <text x="486" y="459" font-size="11.4" font-weight="700" fill="#F59E0B">REVIEW</text>
+  <text x="486" y="479" font-size="10.2" fill="#475569">多角色评审</text>
+  <rect x="770" y="436" width="280" height="58" rx="10" fill="#FFF4F5" stroke="#EFC9CD" filter="url(#cardShadow)"/>
+  <rect x="770" y="436" width="4" height="58" rx="2" fill="#F43F5E"/>
+  <text x="786" y="459" font-size="11.4" font-weight="700" fill="#F43F5E">HUMAN</text>
+  <text x="786" y="479" font-size="10.2" fill="#475569">等待人工确认</text>
+  <rect x="50" y="540" width="360" height="112" rx="12" fill="#F3F7FF" stroke="#D5E3F7" filter="url(#cardShadow)"/>
+  <text x="70" y="568" font-size="13" font-weight="700" fill="#1D4ED8">ExecutionScope</text>
+  <text x="70" y="590" font-size="10.4" fill="#475569">节点输出按 outputKeys 写入变量</text>
+  <text x="70" y="609" font-size="10.4" fill="#64748B">${name} / ${name.field} / ${name?}</text>
+  <rect x="440" y="540" width="360" height="112" rx="12" fill="#FFF9EE" stroke="#F1D9B0" filter="url(#cardShadow)"/>
+  <text x="460" y="568" font-size="13" font-weight="700" fill="#B45309">CheckpointStore</text>
+  <text x="460" y="590" font-size="10.4" fill="#475569">保存实例状态</text>
+  <text x="460" y="609" font-size="10.4" fill="#64748B">支持从等待点恢复</text>
+  <rect x="830" y="540" width="360" height="112" rx="12" fill="#FAF5FF" stroke="#E2CDF2" filter="url(#cardShadow)"/>
+  <text x="850" y="568" font-size="13" font-weight="700" fill="#6D28D9">InteractionService</text>
+  <text x="850" y="590" font-size="10.4" fill="#475569">HUMAN 节点暂停</text>
+  <text x="850" y="609" font-size="10.4" fill="#64748B">用户确认 / 修改意见回填</text>
+  <text x="50" y="682" font-size="10.6" fill="#7C8DA6">配置化工作流当前不支持 LOOP；需要循环时用多个节点或外部工具实现。</text>
+  <line x1="50" y1="706" x2="1190" y2="706" stroke="#DCE6F1" stroke-width="1"/>
+  <text x="50" y="727" font-size="10.8" fill="#7C8DA6">图 9-1 工作流引擎：定义、执行与人工确认。</text>
+  <text x="1190" y="727" font-size="9.4" font-weight="600" fill="#A6B4C7" text-anchor="end" letter-spacing="1.1">CLARA · LEARNING MANUAL</text>
+</svg>

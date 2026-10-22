@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" width="1240" height="800" font-family="'Noto Sans SC','Microsoft YaHei UI','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F8FBFF"/><stop offset="0.55" stop-color="#F5F8FC"/><stop offset="1" stop-color="#F2F6FB"/></linearGradient>
+  <linearGradient id="topLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2563EB"/><stop offset="0.55" stop-color="#06B6D4"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
+  <linearGradient id="divider" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#BFD3EC"/><stop offset="1" stop-color="#E4EDF7" stop-opacity="0"/></linearGradient>
+  <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B82F6"/><stop offset="0.35" stop-color="#8B5CF6"/><stop offset="0.65" stop-color="#10B981"/><stop offset="1" stop-color="#F43F5E"/></linearGradient>
+  <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.4" cy="1.4" r="1.2" fill="#AFC3DB" opacity="0.42"/></pattern>
+  <filter id="cardShadow" x="-12%" y="-18%" width="124%" height="142%"><feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#22324A" flood-opacity="0.075"/></filter>
+  <filter id="softShadow" x="-15%" y="-25%" width="130%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#22324A" flood-opacity="0.08"/></filter>
+  <marker id="arrowGray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8A9AAE"/></marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#3B82F6"/></marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#10B981"/></marker>
+  <marker id="arrowRose" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F43F5E"/></marker>
+</defs>
+  <rect x="0" y="0" width="1240" height="800" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="1240" height="800" fill="url(#dotGrid)"/>
+  
+  <rect x="0" y="0" width="1240" height="4" fill="url(#topLine)"/>
+  <rect x="50" y="17" width="154" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+  <circle cx="65" cy="29" r="3.2" fill="#2563EB"/>
+  <text x="75" y="33" font-size="9.6" font-weight="700" fill="#2563EB" letter-spacing="1.25">CLARA · LEARNING</text>
+  <rect x="1084" y="17" width="106" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+  <text x="1137" y="33" font-size="9.6" font-weight="700" fill="#64748B" text-anchor="middle" letter-spacing="1.2">START HERE</text>
+  <rect x="36" y="51" width="4" height="28" rx="2" fill="#2563EB"/>
+  <text x="50" y="68" font-size="25" font-weight="700" fill="#0F172A" letter-spacing="0.2">Clara 学习路线图</text>
+  <text x="50" y="90" font-size="12.6" font-weight="400" fill="#64748B">沿时间轴推进：先建立全局认识，再逐步深入契约、模型、状态、执行链路，最后回到扩展与质量。</text>
+  <line x1="50" y1="104" x2="1190" y2="104" stroke="url(#divider)" stroke-width="1"/>
+  <line x1="102" y1="138" x2="102" y2="702" stroke="url(#rail)" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="102" y1="186" x2="140" y2="186" stroke="#D5E3F7" stroke-width="2"/>
+    <circle cx="102" cy="186" r="19" fill="#3B82F6" opacity="0.12"/>
+    <circle cx="102" cy="186" r="13" fill="#3B82F6"/>
+    <text x="102" y="187" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">01</text>
+    <rect x="150" y="138" width="650" height="96" rx="14" fill="#F3F7FF" stroke="#D5E3F7" filter="url(#cardShadow)"/>
+    <rect x="150" y="138" width="5" height="96" rx="2.5" fill="#3B82F6" opacity="0.9"/>
+    <text x="174" y="169" font-size="15.2" font-weight="700" fill="#3B82F6">阶段 1 · 建立全局认识</text>
+    <rect x="174" y="192" width="286" height="30" rx="8" fill="#FFFFFF" stroke="#D5E3F7" stroke-width="1"/>
+      <text x="186" y="212" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#3B82F6">01</tspan><tspan dx="6">项目定位与整体架构</tspan></text><rect x="470" y="192" width="286" height="30" rx="8" fill="#FFFFFF" stroke="#D5E3F7" stroke-width="1"/>
+      <text x="482" y="212" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#3B82F6">02</tspan><tspan dx="6">构建、启动与配置</tspan></text>
+<line x1="102" y1="306" x2="140" y2="306" stroke="#F1D9B0" stroke-width="2"/>
+    <circle cx="102" cy="306" r="19" fill="#F59E0B" opacity="0.12"/>
+    <circle cx="102" cy="306" r="13" fill="#F59E0B"/>
+    <text x="102" y="307" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">02</text>
+    <rect x="150" y="258" width="650" height="96" rx="14" fill="#FFF9EE" stroke="#F1D9B0" filter="url(#cardShadow)"/>
+    <rect x="150" y="258" width="5" height="96" rx="2.5" fill="#F59E0B" opacity="0.9"/>
+    <text x="174" y="289" font-size="15.2" font-weight="700" fill="#F59E0B">阶段 2 · 打牢基础能力</text>
+    <rect x="174" y="312" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#F1D9B0" stroke-width="1"/>
+      <text x="186" y="332" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#F59E0B">03</tspan><tspan dx="6">Core 契约与 DTO</tspan></text><rect x="376" y="312" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#F1D9B0" stroke-width="1"/>
+      <text x="388" y="332" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#F59E0B">04</tspan><tspan dx="6">HTTP / SSE 传输</tspan></text><rect x="578" y="312" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#F1D9B0" stroke-width="1"/>
+      <text x="590" y="332" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#F59E0B">05</tspan><tspan dx="6">模型调用链</tspan></text>
+<line x1="102" y1="426" x2="140" y2="426" stroke="#E2CDF2" stroke-width="2"/>
+    <circle cx="102" cy="426" r="19" fill="#8B5CF6" opacity="0.12"/>
+    <circle cx="102" cy="426" r="13" fill="#8B5CF6"/>
+    <text x="102" y="427" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">03</text>
+    <rect x="150" y="378" width="650" height="96" rx="14" fill="#FAF5FF" stroke="#E2CDF2" filter="url(#cardShadow)"/>
+    <rect x="150" y="378" width="5" height="96" rx="2.5" fill="#8B5CF6" opacity="0.9"/>
+    <text x="174" y="409" font-size="15.2" font-weight="700" fill="#8B5CF6">阶段 3 · 理解状态与外部能力</text>
+    <rect x="174" y="432" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#E2CDF2" stroke-width="1"/>
+      <text x="186" y="452" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#8B5CF6">06</tspan><tspan dx="6">记忆与语义召回</tspan></text><rect x="376" y="432" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#E2CDF2" stroke-width="1"/>
+      <text x="388" y="452" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#8B5CF6">07</tspan><tspan dx="6">MCP 客户端</tspan></text><rect x="578" y="432" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#E2CDF2" stroke-width="1"/>
+      <text x="590" y="452" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#8B5CF6">08</tspan><tspan dx="6">技能与脚本工具</tspan></text>
+<line x1="102" y1="546" x2="140" y2="546" stroke="#CBE8D3" stroke-width="2"/>
+    <circle cx="102" cy="546" r="19" fill="#10B981" opacity="0.12"/>
+    <circle cx="102" cy="546" r="13" fill="#10B981"/>
+    <text x="102" y="547" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">04</text>
+    <rect x="150" y="498" width="650" height="96" rx="14" fill="#F2FBF5" stroke="#CBE8D3" filter="url(#cardShadow)"/>
+    <rect x="150" y="498" width="5" height="96" rx="2.5" fill="#10B981" opacity="0.9"/>
+    <text x="174" y="529" font-size="15.2" font-weight="700" fill="#10B981">阶段 4 · 串起执行链路</text>
+    <rect x="174" y="552" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#CBE8D3" stroke-width="1"/>
+      <text x="186" y="572" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#10B981">09</tspan><tspan dx="6">工作流引擎</tspan></text><rect x="376" y="552" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#CBE8D3" stroke-width="1"/>
+      <text x="388" y="572" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#10B981">10</tspan><tspan dx="6">对话编排</tspan></text><rect x="578" y="552" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#CBE8D3" stroke-width="1"/>
+      <text x="590" y="572" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#10B981">11</tspan><tspan dx="6">应用装配与 CLI</tspan></text>
+<line x1="102" y1="666" x2="140" y2="666" stroke="#EFC9CD" stroke-width="2"/>
+    <circle cx="102" cy="666" r="19" fill="#F43F5E" opacity="0.12"/>
+    <circle cx="102" cy="666" r="13" fill="#F43F5E"/>
+    <text x="102" y="667" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">05</text>
+    <rect x="150" y="618" width="650" height="96" rx="14" fill="#FFF4F5" stroke="#EFC9CD" filter="url(#cardShadow)"/>
+    <rect x="150" y="618" width="5" height="96" rx="2.5" fill="#F43F5E" opacity="0.9"/>
+    <text x="174" y="649" font-size="15.2" font-weight="700" fill="#F43F5E">阶段 5 · 融会贯通</text>
+    <rect x="174" y="672" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#EFC9CD" stroke-width="1"/>
+      <text x="186" y="692" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#F43F5E">12</tspan><tspan dx="6">端到端请求追踪</tspan></text><rect x="376" y="672" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#EFC9CD" stroke-width="1"/>
+      <text x="388" y="692" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#F43F5E">13</tspan><tspan dx="6">扩展开发指南</tspan></text><rect x="578" y="672" width="192" height="30" rx="8" fill="#FFFFFF" stroke="#EFC9CD" stroke-width="1"/>
+      <text x="590" y="692" font-size="11.4" fill="#334155"><tspan font-weight="700" fill="#F43F5E">14</tspan><tspan dx="6">测试与质量</tspan></text>
+  <path d="M102,702 L102,714" stroke="#8A9AAE" stroke-width="2" marker-end="url(#arrowGray)"/>
+  <rect x="850" y="138" width="340" height="250" rx="14" fill="#FFFFFF" stroke="#DCE7F4" filter="url(#cardShadow)"/>
+  <text x="874" y="168" font-size="15" font-weight="700" fill="#1D4ED8">建议学习节奏</text>
+  
+    <circle cx="882" cy="193" r="9" fill="#EAF2FF"/>
+    <text x="882" y="197" font-size="9.2" font-weight="700" fill="#2563EB" text-anchor="middle">1</text>
+    <text x="900" y="197" font-size="11.6" fill="#334155">先读 01–02，把项目跑起来</text>
+    <circle cx="882" cy="227" r="9" fill="#EAF2FF"/>
+    <text x="882" y="231" font-size="9.2" font-weight="700" fill="#2563EB" text-anchor="middle">2</text>
+    <text x="900" y="231" font-size="11.6" fill="#334155">再读 03–05，理解一次模型调用</text>
+    <circle cx="882" cy="261" r="9" fill="#EAF2FF"/>
+    <text x="882" y="265" font-size="9.2" font-weight="700" fill="#2563EB" text-anchor="middle">3</text>
+    <text x="900" y="265" font-size="11.6" fill="#334155">接着读 06–08，理解状态与工具</text>
+    <circle cx="882" cy="295" r="9" fill="#EAF2FF"/>
+    <text x="882" y="299" font-size="9.2" font-weight="700" fill="#2563EB" text-anchor="middle">4</text>
+    <text x="900" y="299" font-size="11.6" fill="#334155">然后读 09–11，串起执行链路</text>
+    <circle cx="882" cy="329" r="9" fill="#EAF2FF"/>
+    <text x="882" y="333" font-size="9.2" font-weight="700" fill="#2563EB" text-anchor="middle">5</text>
+    <text x="900" y="333" font-size="11.6" fill="#334155">最后读 12–14，复盘与扩展</text><rect x="850" y="410" width="340" height="200" rx="14" fill="#FFF9EE" stroke="#F1D9B0" filter="url(#cardShadow)"/>
+  <text x="874" y="440" font-size="15" font-weight="700" fill="#B45309">每章怎么读</text>
+  <text x="874" y="468" font-size="11.6" fill="#334155">先看目标与配图，建立心智模型。</text>
+  <text x="874" y="496" font-size="11.6" fill="#334155">再按“关键类 + 调用顺序”读源码。</text>
+  <text x="874" y="524" font-size="11.6" fill="#334155">最后做练习，用 rg / 测试验证。</text>
+  <line x1="874" y1="546" x2="1166" y2="546" stroke="#F1D9B0" stroke-width="1"/>
+  <text x="874" y="570" font-size="10.8" fill="#8A6A3B">读不懂实现时，先回到第 3 章的契约边界。</text><rect x="850" y="632" width="340" height="94" rx="14" fill="#F2FBF5" stroke="#CBE8D3" filter="url(#cardShadow)"/>
+  <text x="874" y="660" font-size="14" font-weight="700" fill="#047857">先跑起来</text>
+  <text x="874" y="684" font-size="10.4" fill="#334155" font-family="Consolas,monospace">mvn -pl clara-application -am package</text>
+  <text x="874" y="702" font-size="10.4" fill="#334155" font-family="Consolas,monospace">java -jar clara.jar</text>
+  
+  <line x1="50" y1="762" x2="1190" y2="762" stroke="#DCE6F1" stroke-width="1"/>
+  <text x="50" y="783" font-size="10.8" font-weight="400" fill="#7C8DA6">图 0-1 学习路线：从全局到局部，再回到一条完整请求链路。</text>
+  <text x="1190" y="783" font-size="9.4" font-weight="600" fill="#A6B4C7" text-anchor="end" letter-spacing="1.1">CLARA · LEARNING MANUAL</text>
+</svg>

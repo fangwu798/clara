@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 736" width="1240" height="736" font-family="'Segoe UI Variable','Segoe UI','Microsoft YaHei UI','Microsoft YaHei',Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8FBFF"/><stop offset="0.55" stop-color="#F5F8FC"/><stop offset="1" stop-color="#F2F6FB"/>
+    </linearGradient>
+    <linearGradient id="topLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2563EB"/><stop offset="0.55" stop-color="#06B6D4"/><stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="divider" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#BFD3EC"/><stop offset="1" stop-color="#E4EDF7" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="1.4" cy="1.4" r="1.2" fill="#AFC3DB" opacity="0.42"/>
+    </pattern>
+    <filter id="cardShadow" x="-12%" y="-18%" width="124%" height="142%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#22324A" flood-opacity="0.075"/>
+    </filter>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8A9AAE"/></marker>
+    <marker id="arrowDark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#64748B"/></marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#3B82F6"/></marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#10B981"/></marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F59E0B"/></marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#8B5CF6"/></marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9 z" fill="#F43F5E"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1240" height="736" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="1240" height="736" fill="url(#dotGrid)"/>
+  <rect x="0" y="0" width="1240" height="4" fill="url(#topLine)"/>
+  <g>
+    <rect x="50" y="17" width="154" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+    <circle cx="65" cy="29" r="3.2" fill="#2563EB"/>
+    <text x="75" y="33" font-size="9.6" font-weight="700" fill="#2563EB" letter-spacing="1.25">CLARA · LEARNING</text>
+    <rect x="1084" y="17" width="106" height="24" rx="12" fill="#FFFFFF" stroke="#D7E4F3" stroke-width="1"/>
+    <text x="1137" y="33" font-size="9.6" font-weight="700" fill="#64748B" text-anchor="middle" letter-spacing="1.2">CHAPTER 06</text>
+  </g>
+  <rect x="36" y="51" width="4" height="28" rx="2" fill="#2563EB"/>
+  <text x="50" y="68" font-size="25" font-weight="700" fill="#0F172A" letter-spacing="0.2">记忆分层：窗口、持久化、摘要与语义召回</text>
+  <text x="50" y="90" font-size="12.6" font-weight="400" fill="#64748B">理解每一层解决什么问题，才能判断一个上下文问题应该改哪一层。</text>
+  <line x1="50" y1="104" x2="1190" y2="104" stroke="url(#divider)" stroke-width="1"/>
+  <g transform="translate(0,28)">
+  <rect x="70" y="92" width="660" height="98" rx="12" fill="#F3F7FF" stroke="#C9DCF7" filter="url(#cardShadow)" stroke-width="1" /><rect x="70.5" y="105.0" width="3" height="72.0" rx="1.5" fill="#3B82F6" opacity="0.9"/><text x="84" y="115" font-size="13.5" font-weight="700" fill="#1D4ED8" text-anchor="start">① 会话窗口 IWindowMemory</text><text x="84" y="133" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">最近消息、按会话隔离、窗口裁剪</text><text x="84" y="148" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">提供本轮模型真正看到的消息</text><line x1="400" y1="190" x2="400" y2="218" stroke="#64748B" stroke-width="1.8" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/><rect x="70" y="218" width="660" height="98" rx="12" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="70.5" y="231.0" width="3" height="72.0" rx="1.5" fill="#10B981" opacity="0.9"/><text x="84" y="241" font-size="13.5" font-weight="700" fill="#047857" text-anchor="start">② 会话持久化 ConversationStore</text><text x="84" y="259" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">本地 JSON / JDBC / 内存实现</text><text x="84" y="274" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">保证进程重启后还能恢复历史</text><line x1="400" y1="316" x2="400" y2="344" stroke="#64748B" stroke-width="1.8" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/><rect x="70" y="344" width="660" height="98" rx="12" fill="#FFF8EC" stroke="#F1D6AC" filter="url(#cardShadow)" stroke-width="1" /><rect x="70.5" y="357.0" width="3" height="72.0" rx="1.5" fill="#F59E0B" opacity="0.9"/><text x="84" y="367" font-size="13.5" font-weight="700" fill="#B45309" text-anchor="start">③ 摘要 SummarizeCoordinator</text><text x="84" y="385" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">把窗口淘汰的消息归纳为摘要</text><text x="84" y="400" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">摘要进入 system 指令，而不是丢弃</text><line x1="400" y1="442" x2="400" y2="470" stroke="#64748B" stroke-width="1.8" marker-end="url(#arrowGray)" stroke-linecap="round" stroke-linejoin="round"/><rect x="70" y="470" width="660" height="98" rx="12" fill="#F8F3FF" stroke="#DEC9F1" filter="url(#cardShadow)" stroke-width="1" /><rect x="70.5" y="483.0" width="3" height="72.0" rx="1.5" fill="#8B5CF6" opacity="0.9"/><text x="84" y="493" font-size="13.5" font-weight="700" fill="#6D28D9" text-anchor="start">④ 语义记忆 ISemanticMemoryStore</text><text x="84" y="511" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">本地实现 / Milvus BM25 / Milvus 向量</text><text x="84" y="526" font-size="10.8" font-weight="400" fill="#64748B" text-anchor="start">按输入召回历史相关知识</text><rect x="790" y="92" width="390" height="180" rx="12" fill="#F3F7FF" stroke="#C9DCF7" filter="url(#cardShadow)" stroke-width="1" /><rect x="790.5" y="105.0" width="3" height="154.0" rx="1.5" fill="#3B82F6" opacity="0.9"/><text x="804" y="115" font-size="13.5" font-weight="700" fill="#1D4ED8" text-anchor="start">写入路径</text><text x="804" y="133" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">用户 / 助手消息先进入 WindowMemory；</text><text x="804" y="148" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">持久化实现按会话追加到 .clara 或数据库；</text><text x="804" y="163" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">开启 Milvus 时，对话记录同时写入语义库。</text><rect x="790" y="300" width="390" height="180" rx="12" fill="#F2FBF5" stroke="#C9E7D2" filter="url(#cardShadow)" stroke-width="1" /><rect x="790.5" y="313.0" width="3" height="154.0" rx="1.5" fill="#10B981" opacity="0.9"/><text x="804" y="323" font-size="13.5" font-weight="700" fill="#047857" text-anchor="start">读取路径</text><text x="804" y="341" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">窗口消息直接进入本轮请求；</text><text x="804" y="356" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">被淘汰的历史可压缩成摘要；</text><text x="804" y="371" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">语义记忆按当前输入召回，去重后注入 system。</text><rect x="790" y="508" width="390" height="150" rx="12" fill="#FFF3F4" stroke="#EBC7CA" filter="url(#cardShadow)" stroke-width="1" /><rect x="790.5" y="521.0" width="3" height="124.0" rx="1.5" fill="#F43F5E" opacity="0.9"/><text x="804" y="531" font-size="13.5" font-weight="700" fill="#BE123C" text-anchor="start">关键取舍</text><text x="804" y="549" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">窗口太长：token 爆炸；</text><text x="804" y="564" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">窗口太短：丢上下文；</text><text x="804" y="579" font-size="10.8" font-weight="400" fill="#1E293B" text-anchor="start">所以需要“保留最近 + 压缩旧历史 + 语义召回”三层配合。</text><text x="70" y="650" font-size="10.4" font-weight="400" fill="#94A3B8" text-anchor="start">记忆不是一个类，而是一组协作组件：窗口负责“当下”，持久化负责“重启”，摘要负责“压缩”，语义库负责“找回”。</text>
+</g>
+  <line x1="50" y1="682" x2="1190" y2="682" stroke="#DCE6F1" stroke-width="1"/>
+  <text x="50" y="719" font-size="10.8" font-weight="400" fill="#7C8DA6">图 6-1 记忆分层：窗口、持久化、摘要与语义召回。</text>
+  <text x="1190" y="719" font-size="9.4" font-weight="600" fill="#A6B4C7" text-anchor="end" letter-spacing="1.1">CLARA · LEARNING MANUAL</text>
+</svg>

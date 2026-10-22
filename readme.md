@@ -1,129 +1,89 @@
 # Clara
 
-Clara 是一套面向 Java 8 的 AI 应用运行时库。它提供模型调用、会话记忆、MCP 客户端、工作流编排、任务规划、技能注册与执行、工作区文档读写与媒体生成等能力，并拆分为可独立复用的 Maven 模块，便于嵌入 Java 系统。
+Clara 是一套面向 Java 8 的本地 AI 智能体运行时与控制台。它把模型调用、上下文管理、工具调用、MCP、工作流、技能、代码知识图谱和可观测能力拆成独立 Maven 模块，既可整套运行，也可按需嵌入 Java 系统。
 
-> Clara 当前是「库 + 控制台」形态，不是开箱即用的独立服务。仓库没有 Spring Boot 或 Web 容器；clara-application 提供交互式控制台与装配入口，REST / SSE 等边界由宿主应用按需自建。宿主负责装配、配置、鉴权、持久化与交互 UI。
+> Clara 当前是「运行时库 + 交互式 CLI」形态，不是开箱即用的 Web 服务。仓库没有 Spring Boot / Web 容器；`clara-application` 提供装配入口和控制台，REST、SSE 等 Web 接入由宿主应用自行实现。
 
-## 项目目标
+## 架构总览
 
-- 以 Java 8 API 与字节码为基线，提供统一、稳定的 AI 能力接口。
-- 隔离不同模型供应商的协议与 SDK，避免供应商类型泄漏到业务代码。
-- 让超时、取消、租户身份与可观测信息贯穿每次外部调用。
-- 为有状态、长耗时、需要人工确认的业务提供重试、恢复与幂等能力。
-- 为网络、凭据、文件系统与工具访问建立明确安全边界。
+![Clara 架构总览](assets/architecture.svg)
 
-## 架构
+- 运行入口：当前只提供可执行 jar 与交互式 CLI；REST、SSE 等 Web 接入由宿主应用按需实现。
+- 装配层：`ApplicationBootstrap` 是唯一装配点，负责模型注册、工作流清单、工具调用与图谱 / 观测接入。
+- 能力模块：编排、模型、记忆、技能、MCP、工作流六个模块通过 `clara-core` 契约交互，不直接耦合。
+- 基础模块：`clara-core` 提供契约与通用模型，`clara-transport` 提供 HTTP / SSE 传输，`clara-bom` 统一版本。
+- 外部依赖：模型平台、MCP 服务端、代码知识图谱、Milvus、可观测栈与本地文件系统均按配置启用。
+- 外部访问协议不是独立模块：HTTP/HTTPS 用于模型平台、Streamable HTTP MCP、Milvus 与 OTLP，stdio 用于本地 MCP 子进程，gRPC 由 Milvus SDK 内部使用，文件访问覆盖工作区与本地状态目录。
 
-![Clara 架构总览](docs/diagrams/architecture.svg)
+架构图源文件为 `assets/architecture.svg`，修改后随 README 一起提交。
 
-### 模块说明
+## 功能概览
 
-| 模块 | 职责 | 主要使用场景 |
-| --- | --- | --- |
-| clara-bom | 统一管理各模块版本 | 外部项目通过 dependencyManagement 导入 |
-| clara-core | 能力/角色/协议及各领域枚举（document / interaction / memory / planner / skill / workflow）、结构化错误模型与跨模块契约（含媒体契约与值对象） | 所有模块的公共基础 |
-| clara-transport | 通用 HTTP / SSE 传输实现（连接与超时、体积上限、SSE 解析、有界流、端点与请求头校验） | 模型调用与 MCP 调用共享同一套传输语义 |
-| clara-model | 调用上下文、Provider 配置、模型调用实现（协议编解码、Token 估算、嵌入、传输适配） | 同步/流式对话、Embedding、Token 估算与 OpenAI/DeepSeek/火山方舟/阿里云/Kimi/Anthropic 协议适配 |
-| clara-memory | 窗口记忆、会话持久化、语义记忆 | 消息/Token 窗口裁剪、本地/JDBC 会话存储、Milvus 召回 |
-| clara-mcp | MCP 客户端、服务注册表、能力目录、协议传输适配与外部工具路由 | stdio 或 Streamable HTTP 接入外部 MCP 工具、资源与提示词 |
-| clara-workflow | 工作流定义、DAG 执行、任务规划、预算台账、人工交互网关、内置动作与运行支撑 | 多步骤任务、并行/条件/循环节点、失败恢复与 WAITING_INPUT 挂起 |
-| clara-orchestration | 对话编排、上下文组装、工具往返、技能匹配 | 组合模型、记忆、技能、工具与工作流 |
-| clara-skill | 技能注册表、执行器、Schema 校验与工具执行 | 业务能力封装为可版本化、可授权的技能 |
-| clara-application | 应用装配、交互式控制台入口、文档解析、会话/工具/媒体装配 | 构建可执行 clara.jar |
+- 多模型对话：OpenAI、DeepSeek、火山方舟、Kimi、Anthropic、阿里通义；支持 Completion / Response 等调用方式。
+- 上下文编排：窗口裁剪、历史压缩、语义召回、提示词匹配、技能匹配、复杂任务动态计划。
+- 工具与 MCP：内置文件、命令、图谱、工作流工具；启动时自动发现 `config/mcp` 中的 MCP 服务，未配置 MCP 时仅使用内置工具与技能。
+- 工作流：顺序、条件、并行、循环、人工确认、多角色评审等节点；支持运行期生成并发布自定义工作流。
+- 代码知识图谱：优先查图谱、未覆盖时回退本地文件，降低大仓库阅读成本。
+- 媒体能力：文生图、图片编辑、图片理解、视频生成；高成本视频任务必须人工确认。
+- 本地记忆：会话历史落盘、历史查看与按范围清理、Milvus / 本地语义记忆。
+- 可观测：链路 Span、JSONL 落盘、`/trace`、Prometheus 指标与 OTLP 导出。
+- 终端体验：命令补全提示、历史输入召回、多行输入、ESC 取消、彩色输出、精简 / 全量日志。
 
-### 模块依赖
+## 模块说明
 
-- **clara-core 不依赖任何业务模块**，只提供契约、枚举与错误模型。
-- **clara-transport 只依赖 core**，提供通用 HTTP / SSE 实现；model 与 mcp 依赖 transport。
-- 各能力模块（model / memory / mcp / workflow / skill）依赖 core，并按需相互依赖（如 memory 依赖 model）。
-- **clara-orchestration 仅通过接口使用各能力**，不接触 Provider / Store / Transport 实现。
-- **clara-application 负责整体装配**，业务模块不得反向依赖应用模块。
+| 模块 | 职责 |
+| --- | --- |
+| `clara-bom` | 对外发布的版本清单 |
+| `clara-core` | 跨模块契约、DTO、枚举、结构化错误与通用工具 |
+| `clara-transport` | 通用 HTTP / SSE 传输、超时、体积上限与有界流 |
+| `clara-model` | Provider 配置、协议编解码、流式模型、Embedding、Token 估算与媒体模型 |
+| `clara-mcp` | MCP 客户端、stdio / Streamable HTTP 传输、服务注册与能力目录（可选，未配置时不启用） |
+| `clara-workflow` | 工作流定义、DAG 执行、任务规划、预算台账与人工交互网关 |
+| `clara-memory` | 窗口记忆、会话持久化、语义记忆、Milvus 接入 |
+| `clara-skill` | 技能注册、Schema 校验、权限控制与工具执行 |
+| `clara-orchestration` | 对话主循环、上下文组装、工具往返、意图计划与技能匹配 |
+| `clara-application` | 整体装配、配置加载、交互式控制台、图谱与可观测接入 |
 
-### clara-bom 是否参与构建
+依赖方向保持单向：`core` 不依赖业务模块；`transport` 只依赖 `core`；能力模块按需依赖 `core` / `transport`；`orchestration` 只通过接口使用能力模块；`application` 负责最终装配。
 
-仓库内部由根 pom.xml 统一聚合与版本管理，clara-bom 只作为对外发布的版本清单。对外发布时建议保留；若项目永远只在仓库内使用，可删除 clara-bom 并从根 POM 的 modules 中移除。
+## 环境要求
 
-## 核心业务流程
-
-Clara 的核心业务是**对话编排**：一次用户请求依次经过「装配上下文 → 调用模型 →（若响应要求调用工具则执行工具并回填）→ 循环直至产出最终答复」。交互式对话与工作区 run / resume 最终都收敛到同一条编排链路（`DefaultConversationOrchestrator.converse`）。
-
-### 流程图
-
-![对话编排流程图](docs/diagrams/conversation-flow.svg)
-
-要点：
-
-- **循环的出口**是「响应不含工具调用」——此时才提取正文并结束本轮。
-- **工具往返**：本地技能优先、外部 MCP 工具兜底；单次工具失败以错误文本回填而不中断整轮，让模型可据错误自行修正。
-- **取消**：请求携带的取消令牌贯穿全链路，令牌置位后模型读取与脚本工具在检查点立即终止，以 CANCELLED 收尾。
-- **失败**：模型调用或工具执行异常被捕获，以 FAILED 收尾并携带结构化错误码与 traceId。
-
-### 时序图
-
-![对话编排时序图](docs/diagrams/conversation-sequence.svg)
-
-一次请求的关键交互：宿主调用编排器 → 编排器写入用户消息 → 循环内装配上下文并调用模型 → 模型返回内容或工具调用 → 命中工具调用时由工具往返协调器执行本地技能 / MCP 工具并回填历史 → 直到不再有工具调用，追加助手回复并返回结果。
-
-## 构建要求
-
-- JDK 8 或更高（JDK 9+ 自动启用 release=8）。
-- Maven 3.3.9 或更高。
-- 源文件编码 UTF-8。
-- 产物为 Java 8 class-file 版本 52。
-- 使用远程模型、远程 MCP 或 Milvus 时需要对应网络与凭据。
-
-## 构建与验证
-
-```powershell
-mvn clean verify
-```
-
-只构建某模块并测试：
-
-```powershell
-mvn -pl clara-model -am test
-```
-
-打包可执行 fat jar（输出 clara.jar）：
-
-```powershell
-mvn -q -pl clara-application -am package -DskipTests
-```
-
-安装到本地 Maven 仓库：
-
-```powershell
-mvn clean install
-```
-
-项目未发布到公共中央仓库，外部项目使用前需先 mvn install 或由团队部署内部仓库。
+- JDK 8 或更高版本，编译目标为 Java 8 字节码。
+- Maven 3.3.9 或更高版本。
+- Python 3：工作区文件处理、搜索等技能脚本需要。
+- Docker（可选）：Milvus、代码知识图谱、Prometheus / Tempo / Grafana 观测栈。
+- 使用远程模型、远程 MCP 或 Milvus 时需要对应网络、账号与凭据。
 
 ## 快速开始
 
-### 1. 构建 jar
+### 1. 构建
+
+```powershell
+mvn clean package -DskipTests
+```
+
+只构建可执行 jar：
 
 ```powershell
 mvn -q -pl clara-application -am package -DskipTests
 ```
 
-### 2. 准备模型 Provider 配置
+产物输出到仓库根目录的 `clara.jar`，入口为 `com.clara.ClaraApplication`。
 
-clara.jar 启动时扫描 config/model-providers 下的 *.yml / *.yaml（排除 examples 目录与 *.example.yml）。首次使用可复制示例并填入真实模型 ID 与凭据：
+### 2. 配置模型凭据
 
-```powershell
-Copy-Item config/model-providers/examples/openai.example.yml `
-    config/model-providers/local/openai.yml
-```
+模型配置位于 `config/model-providers/*.yml`，并通过环境变量读取密钥：
 
-local 目录已在 .gitignore 中忽略，适合保存本机真实配置；examples 只保留占位值。
+| 平台 | 环境变量 |
+| --- | --- |
+| DeepSeek | `CLARA_DEEPSEEK_API_KEY` |
+| Kimi | `CLARA_KIMI_API_KEY` |
+| OpenAI | `CLARA_OPENAI_API_KEY` |
+| 火山方舟 | `CLARA_VOLCENGINE_API_KEY` |
 
-### 3. 交互式对话
+启动脚本会扫描所有模型配置，按环境变量去重后检查凭据；缺失时会在终端提示输入本次启动使用的值。
 
-```powershell
-java -jar clara.jar
-```
-
-或使用启动脚本（脚本将启动目录设为 CLARA_WORK_DIR）：
+### 3. 启动
 
 ```powershell
 # Windows
@@ -133,416 +93,665 @@ clara.bat
 ./clara.sh
 ```
 
-对话内可用命令：
-
-| 命令 | 作用 |
-| --- | --- |
-| /model | 选择并切换模型 |
-| /log（/verbose） | 切换精简/完整日志 |
-| /color | 开关 ANSI 颜色 |
-| ESC（执行中连按两次） | 取消本轮正在进行的模型调用与工具执行 |
-| exit / quit（/exit） | 退出 |
-
-完整日志始终写入 logs 目录下 clara-时间戳.log。
-
-执行中可按 ESC 请求取消：首次 ESC 仅提示（防误触），5 秒内再按一次 ESC（或回车 / y）才真正取消；取消后本轮模型流式读取与正在运行的脚本工具都会在检查点立即终止，本轮以 `CANCELLED` 状态收尾。该能力依赖终端原始模式（JLine），在非交互环境（如把标准输入重定向）下会提示不可用并自动跳过。
-
-对话历史按工作目录持久化：会话标识由工作目录推导（启动横幅的 `sessionId`），历史写入 `<工作目录>/.clara/state/conversations`，因此**退出后再次进入同一目录会续接上次的上下文**（换目录即换上下文）。删除该目录即清空历史；同一目录下同时只允许一个 Clara 实例（历史目录有排他锁），第二个实例会提示并降级为进程内历史（本次退出即丢失）。
-
-### 4. 自然语言提交任务
-
-clara.jar 只有交互式对话一个入口（com.clara.ClaraApplication），任务用自然语言描述，由模型选择工具或工作流执行：
+也可以直接运行：
 
 ```powershell
-java -jar clara.jar
+java -Dfile.encoding=UTF-8 -jar clara.jar
 ```
 
-- 读取本地目录、整理技术文档、生成需求与技术方案、生成开发计划、生成 / 编辑 / 识别图片等，直接说明诉求即可（模型会调用 run_workflow 工作流）。
-- 需要固定流程时，可让模型生成自定义工作流（内置工具 publish_workflow），或直接写入 config/workflow/custom，随后在对话里按名调用。
-- 交互指令、取消、日志与目录结构见「3. 交互式对话」。
+`-Dfile.encoding=UTF-8` 不要省略。Milvus SDK 在 BM25 检索中使用平台默认字符集编码文本，中文 Windows 下默认 GBK 可能导致 Milvus 分词失败。
 
-> 历史说明：早期版本另有 `run` / `resume` 子命令与 `--ui plain|json-detached|json-stream` 等 CLI 选项（clara-application 的 adapter/cli 适配层）。该适配层已删除——它没有生产调用方（jar 入口一直是 ClaraApplication），相应能力改由工作流承担。
+### 4. 开始对话
 
-## 模型 Provider 配置
+直接用自然语言描述任务，例如：
 
-推荐用 YAML 描述平台配置。每个「平台 + 调用方式（协议）」一个文件（同一平台可拆成 completion / response 等调用方式），例如：
+- 「读取当前目录并整理一份技术文档」
+- 「根据这个需求生成技术方案和开发计划」
+- 「分析 PackageRuleDescriptionService 被哪些类引用」
+- 「生成一张产品首页配图」
+- 「帮我做一个每天导出报表的工作流」
 
-```text
-config/model-providers/
-|-- examples/
-|   |-- openai.example.yml
-|   |-- deepseek.example.yml
-|   `-- volcengine.example.yml
-`-- local/
-    `-- README.md
+模型会根据任务选择直接回答、调用工具或运行工作流。
+
+## 代码使用示例
+
+Clara 既可以作为整套 CLI 运行，也可以作为 Java 基础库嵌入宿主系统。当前版本尚未发布到 Maven Central，先在仓库根执行：
+
+```powershell
+mvn -DskipTests install
 ```
 
-主要节点：
+宿主项目引入完整能力：
 
-| 节点 | 说明 |
-| --- | --- |
-| provider | 平台枚举：OPENAI、DEEPSEEK、VOLCENGINE、ALIBABA、KIMI、ANTHROPIC |
-| credential.secretRef | 凭据引用名，文件内唯一稳定 |
-| credential.environmentVariable | 推荐：从环境变量读取 API Key |
-| credential.apiKey | 仅限被 Git 忽略的本地文件 |
-| transport.allowedOrigins | HTTP 来源白名单，只写协议、主机、可选端口 |
-| transport.connectTimeoutMillis | 建连超时（毫秒） |
-| transport.readTimeoutMillis | 读取超时（毫秒） |
-| transport.maxRequestBytes | 请求体最大字节数 |
-| transport.maxResponseBytes | 响应体最大字节数 |
-| transport.allowHttp | 是否允许明文 HTTP，生产保持 false |
-| transport.headers | 平台默认请求头，调用方同名头优先 |
-| capabilities.<name>.endpoint | 能力 API 地址 |
-| capabilities.<name>.modelId | 账号实际可用的模型或 endpoint ID |
-| capabilities.<name>.apiProfile | 协议版本标识 |
-| capabilities.<name>.parameters | 能力级默认参数 |
+```xml
+<dependency>
+    <groupId>com.clara</groupId>
+    <artifactId>clara-application</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
 
-示例见 config/model-providers/examples/openai.example.yml。
+`clara-application` 会传递依赖编排、模型、记忆、技能、MCP 与工作流模块；只需要模型调用时，也可以只引入 `clara-model`。
 
-### Java 加载示例
+> 示例默认进程工作目录能找到 `config/`（`ConfigLocator` 会从当前目录向上回溯最多 6 层）。生产环境建议把 `config/` 随应用一起部署，或显式传入配置文件路径。
+
+### 1. 嵌入完整对话编排
+
+适合需要“模型 + 上下文 + 工具 + 工作流”完整能力的宿主：
 
 ```java
+import com.clara.ApplicationBootstrap;
+import com.clara.config.ConfigLocator;
+import com.clara.enums.CapabilityKindEnum;
 import com.clara.kernel.config.ProviderConfiguration;
-import com.clara.model.configuration.ProviderYamlConfigurationLoader;
-import java.nio.file.Paths;
+import com.clara.orchestration.api.ConversationRequest;
+import com.clara.orchestration.api.ConversationResult;
 
-ProviderYamlConfigurationLoader loader = new ProviderYamlConfigurationLoader();
-try (ProviderConfiguration provider = loader.load(
-        Paths.get("config/model-providers/local/openai.yml"))) {
-    // 在 provider 关闭前完成模型注册与调用
+import java.nio.file.Path;
+
+public final class EmbeddedChatExample {
+    public static void main(String[] args) {
+        try (ApplicationBootstrap bootstrap = new ApplicationBootstrap()) {
+            Path modelConfig = ConfigLocator.resolveModel(ConfigLocator.modelConfigs(), "deepseek-response");
+            if (modelConfig == null) {
+                throw new IllegalStateException("未找到 deepseek-response 模型配置");
+            }
+
+            bootstrap.modelRegistry().select(modelConfig);
+            ProviderConfiguration provider = bootstrap.modelRegistry().currentConfiguration();
+
+            ConversationResult result = bootstrap.orchestrator().converse(
+                    ConversationRequest.builder()
+                            .conversationId("demo-session")
+                            .provider(provider.getProvider())
+                            .model(provider.toConfig(CapabilityKindEnum.CHAT).getModelId())
+                            .capabilityKind(CapabilityKindEnum.CHAT)
+                            .providerConfiguration(provider)
+                            .userInput("用三句话说明什么是代码知识图谱")
+                            .build());
+
+            System.out.println("status = " + result.getStatus());
+            System.out.println(result.getContent());
+            if (result.getError() != null) {
+                System.err.println("error = " + result.getError().getSafeMessage());
+            }
+        }
+    }
 }
 ```
 
-配置加载默认拒绝超过 1 MiB 的文件、未知字段、非 HTTPS URI、非法扩展名与越界扫描，且只加载明确指定的单个文件。
+关键点：
 
-模型配置由 `ConfigLocator` 定位（`config/model-providers/**`，按 `config/clara.yml` 的 `enabledProviders` 过滤启用项），加载、缓存与生命周期由 `ModelRegistry` 统一负责。
+- `ApplicationBootstrap` 是装配入口，负责加载 `config/clara.yml`、模型配置、技能、MCP 与记忆；使用完必须 `close()`。
+- `ConversationRequest` 绑定会话、平台配置、模型 ID 和能力种类；`providerConfiguration` 决定本次调用走哪个平台。
+- `ConversationResult` 返回最终文本、思考内容、工具往返次数、token 用量和结构化错误。
 
-### 模型不可用时的自动切换
+### 2. 只调用模型
 
-启动期可用性检查除了给出「哪些模型可用」，还给出它们的首字符响应时间顺序；该顺序在会话期间同时用作故障转移顺序：
-
-- 某一轮若失败原因属于「当前模型用不了」（401 / 403 / 429 / 5xx、连接失败、超时、凭据不可用，或模型一个字节都没回），自动按响应时间顺序切到下一个可用模型重试，并打印一行 `[failover] 已切到 <别名>`。
-- 切换会写入会话当前模型（后续轮次默认用它）；不做静默切换，每次切换都有一行说明。
-- 只有「模型不可用」才换：入参非法、内容安全、体积超限、用户取消等一律如实报错；换模型解决不了这些，硬换只会把真实失败原因掩盖掉。
-- 本轮已经执行过工具调用的不再换（工具可能有副作用，重放等于把副作用重做一遍），直接报错。
-- 试完全部可用模型仍失败时，提示用 `/model` 手动指定，或检查网络与凭据。
-- 会话历史按「会话 + 平台 + 模型」隔离：切到新模型后，它读到的是自己那份历史（可能为空）；用 `/model` 切回原模型即恢复原上下文。
-
-## 会话上下文
-
-ConvContext 标识一次对话会话，CallContext 标识会话中的一次调用，二者贯穿传输、SSE 解析与外部调用。
-
-| 类型 | 字段 | 说明 |
-| --- | --- | --- |
-| ConvContext | userId | 发起会话的用户，可空 |
-| ConvContext | convId | 会话标识，与 clara-memory 会话 ID 同源同值 |
-| ConvContext | historyCall | 已登记的历史调用 |
-| CallContext | traceId | 端到端跟踪标识，每次调用自动生成 |
-| CallContext | deadlineEpochMillis | 绝对截止时间（Unix epoch 毫秒） |
-| CallContext | cancellationToken | 协作式取消信号 |
+不需要编排、工具和工作流时，直接使用统一模型入口：
 
 ```java
 import com.clara.context.ConvContext;
+import com.clara.core.message.IContent;
+import com.clara.core.model.IStreamModel;
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.kernel.config.ModelConfig;
+import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.http.HttpRequest;
+import com.clara.kernel.http.HttpResponse;
+import com.clara.kernel.http.execute.Jdk8HttpTransport;
+import com.clara.kernel.message.delta.UserContent;
+import com.clara.model.configuration.ProviderYamlConfigurationLoader;
+import com.clara.model.provider.CompatibleStream;
 
-ConvContext conversation = new ConvContext(
-        "user-1001",
-        "conversation-42",
-        providerConfiguration,
-        CapabilityKindEnum.CHAT);
+import java.nio.file.Paths;
+import java.util.Collections;
 
-CallContext call = conversation.newCall(30_000L);
-conversation.cancel(); // 中止整个会话
+public final class DirectModelExample {
+    public static void main(String[] args) {
+        try (ProviderConfiguration provider = new ProviderYamlConfigurationLoader().load(Paths.get("config/model-providers/deepseek-response.yml"))) {
+            ModelConfig chat = provider.toConfig(CapabilityKindEnum.CHAT);
+            ConvContext context = new ConvContext("demo-user", "demo-session", provider, CapabilityKindEnum.CHAT);
+
+            try (ConvContext.Scope ignored = ConvContext.open(context)) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                HttpRequest request = HttpRequest.builder()
+                        .model(chat.getModelId())
+                        .messages(Collections.<IContent>singletonList(
+                                new UserContent("你好，介绍一下你自己")))
+                        .stream(false)
+                        .build();
+
+                HttpResponse response = model.chat(request, HttpResponse.class);
+                System.out.println(response.getContent());
+            }
+        }
+    }
+}
 ```
 
-注意：newCall 每次生成新 traceId 并复用会话取消令牌；取消是协作式的；ConvContext 通过 ThreadLocal 绑定当前线程，跨线程需显式 bind 并在 finally 中 clear；取消幂等。
+关键点：
 
-## 错误处理
+- `ProviderYamlConfigurationLoader` 读取平台 YAML，`ProviderConfiguration` 负责凭据、端点和能力配置。
+- 调用前必须用 `ConvContext.open(...)` 绑定平台配置与能力种类；`HttpRequest` / `HttpResponse` 是协议无关的请求响应对象。
+- `CompatibleStream` 不含平台分支，换平台只换配置，不换调用代码。
 
-Clara 使用 ClaraException 携带结构化 ClaraError，主要字段：
+### 3. 流式输出
+
+```java
+import com.clara.context.ConvContext;
+import com.clara.core.message.IContent;
+import com.clara.core.model.IStreamHandle;
+import com.clara.core.model.IStreamModel;
+import com.clara.enums.CapabilityKindEnum;
+import com.clara.kernel.config.ModelConfig;
+import com.clara.kernel.config.ProviderConfiguration;
+import com.clara.kernel.http.HttpRequest;
+import com.clara.kernel.http.HttpResponse;
+import com.clara.kernel.http.execute.Jdk8HttpTransport;
+import com.clara.kernel.message.delta.UserContent;
+import com.clara.model.configuration.ProviderYamlConfigurationLoader;
+import com.clara.model.provider.CompatibleStream;
+
+import java.nio.file.Paths;
+import java.util.Collections;
+
+public final class StreamingExample {
+    public static void main(String[] args) throws Exception {
+        try (ProviderConfiguration provider = new ProviderYamlConfigurationLoader().load(Paths.get("config/model-providers/deepseek-response.yml"))) {
+            ModelConfig chat = provider.toConfig(CapabilityKindEnum.CHAT);
+            ConvContext context = new ConvContext("demo-user", "demo-session", provider, CapabilityKindEnum.CHAT);
+
+            try (ConvContext.Scope ignored = ConvContext.open(context)) {
+                IStreamModel model = new CompatibleStream(new Jdk8HttpTransport());
+                HttpRequest request = HttpRequest.builder()
+                        .model(chat.getModelId())
+                        .messages(Collections.<IContent>singletonList(
+                                new UserContent("流式输出一段自我介绍")))
+                        .stream(true)
+                        .build();
+
+                IStreamHandle handle = model.chat(request, HttpResponse.class, event -> {
+                    switch (event.getType()) {
+                        case TEXT_DELTA:
+                            System.out.print(event.getPayload());
+                            break;
+                        case ERROR:
+                            System.err.println("stream error: " + event.getError().getSafeMessage());
+                            break;
+                        default:
+                            break;
+                    }
+                });
+
+                while (!handle.isDone()) {
+                    Thread.sleep(50L);
+                }
+                HttpResponse response = (HttpResponse) handle.result();
+                System.out.println("\n--- done ---");
+                System.out.println(response == null ? "no response" : response.getContent());
+            }
+        }
+    }
+}
+```
+
+`TEXT_DELTA` / `REASONING_DELTA` 用于实时展示，`RESPONSE_COMPLETE` 携带完整响应，`ERROR` 表示流失败。观察者回调运行在读取线程上，不要在其中执行耗时操作。
+
+### 常用扩展点
+
+| 场景 | 入口 |
+| --- | --- |
+| 完整对话 | `ApplicationBootstrap#orchestrator()` |
+| 工作流 | `ApplicationBootstrap#workflowEngine()` / `workflowRunner()` |
+| MCP | `ApplicationBootstrap#mcpGateway()` / `loadMcpServers()` |
+| 会话历史 | `ApplicationBootstrap#conversationMessages()` / `clearHistory()` |
+| 模型配置 | `ApplicationBootstrap#modelRegistry()` |
+| Token 用量 | `ConversationResult#getUsage()` / `ApplicationBootstrap#conversationUsageReport()` |
+
+## 交互命令
+
+| 命令 | 作用 |
+| --- | --- |
+| `/?` / `/help` | 显示命令帮助 |
+| `/model` | 重新选择模型 |
+| `/init` | 重新检测模型可用性并重建配置、技能、MCP 连接 |
+| `/compress` / `/compact` | 把当前上下文压缩为摘要 |
+| `/new` | 开始新对话，旧历史保留 |
+| `/usage` / `/tokens` | 统计 token 用量与平台分布 |
+| `/history` | 查看历史聊天记录 |
+| `/history clear` | 清空全部历史记录 |
+| `/history clear -n N` | 清理最早的 N 条 |
+| `/history clear -t N` | 清理最新的 N 条 |
+| `/graph` | 查看当前工作目录的代码知识图谱状态 |
+| `/graph import` | 将当前工作目录导入代码知识图谱 |
+| `/trace` | 查看最近一轮执行链路 |
+| `/trace list` | 列出最近链路；`/trace <traceId>` 查看指定链路 |
+| `/log` / `/verbose` | 切换精简 / 全量日志 |
+| `/color` | 开关彩色输出 |
+| `exit` / `quit` / `/exit` | 结束会话 |
+
+执行中连按两次 `ESC` 可取消本轮模型调用和工具执行；首次 ESC 只提示，避免误触。`Enter` 发送，`Shift+Enter` / `Ctrl+Enter` 换行，上 / 下方向键召回历史输入。
+
+## 配置目录与扩展协议
+
+`config/` 是 Clara 的运行期配置根目录。模型、MCP、技能、提示词、工作流、开发规范和质量门禁都通过目录约定发现；新增文件通常不需要修改 Java 代码。
+
+### 目录总览
+
+| 路径 | 作用 | 发现 / 生效方式 |
+| --- | --- | --- |
+| `clara.yml` | 主运行配置 | 启动时读取；`/init` 重新加载 |
+| `model-providers/` | 模型平台、端点、能力与参数 | 启动扫描；由 `enabledProviders` 过滤 |
+| `model-roles.yml` | 工作流角色到模型别名的映射 | AGENT / REVIEW 节点解析模型时读取 |
+| `mcp/` | MCP 服务注册 | 启动时递归扫描 `*.json`；可选，未配置时只用内置工具 |
+| `skill/prompt/` | 提示词定义 | 启动加载，按输入相似度检索，支持同名覆盖 |
+| `skill/tools/` | 内置工具声明 | 启动加载，与脚本工具合并成工具目录 |
+| `skill/scripts/` | Python / Shell / JavaScript 脚本工具 | 通过 `--describe` 自描述发现，按文件签名热加载 |
+| `workflow/` | 随应用发布的内置工作流 | 启动加载 |
+| `workflow/custom/` | 用户或模型生成的工作流 | 按文件签名热加载，无需重启 |
+| `standards/` | 开发规范 | 被方案 / 计划工作流批量读取，作为固定约束注入 |
+| `sonar/` | SonarQube 质量配置 | 由 `deploy/sonar` 脚本导入 |
+| `static-analysis/` | SpotBugs 排除规则 | 由 Maven / SpotBugs 扫描读取 |
+
+### 主配置 `clara.yml`
+
+`config/clara.yml` 是唯一的主配置入口，常用节点如下：
+
+| 节点 | 说明 |
+| --- | --- |
+| `defaultModel` | 默认模型配置别名，例如 `deepseek-response`；必须出现在 `enabledProviders` 中 |
+| `enabledProviders` | 启动时启用、`/model` 可切换的模型配置别名列表 |
+| `codeGraph` | 代码知识图谱开关、自动挂载、自动导入与补充信息上限 |
+| `context.alwaysPrompts` | 每轮固定注入的提示词，不参与相似度检索；取值为 `config/skill/prompt` 下的 `id` |
+| `intentPlanning` | 复杂任务识别、动态计划与计划校验 |
+| `milvus` | 语义记忆与 BM25 / 向量召回配置 |
+| `telemetry` | 链路追踪、JSONL 保留、OTLP 与 Prometheus |
+
+`enabledProviders` 同时决定三件事：哪些模型配置会被加载、`/model` 列出哪些模型、启动脚本检查哪些凭据环境变量。未启用的模型配置不会被加载。
+
+### 模型配置 `model-providers/`
+
+每个 `*.yml` 对应一个可选择的模型别名，别名就是去掉扩展名的文件名（例如 `deepseek-response.yml` → `deepseek-response`）。目录下的 `examples/` 和 `*.example.yml` 不会被扫描。
+
+最小结构如下：
+
+```yaml
+provider: OPENAI
+credential:
+  secretRef: openai
+  environmentVariable: CLARA_OPENAI_API_KEY
+transport:
+  allowedOrigins: [https://api.openai.com]
+  connectTimeoutMillis: 10000
+  readTimeoutMillis: 600000
+  maxRequestBytes: 33554432
+  maxResponseBytes: 33554432
+  allowHttp: false
+capabilities:
+  CHAT:
+    endpoint: https://api.openai.com/v1/responses
+    modelId: gpt-5.6-sol
+    apiProfile: responses-v1
+    protocol: RESPONSE
+    parameters:
+      maxTokens: 128000
+```
 
 | 字段 | 说明 |
 | --- | --- |
-| code | 稳定错误码，供分支判断 |
-| category | 配置/校验/认证/授权/能力/限流/超时/取消/冲突/资源限制/内容安全/外部服务等 |
-| safeMessage | 可安全跨越系统边界的文案 |
-| retryable | 是否可重试恢复 |
-| provider / providerCode | 供应商及其原始错误码 |
-| retryAfterMillis | 建议等待毫秒数 |
-| traceId | 跟踪标识 |
-| safeDetails | 可安全外发的补充信息 |
+| `provider` | `OPENAI`、`DEEPSEEK`、`VOLCENGINE`、`KIMI`、`ANTHROPIC`、`ALIBABA` |
+| `credential.secretRef` | 必填的凭据引用名，用于日志与凭据解析，不直接保存明文 |
+| `credential.environmentVariable` | 推荐方式：从环境变量读取 API Key |
+| `credential.apiKey` | 内联密钥，仅允许出现在被 Git 忽略的本地配置中；与环境变量二选一 |
+| `transport.allowedOrigins` | HTTP 目标来源白名单，端点必须命中 |
+| `transport.allowHttp` | 是否允许明文 HTTP；生产环境保持 `false` |
+| `transport.connectTimeoutMillis` / `readTimeoutMillis` | 连接 / 读取超时 |
+| `transport.maxRequestBytes` / `maxResponseBytes` | 请求 / 响应体积上限，防止异常响应撑爆内存 |
+| `transport.headers` | 附加到所有请求的固定请求头 |
+| `capabilities` | 能力节点表，键必须是能力枚举名 |
 
-系统边界统一转换错误：可恢复错误做有上限退避；认证/授权直接失败；日志保留错误码与 traceId，不记录 API Key、Authorization 头或完整响应正文。
+能力节点统一协议：
 
-## 会话记忆
-
-- 消息窗口：适合限制历史消息数量的场景。
-- Token 窗口：适合上下文受限、动态裁剪的场景。
-- InMemoryConversationStore 仅进程内有效，重启丢失。
-- 需要跨进程恢复时使用持久化 ConversationStore。
-- 限制内存驻留可用 BoundedCachingConversationStore 包装，支持 LRU 与条数上限。
-- 关闭应用时显式关闭 Closeable 存储。
-
-### 语义记忆与 Milvus（可选）
-
-语义记忆用于长程/跨窗口关联：把对话记录沉淀到 Milvus，并每轮按输入召回相关历史注入上下文。默认关闭，开启方式：
-
-1. 起服务：`docker compose -f deploy/docker-compose.yml up -d`（etcd + MinIO + milvus standalone，gRPC 端口 19530）。
-2. 在 `config/clara.yml` 增加 `milvus` 节点（字段与注释见该文件），确保可连上；启动横幅的 `semantic` 一行会显示最终用的是 `local` 还是 `milvus`，据此确认是否生效。
-
-开启后：所有对话记录（按会话隔离，来源 CONVERSATION）写入 Milvus；每轮按输入召回历史上下文注入提示词（默认召回 3 条、阈值 0.7，见 `ContextControlConfig`）。召回方式由 `milvus.mode` 决定：全文检索（BM25）或向量相似度。
-
-注意事项：
-
-- 集合名默认按「项目名 + `_conversations`」生成（即按项目隔离）：项目名取「工作目录的目录名」——优先启动脚本注入的 `CLARA_WORK_DIR`，未注入时用进程当前工作目录，即「从哪个目录启动，就以该目录名为项目名」。**Milvus 集合名只允许 ASCII（字母 / 数字 / 下划线）**，故目录名含中文等非 ASCII 字符时会用拼音转写为英文（如 `我的项目 → wodexiangmu`），其余非法字符折叠为下划线；转写后仍为空时退化为 `p + 目录路径哈希前 12 位`。不同项目使用各自独立的集合，避免互相串数据；也可在 `milvus.collection` 显式指定固定集合名。
-- 检索模式（`milvus.mode`）：
-  - `bm25`（默认，推荐）：用 Milvus 内置 BM25 全文检索，中文按 `milvus.analyzer`（默认 `chinese`，jieba）分词；不依赖任何嵌入服务，集合里也不存向量。
-  - `vector`：把输入向量化后按余弦相似度检索，需要有可用的嵌入服务。离线占位嵌入 `HashingEmbeddingClient` 没有语义（实测同一问题与历史记录的最高余弦分只有 0.08 左右），永远过不了 0.70 的召回阈值，表现为 `[向量]` 一直「召回 0 条」；没有可用 embeddings 端点时不要用这个模式。
-  - 两种模式的集合结构不同，**切换模式（或改 `analyzer` / `dimension`）必须重建集合**：把 `milvus.recreateOnSchemaMismatch` 设为 `true`，启动时检测到结构不匹配就自动删除旧集合并按新结构重建。注意重建会清空该集合里的历史记录。
-  - 分数口径：BM25 原始分没有上界，回给上层前按 `score / (score + 1)` 单调压到 (0, 1)，所以阈值 0.70 约等于原始分 2.33（实测相关文档 4~7 分、无关文档 1 分上下）。
-- **JVM 默认字符集必须是 UTF-8**（`clara.bat` / `clara.sh` 已带 `-Dfile.encoding=UTF-8`）：milvus-sdk-java 拼全文检索占位符时用的是 `String.getBytes()`（平台默认字符集）而不是 UTF-8。中文 Windows 默认 GBK，中文正文会以 GBK 字节发出，Milvus 的 jieba 分词器读到非法 UTF-8 会 panic，并把**整个 Milvus 服务端 abort**（不是这一次检索失败，而是整个记忆库掉线）。手工 `java -jar` 启动时务必自己加该参数；启动期检测到默认字符集不是 UTF-8 且模式为 BM25 时会打印警告。
-- `milvus.dimension` 仅向量模式使用，必须与嵌入模型输出维度一致；默认离线占位嵌入 `HashingEmbeddingClient` 为 1024。
-- 不写 `milvus` 节点、或写 `enabled: false` 时保持原样：语义记忆用进程内实现，不写对话记录。
-- Milvus 连不上时启动会提示并回退为进程内实现（本次不写对话记录），不阻断对话。
-
-## MCP
-
-clara-mcp 支持 stdio 与 Streamable HTTP，围绕注册、初始化、能力发现、目录与统一调用组织：
-
-1. 注册 MCP 服务及传输配置。
-2. 建立传输，完成协议初始化与版本协商。
-3. 发现并缓存 tools、resources、resource templates 与 prompts。
-4. 保存为带版本信息的目录快照。
-5. 通过 IMcpGateway 执行工具、读资源、取提示词。
-6. 配置变更时重连或刷新；关闭时释放子进程与连接。
-
-注意：stdio 会启动受控子进程，应限制可执行文件路径与工作目录；Streamable HTTP 应使用 HTTPS；发现结果可能过期；InMemoryMcpServerRegistry 适合单实例。
-
-接入外部 MCP 服务端（启动时自动完成）：
-
-- 注册项写在 `config/mcp/*.json` 的 `mcpServers` 映射下，每项给 `command` + `args` + `env`（stdio）或 `url`（Streamable HTTP）。
-- 启动时由 `ApplicationBootstrap.loadMcpServers()` 注册 → 握手发现 → 登记工具，横幅打印 `mcp : N 个服务端 / M 个外部工具`。
-- 下发给模型的工具声明由 `CompositeToolCatalog` 合并「本地技能工具 + 外部 MCP 工具」，**同名时本地优先**，与 `CompositeToolInvoker` 的调用路由顺序一致。
-- stdio 的首项命令必须命中允许清单：清单取自 `config/mcp` 里声明的命令、环境变量 `CLARA_MCP_ALLOWED_EXECUTABLES`（分号或逗号分隔）与 `node` 兜底，逐项按 PATH / PATHEXT 解析成绝对路径；配置里可以写 `npx` 这类裸命令名，工厂会在清单内按文件名解析成绝对路径。
-- 子进程在继承父进程环境的基础上叠加配置里的 `env`，因此服务端能取到 `PATH`、`USERPROFILE` 等变量。
-
-### 代码知识图谱（可选）
-
-接入 [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) 后，读代码会优先走本机知识图谱：
-
-- 部署（二选一）：`deploy/codebase-memory-mcp/install.ps1` 装到宿主；`deploy/codebase-memory-mcp/install-docker.ps1` 走 Docker Compose —— 容器常驻并把待分析仓库只读挂到 `/work/repo`，宿主按 `docker exec -i <容器> codebase-memory-mcp` 调用，宿主不需要留安装目录。细节见 `deploy/codebase-memory-mcp/readme.md`。图谱可视化：容器部署会把 UI 发布到宿主回环，浏览器打开 `http://127.0.0.1:9749/`；宿主安装用 `codebase-memory-mcp daemon start` 后访问同一地址。
-- 技能脚本 `config/skill/scripts/code-graph/code_graph.py`（工具名 `code_graph`）：`op=read` 对代码文件先取图谱大纲，图谱未覆盖（未索引 / 不在索引范围 / 图谱不可用）时回退本地文件读取，返回里 `source` 标明每条信息来自 `graph` 还是 `file`；`.md` / `.txt` 这类散文文件不查图谱、直接返回原文。
-- 其余 `op` 直通图谱能力：`index`（建 / 重建索引）、`status`、`search`、`outline`、`snippet`、`trace`（`inbound` 查调用方、`outbound` 查被调用方；只跟 `CALLS` 边、会漏掉 `USAGE`，不能当完整引用清单）、`query`（只读 Cypher）。完整问「谁引用了 X」用 `query`，例如 `MATCH (c:Class)-[:DEFINES_METHOD]->(m)-[r]->(n) WHERE n.name='X' RETURN DISTINCT c.qualified_name`。图谱的 Cypher 只支持子集：标签写成 `n:Class` 或 `(c:Class {name:'X'})`，**不支持列表下标**（如 `labels(n)[0]`，写它整条语句会报 `not fully parsed`）。
-- 会话提示 `config/skill/prompt/code_graph_guide.json` 约定「先查图谱 → 没覆盖再读文件 → 最后才整文件读取」；它由 `config/clara.yml` 的 `context.alwaysPrompts`（默认 `[code_graph_guide]`）常驻注入每轮 system 指令——按输入相似度检索那套指望不上（有阈值与条数上限），故单列一条不参与检索的通道；图谱关闭时该条自动跳过。
-- `analyze_repo_docs`、`design_business_solution` 两个工作流的读取节点也已改用 `code_graph`。
-- 每轮预取图谱补充信息（`codeGraph.supplement`）默认关，交给模型按需调 `code_graph`：这笔查询压在每轮模型开始之前，实测大仓库（lippo-life，约 2 万个符号）单次要 20 秒以上（换项目、换关键词都稳定 20 秒左右，不是冷启动；同库按符号名的 `search_graph` 只要 3 秒），会把首字响应从 1~2 秒拖到 20 秒+。小仓库想恢复「先查再答」把它设回 `true` 即可。
-- 每轮对话还会在控制台打印知识源命中情况，便于直接观察执行：
-
-  ```
-    [图谱]    命中 1 条（320ms）
-              pattern=ContextAssembler
-    [提示词]  未命中（33ms）
-              阈值 0.70，候选 16 条
-    [向量]    命中 2 条（1014ms）
-              score=0.812  ...
-  ```
-
-  `[图谱]` = 代码知识图谱补充（仅 `codeGraph.supplement: true` 时有这一行）、`[提示词]` = 提示词向量匹配、`[向量]` = 语义记忆（Milvus）召回（仅启用外部向量库时有这一行：`milvus.enabled: false` 时对话记录不进语义库、召回必然为空，这行也不再打印）；命中为绿色，未命中与明细为灰色（`/color` 可关色）。明细行先汇总「召回了几条 / 其中几条因已在本轮上下文被丢弃 / 几条过阈值 / 最高分」，再逐条给出 score 与片段预览（无召回时直接写「语义库里没有本会话可检索的记录」，好区分「库里没数据」和「分数不够」），同一份文本同时写入详细日志。命中内容若本轮请求里已经带着（本轮提问本身、刚返回的工具结果）会被丢弃并单列一行「丢弃 …」、不再重复注入 system 指令：判重只比文本，且与写入端共用同一套「入库文本」折算，所以被压缩或截断过的历史照常召回。缺了这几行，就分不清「模型没用图谱」是没命中、没接线，还是被阈值刷掉了。
-- 自动查图谱只认提问里「像代码标识符」的词（类名 / 方法名 / 字段名：驼峰、下划线、字母数字混排），汉字与自然语言词只当分隔符。纯中文整句没有可查的标识符时本轮跳过查询（图谱按符号名与代码内容匹配，整句命中不了，白等一次查询），由模型按 `code_graph_guide` 自己带模式查；图谱自身报错（未索引当前目录、项目登记的根路径已失效）会单独打印原因，不与「零命中」混成一句。
-- 启用图谱时会在启动阶段打印初始化日志：`挂载检查`（容器能否看到当前工作目录，带耗时）、`导入检查`（当前项目是否已导入；没导入且开了 `autoImport` 时会在后台发起索引），开了但某步跳过（`autoMount: false` / `autoImport: false`）时会打一行说明原因，免得「图谱怎么没命中」只能靠猜；总开关 `enabled: false` 时整块不打印，关闭的功能不出现在日志里：
-
-  ```
-    codegraph      : 初始化：工作目录 E:\workspace_rongshu\lippo-life，autoMount=true autoImport=true
-    codegraph      : 挂载检查 830ms：已可见，无需挂载：E:\workspace_rongshu\lippo-life
-    codegraph      : 导入检查 3120ms：未导入，已在后台发起导入（大仓库要几分钟，完成后用 /graph 查看）
-                     项目：lippo-life
-  ```
-
-## 工作流与人工交互
-
-clara-workflow 提供工作流定义、DAG 执行、预算控制、检查点与人工交互恢复。
-
-典型流程：构造并校验工作流定义，按 DAG 拓扑执行；节点需人工确认时写检查点并返回 WAITING_INPUT；收到答案后按实例版本与幂等键恢复。
-
-注意：工作流定义需版本化；预算覆盖耗时、Token 与外部资源；检查点生产环境需持久化；恢复时同时校验 expectedInstanceVersion 与 idempotencyKey。
-
-## 多角色与多模态工作流
-
-工作流定义放在 config/workflow 下的 *.yml / *.yaml。AGENT 节点除 prompt / promptVars 外，支持以下可选属性：
-
-| 属性 | 说明 |
+| 字段 | 说明 |
 | --- | --- |
-| role | 逻辑角色名，经 config/model-roles.yml 映射为模型别名；未映射时角色名直接作别名 |
-| model | 模型别名（即 config/model-providers 下配置文件的文件名），优先于 role |
-| capability | 能力种类名（CapabilityKindEnum 常量名），缺省 CHAT；IMAGE 走图片生成 |
-| attachments | 图片引用数组（公网 URL 或 data:image/<格式>;base64,<编码>），每项可含 ${...} 变量 |
+| `endpoint` | 必填，能力调用的绝对 HTTP(S) 地址 |
+| `taskQueryEndpoint` | 异步任务查询地址；视频等异步能力使用，支持 `{id}` 占位 |
+| `modelId` | 平台模型 ID；生产配置必须写固定模型 ID，不要依赖会变化的别名 |
+| `apiProfile` | 平台协议档位，自由字符串，用于区分同平台的接口变体 |
+| `protocol` | 线格式：`COMPLETION`（Chat Completions）或 `RESPONSE`（OpenAI Responses） |
+| `parameters` | 标量扩展参数，例如 `maxTokens`、`maxPromptChars`、`maxOutputs`、轮询参数 |
+| `control` | 上下文窗口、压缩、召回等单能力覆盖配置 |
 
-解析优先级：model > role > 会话默认模型。同一工作流的不同节点可绑定不同模型，因此多角色既可共用同一模型，也可各用不同模型。未注册的别名按配置错误直接失败，不做静默降级。
+支持的能力键：`CHAT`、`IMAGE`、`VIDEO`、`AUDIO_TRANSCRIPTION`、`SPEECH`。同一能力最多配置一个节点；未配置的能力在调用时会报配置错误。
 
-内置示例（config/workflow）：
+### 角色映射 `model-roles.yml`
 
-| 工作流 | 用途 | 输入 |
-| --- | --- | --- |
-| review_panel | 多角色多轮评审后由主持人汇总结论 | topic |
-| image_generation | 文生图，产物落成媒体资产 | subject |
-| image_understanding | 图 → 文，图片随对话消息下发给多模态模型 | image |
-| image_edit | 图生图（OpenAI 主用、火山回退；参考图支持本地路径 / URL / data URI） | reference、instruction |
+把工作流中的角色名映射到模型别名：
 
-交互式对话中用自然语言让助手调用内置工具 run_workflow 即可，例如：
+```yaml
+architect: deepseek-response
+reviewer: volcengine-response
+tester: deepseek-completion
+```
+
+- 键是 AGENT 节点的 `role`，或 REVIEW 节点的 `roles` / `moderator`。
+- 值是 `model-providers` 下的模型别名。
+- 未声明的角色会直接把角色名当模型别名解析；仍解析不到时 fail-fast，不静默降级。
+
+### MCP 注册 `mcp/`
+
+`config/mcp/` 下的所有 `*.json` 都会被递归扫描。协议兼容 Claude Desktop / VS Code 的 `mcpServers` 结构：
+
+```json
+{
+  "mcpServers": {
+    "local-tool": {
+      "command": "python",
+      "args": ["server.py"],
+      "env": {"MCP_TOKEN": "${MCP_TOKEN}"}
+    },
+    "remote-tool": {
+      "url": "https://example.com/mcp",
+      "headers": {"Authorization": "Bearer ${MCP_TOKEN}"}
+    }
+  }
+}
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `command` | stdio 启动命令；可以是字符串，也可以是字符串数组 |
+| `args` | 追加到命令后的参数数组 |
+| `env` | stdio 子进程环境变量；值支持 `${VAR}`，未定义时直接报错 |
+| `url` | Streamable HTTP 服务地址；与 `command` 互斥 |
+| `headers` | HTTP 请求头；值支持 `${VAR}`，常用于鉴权 |
+
+同名 `serverKey` 的覆盖顺序是：运行目录配置覆盖 classpath 内置配置；同一来源内后加载的覆盖先加载的。`config/mcp/mcp.json` 可能包含真实密钥，已被 Git 忽略，只应保留在本地。
+
+### 技能与提示词 `skill/`
+
+`config/skill` 与 classpath 内置技能合并，同名 `id` 以运行期配置覆盖内置实现。
+
+提示词协议（`skill/prompt/*.json`）：
+
+```json
+{
+  "id": "my_prompt",
+  "description": "给模型的使用说明",
+  "segments": [
+    {"role": "system", "content": "这里是提示词正文"}
+  ]
+}
+```
+
+- `id` 是工作流 `prompt`、`context.alwaysPrompts` 引用的标识。
+- `description` 用于检索匹配。
+- `segments` 按顺序拼接成消息段；`role` 使用模型消息角色（如 `system`）。
+
+工具声明协议（`skill/tools/**/*.json`）：
+
+```json
+{
+  "id": "my_tool",
+  "name": "my_tool",
+  "type": "PYTHON",
+  "description": "工具用途；会展示给模型",
+  "parameters": {"type": "object", "properties": {}},
+  "script": "my_tool",
+  "metadata": {"domain": "custom", "tags": "demo"}
+}
+```
+
+- `type`：`PYTHON`、`JAVASCRIPT`、`SHELL` 或 `BUILTIN`。`BUILTIN` 表示进程内 Java 工具，`script` 是内置名称。
+- `parameters` 是 JSON Schema 对象或等价 JSON 字符串，用于入参校验与模型调用。
+- `script` 是脚本名或路径，由执行器解析。
+
+脚本工具采用“自描述 + stdin/stdout”协议（`skill/scripts/**`）：
 
 ```text
-请运行工作流 image_generation，subject 用「一只在雪地里的柴犬」
-请运行工作流 image_understanding，image 用 https://example.com/a.png
-请运行工作流 review_panel，topic 用「是否引入事件总线」
+python my_tool.py --describe   # stdout 输出工具声明 JSON：id/name/type/description/parameters/metadata
+python my_tool.py             # stdin 读 JSON 入参，stdout 写 JSON 结果
 ```
 
-生成类产物由 MediaStore 落成媒体资产，写入工作目录下 .clara/assets（首次用到时创建）；作用域回填 {assetId, storageUri, mimeType, size}，其中 storageUri 形如 clara-media:<sha256>。工作流若通过顶层 outputs 声明对外输出键，则只回传这些变量。
+- 以下划线开头的脚本视为共享模块，`--describe` 无输出时会被跳过。
+- 脚本声明按“绝对路径 + 修改时间 + 文件大小”缓存，文件改动后自动重新发现。
+- 脚本执行时设置 `PYTHONUTF8=1`、`PYTHONIOENCODING=utf-8`、`PYTHONDONTWRITEBYTECODE=1`，不要提交 `__pycache__`。
 
-说明：
+### 工作流 `workflow/`
 
-- 图片识别使用该节点绑定的对话模型，需选择多模态模型；图生图的参考图字段目前仅 VOLCENGINE 已声明协议适配。
-- 角色名需能解析到模型别名（见 config/model-roles.yml），否则该节点按配置错误失败。
-- 工作流定义与提示词在进程启动时扫描加载，修改配置后需重启进程。
-- 视频生成能力尚未接线（缺异步任务 provider 适配与回调解析实现）。
+内置流程位于 `config/workflow/*.yml`，自定义流程位于 `config/workflow/custom/*.yml`。两者使用同一套协议；自定义流程写入后按文件签名热加载，下一轮即可调用。
 
-## 技能
+最小示例：
 
-clara-skill 将业务能力封装为可注册、可校验、可执行的技能，覆盖版本、权限、Schema 与执行状态。
-
-典型用法：实现技能接口并声明输入/输出与权限，注册到技能注册表，校验与授权后调用；恢复时按版本号确定执行体。
-
-注意：技能接收外部输入先做结构化校验；文件、网络、进程与高风险业务分别授权；执行需携带上下文、租户、截止时间与取消信号；技能注册表（SkillRegistry）为内存实现，仅进程内有效。
-
-## 浏览器自动化（UI 测试）
-
-技能脚本 `config/skill/scripts/browser/browser.py`（工具名 `browser`）用 Playwright 驱动浏览器，让模型直接操作本机 / 内网页面做自动测试：打开页面、读取可交互元素、点击 / 输入 / 选择 / 勾选、断言、截图留证。
-
-- 会话常驻：真正的浏览器跑在后台进程 `_browser_host.py` 里（由工具脚本按需拉起、无窗口运行），同一工作目录的多次调用是同一个浏览器——登录态与页面进度跨调用保留，不必每步重新登录；`op=close` 结束会话，空闲 30 分钟自动退出。状态、截图与后台日志都在工作目录的 `.clara/browser/` 下（`session.json` / `shots/` / `host.log`）。
-- 快照驱动定位：`op=open` 与 `op=snapshot` 返回「可交互元素清单」（每个元素带 `ref`、角色、名称、当前值、禁用状态、下拉选项），模型用 `target="ref=e3"` 或 `css=` / `text=` / `role=button[name=提交]` / `label=` / `placeholder=` / `testid=` / `xpath=` 定位；匹配到多个时取第一个可见元素并说明，可用 `index` 指定。页面跳转或重渲染后 `ref` 失效会提示重新快照。
-- 断言与证据：`op=expect` 支持 visible / hidden / attached / detached / enabled / disabled / text_contains / value_equals / count / url_contains / title_contains / no_console_errors，返回 `pass` 与实际值；`op=run` 用 `steps=[{op:...},...]` 一次跑多步、失败即停，换页面的步骤会自动带回新快照（`ref` 按新快照重新编号）；失败自动截图并把页面快照一并回传，便于模型自我修正。控制台报错与失败请求按「当前文档」统计，跳转后自动重置。
-- 用例可回放：把一次测试写成 JSON 用例文件（内容就是 `steps` 数组，或 `{"name":"..","vars":{..},"steps":[..]}`），用 `op=run` 的 `case=<路径>` 回放；`steps` 里的字符串可用 `{{变量名}}` 引用 `vars`，同一份用例换环境（如基地址）不必改文件。路径按当前工作目录解析，适合随项目版本化（例如放 `ui-tests/login-smoke.json`）。
-- 单次调用受框架 30 秒硬超时约束，因此工具内部预算默认 20 秒（`budget_ms` 可调小），超时返回「接着做」的提示——长流程拆成多次调用即可，不用一口气走完。
-- 首次使用先自检：`op=doctor` 显示 Python、Playwright、可用浏览器（内置 chromium / 系统 Chrome / 系统 Edge）与会话状态。缺内置浏览器时执行 `python -m playwright install chromium`，或调用时传 `channel="chrome"` / `channel="msedge"` 直接走系统浏览器。
-- 默认无头运行；需要盯着执行过程时在 `open` 里传 `headless=false`（或设环境变量 `CLARA_BROWSER_HEADLESS=0`）。技能脚本按目录自动发现，新增 / 修改后重启进程即生效（见「技能」）。
-
-对话里直接说诉求即可，例如：「打开 http://localhost:5174，用 admin/123456 登录，看首页有没有待办列表」「把注册表单填一遍提交，检查有没有报错」。典型调用序列：`open` → `snapshot` → `fill` / `click` → `expect` → `screenshot` → `close`。
-
-## 文档解析与媒体处理
-
-### 工作区文件
-
-- 路径需规范化并校验位于根目录内，拒绝 .. 越界。
-- 默认忽略 .git、.svn、target、node_modules 等目录。
-- 读取与写入由工作流的工具节点承担（`file_ops` 等脚本工具）：路径先规范化并校验位于工作目录内，越界（`..`）与忽略目录由工具侧统一拦截。
-
-### 文档解析
-
-通过 Apache POI 与 PDFBox 解析 Office 与 PDF。处理外部文件应限制大小、页数、压缩扩展名与耗时，并在隔离环境处理不可信内容。
-
-### 媒体生成
-
-图片生成（工作流 AGENT 节点声明 `capability: IMAGE`）的产物会落成媒体资产；视频生成由工作流 `video_generation` 的 AGENT 节点（`capability: VIDEO`）完成提交与轮询。媒体资产写入受控存储（单机为工作区下 `.clara/assets`），不直接暴露临时 URL。
-
-## 作为依赖引入
-
-推荐使用方 POM 导入 BOM：
-
-```xml
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>com.clara</groupId>
-            <artifactId>clara-bom</artifactId>
-            <version>0.1.0-SNAPSHOT</version>
-            <type>pom</type>
-            <scope>import</scope>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
+```yaml
+workflowId: export_report
+description: 汇总目录结构并生成报告
+version: "1.0.0"
+inputSchema:
+  type: object
+  required: [target_dir]
+  properties:
+    target_dir:
+      type: string
+outputs: [report]
+root:
+  id: root
+  type: SEQUENCE
+  children:
+    - id: list_files
+      type: TOOL
+      outputKeys: [listing]
+      tool: dir_tree
+      arguments:
+        path: "${target_dir}"
+        purpose: 了解目录结构
+    - id: write_report
+      type: AGENT
+      outputKeys: [report]
+      promptText: |
+        根据目录结构输出一份中文报告，只输出报告正文。
+      promptVars:
+        listing: "${listing}"
 ```
 
-再按需选择模块，无需重复声明版本：
+顶层字段：
 
-```xml
-<dependencies>
-    <dependency>
-        <groupId>com.clara</groupId>
-        <artifactId>clara-model</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>com.clara</groupId>
-        <artifactId>clara-memory</artifactId>
-    </dependency>
-</dependencies>
+| 字段 | 说明 |
+| --- | --- |
+| `workflowId` | 必填；只允许字母、数字、下划线、中划线，不得与内置流程重名 |
+| `description` / `version` | 流程说明与版本；`version` 必填 |
+| `inputSchema` / `outputSchema` | JSON Schema，可写对象或 JSON 字符串 |
+| `outputs` | 对外返回的变量键列表；未列出的中间结果不回灌给对话模型 |
+| `root` | 必填，节点树根节点 |
+
+支持的配置化节点：
+
+| 节点 | 作用 | 关键字段 |
+| --- | --- | --- |
+| `SEQUENCE` | 顺序执行 | 非空 `children` |
+| `PARALLEL` | 并行执行 | 非空 `children` |
+| `AGENT` | 调用模型 | `outputKeys`（只能一个）、`prompt` 或 `promptText`、`promptVars`、`role` / `model` / `fallbackModel`、`capability`、`attachments` |
+| `TOOL` | 调用工具 | `outputKeys`（只能一个）、`tool`、`arguments` |
+| `REVIEW` | 多角色讨论 / 评审 | `outputKeys`、`prompt`、`roles`、`moderator`、`topic`、`rounds` |
+| `HUMAN` | 等待人工输入 | `inputKey` |
+| `CONDITION` | 条件分支 | `condition.key`、`condition.operator`（`equals` / `notEquals` / `exists`）、`condition.value`、`whenTrue`、`whenFalse` |
+
+`LOOP` 目前只存在于枚举中，配置化工作流加载器不支持，使用 `LOOP` 会直接报错。
+
+变量协议：
+
+| 写法 | 含义 |
+| --- | --- |
+| `${name}` | 取上游节点 `outputKeys` 声明的输出或运行入参 |
+| `${name.field}` | 当上游输出是对象时取字段，支持逐级下钻 |
+| `${name?}` | 可选变量；缺失时返回 null / 空串，不报错 |
+
+整个字符串恰好是一个 `${...}` 时保留原始类型，可传数组或对象；否则按字符串替换。引用必须由上游输出或运行入参满足，不允许悬空引用。
+
+### 开发规范与质量配置
+
+- `standards/*.md|html`：所有开发规范文件都是方案的固定约束。`design_business_solution` 和 `plan_development` 通过 `file_ops read_many` 读取 `config/standards/*`，新增文件会自动纳入，不需要改工作流。当前包含后端规范、前端 UED 摘要、Honeycomb UED 全文和 Java 编码规范。
+- `sonar/quality-profile-java.xml`：名为 `Clara Java` 的 SonarQube 质量配置，由 `deploy/sonar` 下的扫描 / 门禁脚本导入。
+- `static-analysis/spotbugs-exclude.xml`：项目级 SpotBugs 排除规则。每条排除都必须写明理由，禁止用包级通配符整包屏蔽。
+
+### 配置加载与安全约定
+
+- 模型配置和 MCP 配置采用严格解析：字段类型、端点、超时、必填项不合法时直接报配置错误，不静默使用默认值。
+- 运行目录配置覆盖 classpath 内置配置；自定义工作流不得与内置流程重名。
+- `config/mcp/mcp.json`、`config/model-providers/local/*.yml`、`.clara/`、`logs/`、`__pycache__/` 均不纳入 Git。
+- 不要把真实 API Key 写入随代码发布的 `config/model-providers/*.yml`；优先使用 `credential.environmentVariable`。
+
+启动时会探测模型可用性。若当前模型属于「平台不可用」（401 / 403 / 429 / 5xx、连接失败、超时、无响应字节等），会按首字符响应时间顺序自动切到下一个可用模型，并打印 `[failover]` 提示；已完成工具调用的轮次不会重放。
+
+## 工作流
+
+内置工作流位于 `config/workflow/*.yml`：
+
+| 工作流 | 用途 |
+| --- | --- |
+| `analyze_repo_docs` | 扫描当前目录并整理技术文档 |
+| `design_business_solution` | 产出需求与技术方案 |
+| `plan_development` | 根据技术方案产出开发计划 |
+| `image_generation` | 文生图，先生成提示词并人工确认 |
+| `image_edit` | 根据参考图和编辑指令生成图片 |
+| `image_understanding` | 提取图片内容并生成客观描述 |
+| `video_generation` | 文生视频，必须人工确认后调用，产物下载到 `.clara/media/videos` |
+| `review_panel` | 多角色讨论并汇总评审结论 |
+| `author_custom_workflow` | 按用户诉求生成自定义工作流并发布 |
+
+自定义工作流写入 `config/workflow/custom/*.yml`。发布后无需重启，下一轮即可按 `workflowId` 调用。推荐直接对 Clara 说「帮我做一个……的工作流」，由模型完成起草、校验和发布；也可以手写 YAML 后让模型调用 `publish_workflow` 校验。
+
+高成本操作（尤其是视频生成、图片生成）通过 `HUMAN` 节点暂停，返回 `WAITING_INPUT`。用户明确批准后才继续执行；修改意见会回到上一节点重新生成。
+
+## 代码知识图谱
+
+知识图谱基于 `codebase-memory-mcp`，与 Milvus 共用 `deploy/docker-compose.yml`：
+
+```powershell
+# 启动 Milvus + 代码知识图谱
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
-除非确实需要整套装配，否则不要默认引入 clara-application，按需引入对应模块即可减少传递依赖。
+首次部署或需要重新注册 MCP：
 
-## 安全与运行时清单
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\codebase-memory-mcp\install-docker.ps1
+```
 
-- 凭据只通过 secretRef 引用，由解析器按租户动态解析。
-- 外部 HTTP 目标使用精确 origin 白名单，默认只允许 HTTPS。
-- 为请求、响应、文件解析、文档页数、MCP 消息与媒体资产设置明确上限。
-- 将截止时间与取消信号传递给每个外部调用与长耗时任务。
-- 内存注册表/存储/Job 仅用于演示或单机，生产替换为共享实现。
-- 恢复、回调、提交与配置变更使用实例版本检查与幂等键。
-- 对工作区写入、技能调用、MCP 子进程与文件历史分别授权并审计。
-- 关闭应用时显式关闭所有 Closeable 资源。
-- 上线前实际验证账号权限、模型 ID、配额、计费与超时/重试映射。
+使用方式：
 
-## 当前验证状态
+- `/graph`：查看当前工作目录是否已导入、导入方式与可视化地址。
+- `/graph import`：把当前工作目录导入图谱。
+- 开启 `codeGraph.supplement` 后，每轮先查图谱并把命中内容注入提示词；未命中时模型再调用文件工具读取本地源码。
+- 开启 `codeGraph.autoMount` 后，启动时按需为当前工作目录补充容器挂载；`autoImport` 可控制是否自动导入。
 
-根据本次传输层重构（2026-10-19）离线验证：
+MCP 服务注册在 `config/mcp/mcp.json`。该文件可能包含本机密钥，已被 Git 忽略，只应保留在本地。
 
-- 十个模块在单一 Maven reactor 中编译通过。
-- 产物为 Java 8 字节码（major version 52）。
-- clara-transport 23 个测试、clara-model 17 个测试、clara-mcp 127 个测试、clara-application 指定 12 个测试全部通过。
-- 核心 API 未暴露 Provider SDK 类型；模型调用通过 provider 与 model 标识选择与隔离。
+## 语义记忆
 
-实时验证仍需单独完成：供应商账号权限与配额、流式/工具调用往返、Milvus 版本与集合结构、生产状态持久化与恢复。
+`config/clara.yml` 的 `milvus.enabled: true` 时：
+
+- 对话记录写入 Milvus，按会话隔离；
+- 每轮按输入召回相关历史并注入上下文；
+- 推荐 `mode: bm25`，使用 Milvus 内置中文分词，不依赖 Embedding 服务；
+- `mode: vector` 需要可用的 Embedding 端点；
+- 模式、分词器或向量维度变化时，需开启 `recreateOnSchemaMismatch` 重建集合，重建会清空旧记录。
+
+本地运行 Milvus：
+
+```powershell
+docker compose -f deploy/docker-compose.yml up -d etcd minio standalone
+```
+
+## 可观测
+
+`telemetry.enabled: true` 后：
+
+- 链路数据写入 `<工作目录>/.clara/telemetry`；
+- `/trace` 查看最近一轮阶段、耗时、token 与错误；
+- Prometheus 默认监听 `9464`，路径 `/metrics`；
+- 配置 `telemetry.otlp.enabled` 后导出到 OTLP/HTTP Collector。
+
+本地观测栈：
+
+```powershell
+docker compose -f deploy/observability/docker-compose.yml up -d
+```
+
+| 组件 | 地址 |
+| --- | --- |
+| Grafana | `http://localhost:3001` |
+| Prometheus | `http://localhost:9090` |
+| Tempo | `http://localhost:3200` |
+| Clara 指标 | `http://localhost:9464/metrics` |
+
+Prometheus 在 Docker 内抓取宿主机时，`telemetry.prometheus.host` 应设为 `0.0.0.0`。
+
+## 测试与质量
+
+```powershell
+# 全量单元测试
+mvn test
+
+# 构建 + 测试 + 打包
+mvn clean verify
+
+# 覆盖率门禁（默认 80%）
+node tools/coverage/check-coverage.mjs 0.80
+```
+
+部分模型兼容性、图片 / 视频和外部服务测试会在检测到真实凭据或本地服务时发起实际调用，执行前请确认账号权限、配额与费用。纯离线验证可先移除对应环境变量或关闭 Milvus。
+
+仓库还提供本地 SonarQube 扫描脚本：
+
+```powershell
+deploy\sonar\scan.cmd
+deploy\sonar\gate.cmd
+```
 
 ## 目录结构
 
 ```text
 clara/
-|-- pom.xml                    # 根 POM，聚合各模块
-|-- clara-bom/                 # 版本清单
-|-- clara-core/                # 枚举与错误模型
-|-- clara-transport/           # 通用 HTTP / SSE 传输实现
-|-- clara-model/               # 模型内核、Provider 配置、媒体资产
-|-- clara-memory/              # 窗口记忆、会话持久化、语义记忆
-|-- clara-mcp/                 # MCP 客户端、注册表与协议传输适配
-|-- clara-workflow/            # 工作流引擎、任务规划、人工交互
-|-- clara-orchestration/       # 对话编排与能力组合
-|-- clara-skill/               # 技能注册、执行与工具
-|-- clara-application/         # 应用装配、交互式控制台、工作流自举、文档解析
-|-- config/                    # 模型 Provider、MCP、技能与工作流配置
-|-- docs/                      # 架构、业务、技术设计与迁移记录
-|   `-- diagrams/              # 架构图与核心业务流程图 / 时序图（SVG）
-|-- deploy/                    # 部署脚本与依赖编排
-|   |-- docker-compose.yml     # Milvus 等本地依赖的 docker-compose 配置
-|   |-- codebase-memory-mcp/   # 代码知识图谱 MCP 的部署脚本与说明
-|   |   |-- install.ps1        # 装到宿主：下载二进制、注册 MCP、建索引
-|   |   |-- install-docker.ps1 # 容器部署：docker compose 起容器并在容器内建索引
-|   |   |-- docker-compose.yml # 容器定义：仓库只读挂载 + 索引命名卷 + 图谱 UI 端口
-|   |   `-- entrypoint.sh      # 容器内常驻 daemon（图谱 UI），并把 UI 转发到容器网卡
-|   `-- observability/         # 本地观测栈：OTel Collector + Tempo + Prometheus + Grafana
-|-- sample/                    # 示例应用工程（clara-sample，独立 Maven 工程，不纳入根 POM）
-|-- clara.bat / clara.sh       # 启动脚本
-`-- clara.jar                  # 构建产物
+|-- pom.xml                     # Maven 聚合与版本管理
+|-- clara-bom/                  # 版本清单
+|-- clara-core/                 # 契约、DTO、枚举、错误模型
+|-- clara-transport/            # HTTP / SSE 传输
+|-- clara-model/                # 模型、Provider、媒体与 Token
+|-- clara-mcp/                  # MCP 客户端与能力发现
+|-- clara-workflow/             # 工作流引擎与任务规划
+|-- clara-memory/               # 会话、窗口与语义记忆
+|-- clara-orchestration/        # 对话编排与工具往返
+|-- clara-skill/                # 技能注册与执行
+|-- clara-application/          # 装配入口与交互式控制台
+|-- assets/                     # README 架构图与静态资源
+|-- config/                     # 运行期配置根目录
+|   |-- clara.yml               # 主配置：默认模型、图谱、记忆、观测等
+|   |-- model-providers/        # 模型平台、端点、能力与参数
+|   |-- model-roles.yml         # 工作流角色到模型别名映射
+|   |-- mcp/                    # MCP 服务注册（可选）
+|   |-- skill/                  # 提示词、工具声明与脚本
+|   |-- workflow/               # 内置工作流 + custom 自定义流程
+|   |-- standards/              # 开发规范（自动纳入方案 / 计划工作流）
+|   |-- sonar/                  # SonarQube 质量配置
+|   `-- static-analysis/        # SpotBugs 排除规则
+|-- deploy/                     # Milvus、知识图谱、观测栈与 Sonar 脚本
+|-- tools/                      # 覆盖率等本地工具
+|-- clara.bat / clara.sh        # 启动脚本
+`-- clara.jar                   # 构建产物（不纳入版本库）
 ```
 
-## 延伸阅读
+`docs/` 是本地开发过程文档，不纳入 Git，仅在当前开发机保留。
 
-- Java 8 AI 能力迁移架构：docs/migration-design/java8-ai-capability-migration.md
-- 迁移任务与验证记录：docs/migration-design/tasks.md
-- Java 8 依赖与许可基线：docs/migration-design/java8-dependencies.md
-- 技术设计：docs/technical-design/ 下各模块设计文档
-- 可观测链路设计（Span / 指标 / JSONL 落盘 / OTLP / /trace）：docs/design/observability-pipeline.md
-- 可观测落地：`config/clara.yml` 的 `telemetry` 节点；Prometheus `/metrics` 默认关闭（开启后 9464）；OTLP 默认关闭（开启后导出到 `http://localhost:4318/v1/traces`）
-- 本地观测栈部署：deploy/observability/README.md
-- 业务设计：docs/business-design/ 下各模块业务文档
-- clara-mcp 模块学习指南（设计思想与类架构）：docs/architecture-design/clara-mcp-module-learning-guide.md
-- Clara 项目总览学习指南（架构、主链路与扩展点）：docs/architecture-design/clara-project-learning-guide.md
+## 安全约定
 
-仓库当前未附带完整许可证合规材料。分发或商用前应补齐许可证、NOTICE 与第三方归属清单。
+- 不要提交真实 API Key、`config/mcp/mcp.json`、`.clara/`、`logs/` 或本机模型配置。
+- 优先使用环境变量保存凭据，内联 `apiKey` 仅限本地未跟踪文件。
+- 外部 HTTP 目标使用来源白名单，生产环境保持 HTTPS。
+- 工具调用可能读写工作目录或执行命令，运行前确认工作区与权限边界。
+- 会话历史和链路数据默认落在本地工作目录，共享机器上注意清理。
+
+## License
+
+Apache License 2.0，详见 `LICENSE` 与 `NOTICE`。
