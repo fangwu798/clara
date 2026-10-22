@@ -354,8 +354,6 @@ public final class StreamingExample {
 | `workflow/` | 随应用发布的内置工作流 | 启动加载 |
 | `workflow/custom/` | 用户或模型生成的工作流 | 按文件签名热加载，无需重启 |
 | `standards/` | 开发规范 | 被方案 / 计划工作流批量读取，作为固定约束注入 |
-| `sonar/` | SonarQube 质量配置 | 由 `deploy/sonar` 脚本导入 |
-| `static-analysis/` | SpotBugs 排除规则 | 由 Maven / SpotBugs 扫描读取 |
 
 ### 主配置 `clara.yml`
 
@@ -595,8 +593,8 @@ root:
 ### 开发规范与质量配置
 
 - `standards/*.md|html`：所有开发规范文件都是方案的固定约束。`design_business_solution` 和 `plan_development` 通过 `file_ops read_many` 读取 `config/standards/*`，新增文件会自动纳入，不需要改工作流。当前包含后端规范、前端 UED 摘要、Honeycomb UED 全文和 Java 编码规范。
-- `sonar/quality-profile-java.xml`：名为 `Clara Java` 的 SonarQube 质量配置，由 `deploy/sonar` 下的扫描 / 门禁脚本导入。
-- `static-analysis/spotbugs-exclude.xml`：项目级 SpotBugs 排除规则。每条排除都必须写明理由，禁止用包级通配符整包屏蔽。
+- `deploy/sonar/quality-profile-java.xml`：名为 `Clara Java` 的 SonarQube 质量配置，由 `deploy/sonar` 下的扫描 / 门禁脚本导入。
+- `deploy/static-analysis/spotbugs-exclude.xml`：项目级 SpotBugs 排除规则。每条排除都必须写明理由，禁止用包级通配符整包屏蔽。
 
 ### 配置加载与安全约定
 
@@ -737,9 +735,7 @@ clara/
 |   |-- skill/                  # 提示词、工具声明与脚本
 |   |-- workflow/               # 内置工作流 + custom 自定义流程
 |   |-- standards/              # 开发规范（自动纳入方案 / 计划工作流）
-|   |-- sonar/                  # SonarQube 质量配置
-|   `-- static-analysis/        # SpotBugs 排除规则
-|-- deploy/                     # Milvus、知识图谱、观测栈与 Sonar 脚本
+|-- deploy/                     # Milvus、知识图谱、观测栈、Sonar 与 SpotBugs 配置及脚本
 |-- tools/                      # 覆盖率等本地工具
 |-- clara.bat / clara.sh        # 启动脚本
 `-- clara.jar                   # 构建产物（不纳入版本库）

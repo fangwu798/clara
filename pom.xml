@@ -23,13 +23,15 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <junit.version>4.13.2</junit.version>
-        <jackson.version>2.13.4</jackson.version>
+        <jackson.version>2.18.11</jackson.version>
         <slf4j.version>1.7.36</slf4j.version>
         <poi.version>5.4.0</poi.version>
         <pdfbox.version>2.0.29</pdfbox.version>
         <jtokkit.version>1.1.0</jtokkit.version>
+        <snakeyaml.version>2.4</snakeyaml.version>
+        <h2.version>2.2.220</h2.version>
         <milvus.version>2.6.25</milvus.version>
-        <jline.version>3.25.1</jline.version>
+        <jline.version>3.30.15</jline.version>
         <pinyin4j.version>2.5.1</pinyin4j.version>
         <maven.compiler.version>3.11.0</maven.compiler.version>
         <maven.resources.version>3.3.1</maven.resources.version>
@@ -57,6 +59,12 @@
                 <groupId>com.fasterxml.jackson.dataformat</groupId>
                 <artifactId>jackson-dataformat-yaml</artifactId>
                 <version>${jackson.version}</version>
+            </dependency>
+            <!-- SnakeYAML 由 Jackson YAML 传递引入；锁定到已修复 CVE-2022-1471 等漏洞的版本。 -->
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -170,7 +178,7 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
-                <version>3.16.0</version>
+                <version>3.18.0</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
@@ -221,7 +229,7 @@
                     <configuration>
                         <effort>Max</effort>
                         <threshold>Low</threshold>
-                        <excludeFilterFile>${maven.multiModuleProjectDirectory}/config/static-analysis/spotbugs-exclude.xml</excludeFilterFile>
+                        <excludeFilterFile>${project.basedir}/../deploy/static-analysis/spotbugs-exclude.xml</excludeFilterFile>
                         <failOnError>true</failOnError>
                     </configuration>
                 </plugin>

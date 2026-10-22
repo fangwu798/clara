@@ -136,9 +136,7 @@ config/
 ├── workflow/
 │   ├── *.yml
 │   └── custom/*.yml
-├── standards/
-├── sonar/
-└── static-analysis/
+└── standards/
 ```
 
 ### `clara.yml`
@@ -240,11 +238,11 @@ tester: deepseek-completion
 - `*.yml`：随应用发布的流程。
 - `custom/*.yml`：用户或模型生成的流程，按文件签名热加载。
 
-### `standards/`、`sonar/`、`static-analysis/`
+### `standards/` 与 `deploy/` 下的质量配置
 
 - `standards/`：开发规范，被方案与计划工作流读取。
-- `sonar/`：SonarQube 质量配置，由 `deploy/sonar` 导入。
-- `static-analysis/`：SpotBugs 排除规则，由 Maven / SpotBugs 读取。
+- `deploy/sonar/quality-profile-java.xml`：SonarQube 质量配置，由 `deploy/sonar` 下的脚本导入。
+- `deploy/static-analysis/spotbugs-exclude.xml`：SpotBugs 排除规则，由 Maven / SpotBugs 读取。
 
 ## 2.7 什么时候生效
 
@@ -259,7 +257,7 @@ tester: deepseek-completion
 | `workflow/*.yml` | 启动加载；注册表刷新时重扫 |
 | `workflow/custom/*.yml` | 运行期发布后即时可见 |
 | `standards/` | 工作流运行时读取 |
-| `sonar/`、`static-analysis/` | 执行扫描时读取 |
+| `deploy/sonar/`、`deploy/static-analysis/` | 执行扫描时读取（不属于运行期配置） |
 
 ## 2.8 常见启动问题
 

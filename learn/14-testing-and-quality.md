@@ -138,7 +138,7 @@ deploy\sonar\gate.cmd
 SpotBugs 配置在根 `pom.xml`，排除规则在：
 
 ```text
-config/static-analysis/spotbugs-exclude.xml
+deploy/static-analysis/spotbugs-exclude.xml
 ```
 
 执行：
