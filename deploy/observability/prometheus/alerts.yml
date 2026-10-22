@@ -1,0 +1,64 @@
+groups:
+  - name: clara-observability
+    rules:
+      - alert: ClaraModelErrorRateHigh
+        expr: |
+          sum(rate(clara_model_calls_total{status="ERROR"}[5m]))
+            / clamp_min(sum(rate(clara_model_calls_total[5m])), 0.001) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Clara 模型错误率超过 5%"
+          description: "近 10 分钟模型调用错误率持续高于 5%，请检查平台可用性与凭据。"
+
+      - alert: ClaraFirstTokenSlow
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(clara_model_first_token_millis_bucket[5m]))) > 8000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Clara 首字符 P95 超过 8 秒"
+          description: "模型平台响应明显变慢，检查网络、限流与供应商状态。"
+
+      - alert: ClaraContextOverflowHigh
+        expr: |
+          sum(rate(clara_context_overflow_total[5m]))
+            / clamp_min(sum(rate(clara_turn_duration_count[5m])), 0.001) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Clara 上下文超限率超过 2%"
+          description: "上下文窗口频繁溢出，考虑降低召回量或提前压缩。"
+
+      - alert: ClaraFailoverActive
+        expr: sum(rate(clara_failover_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Clara 正在发生模型故障转移"
+          description: "主模型不可用，已切换到备选模型；持续发生时应检查主平台。"
+
+      - alert: ClaraToolErrorRateHigh
+        expr: |
+          sum(rate(clara_tool_calls_total{status="ERROR"}[5m]))
+            / clamp_min(sum(rate(clara_tool_calls_total[5m])), 0.001) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Clara 工具错误率超过 10%"
+          description: "检查 MCP 服务、知识图谱与本地工具链。"
+
+      - alert: ClaraMcpDiscoveryFailing
+        expr: sum(rate(clara_mcp_discovery_errors_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Clara MCP 发现持续失败"
+          description: "MCP 服务发现失败会影响工具可用性，请检查服务配置与网络。"

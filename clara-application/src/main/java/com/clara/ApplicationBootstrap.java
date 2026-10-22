@@ -9,6 +9,9 @@ import com.clara.config.ModelRegistry;
 import com.clara.context.ConvContext;
 import com.clara.core.memory.IContextSupplementProvider;
 import com.clara.core.memory.IContextTraceSink;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetrySpan;
+import com.clara.core.telemetry.TelemetrySpanKindEnum;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
 import com.clara.core.memory.ITokenCountEstimator;
@@ -22,6 +25,7 @@ import com.clara.core.workflow.IWorkflowEngine;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
+import com.clara.enums.interaction.HistoryClearScopeEnum;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.http.execute.Jdk8HttpTransport;
 import com.clara.mcp.api.IMcpCapabilityCatalog;
@@ -252,6 +256,8 @@ public final class ApplicationBootstrap implements Closeable {
      * 图片 / 视频 / 图谱的独立用量台账，由工作流动作写入、{@code /usage} 读取。
      */
     private final CapabilityUsageLedger capabilityUsage = new CapabilityUsageLedger();
+    /** 链路追踪入口：由宿主注入，默认空实现。 */
+    private final Telemetry telemetry;
 
     /**
      * 使用默认配置装配：离线哈希嵌入（{@link HashingEmbeddingClient}）、工作目录下的本地对话历史存储、
@@ -268,7 +274,18 @@ public final class ApplicationBootstrap implements Closeable {
      */
     public ApplicationBootstrap(IContextTraceSink contextTrace) {
         this(new HashingEmbeddingClient(EMBEDDING_DIMENSION), EMBEDDING_DIMENSION, defaultMcpClientFactory(),
-                contextTrace);
+                contextTrace, Telemetry.noop());
+    }
+
+    /**
+     * 使用默认装配，并接入上下文来源观测口与链路追踪。
+     *
+     * @param contextTrace 上下文来源观测口；可为 null（不上报）
+     * @param telemetry    链路追踪入口；可为 null（不记录）
+     */
+    public ApplicationBootstrap(IContextTraceSink contextTrace, Telemetry telemetry) {
+        this(new HashingEmbeddingClient(EMBEDDING_DIMENSION), EMBEDDING_DIMENSION, defaultMcpClientFactory(),
+                contextTrace, telemetry);
     }
 
     /**
@@ -311,6 +328,22 @@ public final class ApplicationBootstrap implements Closeable {
      */
     ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension,
                          IMcpClientFactory mcpClientFactory, IContextTraceSink contextTrace) {
+        this(embeddingClient, embeddingDimension, mcpClientFactory, contextTrace, Telemetry.noop());
+    }
+
+    /**
+     * 指定嵌入客户端、向量维度、MCP 客户端工厂、上下文来源观测口与链路追踪装配。
+     *
+     * @param embeddingClient    嵌入客户端，不可为 null
+     * @param embeddingDimension 向量维度，须与嵌入客户端输出一致，必须为正
+     * @param mcpClientFactory   MCP 客户端工厂，不可为 null
+     * @param contextTrace       上下文来源观测口；可为 null（不上报）
+     * @param telemetry          链路追踪入口；可为 null（不记录）
+     * @throws IllegalArgumentException 参数非法时
+     */
+    ApplicationBootstrap(IEmbeddingClient embeddingClient, int embeddingDimension,
+                         IMcpClientFactory mcpClientFactory, IContextTraceSink contextTrace,
+                         Telemetry telemetry) {
         if (embeddingClient == null) {
             throw new IllegalArgumentException("embeddingClient must not be null");
         }
@@ -321,6 +354,7 @@ public final class ApplicationBootstrap implements Closeable {
             throw new IllegalArgumentException("mcpClientFactory must not be null");
         }
         this.embeddingClient = embeddingClient;
+        this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
 
         // 语义记忆：clara.yml 配了 milvus 就用 Milvus（对话记录写入并召回），否则维持进程内实现、行为不变。
         MilvusSettings milvus = MilvusSettings.load(ConfigLocator.claraConfigFile(), embeddingDimension, ConfigLocator.projectName());
@@ -355,7 +389,7 @@ public final class ApplicationBootstrap implements Closeable {
         ScriptExecutorRegistry scriptExecutors = new ScriptExecutorRegistry();
         IToolInvoker localToolInvoker = new DefaultToolInvoker(new DefaultToolExecutor(skillRegistry, scriptExecutors, new SkillSchemaValidator(), new SkillPermissionAuthorizer(), 30_000L));
         IToolInvoker toolInvoker = new CompositeToolInvoker(skillRegistry, localToolInvoker, mcpGateway,
-                externalToolCatalog, capabilityUsage);
+                externalToolCatalog, capabilityUsage, telemetry);
         // 意图识别与动态执行计划：复杂任务先生成计划，并交给内置工具 validate_execution_plan 校验；
         // 简单任务不生成计划，仍由主链路直接回答。开关见 config/clara.yml 的 intentPlanning 节点。
         IntentPlanSettings intentPlanSettings = IntentPlanSettings.load(ConfigLocator.claraConfigFile());
@@ -366,15 +400,16 @@ public final class ApplicationBootstrap implements Closeable {
                 : null;
 
         // clara-memory：窗口压缩编排（把被淘汰历史交给模型总结为摘要）
-        this.windowCompression = new WindowCompressionCoordinator(new DefaultSummarizeCoordinator(streamModel, promptProvider));
+        this.windowCompression = new WindowCompressionCoordinator(
+                new DefaultSummarizeCoordinator(streamModel, promptProvider, telemetry));
 
         // orchestration 协作者
         // 语义记忆召回只在启用外部向量库（Milvus）时接线：关闭时对话记录根本不进语义库
         // （见下方 windowMemoryFactory 的 conversationIndexing），召回必然是空的——再跑一次空检索
         // 只会多打一行 [向量] 观测行，把「关闭的功能」留在日志里。
         SemanticRecallCoordinator semanticRecall = conversationIndexing
-                ? new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore, contextTrace)
-                : new SemanticRecallCoordinator(null, null);
+                ? new SemanticRecallCoordinator(embeddingClient, semanticMemoryStore, contextTrace, telemetry)
+                : new SemanticRecallCoordinator(null, null, null, telemetry);
         // 代码知识图谱：装配提示词前先查一次图谱，命中的知识作为 system 补充信息注入；图谱里没有的，
         // 模型按 code_graph_guide 的约定改用工具查本地文件。开关在 config/clara.yml 的 codeGraph 节点。
         this.codeGraphSettings = CodeGraphSettings.load(ConfigLocator.claraConfigFile());
@@ -391,9 +426,9 @@ public final class ApplicationBootstrap implements Closeable {
         List<String> basePrompts = alwaysPrompts(AlwaysPromptSettings.load(ConfigLocator.claraConfigFile()),
                 promptProvider, codeGraphSettings.isEnabled());
         ContextAssembler contextAssembler = new ContextAssembler(windowCompression, semanticRecall,
-                codeGraphSupplement, skillMatch, basePrompts);
+                codeGraphSupplement, skillMatch, basePrompts, telemetry);
         CapabilityDispatcher capabilityDispatcher = new CapabilityDispatcher(streamModel);
-        ToolRoundTripCoordinator toolRoundTrip = new ToolRoundTripCoordinator(toolInvoker);
+        ToolRoundTripCoordinator toolRoundTrip = new ToolRoundTripCoordinator(toolInvoker, telemetry);
         // 调用记录接收方：进程内保留最近若干条记录，供上层读取（不打印、不落盘）
         this.callRecordSink = new InMemoryCallRecordSink();
         CallRecordPublisher callRecordPublisher = new CallRecordPublisher(callRecordSink);
@@ -410,10 +445,12 @@ public final class ApplicationBootstrap implements Closeable {
                             : memory;
                 };
 
-        this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler, capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator, intentPlanCoordinator);
+        this.orchestrator = new DefaultConversationOrchestrator(windowMemoryFactory, contextAssembler,
+                capabilityDispatcher, toolRoundTrip, callRecordPublisher, tokenCountEstimator,
+                intentPlanCoordinator).telemetry(telemetry);
 
         // clara-workflow：默认内存检查点工作流引擎；IWorkflowDefinitionResolver 本阶段未接入
-        this.workflowEngine = new DefaultWorkflowEngine(new InMemoryCheckpointStore(), 4);
+        this.workflowEngine = new DefaultWorkflowEngine(new InMemoryCheckpointStore(), 4, telemetry);
 
         // 工作流配置化装配：模型绑定注册表 + 动作工厂 → 定义目录加载 → 定义注册表 → 运行器 → 内置工具
         this.modelRegistry = new ModelRegistry(ConfigLocator.modelConfigs(), ConfigLocator.roleBindings());
@@ -443,6 +480,15 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     /**
+     * 返回宿主注入的链路追踪入口，供 CLI 的命令层读取当前 Span。
+     *
+     * @return 追踪入口，非 null
+     */
+    public Telemetry telemetry() {
+        return telemetry;
+    }
+
+    /**
      * 手动压缩指定会话的上下文：把当前全部历史交给模型归纳为一条摘要，并用该摘要替换历史。
      *
      * <p>用途：长对话历史（尤其工具结果）会随每轮请求重发、持续膨胀，占用大量上下文与费用。本方法提供
@@ -469,8 +515,15 @@ public final class ApplicationBootstrap implements Closeable {
         // 归纳走模型调用，需要绑定会话上下文（平台配置 + 能力种类），与编排层自动压缩时的绑定一致。
         IContent summary;
         ConvContext context = new ConvContext(null, conversationId, providerConfiguration, CapabilityKindEnum.CHAT);
-        try (ConvContext.Scope ignored = ConvContext.open(context)) {
-            summary = windowCompression.summarize(history);
+        try (TelemetrySpan span = telemetry.startSpan("context.compress", TelemetrySpanKindEnum.CONTEXT)) {
+            span.attribute("reason", "manual").attribute("messages", history.size());
+            try (ConvContext.Scope ignored = ConvContext.open(context)) {
+                summary = windowCompression.summarize(history);
+            } catch (RuntimeException failure) {
+                span.error(failure);
+                throw failure;
+            }
+            span.attribute("summary", summary != null);
         }
         if (summary == null) {
             return 0;
@@ -511,6 +564,31 @@ public final class ApplicationBootstrap implements Closeable {
             merged.addAll(snapshot.messages());
         }
         return HistorySanitizer.dropInvalidAssistantMessages(merged);
+    }
+
+    /**
+     * 清理历史聊天记录，并同步当前会话的语义记忆。
+     *
+     * <p>清理口径与 {@code /history} 一致（仅用户与助手消息）；持久化历史被重写或删除后，当前会话在语义库中的
+     * 对话条目也必须删除，否则后续召回仍会带回已被用户清理的内容。语义记忆删除失败不影响历史清理结果，
+     * 只输出告警——历史已经清掉，不应因为附加能力失败让用户误以为操作没生效。
+     *
+     * @param scope          清理范围，不可为 null
+     * @param count          清理条数；{@link HistoryClearScopeEnum#ALL} 时忽略
+     * @param conversationId 当前会话标识，可为 null（此时跳过语义记忆清理）
+     * @return 实际清理的聊天消息条数
+     */
+    public int clearHistory(HistoryClearScopeEnum scope, int count, String conversationId) {
+        int removed = conversationStore().deleteChatMessages(scope, count);
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            return removed;
+        }
+        try {
+            semanticMemoryStore.deleteByConversation(conversationId);
+        } catch (RuntimeException failure) {
+            System.err.println("[memory] 清理会话语义记忆失败（历史已清理）：" + failure.getMessage()); // NOSONAR 控制台告警
+        }
+        return removed;
     }
 
     /**
@@ -815,21 +893,34 @@ public final class ApplicationBootstrap implements Closeable {
                 new McpServerConfigLoader(), configDirectory).load();
         List<McpServerRegistration> registrations =
                 new McpServerRegistrar(mcpServerRegistry).registerAll(configs);
-        int discovered = 0;
-        for (McpServerRegistration registration : registrations) {
-            String serverKey = registration.getServerKey();
-            try {
-                mcpDiscoveryService.refresh(serverKey);
-                McpServerSnapshot snapshot = mcpCapabilityCatalog.latest(serverKey);
-                if (snapshot != null) {
-                    externalToolCatalog.registerSnapshot(snapshot);
+        try (TelemetrySpan load = telemetry.startSpan("mcp.load", TelemetrySpanKindEnum.OTHER)) {
+            load.attribute("configs", configs.size()).attribute("servers", registrations.size());
+            int discovered = 0;
+            int failed = 0;
+            for (McpServerRegistration registration : registrations) {
+                String serverKey = registration.getServerKey();
+                try (TelemetrySpan span = telemetry.startSpan("mcp.discovery", TelemetrySpanKindEnum.OTHER)) {
+                    span.attribute("server", serverKey);
+                    try {
+                        mcpDiscoveryService.refresh(serverKey);
+                        McpServerSnapshot snapshot = mcpCapabilityCatalog.latest(serverKey);
+                        if (snapshot != null) {
+                            externalToolCatalog.registerSnapshot(snapshot);
+                            span.attribute("tools", snapshot.getTools().size())
+                                    .attribute("resources", snapshot.getResources().size())
+                                    .attribute("prompts", snapshot.getPrompts().size());
+                        }
+                        discovered++;
+                    } catch (RuntimeException failure) {
+                        // 单个服务端发现失败不中断其余：链路记录失败原因后继续。
+                        failed++;
+                        span.error(failure);
+                    }
                 }
-                discovered++;
-            } catch (RuntimeException ignored) {
-                // 单个服务端发现失败不中断其余：状态已由发现服务按需更新，此处跳过并继续
             }
+            load.attribute("discovered", discovered).attribute("failed", failed);
+            return discovered;
         }
-        return discovered;
     }
 
     /**

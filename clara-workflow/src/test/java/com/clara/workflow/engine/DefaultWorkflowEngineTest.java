@@ -1,6 +1,9 @@
 package com.clara.workflow.engine;
 
-import com.clara.core.workflow.IScopeCondition;
+import com.clara.core.telemetry.ITelemetrySink;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetryEvent;
+import com.clara.core.telemetry.TelemetryStatusEnum;import com.clara.core.workflow.IScopeCondition;
 import com.clara.core.workflow.IWorkflowNode;
 import com.clara.dto.workflow.WorkflowCheckpoint;
 import com.clara.dto.workflow.WorkflowDefinition;
@@ -22,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -53,6 +57,11 @@ public class DefaultWorkflowEngineTest {
         return engine;
     }
 
+    private DefaultWorkflowEngine engine(int parallelism, Telemetry telemetry) {
+        DefaultWorkflowEngine engine = new DefaultWorkflowEngine(store, parallelism, telemetry);
+        engines.add(engine);
+        return engine;
+    }
     private static WorkflowDefinition definition(IWorkflowNode root) {
         return new WorkflowDefinition("wf", "1", null, null, root);
     }
@@ -286,6 +295,64 @@ public class DefaultWorkflowEngineTest {
     }
 
     @Test
+    public void emitsWorkflowAndNodeSpansUnderOneTrace() {
+        RecordingSink sink = new RecordingSink();
+        DefaultWorkflowEngine engine = engine(2, new Telemetry(sink));
+
+        WorkflowResult result = engine.start(definition(action("a1", "out", new ArrayList<>())),
+                "inst-trace", Collections.emptyMap());
+
+        assertEquals(WorkflowInstanceStatusEnum.SUCCEEDED, result.getStatus());
+        assertEquals(2, sink.events.size());
+        TelemetryEvent execute = event(sink.events, "workflow.execute");
+        TelemetryEvent node = event(sink.events, "workflow.node");
+        assertEquals(execute.getTraceId(), node.getTraceId());
+        assertEquals(execute.getSpanId(), node.getParentSpanId());
+        assertEquals("wf", execute.getAttributes().get("workflow"));
+        assertEquals("a1", node.getAttributes().get("node"));
+        assertEquals("TOOL", node.getAttributes().get("node_type"));
+        assertEquals(TelemetryStatusEnum.OK, node.getStatus());
+    }
+
+    @Test
+    public void marksFailedNodeAndWorkflowAsError() {
+        RecordingSink sink = new RecordingSink();
+        DefaultWorkflowEngine engine = engine(2, new Telemetry(sink));
+        IWorkflowNode failing = WorkflowNodes.action("boom", WorkflowNodeTypeEnum.TOOL,
+                Collections.singleton("out"), "idem-boom", scope -> {
+                    throw new IllegalStateException("boom");
+                });
+
+        assertThrows(IllegalStateException.class, () -> engine.start(definition(failing),
+                "inst-fail", Collections.emptyMap()));
+
+        TelemetryEvent execute = event(sink.events, "workflow.execute");
+        TelemetryEvent node = event(sink.events, "workflow.node");
+        assertEquals(TelemetryStatusEnum.ERROR, node.getStatus());
+        assertEquals("IllegalStateException", node.getErrorCode());
+        assertEquals(TelemetryStatusEnum.ERROR, execute.getStatus());
+    }
+
+    @Test
+    public void keepsParallelNodesInSameTrace() {
+        RecordingSink sink = new RecordingSink();
+        DefaultWorkflowEngine engine = engine(2, new Telemetry(sink));
+        List<String> ran = Collections.synchronizedList(new ArrayList<>());
+        IWorkflowNode root = WorkflowNodes.parallel("par",
+                Arrays.asList(action("a", "outA", ran), action("b", "outB", ran)));
+
+        WorkflowResult result = engine.start(definition(root), "inst-par-trace", Collections.emptyMap());
+
+        assertEquals(WorkflowInstanceStatusEnum.SUCCEEDED, result.getStatus());
+        TelemetryEvent execute = event(sink.events, "workflow.execute");
+        List<TelemetryEvent> nodes = events(sink.events, "workflow.node");
+        assertEquals(3, nodes.size());
+        for (TelemetryEvent node : nodes) {
+            assertEquals(execute.getTraceId(), node.getTraceId());
+            assertEquals(execute.getSpanId(), node.getParentSpanId());
+        }
+    }
+    @Test
     public void closeReleasesParallelExecutor() {
         IWorkflowNode root = WorkflowNodes.parallel("par",
                 Arrays.asList(action("a", "outA", new ArrayList<>()),
@@ -299,5 +366,34 @@ public class DefaultWorkflowEngineTest {
         Map<String, Object> empty = Collections.emptyMap();
         assertThrows(RejectedExecutionException.class,
                 () -> engine.start(definition, "inst-closed", empty));
+    }
+
+    private static TelemetryEvent event(List<TelemetryEvent> events, String name) {
+        for (TelemetryEvent event : events) {
+            if (name.equals(event.getName())) {
+                return event;
+            }
+        }
+        throw new AssertionError("missing event: " + name);
+    }
+
+    private static List<TelemetryEvent> events(List<TelemetryEvent> events, String name) {
+        List<TelemetryEvent> matched = new ArrayList<>();
+        for (TelemetryEvent event : events) {
+            if (name.equals(event.getName())) {
+                matched.add(event);
+            }
+        }
+        return matched;
+    }
+
+    private static final class RecordingSink implements ITelemetrySink {
+
+        private final List<TelemetryEvent> events = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void onSpan(TelemetryEvent event) {
+            events.add(event);
+        }
     }
 }

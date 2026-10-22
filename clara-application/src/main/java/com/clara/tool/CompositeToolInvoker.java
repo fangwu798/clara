@@ -3,6 +3,8 @@ package com.clara.tool;
 import com.clara.context.CallContext;
 import com.clara.context.ConvContext;
 import com.clara.core.skill.IToolInvoker;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetrySpan;
 import com.clara.core.tool.IToolInvocation;
 import com.clara.dto.tool.ToolResult;
 import com.clara.exception.ClaraError;
@@ -57,6 +59,8 @@ public final class CompositeToolInvoker implements IToolInvoker {
     private final IMcpGateway mcpGateway;
     private final ExternalToolCatalog externalToolCatalog;
     private final CapabilityUsageLedger usageLedger;
+    /** 链路追踪入口；用于给当前工具 Span 补充本地 / MCP 路由属性。 */
+    private final Telemetry telemetry;
 
     /**
      * 创建组合工具调用器。
@@ -69,7 +73,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
      */
     public CompositeToolInvoker(SkillRegistry skillRegistry, IToolInvoker localToolInvoker,
             IMcpGateway mcpGateway, ExternalToolCatalog externalToolCatalog) {
-        this(skillRegistry, localToolInvoker, mcpGateway, externalToolCatalog, null);
+        this(skillRegistry, localToolInvoker, mcpGateway, externalToolCatalog, null, Telemetry.noop());
     }
 
     /**
@@ -84,6 +88,23 @@ public final class CompositeToolInvoker implements IToolInvoker {
      */
     public CompositeToolInvoker(SkillRegistry skillRegistry, IToolInvoker localToolInvoker,
             IMcpGateway mcpGateway, ExternalToolCatalog externalToolCatalog, CapabilityUsageLedger usageLedger) {
+        this(skillRegistry, localToolInvoker, mcpGateway, externalToolCatalog, usageLedger, Telemetry.noop());
+    }
+
+    /**
+     * 创建组合工具调用器并接入链路追踪。
+     *
+     * @param skillRegistry       技能注册表，用于判定是否为本地工具，不可为 null
+     * @param localToolInvoker    本地工具执行入口，不可为 null
+     * @param mcpGateway          MCP 调用门面，可为 null
+     * @param externalToolCatalog 外部工具路由目录，不可为 null
+     * @param usageLedger         能力用量台账，可为 null
+     * @param telemetry           链路追踪入口，可为 null（按空实现处理）
+     * @throws IllegalArgumentException 除 mcpGateway / usageLedger / telemetry 外的依赖为 null 时
+     */
+    public CompositeToolInvoker(SkillRegistry skillRegistry, IToolInvoker localToolInvoker,
+            IMcpGateway mcpGateway, ExternalToolCatalog externalToolCatalog, CapabilityUsageLedger usageLedger,
+            Telemetry telemetry) {
         if (skillRegistry == null) {
             throw new IllegalArgumentException("skillRegistry must not be null");
         }
@@ -98,6 +119,7 @@ public final class CompositeToolInvoker implements IToolInvoker {
         this.mcpGateway = mcpGateway;
         this.externalToolCatalog = externalToolCatalog;
         this.usageLedger = usageLedger;
+        this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
     }
 
     @Override
@@ -110,16 +132,32 @@ public final class CompositeToolInvoker implements IToolInvoker {
             throw error(ErrorCodes.INVALID_ARGUMENT, ErrorCategoryEnum.VALIDATION, "工具名不能为空");
         }
         if (skillRegistry.findToolByName(toolName) != null) {
+            attribute("tool.route", "local");
             ToolResult result = localToolInvoker.invoke(invocation);
             recordGraphUsage(toolName, result);
             return result;
         }
         ExternalToolBinding binding = externalToolCatalog.find(toolName);
         if (binding != null) {
+            attribute("tool.route", "mcp");
+            attribute("mcp.server", binding.getServerKey());
             return invokeExternal(invocation, binding);
         }
         throw error(ErrorCodes.SKILL_NOT_FOUND, ErrorCategoryEnum.VALIDATION,
                 "工具未找到：" + toolName + "（本地技能未注册，且外部工具未登记）");
+    }
+
+    /**
+     * 给当前工具 Span 补充路由属性；没有追踪上下文时静默跳过。
+     *
+     * @param key   属性名，非空
+     * @param value 属性值，可为 null
+     */
+    private void attribute(String key, String value) {
+        TelemetrySpan span = telemetry.currentSpan();
+        if (span != null) {
+            span.attribute(key, value);
+        }
     }
 
     /**

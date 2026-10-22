@@ -4,6 +4,9 @@ import com.clara.core.memory.IContextSupplementProvider;
 import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.memory.IWindowMemory;
 import com.clara.core.message.IContent;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetrySpan;
+import com.clara.core.telemetry.TelemetrySpanKindEnum;
 import com.clara.dto.memory.ContextControlConfig;
 import com.clara.dto.memory.WindowPolicy;
 import com.clara.enums.RoleEnum;
@@ -41,6 +44,8 @@ public final class ContextAssembler {
      * 常驻提示词：每轮原样拼进 system 指令，不参与按输入的相似度检索；不可变，可能为空。
      */
     private final List<String> basePrompts;
+    /** 链路追踪入口；未接观测端时为空实现。 */
+    private final Telemetry telemetry;
 
     /**
      * 创建上下文装配器（不注入外部知识补充）。
@@ -52,7 +57,8 @@ public final class ContextAssembler {
     public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
                             SemanticRecallCoordinator semanticRecallCoordinator,
                             SkillMatchCoordinator skillMatchCoordinator) {
-        this(windowCompressionCoordinator, semanticRecallCoordinator, null, skillMatchCoordinator, null);
+        this(windowCompressionCoordinator, semanticRecallCoordinator, null, skillMatchCoordinator, null,
+                Telemetry.noop());
     }
 
 
@@ -70,6 +76,25 @@ public final class ContextAssembler {
                             IContextSupplementProvider supplementProvider,
                             SkillMatchCoordinator skillMatchCoordinator,
                             List<String> basePrompts) {
+        this(windowCompressionCoordinator, semanticRecallCoordinator, supplementProvider,
+                skillMatchCoordinator, basePrompts, Telemetry.noop());
+    }
+
+    /**
+     * 创建上下文装配器并接入链路追踪。
+     *
+     * @param windowCompressionCoordinator 窗口压缩协调器，不可为 null
+     * @param semanticRecallCoordinator    知识找回协调器，不可为 null
+     * @param supplementProvider           外部知识补充提供者（如代码知识图谱）；可为 null（不补充）
+     * @param skillMatchCoordinator        技能匹配协调器，不可为 null
+     * @param basePrompts                  常驻提示词（每轮原样注入，不参与检索）；可为 null（视为无）
+     * @param telemetry                    链路追踪入口，可为 null（按空实现处理）
+     */
+    public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
+                            SemanticRecallCoordinator semanticRecallCoordinator,
+                            IContextSupplementProvider supplementProvider,
+                            SkillMatchCoordinator skillMatchCoordinator,
+                            List<String> basePrompts, Telemetry telemetry) {
         if (windowCompressionCoordinator == null || semanticRecallCoordinator == null
                 || skillMatchCoordinator == null) {
             throw new IllegalArgumentException("context assembler dependencies are invalid");
@@ -81,6 +106,7 @@ public final class ContextAssembler {
         this.basePrompts = basePrompts == null
                 ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(basePrompts));
+        this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
     }
 
     /**
@@ -114,29 +140,61 @@ public final class ContextAssembler {
                 effective.getWindowMaxMessages(), effective.getWindowMaxSizeBytes(),
                 effective.getWindowMaxTokensPercent(), effective.getRecentTurnsKept());
 
-        List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.messages());
-        List<IContent> windowed = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.window(policy, estimator));
-        // 按「总量预算 + 最近优先」压缩工具结果：历史与本轮一视同仁，只保留最近一段原样，其余按预算截断。
-        // 注意：淘汰判定仍用未压缩的 windowed（按对象同一性比对），避免压缩后的新对象被误判为淘汰。
-        List<IContent> prepared = ToolOutputCompactor.compact(windowed,
-                effective.getToolOutputMaxChars(), effective.getToolOutputBudgetChars());
+        List<IContent> history;
+        List<IContent> windowed;
+        List<IContent> prepared;
+        try (TelemetrySpan span = telemetry.startSpan("context.window", TelemetrySpanKindEnum.CONTEXT)) {
+            history = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.messages());
+            windowed = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.window(policy, estimator));
+            // 按「总量预算 + 最近优先」压缩工具结果：历史与本轮一视同仁，只保留最近一段原样，其余按预算截断。
+            // 注意：淘汰判定仍用未压缩的 windowed（按对象同一性比对），避免压缩后的新对象被误判为淘汰。
+            prepared = ToolOutputCompactor.compact(windowed,
+                    effective.getToolOutputMaxChars(), effective.getToolOutputBudgetChars());
+            span.attribute("history_messages", history.size())
+                    .attribute("window_messages", windowed.size())
+                    .attribute("prepared_messages", prepared.size())
+                    .attribute("recent_turns_kept", effective.getRecentTurnsKept());
+        }
         String userInput = latestUserInput(windowMemory.conversationId(), history);
 
         List<IContent> systemParts = new ArrayList<>();
         if (effective.isCompressEnabled()) {
-            IContent summary = windowCompressionCoordinator.summarize(evicted(history, windowed));
-            if (summary != null) {
-                systemParts.add(summary);
+            try (TelemetrySpan span = telemetry.startSpan("context.compress", TelemetrySpanKindEnum.CONTEXT)) {
+                List<IContent> evictedMessages = evicted(history, windowed);
+                IContent summary = windowCompressionCoordinator.summarize(evictedMessages);
+                if (summary != null) {
+                    systemParts.add(summary);
+                }
+                span.attribute("summary", summary != null)
+                        .attribute("reason", "window")
+                        .attribute("evicted", evictedMessages.size());
             }
         }
-        MatchedSkill matched = skillMatchCoordinator.match(userInput, effective);
+        MatchedSkill matched;
+        try (TelemetrySpan span = telemetry.startSpan("context.skill", TelemetrySpanKindEnum.CONTEXT)) {
+            matched = skillMatchCoordinator.match(userInput, effective);
+            span.attribute("prompts", matched.getPrompts().size())
+                    .attribute("tools", matched.getTools().size());
+        }
         // 外部知识补充：先问一次代码知识图谱，命中就把「既有事实」直接放进 system 指令；没命中返回空，
         // 模型自然走工具查本地文件那条路（补充提供者自身兜底，失败不阻断本轮）。
-        List<String> supplement = supplementProvider == null ? Collections.emptyList() : supplementProvider.supplement(userInput);
+        List<String> supplement;
+        try (TelemetrySpan span = telemetry.startSpan("context.code_graph", TelemetrySpanKindEnum.CONTEXT)) {
+            supplement = supplementProvider == null
+                    ? Collections.emptyList() : supplementProvider.supplement(userInput);
+            span.attribute("items", supplement.size())
+                    .attribute("chars", chars(supplement));
+        }
         // 召回被窗口淘汰的历史知识：把本轮真正要下发的消息一并传进去，命中的内容若模型本来就看得到（本轮提问、
         // 刚返回的工具结果）会被丢弃，不重复塞进 system 指令。
-        List<String> recall = semanticRecallCoordinator.recall(windowMemory.conversationId(), userInput,
-                effective, prepared);
+        List<String> recall;
+        try (TelemetrySpan span = telemetry.startSpan("context.recall", TelemetrySpanKindEnum.CONTEXT)) {
+            recall = semanticRecallCoordinator.recall(windowMemory.conversationId(), userInput,
+                    effective, prepared);
+            span.attribute("items", recall.size())
+                    .attribute("chars", chars(recall))
+                    .attribute("source", "semantic_recall");
+        }
 
         String systemText = systemText(systemParts, extraPrompts, basePrompts, matched.getPrompts(), supplement, recall);
         List<IContent> messages = new ArrayList<>();
@@ -202,6 +260,23 @@ public final class ContextAssembler {
             append(text, knowledge);
         }
         return text.toString();
+    }
+
+    /**
+     * 统计补充信息字符数，用于判断检索是否把上下文撑大。
+     *
+     * @param lines 文本行，可为 null
+     * @return 字符总数，非负
+     */
+    private static int chars(List<String> lines) {
+        if (lines == null) {
+            return 0;
+        }
+        int total = 0;
+        for (String line : lines) {
+            total += line == null ? 0 : line.length();
+        }
+        return total;
     }
 
     private static void append(StringBuilder text, String segment) {

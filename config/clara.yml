@@ -12,7 +12,7 @@ defaultModel: deepseek-response
 #   启动脚本（clara.bat / clara.sh）会逐个检查这些供应商凭据声明的环境变量
 #   （config/model-providers/<别名>.yml 的 credential.environmentVariable），缺失时提示输入。
 #   写法：单行方括号列表（启动脚本按此格式解析）；本行也兼容 YAML 块式序列。
-enabledProviders: [deepseek-response, kimi-completion, volcengine-response, deepseek-completion, volcengine-completion, kimi-response, openai]
+enabledProviders: [deepseek-response, kimi-completion, deepseek-completion, openai, volcengine-response, kimi-response, volcengine-completion]
 
 # 代码知识图谱（可选，需要先按 deploy/codebase-memory-mcp/readme.md 部署：
 #   容器部署 deploy\codebase-memory-mcp\install-docker.ps1；宿主安装 deploy\codebase-memory-mcp\install.ps1）。
@@ -104,3 +104,29 @@ milvus:
   # Milvus 开启鉴权时填写，否则留空。
   # username: root
   # password: Milvus
+
+# 链路追踪（可观测）：记录每轮对话的阶段耗时、token 与失败原因。
+# 数据只含名称、计数和错误分类，不记录提示词正文；文件在 <工作目录>/.clara/telemetry。
+telemetry:
+  enabled: true
+  # 内存中保留的最近 Span 数，供 /trace 回看。
+  maxRecentSpans: 500
+  # 磁盘 JSONL 保留天数；0 表示不清理。
+  retainDays: 7
+  # 成功链路保留比例（0~1）；错误、取消与慢请求始终保留。CLI 本地调试建议 1.0，生产可设 0.1。
+  sampleRate: 1.0
+  # 慢请求阈值（毫秒）；超过该耗时的链路 100% 保留；0 表示关闭按耗时保留。
+  slowTraceMillis: 10000
+  # OpenTelemetry Collector 的 OTLP/HTTP 导出；默认关闭，Docker 观测栈见 deploy/observability。
+  otlp:
+    enabled: true
+    endpoint: http://localhost:4318
+    headers: {}
+    timeoutMillis: 5000
+    serviceName: clara
+    flushIntervalMillis: 1000
+  # Prometheus 抓取端点；Docker 内 Prometheus 抓取时必须绑定 0.0.0.0。
+  prometheus:
+    enabled: true
+    host: 0.0.0.0
+    port: 9464

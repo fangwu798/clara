@@ -103,7 +103,7 @@ public class ProviderCapabilityConfigurationTest {
         assertEquals(-1L, configuration.contextControlConfig().getContextWindowTokens());
 
         ContextControlConfiguration control = new ContextControlConfiguration(
-                100L, 5, 50L, 40, Boolean.TRUE, Boolean.FALSE, 2, 0.9, 100);
+                100L, 5, 50L, 40, null, Boolean.TRUE, Boolean.FALSE, 2, 0.9, 100);
         ProviderCapabilityConfiguration configured = capability(ENDPOINT, null, null, null, null, null, control);
         assertEquals(100L, configured.contextControlConfig().getContextWindowTokens());
         assertEquals(2, configured.contextControlConfig().getRetrievalCount());

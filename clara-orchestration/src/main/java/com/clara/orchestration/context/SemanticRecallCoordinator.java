@@ -4,6 +4,8 @@ import com.clara.core.memory.ConversationMemoryText;
 import com.clara.core.memory.IContextTraceSink;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetrySpan;
 import com.clara.core.message.IContent;
 import com.clara.dto.memory.ContextControlConfig;
 import com.clara.dto.memory.MemoryMatch;
@@ -51,6 +53,8 @@ public final class SemanticRecallCoordinator {
     private final IEmbeddingClient embeddingClient;
     private final ISemanticMemoryStore semanticMemoryStore;
     private final IContextTraceSink traceSink;
+    /** 链路追踪入口；未接入时为空实现。 */
+    private final Telemetry telemetry;
 
     /**
      * 创建知识找回协调器。
@@ -72,9 +76,23 @@ public final class SemanticRecallCoordinator {
      */
     public SemanticRecallCoordinator(IEmbeddingClient embeddingClient,
             ISemanticMemoryStore semanticMemoryStore, IContextTraceSink traceSink) {
+        this(embeddingClient, semanticMemoryStore, traceSink, Telemetry.noop());
+    }
+
+    /**
+     * 创建知识找回协调器并接入链路追踪。
+     *
+     * @param embeddingClient     向量化客户端，可为 null（此时不检索）
+     * @param semanticMemoryStore 语义记忆存储，可为 null（此时不检索）
+     * @param traceSink           上下文来源观测口，可为 null（不上报）
+     * @param telemetry           链路追踪入口，可为 null（按空实现处理）
+     */
+    public SemanticRecallCoordinator(IEmbeddingClient embeddingClient,
+            ISemanticMemoryStore semanticMemoryStore, IContextTraceSink traceSink, Telemetry telemetry) {
         this.embeddingClient = embeddingClient;
         this.semanticMemoryStore = semanticMemoryStore;
         this.traceSink = traceSink;
+        this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
     }
 
     /**
@@ -137,6 +155,12 @@ public final class SemanticRecallCoordinator {
                 details.add(String.format(Locale.ROOT, "score=%.3f  %s", match.getScore(),
                         preview(content)));
             }
+        }
+        TelemetrySpan span = telemetry.currentSpan();
+        if (span != null) {
+            span.attribute("candidates", matches.size())
+                    .attribute("above_threshold", aboveThreshold)
+                    .attribute("source", SOURCE);
         }
         details.add(0, summary(control, matches.size(), considered, aboveThreshold, bestScore));
         trace(knowledge.size(), started, details);

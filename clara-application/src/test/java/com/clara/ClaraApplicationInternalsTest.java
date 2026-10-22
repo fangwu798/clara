@@ -96,9 +96,12 @@ public class ClaraApplicationInternalsTest {
      */
     @Test
     public void recordsUsageAndBuildsConversationId() throws Exception {
-        call("recordUsageTrend", new Class<?>[]{TokenUsage.class}, new Object[]{null});
-        call("recordUsageTrend", new Class<?>[]{TokenUsage.class}, new TokenUsage(2, 3, null, null));
-        call("recordUsageTrend", new Class<?>[]{TokenUsage.class}, new TokenUsage(2, 3, 9, 1));
+        call("recordUsageTrend", new Class<?>[]{ApplicationBootstrap.class, TokenUsage.class},
+                bootstrap, null);
+        call("recordUsageTrend", new Class<?>[]{ApplicationBootstrap.class, TokenUsage.class},
+                bootstrap, new TokenUsage(2, 3, null, null));
+        call("recordUsageTrend", new Class<?>[]{ApplicationBootstrap.class, TokenUsage.class},
+                bootstrap, new TokenUsage(2, 3, 9, 1));
         String id = (String) call("newConversationId", new Class<?>[0]);
         assertNotNull(id);
         assertTrue(id.contains("-"));
@@ -159,8 +162,10 @@ public class ClaraApplicationInternalsTest {
     @Test
     public void drivesConversationControls() throws Exception {
         IConversationControls controls = (IConversationControls) call("contextControls",
-                new Class<?>[]{ConsoleView.class, ApplicationBootstrap.class, ModelRegistry.class},
-                view, bootstrap, registry);
+                new Class<?>[]{ConsoleView.class, ApplicationBootstrap.class, ModelRegistry.class,
+                        com.clara.telemetry.TelemetryStore.class, com.clara.telemetry.TelemetryMetrics.class,
+                        String.class},
+                view, bootstrap, registry, null, null, null);
         controls.compressContext();
         controls.showUsage();
         controls.showHistory();

@@ -1,6 +1,7 @@
 package com.clara.memory.persistence;
 
 import com.clara.core.message.IContent;
+import com.clara.enums.interaction.HistoryClearScopeEnum;
 
 import java.util.Collections;
 import java.util.List;
@@ -50,6 +51,22 @@ public interface ConversationStore {
      * @param key 会话历史单元键，不可为 null
      */
     void clear(ConversationKey key);
+
+    /**
+     * 按「用户与助手消息」口径清理全部会话历史。
+     *
+     * <p>为什么由存储实现：历史按「会话 + 供应商 + 模型」分散在多个文件中，只有存储层知道如何按写入时间
+     * 排序并原子重写剩余内容；上层只关心「清理了几条聊天记录」。工具消息不计入条数，但当某份历史里的
+     * 聊天消息被全部清理时整份删除，避免留下孤立工具消息。
+     *
+     * @param scope 清理范围，不可为 null
+     * @param count 清理条数，{@link HistoryClearScopeEnum#ALL} 时忽略，其余范围必须为正
+     * @return 实际清理的聊天消息条数
+     * @throws UnsupportedOperationException 当前存储不支持按条清理时
+     */
+    default int deleteChatMessages(HistoryClearScopeEnum scope, int count) {
+        throw new UnsupportedOperationException("当前会话存储不支持清理历史记录");
+    }
 
     /**
      * 释放底层资源。

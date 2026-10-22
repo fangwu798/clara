@@ -1,6 +1,11 @@
 package com.clara.memory.summarize;
 
+import com.clara.context.ConvContext;
 import com.clara.core.memory.ISummarizeCoordinator;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetrySpan;
+import com.clara.core.telemetry.TelemetrySpanKindEnum;
+import com.clara.enums.CapabilityKindEnum;
 import com.clara.core.skill.IPromptProvider;
 import com.clara.core.model.IStreamModel;
 import com.clara.core.message.IContent;
@@ -21,6 +26,8 @@ public final class DefaultSummarizeCoordinator implements ISummarizeCoordinator 
 
     private final IStreamModel model;
     private final IPromptProvider promptProvider;
+    /** 链路追踪入口；未接入时为空实现。 */
+    private final Telemetry telemetry;
 
     /**
      * 创建压缩编排。
@@ -30,6 +37,18 @@ public final class DefaultSummarizeCoordinator implements ISummarizeCoordinator 
      * @throws IllegalArgumentException 任一参数为 null 时
      */
     public DefaultSummarizeCoordinator(IStreamModel model, IPromptProvider promptProvider) {
+        this(model, promptProvider, Telemetry.noop());
+    }
+
+    /**
+     * 创建压缩编排并接入链路追踪。
+     *
+     * @param model          模型调用入口，不可为 null
+     * @param promptProvider 提示词提供方，不可为 null
+     * @param telemetry      链路追踪入口，可为 null（按空实现处理）
+     * @throws IllegalArgumentException model / promptProvider 为 null 时
+     */
+    public DefaultSummarizeCoordinator(IStreamModel model, IPromptProvider promptProvider, Telemetry telemetry) {
         if (model == null) {
             throw new IllegalArgumentException("model must not be null");
         }
@@ -38,6 +57,7 @@ public final class DefaultSummarizeCoordinator implements ISummarizeCoordinator 
         }
         this.model = model;
         this.promptProvider = promptProvider;
+        this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
     }
 
     @Override
@@ -57,8 +77,30 @@ public final class DefaultSummarizeCoordinator implements ISummarizeCoordinator 
                 .messages(messages)
                 .stream(Boolean.FALSE)
                 .build();
-        HttpResponse response = model.chat(request, HttpResponse.class);
-        String content = response.getContent();
-        return new SystemContent(content == null ? "" : content);
+        try (TelemetrySpan span = telemetry.startSpan("model.call", TelemetrySpanKindEnum.MODEL)) {
+            span.attribute("stage", "compression")
+                    .attribute("capability", "chat")
+                    .attribute("messages", messages.size());
+            ConvContext context = ConvContext.current();
+            if (context != null && context.getProviderConfiguration() != null) {
+                span.attribute("provider", context.getProviderConfiguration().getProvider() == null
+                        ? null : context.getProviderConfiguration().getProvider().name());
+                span.attribute("model", context.getProviderConfiguration()
+                        .toConfig(CapabilityKindEnum.CHAT).getModelId());
+            }
+            try {
+                HttpResponse response = model.chat(request, HttpResponse.class);
+                if (response != null) {
+                    span.attribute("input_tokens", response.getInputTokens())
+                            .attribute("output_tokens", response.getOutputTokens())
+                            .attribute("total_tokens", response.getTotalTokens());
+                }
+                String content = response == null ? null : response.getContent();
+                return new SystemContent(content == null ? "" : content);
+            } catch (RuntimeException failure) {
+                span.error(failure);
+                throw failure;
+            }
+        }
     }
 }

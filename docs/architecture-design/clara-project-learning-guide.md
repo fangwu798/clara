@@ -622,6 +622,7 @@ private String someParameter;
 | `/new` | 开始新对话，旧历史保留 |
 | `/usage` / `/tokens` | 统计 token 用量 |
 | `/history` | 查看用户与助手消息及逐条用量 |
+| `/history clear` | 清空全部历史；`-n N` 清理最早 N 条，`-t N` 清理最新 N 条 |
 | `/graph` | 查看代码知识图谱状态 |
 | `/graph import` | 导入当前工作目录 |
 | `/log` / `/verbose` | 切换精简 / 全量日志 |

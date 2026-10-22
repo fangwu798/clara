@@ -22,6 +22,10 @@ import com.clara.kernel.message.delta.TokenUsage;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.kernel.message.delta.UserVisionContent;
 import com.clara.core.model.IStreamObserver;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetrySpan;
+import com.clara.core.telemetry.TelemetrySpanKindEnum;
+import com.clara.core.telemetry.TelemetryStatusEnum;
 import com.clara.context.CancellationToken;
 import com.clara.context.ConvContext;
 import com.clara.orchestration.api.ConversationRequest;
@@ -33,12 +37,15 @@ import com.clara.orchestration.context.AssembledContext;
 import com.clara.orchestration.intent.IntentPlanCoordinator;
 import com.clara.orchestration.intent.PreparedIntent;
 import com.clara.orchestration.record.CallRecordPublisher;
+import com.clara.orchestration.tool.FirstTokenObserver;
 import com.clara.orchestration.tool.StreamingToolCallObserver;
 import com.clara.orchestration.tool.ToolRoundTripCoordinator;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 对话编排主入口：驱动完整 Agent Loop。
@@ -79,6 +86,8 @@ public final class DefaultConversationOrchestrator {
     private final CallRecordPublisher callRecordPublisher;
     private final ITokenCountEstimator tokenCountEstimator;
     private final IntentPlanCoordinator intentPlanCoordinator;
+    /** 链路追踪入口；构造后、开始对话前注入，未注入时为空实现。 */
+    private final AtomicReference<Telemetry> telemetry = new AtomicReference<>(Telemetry.noop());
 
     /**
      * 创建对话编排器（不启用意图识别与动态计划）。
@@ -127,6 +136,24 @@ public final class DefaultConversationOrchestrator {
     }
 
     /**
+     * 注入链路追踪入口；应在开始对话前调用一次。
+     *
+     * <p>用构造后注入而不是继续增加构造参数，避免构造函数超过 Sonar 的 7 参数上限；内部用原子引用，
+     * 保证读取方能看到完整的实例，不会出现半初始化状态。
+     *
+     * @param value 追踪入口，可为 null（按空实现处理）
+     * @return 当前编排器，便于链式装配
+     */
+    public DefaultConversationOrchestrator telemetry(Telemetry value) {
+        telemetry.set(value == null ? Telemetry.noop() : value);
+        return this;
+    }
+
+    private Telemetry telemetry() {
+        return telemetry.get();
+    }
+
+    /**
      * 执行一次完整对话编排。
      *
      * @param request 一次对话请求，不可为 null
@@ -146,12 +173,25 @@ public final class DefaultConversationOrchestrator {
                 hostObserver, request.getMaxToolRoundTrips(), maxTokensPerCall(request, capabilityKind));
         ConversationState state = new ConversationState(context, windowMemory, new StringBuilder(),
                 request.getUserIntervention());
-        try (ConvContext.Scope ignored = ConvContext.open(context)) {
-            appendUserTurn(plan, state);
-            prepareIntent(plan, state);
-            return agentLoop(plan, state);
-        } catch (ClaraException failure) {
-            return failureResult(plan, state, failure);
+        try (TelemetrySpan turn = telemetry().startSpan("conversation.turn", TelemetrySpanKindEnum.CONVERSATION)) {
+            turn.attribute("conversationId", request.getConversationId())
+                    .attribute("provider", provider == null ? null : provider.name())
+                    .attribute("model", request.getModel())
+                    .attribute("capability", capabilityKind.name());
+            try (ConvContext.Scope ignored = ConvContext.open(context)) {
+                appendUserTurn(plan, state);
+                prepareIntent(plan, state);
+                ConversationResult result = agentLoop(plan, state);
+                turn.attribute("tool_roundtrips", result.getToolRoundTrips());
+                markConversationStatus(turn, result);
+                return result;
+            } catch (ClaraException failure) {
+                turn.error(failure);
+                return failureResult(plan, state, failure);
+            } catch (RuntimeException failure) {
+                turn.error(failure);
+                throw failure;
+            }
         }
     }
 
@@ -235,9 +275,14 @@ public final class DefaultConversationOrchestrator {
             return;
         }
         state.context.throwIfCancelled();
-        PreparedIntent prepared = intentPlanCoordinator.prepare(
-                plan.request.getUserInput(), plan.request.getModel());
-        state.planPrompt = prepared.prompt();
+        try (TelemetrySpan span = telemetry().startSpan("intent.plan", TelemetrySpanKindEnum.INTENT)) {
+            PreparedIntent prepared = intentPlanCoordinator.prepare(
+                    plan.request.getUserInput(), plan.request.getModel());
+            state.planPrompt = prepared.prompt();
+            span.attribute("mode", prepared.isComplex() ? "complex" : "simple")
+                    .attribute("steps", prepared.getPlan() == null ? 0 : prepared.getPlan().getSteps().size())
+                    .attribute("reason", prepared.getReason());
+        }
     }
 
     private ConversationResult agentLoop(ConversationPlan plan, ConversationState state) {
@@ -279,7 +324,13 @@ public final class DefaultConversationOrchestrator {
             if (plan.maxToolRoundTrips > 0 && toolRoundTrips >= plan.maxToolRoundTrips) {
                 throw OrchestrationErrors.toolRoundTripLimitExceeded(plan.maxToolRoundTrips);
             }
-            List<IContent> toolMessages = toolRoundTripCoordinator.perform(response);
+            List<IContent> toolMessages;
+            try (TelemetrySpan span = telemetry().startSpan("tool.roundtrip", TelemetrySpanKindEnum.TOOL)) {
+                span.attribute("round", toolRoundTrips + 1)
+                        .attribute("calls", response.getToolCalls() == null ? 0 : response.getToolCalls().size());
+                toolMessages = toolRoundTripCoordinator.perform(response);
+                span.attribute("messages", toolMessages.size());
+            }
             state.windowMemory.append(toolMessages);
             toolRoundTrips++;
             // 工具执行期间用户可能补了新的约束：写入历史，下一次模型请求即可看到。
@@ -380,10 +431,18 @@ public final class DefaultConversationOrchestrator {
                 state.continuationPrompt = null;
             }
             ContextControlConfig control = state.control == null ? plan.control : state.control;
-            AssembledContext assembled =
-                    contextAssembler.assemble(state.windowMemory, control, tokenCountEstimator, extra);
-            requestBuilder.messages(assembled.getMessages())
-                    .tools(assembled.getTools().isEmpty() ? null : assembled.getTools());
+            try (TelemetrySpan span = telemetry().startSpan("context.assemble", TelemetrySpanKindEnum.CONTEXT)) {
+                AssembledContext assembled =
+                        contextAssembler.assemble(state.windowMemory, control, tokenCountEstimator, extra);
+                span.attribute("messages", assembled.getMessages().size())
+                        .attribute("tools", assembled.getTools().size())
+                        .attribute("window_tokens", control.getContextWindowTokens());
+                if (tokenCountEstimator != null) {
+                    span.attribute("tokens", tokenCountEstimator.estimate(assembled.getMessages()));
+                }
+                requestBuilder.messages(assembled.getMessages())
+                        .tools(assembled.getTools().isEmpty() ? null : assembled.getTools());
+            }
         } else {
             requestBuilder.prompt(plan.request.getUserInput());
         }
@@ -402,7 +461,7 @@ public final class DefaultConversationOrchestrator {
      *
      * @return 已切换到压缩配置并应重试时返回 true
      */
-    private static boolean retryWithCompactedContext(ConversationPlan plan, ConversationState state,
+    private boolean retryWithCompactedContext(ConversationPlan plan, ConversationState state,
             ClaraException failure) {
         if (plan.capabilityKind != CapabilityKindEnum.CHAT
                 || state.overflowRetries >= ContextOverflowPolicy.MAX_RETRIES
@@ -411,6 +470,10 @@ public final class DefaultConversationOrchestrator {
         }
         state.overflowRetries++;
         boolean outputTooLarge = ContextOverflowPolicy.isResponseTooLarge(failure);
+        try (TelemetrySpan overflow = telemetry().startSpan("context.overflow", TelemetrySpanKindEnum.OTHER)) {
+            overflow.attribute("reason", outputTooLarge ? "response_too_large" : "context_too_long")
+                    .attribute("retry", state.overflowRetries);
+        }
         // 响应体超限是输出侧失控，压缩输入只会丢掉刚收集到的工具结果；此时仅收紧单次输出上限。
         if (!outputTooLarge) {
             state.control = ContextOverflowPolicy.compactControl(plan.control, state.overflowRetries);
@@ -424,14 +487,55 @@ public final class DefaultConversationOrchestrator {
         return true;
     }
 
+    /**
+     * 把能力种类映射为低基数指标维度：chat / image / video / audio。
+     *
+     * @param kind 能力种类，可为 null
+     * @return 小写维度值，非 null
+     */
+    private static String stage(CapabilityKindEnum kind) {
+        return kind == null ? "unknown" : kind.name().toLowerCase(Locale.ROOT);
+    }
+
     private HttpResponse invokeModel(ConversationPlan plan, ConversationState state, HttpRequest httpRequest) {
-        StreamingToolCallObserver streamObserver = plan.hostObserver == null
-                ? null : new StreamingToolCallObserver(plan.hostObserver);
-        HttpResponse response = capabilityDispatcher.invoke(httpRequest, streamObserver);
-        mergeStreamedToolCalls(response, streamObserver);
-        callRecordPublisher.publish(httpRequest, response, plan.provider, plan.request.getModel());
-        appendReasoning(state.reasoning, response);
-        return response;
+        state.modelCalls++;
+        try (TelemetrySpan span = telemetry().startSpan("model.call", TelemetrySpanKindEnum.MODEL)) {
+            span.attribute("provider", plan.provider == null ? null : plan.provider.name())
+                    .attribute("model", plan.request.getModel())
+                    .attribute("capability", plan.capabilityKind.name())
+                    .attribute("stage", stage(plan.capabilityKind))
+                    .attribute("call", state.modelCalls)
+                    .attribute("max_tokens", state.maxTokensOverride != null
+                            ? state.maxTokensOverride : plan.maxTokensPerCall);
+            try {
+                FirstTokenObserver firstToken = plan.hostObserver == null
+                        ? null : new FirstTokenObserver(plan.hostObserver);
+                StreamingToolCallObserver streamObserver = firstToken == null
+                        ? null : new StreamingToolCallObserver(firstToken);
+                long startedNanos = System.nanoTime();
+                HttpResponse response = capabilityDispatcher.invoke(httpRequest, streamObserver);
+                if (firstToken != null) {
+                    Long firstTokenMillis = firstToken.firstTokenMillis(startedNanos);
+                    if (firstTokenMillis != null) {
+                        span.attribute("first_token_ms", firstTokenMillis);
+                    }
+                }
+                mergeStreamedToolCalls(response, streamObserver);
+                callRecordPublisher.publish(httpRequest, response, plan.provider, plan.request.getModel());
+                appendReasoning(state.reasoning, response);
+                if (response != null) {
+                    span.attribute("input_tokens", response.getInputTokens())
+                            .attribute("output_tokens", response.getOutputTokens())
+                            .attribute("total_tokens", response.getTotalTokens())
+                            .attribute("finish_reason", response.getFinishReason() == null
+                                    ? null : response.getFinishReason().name());
+                }
+                return response;
+            } catch (RuntimeException failure) {
+                span.error(failure);
+                throw failure;
+            }
+        }
     }
 
     private static ConversationResult missingResponse(ConversationPlan plan, ConversationState state,
@@ -492,6 +596,28 @@ public final class DefaultConversationOrchestrator {
         }
         result.setGeneratedImages(generatedImages);
         return result;
+    }
+
+    /**
+     * 把编排终态映射到 Span：失败与取消不能被记成 OK。
+     *
+     * @param span   会话 Span，非 null
+     * @param result 编排结果，可为 null
+     */
+    private static void markConversationStatus(TelemetrySpan span, ConversationResult result) {
+        if (result == null) {
+            span.status(TelemetryStatusEnum.ERROR);
+            return;
+        }
+        if (result.getError() != null) {
+            span.error(result.getError());
+            return;
+        }
+        if (result.getStatus() == OrchestrationStatusEnum.CANCELLED) {
+            span.cancelled();
+        } else if (result.getStatus() != OrchestrationStatusEnum.COMPLETED) {
+            span.status(TelemetryStatusEnum.ERROR);
+        }
     }
 
     private static ConversationResult failureResult(ConversationPlan plan, ConversationState state,
@@ -555,6 +681,8 @@ public final class DefaultConversationOrchestrator {
         private int interventionRounds;
         /** 尚未归属到某条历史消息的 token 用量（工具往返会先累计，最终答复一并写入）。 */
         private TokenUsage pendingUsage;
+        /** 本轮已发起的模型调用次数，用于链路排序与排查重试。 */
+        private int modelCalls;
 
         private ConversationState(ConvContext context, IWindowMemory windowMemory, StringBuilder reasoning,
                 IUserInterventionSource userIntervention) {

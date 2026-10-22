@@ -1,6 +1,7 @@
 package com.clara.memory.persistence;
 
 import com.clara.core.message.IContent;
+import com.clara.enums.interaction.HistoryClearScopeEnum;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.message.delta.AssistantContent;
 import com.clara.kernel.message.delta.UserContent;
@@ -89,5 +90,54 @@ public class LocalConversationStoreTest {
         assertEquals(2, snapshots.size());
         assertEquals(2, snapshots.get(0).messages().size());
         assertEquals("from other model", ((UserContent) snapshots.get(1).messages().get(0)).getContent());
+    }
+
+    /**
+     * 按最早条数清理：只删除聊天消息，其余消息保持原顺序。
+     */
+    @Test
+    public void deletesOldestChatMessages() {
+        store.append(key, chatMessages(), 0L);
+
+        assertEquals(1, store.deleteChatMessages(HistoryClearScopeEnum.FIRST, 1));
+
+        List<IContent> remaining = store.loadSnapshot(key).messages();
+        assertEquals(3, remaining.size());
+        assertEquals("a1", ((AssistantContent) remaining.get(0)).getContent());
+        assertEquals("u2", ((UserContent) remaining.get(1)).getContent());
+        assertEquals("a2", ((AssistantContent) remaining.get(2)).getContent());
+    }
+
+    /**
+     * 按最新条数清理：从末尾向前删除指定条数。
+     */
+    @Test
+    public void deletesNewestChatMessages() {
+        store.append(key, chatMessages(), 0L);
+
+        assertEquals(2, store.deleteChatMessages(HistoryClearScopeEnum.LAST, 2));
+
+        List<IContent> remaining = store.loadSnapshot(key).messages();
+        assertEquals(2, remaining.size());
+        assertEquals("u1", ((UserContent) remaining.get(0)).getContent());
+        assertEquals("a1", ((AssistantContent) remaining.get(1)).getContent());
+    }
+
+    /**
+     * 条数超过总量时等价于清空，并返回实际清理条数。
+     */
+    @Test
+    public void clearsAllWhenCountExceedsTotal() {
+        store.append(key, chatMessages(), 0L);
+
+        assertEquals(4, store.deleteChatMessages(HistoryClearScopeEnum.FIRST, 99));
+
+        assertTrue(store.loadSnapshot(key).messages().isEmpty());
+        assertTrue(store.loadAllSnapshots().isEmpty());
+    }
+
+    private static List<IContent> chatMessages() {
+        return Arrays.asList(new UserContent("u1"), new AssistantContent("a1"),
+                new UserContent("u2"), new AssistantContent("a2"));
     }
 }

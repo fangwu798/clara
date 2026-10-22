@@ -664,7 +664,7 @@ public final class ConsoleView implements Closeable {
         println(hint("/compress", "压缩当前上下文"));
         println(hint("/new", "开始新对话"));
         println(hint("/usage", "统计 token 用量"));
-        println(hint("/history", "查看历史聊天记录"));
+        println(hint("/history", "查看 / 清理历史聊天记录（/? 查看用法）"));
         println(hint("/log", "切换精简 / 全量日志"));
         println(hint("/color", "开关彩色输出"));
         println(hint("exit | quit", "结束会话"));

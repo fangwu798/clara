@@ -7,6 +7,8 @@ import com.clara.core.model.IResponse;
 import com.clara.core.model.IStreamHandle;
 import com.clara.core.model.IStreamModel;
 import com.clara.core.model.IStreamObserver;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetryEvent;
 import com.clara.core.model.IRequest;
 import com.clara.core.interaction.IUserInterventionSource;
 import com.clara.dto.memory.WindowPolicy;
@@ -86,6 +88,26 @@ public class DefaultConversationOrchestratorLoopTest {
         assertEquals(11, assistant.getUsage().getInputTokens());
         assertEquals(7, assistant.getUsage().getOutputTokens());
         assertFalse(result.isPausedForUserInput());
+    }
+
+    @Test
+    public void emitsTelemetryForMainStages() {
+        List<TelemetryEvent> events = new ArrayList<>();
+        Telemetry telemetry = new Telemetry(events::add);
+        DefaultConversationOrchestrator orchestrator = orchestrator(
+                new FakeStreamModel(response("hello", null, 11, 7)), new FakeWindowMemory("c1"),
+                invocation -> null, telemetry);
+
+        orchestrator.converse(request("hi", CapabilityKindEnum.CHAT));
+
+        assertTrue(containsEvent(events, "conversation.turn"));
+        assertTrue(containsEvent(events, "context.assemble"));
+        assertTrue(containsEvent(events, "model.call"));
+        TelemetryEvent turn = event(events, "conversation.turn");
+        TelemetryEvent model = event(events, "model.call");
+        assertEquals(turn.getTraceId(), model.getTraceId());
+        assertEquals(turn.getSpanId(), model.getParentSpanId());
+        assertEquals("11", model.getAttributes().get("input_tokens"));
     }
 
     @Test
@@ -401,17 +423,36 @@ public class DefaultConversationOrchestratorLoopTest {
 
     private static DefaultConversationOrchestrator orchestrator(IStreamModel model, IWindowMemory memory,
             com.clara.core.skill.IToolInvoker invoker) {
+        return orchestrator(model, memory, invoker, Telemetry.noop());
+    }
+
+    private static DefaultConversationOrchestrator orchestrator(IStreamModel model, IWindowMemory memory,
+            com.clara.core.skill.IToolInvoker invoker, Telemetry telemetry) {
         ContextAssembler assembler = new ContextAssembler(
                 new WindowCompressionCoordinator(null),
                 new SemanticRecallCoordinator(null, null),
-                new SkillMatchCoordinator(null, null, null));
+                null, new SkillMatchCoordinator(null, null, null), null, telemetry);
         return new DefaultConversationOrchestrator(
                 (conversationId, provider, modelName) -> memory,
                 assembler,
                 new CapabilityDispatcher(model),
-                new ToolRoundTripCoordinator(invoker),
+                new ToolRoundTripCoordinator(invoker, telemetry),
                 new CallRecordPublisher(null),
-                null);
+                null,
+                null).telemetry(telemetry);
+    }
+
+    private static boolean containsEvent(List<TelemetryEvent> events, String name) {
+        return event(events, name) != null;
+    }
+
+    private static TelemetryEvent event(List<TelemetryEvent> events, String name) {
+        for (TelemetryEvent event : events) {
+            if (name.equals(event.getName())) {
+                return event;
+            }
+        }
+        return null;
     }
 
     private static ConversationRequest request(String input, CapabilityKindEnum kind) {

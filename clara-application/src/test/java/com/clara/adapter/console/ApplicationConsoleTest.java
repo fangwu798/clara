@@ -3,6 +3,7 @@ package com.clara.adapter.console;
 import com.clara.config.ModelRegistry;
 import com.clara.core.interaction.IConversationControls;
 import com.clara.enums.AvailabilityLevelEnum;
+import com.clara.enums.interaction.HistoryClearScopeEnum;
 import com.clara.enums.interaction.SessionCommandOutcomeEnum;
 import org.junit.After;
 import org.junit.Before;
@@ -96,14 +97,27 @@ public class ApplicationConsoleTest {
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/usage"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/tokens"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history clear"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history clear -n 2"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history clear -t 3"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history clear -n 0"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history clear -x 2"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history clear -n"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/graph"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/graph import"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/trace"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/trace list"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/trace t-1"));
         assertEquals(2, controls.compressed.get());
         assertEquals(1, controls.newConversation.get());
         assertEquals(2, controls.usage.get());
         assertEquals(1, controls.history.get());
+        assertEquals(3, controls.historyCleared.get());
+        assertEquals(HistoryClearScopeEnum.LAST, controls.lastHistoryScope);
+        assertEquals(3, controls.lastHistoryCount);
         assertEquals(1, controls.showGraph.get());
         assertEquals(1, controls.importGraph.get());
+        assertEquals(3, controls.trace.get());
         assertEquals(0, controls.unsupported.get());
     }
 
@@ -120,6 +134,7 @@ public class ApplicationConsoleTest {
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/history"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/graph"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/graph import"));
+        assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/trace"));
         assertEquals(SessionCommandOutcomeEnum.HANDLED, handler.handle("/model"));
     }
 
@@ -186,7 +201,8 @@ public class ApplicationConsoleTest {
         chart.addSample(-5L);
         chart.addSample(20L);
         String rendered = chart.render();
-        assertTrue(rendered.contains("累计 token 趋势"));
+        assertTrue(rendered.contains("总 token 消耗趋势"));
+        assertTrue(rendered.contains("全部平台累计用量"));
         assertTrue(rendered.contains("共 3 个采样点"));
         assertTrue(rendered.contains("末次累计 30 tokens"));
         chart.reset();
@@ -223,9 +239,14 @@ public class ApplicationConsoleTest {
         private final AtomicInteger newConversation = new AtomicInteger();
         private final AtomicInteger usage = new AtomicInteger();
         private final AtomicInteger history = new AtomicInteger();
+        private final AtomicInteger historyCleared = new AtomicInteger();
         private final AtomicInteger showGraph = new AtomicInteger();
         private final AtomicInteger importGraph = new AtomicInteger();
         private final AtomicInteger unsupported = new AtomicInteger();
+        private final AtomicInteger trace = new AtomicInteger();
+        private final java.util.List<String> traceSelectors = new java.util.ArrayList<>();
+        private volatile HistoryClearScopeEnum lastHistoryScope;
+        private volatile int lastHistoryCount;
 
         @Override
         public void compressContext() {
@@ -248,6 +269,13 @@ public class ApplicationConsoleTest {
         }
 
         @Override
+        public void clearHistory(HistoryClearScopeEnum scope, int count) {
+            historyCleared.incrementAndGet();
+            lastHistoryScope = scope;
+            lastHistoryCount = count;
+        }
+
+        @Override
         public void showCodeGraph() {
             showGraph.incrementAndGet();
         }
@@ -255,6 +283,12 @@ public class ApplicationConsoleTest {
         @Override
         public void importCodeGraph() {
             importGraph.incrementAndGet();
+        }
+
+        @Override
+        public void showTrace(String selector) {
+            trace.incrementAndGet();
+            traceSelectors.add(selector);
         }
     }
 }

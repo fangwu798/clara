@@ -1,6 +1,9 @@
 package com.clara.orchestration.tool;
 
 import com.clara.core.message.IContent;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetrySpan;
+import com.clara.core.telemetry.TelemetrySpanKindEnum;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.exception.ClaraError;
 import com.clara.exception.ClaraException;
@@ -31,6 +34,8 @@ public final class ToolRoundTripCoordinator {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final IToolInvoker toolInvoker;
+    /** 链路追踪入口；未接观测端时为空实现。 */
+    private final Telemetry telemetry;
 
     /**
      * 创建工具往返协调器。
@@ -38,10 +43,21 @@ public final class ToolRoundTripCoordinator {
      * @param toolInvoker 工具调用执行入口，不可为 null
      */
     public ToolRoundTripCoordinator(IToolInvoker toolInvoker) {
+        this(toolInvoker, Telemetry.noop());
+    }
+
+    /**
+     * 创建带链路追踪的工具往返协调器。
+     *
+     * @param toolInvoker 工具调用执行入口，不可为 null
+     * @param telemetry   链路追踪入口，可为 null（按空实现处理）
+     */
+    public ToolRoundTripCoordinator(IToolInvoker toolInvoker, Telemetry telemetry) {
         if (toolInvoker == null) {
             throw new IllegalArgumentException("toolInvoker must not be null");
         }
         this.toolInvoker = toolInvoker;
+        this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
     }
 
     /**
@@ -126,12 +142,29 @@ public final class ToolRoundTripCoordinator {
      * 执行单个工具调用并把结果封装为工具结果消息；失败时以错误文本回填，不向上抛出。
      */
     private IContent invokeSafely(ToolCall call) {
-        try {
-            ToolResult result = toolInvoker.invoke(call);
-            return new ToolContent(result.getCallId(), result.getOutput());
-        } catch (RuntimeException error) {
-            return new ToolContent(call.getId(), errorPayload(error));
+        try (TelemetrySpan span = telemetry.startSpan("tool.call", TelemetrySpanKindEnum.TOOL)) {
+            span.attribute("tool", toolName(call))
+                    .attribute("call_id", call == null ? null : call.getId());
+            try {
+                ToolResult result = toolInvoker.invoke(call);
+                span.attribute("output_chars", result == null || result.getOutput() == null
+                        ? 0 : result.getOutput().length());
+                return new ToolContent(result.getCallId(), result.getOutput());
+            } catch (RuntimeException error) {
+                span.error(error);
+                return new ToolContent(call.getId(), errorPayload(error));
+            }
         }
+    }
+
+    /**
+     * 取工具名用于链路属性；调用结构不完整时返回 null，避免观测代码自己抛异常。
+     *
+     * @param call 模型给出的工具调用，可为 null
+     * @return 工具名或 null
+     */
+    private static String toolName(ToolCall call) {
+        return call == null || call.getFunction() == null ? null : call.getFunction().getName();
     }
 
     /**

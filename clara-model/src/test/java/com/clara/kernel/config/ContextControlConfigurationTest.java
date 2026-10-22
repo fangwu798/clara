@@ -15,7 +15,7 @@ public class ContextControlConfigurationTest {
     @Test
     public void fillsDefaultsForMissingValues() {
         ContextControlConfiguration configuration = new ContextControlConfiguration(
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
 
         assertEquals(-1L, configuration.getContextWindowTokens());
         assertEquals(-1, configuration.getWindowMaxMessages());
@@ -32,7 +32,7 @@ public class ContextControlConfigurationTest {
     @Test
     public void keepsExplicitValuesAndConvertsToDto() {
         ContextControlConfiguration configuration = new ContextControlConfiguration(
-                64000L, 20, 1024L, 60, Boolean.TRUE, Boolean.TRUE, 7, 0.5, 900);
+                64000L, 20, 1024L, 60, 10, Boolean.TRUE, Boolean.TRUE, 7, 0.5, 900);
 
         assertEquals(64000L, configuration.getContextWindowTokens());
         assertEquals(20, configuration.getWindowMaxMessages());
@@ -61,14 +61,14 @@ public class ContextControlConfigurationTest {
     @Test
     public void acceptsBoundaryValues() {
         ContextControlConfiguration configuration = new ContextControlConfiguration(
-                -1L, -1, 0L, 0, Boolean.FALSE, Boolean.FALSE, 0, 0.0, -1);
+                -1L, -1, 0L, 0, 10, Boolean.FALSE, Boolean.FALSE, 0, 0.0, -1);
         assertEquals(-1L, configuration.getContextWindowTokens());
         assertEquals(0, configuration.getWindowMaxTokensPercent());
         assertEquals(0.0, configuration.getSimilarityThreshold(), 0.0);
         assertEquals(-1, configuration.getToolOutputMaxChars());
 
         ContextControlConfiguration upper = new ContextControlConfiguration(
-                1L, 1, -1L, 100, null, null, 1, 1.0, 1);
+                1L, 1, -1L, 100, 10, null, null, 1, 1.0, 1);
         assertEquals(1L, upper.getContextWindowTokens());
         assertEquals(100, upper.getWindowMaxTokensPercent());
         assertEquals(1.0, upper.getSimilarityThreshold(), 0.0);
@@ -76,57 +76,61 @@ public class ContextControlConfigurationTest {
 
     @Test
     public void rejectsInvalidWindowTokens() {
-        assertRejected(-2L, null, null, null, null, null, null, null, null);
+        assertRejected(() -> new ContextControlConfiguration(
+                -2L, null, null, null, null, null, null, null, null, null));
     }
 
     @Test
     public void rejectsInvalidWindowMessages() {
-        assertRejected(null, -2, null, null, null, null, null, null, null);
+        assertRejected(() -> new ContextControlConfiguration(
+                null, -2, null, null, null, null, null, null, null, null));
     }
 
     @Test
     public void rejectsInvalidWindowSize() {
-        assertRejected(null, null, -2L, null, null, null, null, null, null);
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, -2L, null, null, null, null, null, null, null));
     }
 
     @Test
     public void rejectsInvalidPercent() {
-        assertRejected(null, null, null, 101, null, null, null, null, null);
-        assertRejected(null, null, null, -1, null, null, null, null, null);
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, null, 101, null, null, null, null, null, null));
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, null, -1, null, null, null, null, null, null));
     }
 
     @Test
     public void rejectsInvalidRetrievalCount() {
-        assertRejected(null, null, null, null, null, null, -1, null, null);
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, null, null, null, null, null, -1, null, null));
     }
 
     @Test
     public void rejectsInvalidSimilarityThreshold() {
-        assertRejected(null, null, null, null, null, null, null, 1.1, null);
-        assertRejected(null, null, null, null, null, null, null, -0.1, null);
-        assertRejected(null, null, null, null, null, null, null, Double.NaN, null);
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, null, null, null, null, null, null, 1.1, null));
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, null, null, null, null, null, null, -0.1, null));
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, null, null, null, null, null, null, Double.NaN, null));
     }
 
     @Test
     public void rejectsInvalidToolOutputMaxChars() {
-        assertRejected(null, null, null, null, null, null, null, null, -2);
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, null, null, null, null, null, null, null, -2));
     }
 
     @Test
     public void rejectsInvalidRecentTurns() {
-        try {
-            new ContextControlConfiguration(null, null, null, null, -1, null, null, null, null, null);
-            throw new AssertionError("expected IllegalArgumentException");
-        } catch (IllegalArgumentException expected) {
-            // expected
-        }
+        assertRejected(() -> new ContextControlConfiguration(
+                null, null, null, null, -1, null, null, null, null, null));
     }
 
-    private static void assertRejected(Long windowTokens, Integer maxMessages, Long maxSize, Integer percent,
-            Boolean compress, Boolean vectorize, Integer retrieval, Double threshold, Integer toolOutput) {
+    private static void assertRejected(Runnable construction) {
         try {
-            new ContextControlConfiguration(windowTokens, maxMessages, maxSize, percent, compress, vectorize,
-                    retrieval, threshold, toolOutput);
+            construction.run();
             throw new AssertionError("expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
             // expected

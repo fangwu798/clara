@@ -1,6 +1,7 @@
 package com.clara.memory.persistence;
 
 import com.clara.core.message.IContent;
+import com.clara.enums.interaction.HistoryClearScopeEnum;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,6 +68,20 @@ public final class BoundedCachingConversationStore implements ConversationStore 
         requireKey(key);
         delegate.clear(key);
         cache.remove(key.value());
+    }
+
+    /**
+     * 委托底层按范围清理历史，并清空本地缓存，避免清理后仍读到旧快照。
+     *
+     * @param scope 清理范围，不可为 null
+     * @param count 清理条数，{@code ALL} 时忽略
+     * @return 实际清理的聊天消息条数
+     */
+    @Override
+    public synchronized int deleteChatMessages(HistoryClearScopeEnum scope, int count) {
+        int removed = delegate.deleteChatMessages(scope, count);
+        cache.clear();
+        return removed;
     }
 
     @Override

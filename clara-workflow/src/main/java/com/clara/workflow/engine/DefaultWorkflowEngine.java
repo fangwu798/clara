@@ -1,5 +1,9 @@
 package com.clara.workflow.engine;
 
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetryContext;
+import com.clara.core.telemetry.TelemetrySpan;
+import com.clara.core.telemetry.TelemetrySpanKindEnum;
 import com.clara.core.workflow.ICheckpointStore;
 import com.clara.core.workflow.IWorkflowEngine;
 import com.clara.core.workflow.IWorkflowNode;
@@ -37,13 +41,34 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
 
     private final ICheckpointStore checkpoints;
     private final ExecutorService parallelExecutor;
+    /** 链路追踪入口；未接入时为空实现。 */
+    private final Telemetry telemetry;
 
+    /**
+     * 创建工作流引擎（不接入链路追踪）。
+     *
+     * @param checkpoints    检查点存储，不可为 null
+     * @param maxParallelism 并行分支上限，必须为正
+     */
     public DefaultWorkflowEngine(ICheckpointStore checkpoints, int maxParallelism) {
+        this(checkpoints, maxParallelism, Telemetry.noop());
+    }
+
+    /**
+     * 创建工作流引擎并接入链路追踪。
+     *
+     * @param checkpoints    检查点存储，不可为 null
+     * @param maxParallelism 并行分支上限，必须为正
+     * @param telemetry      链路追踪入口，可为 null（按空实现处理）
+     * @throws IllegalArgumentException 检查点存储为 null 或并行上限非正时
+     */
+    public DefaultWorkflowEngine(ICheckpointStore checkpoints, int maxParallelism, Telemetry telemetry) {
         if (checkpoints == null || maxParallelism <= 0) {
             throw new IllegalArgumentException("checkpoint store and positive maxParallelism are required");
         }
         this.checkpoints = checkpoints;
         this.parallelExecutor = Executors.newFixedThreadPool(maxParallelism, new WorkflowThreadFactory());
+        this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
     }
 
     @Override
@@ -137,16 +162,26 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
     }
 
     private WorkflowResult execute(WorkflowRun run) {
-        try {
-            executeNode(run.definition.getRoot(), run, "root/", true);
-            run.checkpoint(WorkflowInstanceStatusEnum.SUCCEEDED);
-            return run.result(WorkflowInstanceStatusEnum.SUCCEEDED);
-        } catch (WaitingInputSignal signal) {
-            run.checkpoint(WorkflowInstanceStatusEnum.WAITING_INPUT);
-            return run.result(WorkflowInstanceStatusEnum.WAITING_INPUT, signal.nodeId, signal.inputKey);
-        } catch (RuntimeException failure) {
-            run.checkpoint(WorkflowInstanceStatusEnum.FAILED);
-            throw failure;
+        TelemetryContext parent = telemetry.currentContext();
+        try (TelemetrySpan workflow = telemetry.startSpan("workflow.execute", TelemetrySpanKindEnum.WORKFLOW, parent)) {
+            workflow.attribute("workflow", run.workflowId)
+                    .attribute("instance", run.instanceId);
+            // 节点统一挂在本 Span 下；并行分支用显式上下文跨线程延续同一条 trace。
+            run.telemetryContext = telemetry.currentContext();
+            try {
+                executeNode(run.definition.getRoot(), run, "root/", true);
+                run.checkpoint(WorkflowInstanceStatusEnum.SUCCEEDED);
+                return run.result(WorkflowInstanceStatusEnum.SUCCEEDED);
+            } catch (WaitingInputSignal signal) {
+                workflow.attribute("paused", true)
+                        .attribute("waiting_node", signal.nodeId);
+                run.checkpoint(WorkflowInstanceStatusEnum.WAITING_INPUT);
+                return run.result(WorkflowInstanceStatusEnum.WAITING_INPUT, signal.nodeId, signal.inputKey);
+            } catch (RuntimeException failure) {
+                workflow.error(failure);
+                run.checkpoint(WorkflowInstanceStatusEnum.FAILED);
+                throw failure;
+            }
         }
     }
 
@@ -155,6 +190,24 @@ public final class DefaultWorkflowEngine implements IWorkflowEngine {
         if (run.scope.isCompleted(executionKey)) {
             return;
         }
+        try (TelemetrySpan span = telemetry.startSpan("workflow.node", TelemetrySpanKindEnum.WORKFLOW,
+                run.telemetryContext)) {
+            span.attribute("workflow", run.workflowId)
+                    .attribute("node", node.getId())
+                    .attribute("node_type", node.getType() == null ? null : node.getType().name());
+            try {
+                dispatchNode(node, run, executionKey, persist);
+            } catch (WaitingInputSignal signal) {
+                span.attribute("paused", true);
+                throw signal;
+            } catch (RuntimeException failure) {
+                span.error(failure);
+                throw failure;
+            }
+        }
+    }
+
+    private void dispatchNode(IWorkflowNode node, WorkflowRun run, String executionKey, boolean persist) {
         if (node instanceof ActionNode) {
             executeAction((ActionNode) node, run, executionKey, persist);
         } else if (node instanceof CompositeNode) {

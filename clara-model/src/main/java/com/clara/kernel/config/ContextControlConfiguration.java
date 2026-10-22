@@ -64,27 +64,6 @@ public final class ContextControlConfiguration {
      */
     private final int toolOutputMaxChars;
 
-    /**
-     * 兼容旧调用方的 9 参数构造器：{@code recentTurnsKept} 使用默认值 10。
-     *
-     * @param contextWindowTokens    平台上下文窗口 token 上限，可为 null
-     * @param windowMaxMessages      历史最大条数，可为 null
-     * @param windowMaxSizeBytes     历史最大字节数，可为 null
-     * @param windowMaxTokensPercent 历史占上下文窗口最大百分比，可为 null
-     * @param compressEnabled        是否启用超限压缩，可为 null
-     * @param vectorizeEnabled       是否启用向量化入库，可为 null
-     * @param retrievalCount         每次检索返回条数，可为 null
-     * @param similarityThreshold    检索相似度阈值，可为 null
-     * @param toolOutputMaxChars     历史工具结果单条最大保留字符数，可为 null
-     */
-    public ContextControlConfiguration(Long contextWindowTokens, Integer windowMaxMessages,
-            Long windowMaxSizeBytes, Integer windowMaxTokensPercent, Boolean compressEnabled,
-            Boolean vectorizeEnabled, Integer retrievalCount, Double similarityThreshold,
-            Integer toolOutputMaxChars) {
-        this(contextWindowTokens, windowMaxMessages, windowMaxSizeBytes, windowMaxTokensPercent, null,
-                compressEnabled, vectorizeEnabled, retrievalCount, similarityThreshold, toolOutputMaxChars);
-    }
-
     @JsonCreator
     public ContextControlConfiguration(
             @JsonProperty("contextWindowTokens") Long contextWindowTokens,

@@ -1,5 +1,6 @@
 package com.clara.workflow.engine;
 
+import com.clara.core.telemetry.TelemetryContext;
 import com.clara.core.workflow.ICheckpointStore;
 import com.clara.dto.workflow.ExecutionScope;
 import com.clara.dto.workflow.WorkflowCheckpoint;
@@ -35,6 +36,9 @@ final class WorkflowRun {
 
     /** 当前检查点版本，每次持久化后递增。 */
     long checkpointVersion;
+
+    /** 工作流执行 Span 的链路上下文；并行分支据此把节点挂到同一条 trace。 */
+    TelemetryContext telemetryContext;
 
     /**
      * 以工作流定义中的标识与版本创建运行状态。
@@ -92,8 +96,10 @@ final class WorkflowRun {
      * @return 新的运行状态
      */
     WorkflowRun branch(ExecutionScope branchScope) {
-        return new WorkflowRun(checkpoints, definition, instanceId, branchScope, checkpointVersion,
+        WorkflowRun branch = new WorkflowRun(checkpoints, definition, instanceId, branchScope, checkpointVersion,
                 workflowId, workflowVersion);
+        branch.telemetryContext = telemetryContext;
+        return branch;
     }
 
     /**

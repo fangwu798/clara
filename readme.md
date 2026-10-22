@@ -521,11 +521,12 @@ clara/
 |   `-- diagrams/              # 架构图与核心业务流程图 / 时序图（SVG）
 |-- deploy/                    # 部署脚本与依赖编排
 |   |-- docker-compose.yml     # Milvus 等本地依赖的 docker-compose 配置
-|   `-- codebase-memory-mcp/   # 代码知识图谱 MCP 的部署脚本与说明
-|       |-- install.ps1        # 装到宿主：下载二进制、注册 MCP、建索引
-|       |-- install-docker.ps1 # 容器部署：docker compose 起容器并在容器内建索引
-|       |-- docker-compose.yml # 容器定义：仓库只读挂载 + 索引命名卷 + 图谱 UI 端口
-|       `-- entrypoint.sh      # 容器内常驻 daemon（图谱 UI），并把 UI 转发到容器网卡
+|   |-- codebase-memory-mcp/   # 代码知识图谱 MCP 的部署脚本与说明
+|   |   |-- install.ps1        # 装到宿主：下载二进制、注册 MCP、建索引
+|   |   |-- install-docker.ps1 # 容器部署：docker compose 起容器并在容器内建索引
+|   |   |-- docker-compose.yml # 容器定义：仓库只读挂载 + 索引命名卷 + 图谱 UI 端口
+|   |   `-- entrypoint.sh      # 容器内常驻 daemon（图谱 UI），并把 UI 转发到容器网卡
+|   `-- observability/         # 本地观测栈：OTel Collector + Tempo + Prometheus + Grafana
 |-- sample/                    # 示例应用工程（clara-sample，独立 Maven 工程，不纳入根 POM）
 |-- clara.bat / clara.sh       # 启动脚本
 `-- clara.jar                  # 构建产物
@@ -537,6 +538,9 @@ clara/
 - 迁移任务与验证记录：docs/migration-design/tasks.md
 - Java 8 依赖与许可基线：docs/migration-design/java8-dependencies.md
 - 技术设计：docs/technical-design/ 下各模块设计文档
+- 可观测链路设计（Span / 指标 / JSONL 落盘 / OTLP / /trace）：docs/design/observability-pipeline.md
+- 可观测落地：`config/clara.yml` 的 `telemetry` 节点；Prometheus `/metrics` 默认关闭（开启后 9464）；OTLP 默认关闭（开启后导出到 `http://localhost:4318/v1/traces`）
+- 本地观测栈部署：deploy/observability/README.md
 - 业务设计：docs/business-design/ 下各模块业务文档
 - clara-mcp 模块学习指南（设计思想与类架构）：docs/architecture-design/clara-mcp-module-learning-guide.md
 - Clara 项目总览学习指南（架构、主链路与扩展点）：docs/architecture-design/clara-project-learning-guide.md

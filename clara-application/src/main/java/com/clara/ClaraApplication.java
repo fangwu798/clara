@@ -18,8 +18,14 @@ import com.clara.config.ModelFailover;
 import com.clara.config.ModelRegistry;
 import com.clara.context.CancellationToken;
 import com.clara.core.interaction.IConversationControls;
+import com.clara.core.telemetry.Telemetry;
+import com.clara.core.telemetry.TelemetryEvent;
+import com.clara.core.telemetry.TelemetrySpan;
+import com.clara.core.telemetry.TelemetrySpanKindEnum;
+import com.clara.core.telemetry.TelemetryStatusEnum;
 import com.clara.core.message.IContent;
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.interaction.HistoryClearScopeEnum;
 import com.clara.enums.interaction.SessionCommandOutcomeEnum;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.config.ProviderConfiguration;
@@ -28,7 +34,12 @@ import com.clara.interaction.UserInterventionBuffer;
 import com.clara.orchestration.api.ConversationRequest;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.orchestration.api.OrchestrationStatusEnum;
+import com.clara.telemetry.TelemetryMetrics;
+import com.clara.telemetry.TelemetryRuntime;
+import com.clara.telemetry.TelemetrySettings;
+import com.clara.telemetry.TelemetryStore;
 import com.clara.workflow.WorkflowCatalog;
+import com.clara.adapter.console.TraceRenderer;
 import com.clara.workflow.runtime.WorkflowProgress;
 import org.jline.terminal.Terminal;
 
@@ -63,7 +74,8 @@ import java.util.List;
  * <p>使用方法：主（默认）模型由 {@code config/clara.yml} 的 {@code defaultModel} 指定；未配置或未匹配到时，
  * 若存在多个模型配置会列出编号供选择，也可用首个命令行参数直接指定配置文件。进入对话后逐行输入回车发送，
  * {@code /model} 重新选择模型，{@code /init} 重新检测模型可用性并重建配置 / 技能 / MCP 连接（保留当前会话），
- * {@code /history} 查看历史聊天记录，{@code Enter} 发送、{@code Shift+Enter} / {@code Ctrl+Enter} 换行、上 / 下方向键召回历史输入，
+ * {@code /history} 查看历史聊天记录（{@code /history clear [-n|-t] N} 清空或按条清理），
+ * {@code Enter} 发送、{@code Shift+Enter} / {@code Ctrl+Enter} 换行、上 / 下方向键召回历史输入，
  * {@code /graph} 查看代码知识图谱状态、{@code /graph import} 把当前工作目录导入图谱，
  * {@code /log} 切换日志模式，{@code /color} 开关颜色，{@code exit} / {@code quit} 结束；
  * 一轮执行过程中按 ESC 两次可取消本轮正在进行的模型调用与工具执行（首次 ESC 仅提示，避开误触）。
@@ -140,37 +152,46 @@ public final class ClaraApplication {
         List<Path> sessionCandidates = candidates;
         ModelChoice sessionChoice = choice;
         while (true) {
-            // 控制台观测：每轮把图谱补充与向量召回的命中情况打在控制台（同时落详细日志）。
-            try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(new ConsoleContextTrace(view))) {
-                ModelRegistry registry = bootstrap.modelRegistry();
-                registry.select(sessionChoice.configPath());
-                reader.setStatusLine(() -> inputStatusLine(registry));
-                SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry,
-                        sessionCandidates, contextControls(view, bootstrap, registry));
+            TelemetrySettings telemetrySettings = TelemetrySettings.load(ConfigLocator.claraConfigFile());
+            try (TelemetryRuntime telemetryRuntime = TelemetryRuntime.start(telemetrySettings,
+                    ConfigLocator.workspaceRoot())) {
+                Telemetry telemetry = telemetryRuntime.telemetry();
+                // 控制台观测：每轮把图谱补充与向量召回的命中情况打在控制台（同时落详细日志）。
+                try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(new ConsoleContextTrace(view), telemetry)) {
+                    ModelRegistry registry = bootstrap.modelRegistry();
+                    registry.select(sessionChoice.configPath());
+                    reader.setStatusLine(() -> inputStatusLine(registry));
+                    SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry,
+                            sessionCandidates, contextControls(view, bootstrap, registry, telemetryRuntime.store(),
+                                    telemetryRuntime.metrics(), telemetryRuntime.metricsAddress()));
 
-                view.printBanner(bootstrap, registry.currentConfiguration(),
-                        sessionChoice.configPath(), sessionChoice.source());
-                printMcpStatus(view, bootstrap);
-                prepareCodeGraph(view, bootstrap);
-                view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
-                printRecentHistory(view, bootstrap, registry, reader);
-                view.printHints(WorkflowCatalog.customSummaries());
-                if (!reader.isLineEditingAvailable()) {
-                    view.emit("输入：Enter 发送（当前终端不支持行编辑，方向键与多行换行不可用）。", ConsoleView.ANSI_GRAY);
-                }
-                if (monitor.isAvailable()) {
-                    view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
-                }
-                if (loop(view, reader, bootstrap, registry, sessionCandidates, commands, monitor)
-                        != SessionCommandOutcomeEnum.REINIT) {
+                    view.printBanner(bootstrap, registry.currentConfiguration(),
+                            sessionChoice.configPath(), sessionChoice.source());
+                    printMcpStatus(view, bootstrap);
+                    prepareCodeGraph(view, bootstrap);
+                    if (telemetryRuntime.metricsAddress() != null) {
+                        view.emit("  metrics        : http://" + telemetryRuntime.metricsAddress(), ConsoleView.ANSI_GRAY);
+                    }
+                    view.emit("  sessionId      : " + conversationId + "（由工作目录生成，同一目录再次进入续接同一份历史）");
+                    printRecentHistory(view, bootstrap, registry, reader);
+                    view.printHints(WorkflowCatalog.customSummaries());
+                    if (!reader.isLineEditingAvailable()) {
+                        view.emit("输入：Enter 发送（当前终端不支持行编辑，方向键与多行换行不可用）。", ConsoleView.ANSI_GRAY);
+                    }
+                    if (monitor.isAvailable()) {
+                        view.emit("执行中可按 ESC 两次请求取消本轮模型调用与工具执行。", ConsoleView.ANSI_GRAY);
+                    }
+                    if (loop(view, reader, bootstrap, registry, sessionCandidates, commands, monitor)
+                            != SessionCommandOutcomeEnum.REINIT) {
+                        return;
+                    }
+                } catch (RuntimeException startupFailure) {
+                    view.println("启动失败：" + startupFailure.getClass().getSimpleName() + ": " + startupFailure.getMessage());
+                    view.println("请确认：1) 所选模型配置存在且合法（当前 " + sessionChoice.configPath().toAbsolutePath() + "）；"
+                            + "2) 其 credential 声明的环境变量已设置。");
+                    System.exit(1);
                     return;
                 }
-            } catch (RuntimeException startupFailure) {
-                view.println("启动失败：" + startupFailure.getClass().getSimpleName() + ": " + startupFailure.getMessage());
-                view.println("请确认：1) 所选模型配置存在且合法（当前 " + sessionChoice.configPath().toAbsolutePath() + "）；"
-                        + "2) 其 credential 声明的环境变量已设置。");
-                System.exit(1);
-                return;
             }
             view.emit("", ConsoleView.ANSI_GRAY);
             view.emit("正在重新初始化：重新检测模型可用性，并重建配置 / 技能 / MCP / 图谱连接...",
@@ -312,7 +333,9 @@ public final class ClaraApplication {
      * @param registry  模型注册表（取当前平台与模型），非 null
      * @return 上下文控制实现，非 null
      */
-    private static IConversationControls contextControls(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry) {
+    private static IConversationControls contextControls(ConsoleView view, ApplicationBootstrap bootstrap,
+            ModelRegistry registry, TelemetryStore telemetryStore, TelemetryMetrics telemetryMetrics,
+            String metricsAddress) {
         return new IConversationControls() {
             @Override
             public void compressContext() {
@@ -338,6 +361,36 @@ public final class ClaraApplication {
             }
 
             @Override
+            public void showTrace(String selector) {
+                if (telemetryStore == null) {
+                    view.emit("链路追踪未启用：可在 config/clara.yml 的 telemetry.enabled 打开。", ConsoleView.ANSI_GRAY);
+                    return;
+                }
+                String query = selector == null ? "" : selector.trim();
+                if ("list".equalsIgnoreCase(query)) {
+                    List<String> ids = telemetryStore.recentTraceIds(5);
+                    if (ids.isEmpty()) {
+                        view.emit("暂无链路记录。", ConsoleView.ANSI_GRAY);
+                        return;
+                    }
+                    view.println("最近的执行链路（最多 5 条）：");
+                    for (String id : ids) {
+                        view.println("  " + id);
+                    }
+                    return;
+                }
+                List<TelemetryEvent> events = query.isEmpty()
+                        ? telemetryStore.lastTrace() : telemetryStore.trace(query);
+                if (events.isEmpty()) {
+                    view.emit(query.isEmpty() ? "暂无链路记录。" : "未找到链路：" + query, ConsoleView.ANSI_GRAY);
+                    return;
+                }
+                for (String line : TraceRenderer.lines(events)) {
+                    view.println(line);
+                }
+            }
+
+            @Override
             public void showCodeGraph() {
                 view.emit("正在查询代码知识图谱（工作目录：" + ConfigLocator.workspaceRoot() + "）...", ConsoleView.ANSI_GRAY);
                 view.println(codeGraphConsole.status());
@@ -360,6 +413,13 @@ public final class ClaraApplication {
                     view.println(usageTrend.render());
                     view.println("");
                     view.println(bootstrap.capabilityUsage().report());
+                    if (telemetryMetrics != null) {
+                        view.println("");
+                        view.println(telemetryMetrics.report());
+                        if (metricsAddress != null) {
+                            view.println("  Prometheus: http://" + metricsAddress);
+                        }
+                    }
                 } catch (RuntimeException failure) {
                     view.emit("[error] 统计用量失败：" + failure.getMessage(), ConsoleView.ANSI_RED);
                 }
@@ -379,6 +439,25 @@ public final class ClaraApplication {
                     view.println(line);
                 }
                 view.println("");
+            }
+
+            @Override
+            public void clearHistory(HistoryClearScopeEnum scope, int count) {
+                try {
+                    int removed = bootstrap.clearHistory(scope, count, conversationId);
+                    if (removed <= 0) {
+                        view.emit("没有可清理的历史聊天记录。", ConsoleView.ANSI_GRAY);
+                        return;
+                    }
+                    if (scope == HistoryClearScopeEnum.ALL) {
+                        view.emit("已清空历史记录：共清理 " + removed + " 条聊天消息。", ConsoleView.ANSI_GREEN);
+                    } else {
+                        view.emit("已清理" + (scope == HistoryClearScopeEnum.FIRST ? "最早" : "最新")
+                                + " " + removed + " 条历史聊天记录。", ConsoleView.ANSI_GREEN);
+                    }
+                } catch (RuntimeException failure) {
+                    view.emit("[error] 清理历史记录失败：" + failure.getMessage(), ConsoleView.ANSI_RED);
+                }
             }
         };
     }
@@ -667,7 +746,8 @@ public final class ClaraApplication {
      * @param input      用户输入，非空白
      * @param monitor    ESC 取消监听器，非 null
      */
-    private static void converse(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry, List<Path> candidates, String input, CancelKeyMonitor monitor) {
+    private static void converse(ConsoleView view, ApplicationBootstrap bootstrap, ModelRegistry registry,
+            List<Path> candidates, String input, CancelKeyMonitor monitor) {
         // 本轮取消令牌：交给监听器置位，随请求下发给编排层，进而让模型调用与脚本工具在检查点终止。
         // 一次对话可能换模型重试，令牌跨尝试共用——用户按 ESC 取消的是整轮，不是某一次尝试。
         CancellationToken cancellationToken = new CancellationToken();
@@ -678,30 +758,69 @@ public final class ClaraApplication {
         }
         // 执行期补充通道：监听线程写入，本轮所有模型尝试共享；换模型重试时补充不会丢。
         UserInterventionBuffer intervention = new UserInterventionBuffer();
-        try (CancelKeySession ignored = monitor.watch(cancellationToken, intervention)) {
-            for (int index = 0; index < plan.size(); index++) {
-                Path configPath = plan.get(index);
-                if (index > 0) {
-                    registry.select(configPath);
-                    view.emit("  [failover] 上一个模型不可用，已切到 " + ConfigLocator.aliasOf(configPath) + " 重试（会话历史按模型隔离，切回原模型即恢复原上下文）", ConsoleView.ANSI_YELLOW);
-                }
-                ConversationResult result = converseOnce(view, bootstrap, registry.currentConfiguration(), input,
-                        cancellationToken, intervention);
-                if (result == null
-                        || result.getStatus() != OrchestrationStatusEnum.FAILED
-                        || !ModelFailover.isUnavailable(result.getError())) {
-                    // 成功、异常已就地报告，或失败原因与「模型不可用」无关（入参、内容安全等）：如实报告，不换模型。
-                    return;
-                }
-                if (result.getToolRoundTrips() > 0) {
-                    view.emit("  [failover] 本轮已经执行过工具调用（可能有副作用），不再换模型重试", ConsoleView.ANSI_YELLOW);
-                    return;
-                }
-                if (index == plan.size() - 1) {
-                    // 只有一个候补都没有时别报「试完 N 个」，那种说法会让用户以为换过了别的模型。
-                    view.emit(plan.size() > 1 ? "  [failover] 已按响应时间顺序试完 " + plan.size() + " 个可用模型，均不可用；可用 /model 手动指定，或检查网络与凭据" : "  [failover] 没有其它可用模型可切换；可用 /model 手动指定，或检查网络与凭据", ConsoleView.ANSI_RED);
+        try (TelemetrySpan turn = bootstrap.telemetry().startSpan("user.turn", TelemetrySpanKindEnum.TURN)) {
+            turn.attribute("input_chars", input.length())
+                    .attribute("attempts", plan.size());
+            try (CancelKeySession ignored = monitor.watch(cancellationToken, intervention)) {
+                for (int index = 0; index < plan.size(); index++) {
+                    Path configPath = plan.get(index);
+                    if (index > 0) {
+                        String fromAlias = ConfigLocator.aliasOf(registry.currentConfigPath());
+                        registry.select(configPath);
+                        turn.attribute("failover.from", fromAlias)
+                                .attribute("failover.to", ConfigLocator.aliasOf(configPath))
+                                .attribute("failover.attempt", index + 1);
+                        view.emit("  [failover] 上一个模型不可用，已切到 " + ConfigLocator.aliasOf(configPath)
+                                + " 重试（会话历史按模型隔离，切回原模型即恢复原上下文）", ConsoleView.ANSI_YELLOW);
+                    }
+                    ConversationResult result = converseOnce(view, bootstrap, registry.currentConfiguration(),
+                            input, cancellationToken, intervention);
+                    if (result == null
+                            || result.getStatus() != OrchestrationStatusEnum.FAILED
+                            || !ModelFailover.isUnavailable(result.getError())) {
+                        // 成功、异常已就地报告，或失败原因与「模型不可用」无关（入参、内容安全等）：如实报告，不换模型。
+                        markTurnStatus(turn, result);
+                        return;
+                    }
+                    if (result.getToolRoundTrips() > 0) {
+                        view.emit("  [failover] 本轮已经执行过工具调用（可能有副作用），不再换模型重试",
+                                ConsoleView.ANSI_YELLOW);
+                        markTurnStatus(turn, result);
+                        return;
+                    }
+                    if (index == plan.size() - 1) {
+                        // 只有一个候补都没有时别报「试完 N 个」，那种说法会让用户以为换过了别的模型。
+                        markTurnStatus(turn, result);
+                        view.emit(plan.size() > 1
+                                ? "  [failover] 已按响应时间顺序试完 " + plan.size()
+                                        + " 个可用模型，均不可用；可用 /model 手动指定，或检查网络与凭据"
+                                : "  [failover] 没有其它可用模型可切换；可用 /model 手动指定，或检查网络与凭据",
+                                ConsoleView.ANSI_RED);
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * 把编排结果映射到链路终态；失败的链路必须落成 ERROR，而不是只写一个同名的展示属性。
+     *
+     * @param turn   本轮根 Span，非 null
+     * @param result 编排结果；null 表示未预期异常已被就地吞掉
+     */
+    private static void markTurnStatus(TelemetrySpan turn, ConversationResult result) {
+        if (result == null) {
+            turn.status(TelemetryStatusEnum.ERROR);
+            return;
+        }
+        if (result.getError() != null) {
+            turn.error(result.getError());
+            return;
+        }
+        if (result.getStatus() == OrchestrationStatusEnum.CANCELLED) {
+            turn.cancelled();
+        } else if (result.getStatus() != OrchestrationStatusEnum.COMPLETED) {
+            turn.status(TelemetryStatusEnum.ERROR);
         }
     }
 
