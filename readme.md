@@ -80,8 +80,11 @@ mvn -q -pl clara-application -am package -DskipTests
 | Kimi | `CLARA_KIMI_API_KEY` |
 | OpenAI | `CLARA_OPENAI_API_KEY` |
 | 火山方舟 | `CLARA_VOLCENGINE_API_KEY` |
+| 阿里云百炼（通义千问） | `CLARA_ALIBABA_API_KEY` |
 
 启动脚本会扫描所有模型配置，按环境变量去重后检查凭据；缺失时会在终端提示输入本次启动使用的值。
+
+阿里云百炼官方示例使用 `DASHSCOPE_API_KEY`，Clara 统一按 `CLARA_ALIBABA_API_KEY` 检查凭据，把前者的值设置到后者即可。内置的 `alibaba-completion.yml` 走官方共享接入点 `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`；若要使用官方推荐的业务空间专属域名 `https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/...`，需要同时修改 `transport.allowedOrigins`。
 
 ### 3. 启动
 

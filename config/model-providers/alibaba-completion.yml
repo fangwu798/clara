@@ -1,0 +1,31 @@
+provider: ALIBABA
+credential:
+  secretRef: alibaba
+  # apiKey: xxx
+  # 项目统一使用 CLARA_<平台>_API_KEY 命名；阿里云官方示例使用 DASHSCOPE_API_KEY，
+  # 把后者的值设置到本变量即可。
+  environmentVariable: CLARA_ALIBABA_API_KEY
+transport:
+  # 官方共享接入点（华北 2 / 北京）。业务空间专属域名性能更好，替换方式见 CHAT.endpoint 注释。
+  allowedOrigins:
+    - https://dashscope.aliyuncs.com
+  connectTimeoutMillis: 10000
+  readTimeoutMillis: 600000
+  maxRequestBytes: 8388608
+  maxResponseBytes: 33554432
+  allowHttp: false
+capabilities:
+  CHAT:
+    # 官方文档：OpenAI 兼容-Chat（https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope）
+    #   共享接入点：https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+    #   业务空间专属域名：https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions
+    # 改用专属域名时，allowedOrigins 要同步改成 https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com。
+    # API Key 按地域绑定：调用哪个地域的 endpoint，就要用该地域创建的 Key。
+    endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+    modelId: qwen3.8-max
+    apiProfile: Completion
+    protocol: COMPLETION
+    parameters:
+      # qwen3.8-max（官方模型页）：上下文 1,000,000；最大输入 991808；最大输出 131072；
+      # 思考模式下最大输入 983616、最大输出 131072，最大思维链长度 262144。
+      maxTokens: 131072

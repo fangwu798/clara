@@ -5,7 +5,7 @@
 #
 # 未在此声明的 role 直接作为模型别名解析；解析不到别名时按配置错误 fail-fast（不静默降级）。
 # 示例（按需取消注释并改为本机可用配置；仓库现有别名为 deepseek-response / deepseek-completion /
-# kimi-response / kimi-completion / volcengine-response / volcengine-completion / openai）：
+# kimi-response / kimi-completion / volcengine-response / volcengine-completion / openai / alibaba-completion）：
 # 当前默认启用三模型讨论：架构师用 DeepSeek，评审员用火山，测试员用 DeepSeek 的另一个别名。
 # 缺少对应 API Key 时，运行 REVIEW 工作流会直接报该别名不可用；按需改成已启用的别名即可。
 architect: deepseek-response
