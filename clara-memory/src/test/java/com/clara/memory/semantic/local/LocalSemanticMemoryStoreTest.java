@@ -10,11 +10,16 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 /**
  * {@link LocalSemanticMemoryStore} 的单元测试：余弦相似度排序、topK/minScore 过滤与按条目 / 会话删除。
@@ -104,5 +109,108 @@ public class LocalSemanticMemoryStoreTest {
         for (MemoryMatch match : matches) {
             assertNotEquals("conv1", match.getEntry().getId());
         }
+    }
+
+    /**
+     * 构造与写入校验：维度必须为正、批次与元素不得为 null、维度必须一致、同一批次 id 不得重复。
+     */
+    @Test
+    public void validatesDimensionAndUpsertPayload() {
+        assertThrows(IllegalArgumentException.class, () -> new LocalSemanticMemoryStore(0));
+        assertThrows(IllegalArgumentException.class, () -> new LocalSemanticMemoryStore(-1));
+
+        LocalSemanticMemoryStore store = new LocalSemanticMemoryStore(2);
+        assertThrows(IllegalArgumentException.class, () -> store.upsert(null));
+        store.upsert(Collections.<MemoryEntry>emptyList());
+        assertThrows(IllegalArgumentException.class, () -> store.upsert(Collections.<MemoryEntry>singletonList(null)));
+        assertThrows(com.clara.exception.ClaraException.class, () -> store.upsert(Collections.singletonList(
+                entry("a", MemorySourceTypeEnum.PROMPT, null, new float[] {1, 0, 0}, 100L))));
+        assertThrows(IllegalArgumentException.class, () -> store.upsert(Arrays.asList(
+                entry("a", MemorySourceTypeEnum.PROMPT, null, new float[] {1, 0}, 100L),
+                entry("a", MemorySourceTypeEnum.PROMPT, null, new float[] {0, 1}, 100L))));
+    }
+
+    /**
+     * 检索条件：来源、会话、元数据过滤、过期条目与非法查询。
+     */
+    @Test
+    public void appliesQueryFiltersAndRejectsInvalidQueries() {
+        LocalSemanticMemoryStore store = new LocalSemanticMemoryStore(2);
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("kind", "doc");
+        MemoryEntry conversation = MemoryEntry.builder("c1", MemorySourceTypeEnum.CONVERSATION, "s", "body",
+                        sha256("c1"), new float[] {1, 0})
+                .conversationId("conv-1").createdAtEpochMillis(100L).metadata(metadata).build();
+        MemoryEntry otherConversation = entry("c2", MemorySourceTypeEnum.CONVERSATION, "conv-2",
+                new float[] {1, 0}, 100L);
+        MemoryEntry prompt = entry("p1", MemorySourceTypeEnum.PROMPT, null, new float[] {1, 0}, 100L);
+        MemoryEntry expired = MemoryEntry.builder("e1", MemorySourceTypeEnum.CONVERSATION, "s", "body",
+                        sha256("e1"), new float[] {1, 0})
+                .conversationId("conv-1").createdAtEpochMillis(100L)
+                .expiresAtEpochMillis(200L).build();
+        store.upsert(Arrays.asList(conversation, otherConversation, prompt, expired));
+
+        Map<String, String> filters = new HashMap<>();
+        filters.put("kind", "doc");
+        List<MemoryMatch> filtered = store.search(SemanticMemoryQuery.builder(new float[] {1, 0}, 10, 0.0, NOW)
+                .filters(filters).build());
+        assertEquals(1, filtered.size());
+        assertEquals("c1", filtered.get(0).getEntry().getId());
+
+        Map<String, String> noMatch = new HashMap<>();
+        noMatch.put("kind", "other");
+        assertTrue(store.search(SemanticMemoryQuery.builder(new float[] {1, 0}, 10, 0.0, NOW)
+                .filters(noMatch).build()).isEmpty());
+
+        List<MemoryMatch> bySource = store.search(SemanticMemoryQuery.builder(new float[] {1, 0}, 10, 0.0, NOW)
+                .sourceType(MemorySourceTypeEnum.PROMPT).build());
+        assertEquals(1, bySource.size());
+        assertEquals("p1", bySource.get(0).getEntry().getId());
+
+        List<MemoryMatch> byConversation = store.search(SemanticMemoryQuery.builder(new float[] {1, 0}, 10, 0.0, NOW)
+                .conversationId("conv-2").build());
+        assertEquals(1, byConversation.size());
+        assertEquals("c2", byConversation.get(0).getEntry().getId());
+
+        assertThrows(IllegalArgumentException.class, () -> store.search(null));
+        assertThrows(com.clara.exception.ClaraException.class,
+                () -> store.search(query(new float[] {1, 0, 0}, 1, 0.0)));
+    }
+
+    /**
+     * 同分同时间时按 id 稳定排序；零向量得分为 -1，不应产生 NaN。
+     */
+    @Test
+    public void sortsTiesByIdAndHandlesZeroVectors() {
+        LocalSemanticMemoryStore store = new LocalSemanticMemoryStore(2);
+        store.upsert(Arrays.asList(
+                entry("b", MemorySourceTypeEnum.PROMPT, null, new float[] {1, 0}, 100L),
+                entry("a", MemorySourceTypeEnum.PROMPT, null, new float[] {1, 0}, 100L)));
+
+        List<MemoryMatch> matches = store.search(query(new float[] {1, 0}, 10, 0.0));
+        assertEquals("a", matches.get(0).getEntry().getId());
+        assertEquals("b", matches.get(1).getEntry().getId());
+
+        // 全零向量在 DTO 构造期就被拒绝，检索不会出现除零
+        assertThrows(IllegalArgumentException.class, () -> query(new float[] {0, 0}, 1, 0.0));
+        assertThrows(IllegalArgumentException.class,
+                () -> entry("zero", MemorySourceTypeEnum.PROMPT, null, new float[] {0, 0}, 100L));
+    }
+
+    /**
+     * 删除参数与关闭后行为：null 参数显式拒绝，关闭后所有操作快速失败。
+     */
+    @Test
+    public void rejectsNullDeletesAndOperationsAfterClose() {
+        LocalSemanticMemoryStore store = new LocalSemanticMemoryStore(2);
+        assertThrows(IllegalArgumentException.class, () -> store.deleteById(null));
+        assertThrows(IllegalArgumentException.class, () -> store.deleteByConversation(null));
+
+        store.close();
+
+        assertThrows(IllegalStateException.class, () -> store.upsert(Collections.<MemoryEntry>emptyList()));
+        assertThrows(IllegalStateException.class, () -> store.search(query(new float[] {1, 0}, 1, 0.0)));
+        assertThrows(IllegalStateException.class, () -> store.deleteById("a"));
+        assertThrows(IllegalStateException.class, () -> store.deleteByConversation("conv"));
     }
 }

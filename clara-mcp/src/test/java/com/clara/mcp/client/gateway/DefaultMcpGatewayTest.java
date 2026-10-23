@@ -179,10 +179,128 @@ public class DefaultMcpGatewayTest {
         }
     }
 
+    @Test
+    public void readResourceInvokesClient() {
+        FakeClient client = new FakeClient(initialization());
+        client.resourceResult = new McpResourceContent(content());
+        DefaultMcpGateway gateway = new DefaultMcpGateway(registry(ACTIVE_REGISTRATION),
+                stubCatalog(snapshot(tools(descriptor("echo")))), new FakeClientFactory(client));
+
+        McpResourceContent result = gateway.readResource(resourceRequest());
+
+        assertEquals(1, result.getContent().size());
+        assertEquals(1, client.closeCount);
+    }
+
+    @Test
+    public void getPromptInvokesClient() {
+        FakeClient client = new FakeClient(initialization());
+        client.promptResult = new McpPromptResult("demo", content(), false);
+        DefaultMcpGateway gateway = new DefaultMcpGateway(registry(ACTIVE_REGISTRATION),
+                stubCatalog(snapshot(tools(descriptor("echo")))), new FakeClientFactory(client));
+
+        McpPromptResult result = gateway.getPrompt(promptRequest());
+
+        assertEquals("demo", result.getDescription());
+        assertEquals(1, client.closeCount);
+    }
+
+    @Test
+    public void rejectsNullDependenciesAndNullRequests() {
+        try {
+            new DefaultMcpGateway(null, stubCatalog(snapshot(tools(descriptor("echo")))),
+                    new FakeClientFactory(new FakeClient(initialization())));
+            fail("null registry must fail");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("dependencies"));
+        }
+        DefaultMcpGateway gateway = new DefaultMcpGateway(registry(ACTIVE_REGISTRATION),
+                stubCatalog(snapshot(tools(descriptor("echo")))),
+                new FakeClientFactory(new FakeClient(initialization())));
+        try {
+            gateway.readResource(null);
+            fail("null request must fail");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("request"));
+        }
+        try {
+            gateway.getPrompt(null);
+            fail("null request must fail");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("request"));
+        }
+    }
+
+    @Test
+    public void rejectsMissingAndUnhealthySnapshots() {
+        FakeClientFactory factory = new FakeClientFactory(new FakeClient(initialization()));
+        DefaultMcpGateway missing = new DefaultMcpGateway(registry(ACTIVE_REGISTRATION),
+                new StubCatalog(null), factory);
+        assertCode(ErrorCodes.MCP_CAPABILITY_NOT_FOUND, new Runnable() {
+            public void run() {
+                missing.callTool(toolCall("echo", "hash"));
+            }
+        });
+
+        McpServerSnapshot unhealthy = new McpServerSnapshot(SNAPSHOT, SERVER, 1L, VERSION, IDENTITY, CAPS,
+                tools(descriptor("echo")), Collections.<McpResourceDescriptor>emptyList(),
+                Collections.<McpResourceTemplateDescriptor>emptyList(),
+                Collections.<McpPromptDescriptor>emptyList(), McpHealthStatus.DEGRADED);
+        DefaultMcpGateway broken = new DefaultMcpGateway(registry(ACTIVE_REGISTRATION),
+                new StubCatalog(unhealthy), factory);
+        assertCode(ErrorCodes.MCP_SERVER_NOT_ACTIVE, new Runnable() {
+            public void run() {
+                broken.callTool(toolCall("echo", "hash"));
+            }
+        });
+    }
+
+    @Test
+    public void closeFailureIsReportedAsDiscoveryFailure() {
+        FakeClient client = new FakeClient(initialization());
+        client.toolResult = new McpToolResult(content(), false);
+        client.closeFailure = true;
+        DefaultMcpGateway gateway = new DefaultMcpGateway(registry(ACTIVE_REGISTRATION),
+                stubCatalog(snapshot(tools(descriptor("echo")))), new FakeClientFactory(client));
+        assertCode(ErrorCodes.MCP_DISCOVERY_FAILED, new Runnable() {
+            public void run() {
+                gateway.callTool(toolCall("echo", descriptor("echo").getSchemaHash()));
+            }
+        });
+    }
+
+    @Test
+    public void closeFailureDoesNotHideOperationFailure() {
+        FakeClient client = new FakeClient(initialization());
+        client.callFailure = error(ErrorCodes.MCP_DISCOVERY_FAILED);
+        client.closeFailure = true;
+        DefaultMcpGateway gateway = new DefaultMcpGateway(registry(ACTIVE_REGISTRATION),
+                stubCatalog(snapshot(tools(descriptor("echo")))), new FakeClientFactory(client));
+        assertCode(ErrorCodes.MCP_DISCOVERY_FAILED, new Runnable() {
+            public void run() {
+                gateway.callTool(toolCall("echo", descriptor("echo").getSchemaHash()));
+            }
+        });
+        assertEquals(1, client.closeCount);
+    }
     private static final McpServerRegistration ACTIVE_REGISTRATION = new McpServerRegistration(
             SERVER, McpTransportProfile.STDIO, "node echo", null, IDENTITY.getName(),
             IDENTITY.getVersion(), McpRegistrationStatus.ACTIVE);
 
+    private static McpResourceRequest resourceRequest() {
+        ConvContext conversation = new ConvContext("user-1", "conv-1", null, null);
+        CallContext call = new CallContext("trace-1", System.currentTimeMillis() + 10000L,
+                new CancellationToken());
+        return new McpResourceRequest(SERVER, SNAPSHOT, "file:///demo.txt", "hash", conversation, call);
+    }
+
+    private static McpPromptRequest promptRequest() {
+        ConvContext conversation = new ConvContext("user-1", "conv-1", null, null);
+        CallContext call = new CallContext("trace-1", System.currentTimeMillis() + 10000L,
+                new CancellationToken());
+        return new McpPromptRequest(SERVER, SNAPSHOT, "demo", "hash",
+                Collections.<String, Object>emptyMap(), conversation, call);
+    }
     private static McpInitialization initialization() {
         return new McpInitialization(VERSION, IDENTITY, CAPS);
     }
@@ -291,7 +409,10 @@ public class DefaultMcpGatewayTest {
     private static final class FakeClient implements IMcpClient {
         private final McpInitialization initialization;
         private McpToolResult toolResult;
+        private McpResourceContent resourceResult;
+        private McpPromptResult promptResult;
         private RuntimeException callFailure;
+        private boolean closeFailure;
         private int closeCount;
 
         private FakeClient(McpInitialization initialization) { this.initialization = initialization; }
@@ -312,11 +433,16 @@ public class DefaultMcpGatewayTest {
             return toolResult;
         }
         public McpResourceContent readResource(McpResourceRequest request) {
-            throw new UnsupportedOperationException();
+            return resourceResult;
         }
         public McpPromptResult getPrompt(McpPromptRequest request) {
-            throw new UnsupportedOperationException();
+            return promptResult;
         }
-        public void close() throws IOException { closeCount++; }
+        public void close() throws IOException {
+            closeCount++;
+            if (closeFailure) {
+                throw new IOException("close failed");
+            }
+        }
     }
 }

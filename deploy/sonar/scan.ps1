@@ -41,10 +41,10 @@
     扫描结束后在浏览器打开项目看板。
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File tools\sonar\scan.ps1
+    powershell -ExecutionPolicy Bypass -File deploy\sonar\scan.ps1
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File tools\sonar\scan.ps1 -RunTests -Open
+    powershell -ExecutionPolicy Bypass -File deploy\sonar\scan.ps1 -RunTests -Open
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File deploy\sonar\scan.ps1 -ProjectKey "com.clara:clara" -SkipQualityGate

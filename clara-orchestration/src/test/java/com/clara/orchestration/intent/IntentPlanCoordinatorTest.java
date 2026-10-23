@@ -26,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -232,5 +233,141 @@ public class IntentPlanCoordinatorTest {
             String prefix = source + "|" + status + "|";
             return events.stream().anyMatch(event -> event.startsWith(prefix));
         }
+    }
+
+    /**
+     * 构造参数校验：模型与校验器必填，修正次数不得为负。
+     */
+    @Test
+    public void rejectsInvalidConstructorArguments() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new IntentPlanCoordinator(null, null, new ExecutionPlanValidator(5), 0, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new IntentPlanCoordinator(new FakeModel(SIMPLE), null, null, 0, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new IntentPlanCoordinator(new FakeModel(SIMPLE), null, new ExecutionPlanValidator(5), -1, null));
+    }
+
+    /**
+     * 模型空输出视为判断失败并降级为简单任务，而不是抛异常中断本轮对话。
+     */
+    @Test
+    public void blankModelOutputFallsBackToSimple() {
+        FakeModel model = new FakeModel("   ");
+        IntentPlanCoordinator coordinator = coordinator(model, tool(new AtomicInteger()), 1);
+
+        PreparedIntent prepared = coordinator.prepare("帮我实现登录并验证", "m1");
+
+        assertFalse(prepared.isComplex());
+        assertTrue(prepared.getReason().contains("意图判断失败"));
+    }
+
+    /**
+     * 兼容「计划包在 plan 对象里」的输出：判定为复杂任务并把内层计划交给校验。
+     */
+    @Test
+    public void unwrapsNestedPlanObject() {
+        String nested = "{\"plan\":{\"goal\":\"实现登录\",\"steps\":[{\"id\":\"s1\",\"title\":\"读取代码\"}]}}";
+        IntentPlanCoordinator coordinator = coordinator(new FakeModel(nested), tool(new AtomicInteger()), 0);
+
+        PreparedIntent prepared = coordinator.prepare("帮我实现登录", "m1");
+
+        assertTrue(prepared.isComplex());
+        assertEquals(1, prepared.getPlan().getSteps().size());
+        assertTrue(prepared.prompt().contains("目标：实现登录"));
+        assertTrue(prepared.prompt().contains("[s1] 读取代码"));
+    }
+
+    /**
+     * 没有 mode 字段但有步骤数组时按复杂任务处理；显式 simple 时即使带步骤也不生成计划。
+     */
+    @Test
+    public void infersComplexityFromStepsUnlessModeIsSimple() {
+        String stepsOnly = "{\"goal\":\"实现登录\",\"steps\":[{\"id\":\"s1\",\"title\":\"a\"}]}";
+        PreparedIntent inferred = coordinator(new FakeModel(stepsOnly), tool(new AtomicInteger()), 0)
+                .prepare("多步骤任务", "m1");
+        assertTrue(inferred.isComplex());
+
+        String simpleWithSteps = "{\"mode\":\"simple\",\"reason\":\"直接回答\","
+                + "\"steps\":[{\"id\":\"s1\",\"title\":\"a\"}]}";
+        AtomicInteger toolCalls = new AtomicInteger();
+        PreparedIntent explicit = coordinator(new FakeModel(simpleWithSteps), tool(toolCalls), 0)
+                .prepare("多步骤任务", "m1");
+        assertFalse(explicit.isComplex());
+        assertEquals(0, toolCalls.get());
+    }
+
+    /**
+     * 模型偶尔输出 Markdown 代码围栏，解析前应剥离围栏只保留 JSON。
+     */
+    @Test
+    public void acceptsFencedJsonOutput() {
+        String fenced = "```json\n" + PLAN + "\n```";
+        PreparedIntent prepared = coordinator(new FakeModel(fenced), tool(new AtomicInteger()), 0)
+                .prepare("帮我实现登录并验证", "m1");
+
+        assertTrue(prepared.isComplex());
+        assertEquals(2, prepared.getPlan().getSteps().size());
+    }
+
+    /**
+     * 校验工具判定失败：ok=false 且没有 error 字段时使用默认原因。
+     */
+    @Test
+    public void toolFailureWithoutErrorUsesDefaultReason() {
+        IToolInvoker failing = invocation -> new ToolResult(invocation.callId(), "{\"ok\":false}");
+        PreparedIntent prepared = coordinator(new FakeModel(PLAN), failing, 0)
+                .prepare("帮我实现登录并验证", "m1");
+
+        assertFalse(prepared.isComplex());
+        assertTrue(prepared.getReason().contains("计划格式校验未通过"));
+    }
+
+    /**
+     * 校验工具没有返回值：按「未返回结果」处理，而不是当作通过。
+     */
+    @Test
+    public void missingToolResultIsRejected() {
+        IToolInvoker empty = invocation -> null;
+        PreparedIntent prepared = coordinator(new FakeModel(PLAN), empty, 0)
+                .prepare("帮我实现登录并验证", "m1");
+
+        assertFalse(prepared.isComplex());
+        assertTrue(prepared.getReason().contains("未返回结果"));
+    }
+
+    /**
+     * 校验工具本身异常时退回本地校验，计划能力不依赖宿主是否正确注册工具。
+     */
+    @Test
+    public void throwingToolFallsBackToLocalValidation() {
+        RecordingTrace trace = new RecordingTrace();
+        IToolInvoker broken = invocation -> {
+            throw new IllegalStateException("tool down");
+        };
+        IntentPlanCoordinator coordinator = new IntentPlanCoordinator(new FakeModel(PLAN), broken,
+                new ExecutionPlanValidator(12), 0, trace);
+
+        PreparedIntent prepared = coordinator.prepare("帮我实现登录并验证", "m1");
+
+        assertTrue(prepared.isComplex());
+        assertTrue(trace.has("validation", "工具不可用"));
+        assertTrue(trace.has("validation", "通过（本地）"));
+    }
+
+    /**
+     * 修正后模型改判为简单任务：直接结束，不再继续修计划。
+     */
+    @Test
+    public void repairMayDowngradeToSimpleTask() {
+        RecordingTrace trace = new RecordingTrace();
+        IntentPlanCoordinator coordinator = new IntentPlanCoordinator(
+                new FakeModel(INVALID_PLAN, SIMPLE), tool(new AtomicInteger()),
+                new ExecutionPlanValidator(12), 1, trace);
+
+        PreparedIntent prepared = coordinator.prepare("帮我实现登录并验证", "m1");
+
+        assertFalse(prepared.isComplex());
+        assertTrue(trace.has("intent", "简单任务"));
     }
 }

@@ -32,7 +32,7 @@
 | 把快照翻译成工具声明、按名分派 | 处理对话上下文与历史 |
 | 调用前做契约校验 | 实现具体业务工具（服务端自己实现） |
 
-一个容易看漏的边界：**工具声明在 `clara-application` 的 `McpToolCatalog`，不在 `clara-mcp`。** 因为“工具声明长什么样”由模型协议决定，属于宿主适配；`clara-mcp` 只提供能力快照。
+一个容易看漏的边界：**工具声明在 `clara-sdk` 的 `McpToolCatalog`，不在 `clara-mcp`。** 因为“工具声明长什么样”由模型协议决定，属于宿主适配；`clara-mcp` 只提供能力快照。
 
 ## 7.3 配置与注册
 
@@ -187,8 +187,8 @@ McpServerConfigDirectoryLoader
 3. `clara-mcp/src/main/java/com/clara/mcp/registry/DefaultMcpDiscoveryService.java`
 4. `clara-mcp/src/main/java/com/clara/mcp/client/gateway/DefaultMcpGateway.java`
 5. `clara-mcp/src/main/java/com/clara/mcp/tool/ExternalToolCatalog.java`
-6. `clara-application/src/main/java/com/clara/tool/McpToolCatalog.java`
-7. `clara-application/src/main/java/com/clara/ApplicationBootstrap.java` 的 `loadMcpServers`
+6. `clara-sdk/src/main/java/com/clara/tool/McpToolCatalog.java`
+7. `clara-sdk/src/main/java/com/clara/ApplicationBootstrap.java` 的 `loadMcpServers`
 
 ## 7.11 练习
 
@@ -201,6 +201,6 @@ McpServerConfigDirectoryLoader
 
 - 为什么发现和调用要分离？
 - 快照里的三个契约锚点分别防止什么问题？
-- 工具声明为什么放在 `clara-application`，而不是 `clara-mcp`？
+- 工具声明为什么放在 `clara-sdk`，而不是 `clara-mcp`？
 - stdio 和 Streamable HTTP 分别适合什么场景？
 - 图谱查询失败为什么不应影响普通对话？

@@ -374,6 +374,9 @@ public final class RecordingObserver<R extends IResponse> implements IStreamObse
      * @param message 日志内容，非 null
      */
     private void print(String message) {
+        if (log == null) {
+            return;
+        }
         log.println(tag.isEmpty() ? message : "[" + tag + "] " + message);
     }
 }

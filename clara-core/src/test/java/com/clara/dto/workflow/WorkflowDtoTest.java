@@ -209,4 +209,97 @@ public class WorkflowDtoTest {
             return children;
         }
     }
+
+    /**
+     * 结果与检查点的 equals/hashCode 覆盖全部字段：仅等待信息或版本不同即不相等。
+     */
+    @Test
+    public void resultEqualityCoversEveryField() {
+        ExecutionScope scope = new ExecutionScope(Collections.singletonMap("k", "v"));
+        WorkflowResult base = new WorkflowResult("i1", WorkflowInstanceStatusEnum.WAITING_INPUT,
+                scope, 3L, "node-1", "input");
+        WorkflowResult same = new WorkflowResult("i1", WorkflowInstanceStatusEnum.WAITING_INPUT,
+                scope, 3L, "node-1", "input");
+        assertEquals(base, same);
+        assertEquals(base.hashCode(), same.hashCode());
+        assertFalse(base.equals(new WorkflowResult("i1", WorkflowInstanceStatusEnum.WAITING_INPUT,
+                scope, 3L, "node-2", "input")));
+        assertFalse(base.equals(new WorkflowResult("i2", WorkflowInstanceStatusEnum.WAITING_INPUT,
+                scope, 3L, "node-1", "input")));
+        assertFalse(base.equals(new WorkflowResult("i1", WorkflowInstanceStatusEnum.RUNNING,
+                scope, 3L, "node-1", "input")));
+        assertFalse(base.equals(new WorkflowResult("i1", WorkflowInstanceStatusEnum.WAITING_INPUT,
+                scope, 4L, "node-1", "input")));
+        assertFalse(base.equals(new WorkflowResult("i1", WorkflowInstanceStatusEnum.WAITING_INPUT,
+                scope, 3L, "node-2", "input")));
+        assertFalse(base.equals(new WorkflowResult("i1", WorkflowInstanceStatusEnum.WAITING_INPUT,
+                scope, 3L, "node-1", "other")));
+        assertTrue(base.toString().contains("node-1"));
+
+        WorkflowCheckpoint checkpoint = new WorkflowCheckpoint("i1", "wf", "v1",
+                WorkflowInstanceStatusEnum.RUNNING, scope, 2L);
+        WorkflowCheckpoint checkpointSame = new WorkflowCheckpoint("i1", "wf", "v1",
+                WorkflowInstanceStatusEnum.RUNNING, scope, 2L);
+        assertEquals(checkpoint, checkpointSame);
+        assertEquals(checkpoint.hashCode(), checkpointSame.hashCode());
+        assertFalse(checkpoint.equals(new WorkflowCheckpoint("i2", "wf", "v1",
+                WorkflowInstanceStatusEnum.RUNNING, scope, 2L)));
+        assertFalse(checkpoint.equals(new WorkflowCheckpoint("i1", "wf2", "v1",
+                WorkflowInstanceStatusEnum.RUNNING, scope, 2L)));
+        assertFalse(checkpoint.equals(new WorkflowCheckpoint("i1", "wf", "v2",
+                WorkflowInstanceStatusEnum.RUNNING, scope, 2L)));
+        assertFalse(checkpoint.equals(new WorkflowCheckpoint("i1", "wf", "v1",
+                WorkflowInstanceStatusEnum.SUCCEEDED, scope, 2L)));
+        assertFalse(checkpoint.equals(new WorkflowCheckpoint("i1", "wf", "v1",
+                WorkflowInstanceStatusEnum.RUNNING, scope, 3L)));
+        assertTrue(checkpoint.toString().contains("wf"));
+    }
+
+    /**
+     * 节点类型枚举的常量集合是对外契约，配置与恢复日志都按名称读写。
+     */
+    @Test
+    public void workflowNodeTypesRoundTrip() {
+        assertEquals(8, WorkflowNodeTypeEnum.values().length);
+        for (WorkflowNodeTypeEnum type : WorkflowNodeTypeEnum.values()) {
+            assertEquals(type, WorkflowNodeTypeEnum.valueOf(type.name()));
+        }
+    }
+
+    /**
+     * 作用域按快照内容比较：副本相等，任一维度变化后不相等，哈希值随内容保持一致。
+     */
+    @Test
+    public void comparesScopeSnapshotsByContent() {
+        ExecutionScope one = new ExecutionScope(Collections.singletonMap("k", "v"));
+        one.complete("exec-1", "node-1", Collections.singletonMap("out", 1));
+        one.control("flag", "on");
+
+        ExecutionScope same = new ExecutionScope(Collections.singletonMap("k", "v"));
+        same.complete("exec-1", "node-1", Collections.singletonMap("out", 1));
+        same.control("flag", "on");
+
+        assertEquals(one, one);
+        assertEquals(one, same);
+        assertEquals(one.hashCode(), same.hashCode());
+        assertEquals(one, one.copy());
+        assertFalse(one.equals("other"));
+        assertFalse(one.equals(null));
+
+        ExecutionScope differentVariables = same.copy();
+        differentVariables.addInputs(Collections.singletonMap("extra", 2));
+        assertFalse(one.equals(differentVariables));
+
+        ExecutionScope differentControls = same.copy();
+        differentControls.control("flag", "off");
+        assertFalse(one.equals(differentControls));
+
+        ExecutionScope differentResults = same.copy();
+        differentResults.complete("exec-2", "node-2", Collections.singletonMap("out", 2));
+        assertFalse(one.equals(differentResults));
+
+        ExecutionScope differentVersion = same.copy();
+        differentVersion.addInputs(Collections.singletonMap("k", "v"));
+        assertFalse(one.equals(differentVersion));
+    }
 }

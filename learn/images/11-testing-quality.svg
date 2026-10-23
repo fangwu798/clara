@@ -85,7 +85,7 @@
   <rect x="50" y="700" width="1140" height="76" rx="14" fill="#F3F7FF" stroke="#D5E3F7" filter="url(#cardShadow)"/>
   <rect x="50" y="700" width="5" height="76" rx="2.5" fill="#3B82F6"/>
   <text x="74" y="728" font-size="13.2" font-weight="700" fill="#1D4ED8">常用命令</text>
-  <text x="74" y="753" font-size="10.8" fill="#334155" font-family="Consolas,monospace">mvn -B -Dmaven.repo.local=m2/repository test | node tools/coverage/check-coverage.mjs 0.80 | deploy\sonar\scan.cmd</text>
+  <text x="74" y="753" font-size="10.8" fill="#334155" font-family="Consolas,monospace">mvn -B -Dmaven.repo.local=m2/repository test | node deploy/coverage/check-coverage.mjs 0.80 | deploy\sonar\scan.cmd</text>
   
   <line x1="50" y1="812" x2="1190" y2="812" stroke="#DCE6F1" stroke-width="1"/>
   <text x="50" y="833" font-size="10.8" font-weight="400" fill="#7C8DA6">图 14-1 测试与质量门禁：单元测试、覆盖率、Sonar 与打包的完整链路。</text>

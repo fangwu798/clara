@@ -3,6 +3,7 @@ package com.clara.telemetry;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * 一条指标序列的唯一标识：指标名 + 标签集合。
@@ -81,7 +82,8 @@ final class MetricSeries implements Comparable<MetricSeries> {
         if (byName != 0) {
             return byName;
         }
-        return labels.toString().compareTo(other.labels.toString());
+        // Sort labels before comparison so the natural order is consistent with equals().
+        return new TreeMap<>(labels).toString().compareTo(new TreeMap<>(other.labels).toString());
     }
 
     @Override

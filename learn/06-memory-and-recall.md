@@ -100,6 +100,8 @@ new DefaultWindowMemory(conversationId, provider, model, store)
 
 ## 6.6 Milvus 两种模式
 
+Milvus 实现位于独立模块 `clara-memory-milvus`，通过 `META-INF/services/com.clara.memory.semantic.spi.ISemanticMemoryBackendProvider` 注册。核心模块 `clara-memory` 只保留契约与进程内实现，不引入 Milvus 依赖；CLI 打包时才会带上 `clara-memory-milvus`。
+
 `config/clara.yml` 的 `milvus.mode`：
 
 | 模式 | 原理 | 适用 |
@@ -149,7 +151,7 @@ new DefaultWindowMemory(conversationId, provider, model, store)
 1. `clara-core/src/main/java/com/clara/core/memory`：先看 `IWindowMemory`、`ISemanticMemoryStore`。
 2. `clara-memory/src/main/java/com/clara/memory/window/DefaultWindowMemory.java`
 3. `clara-memory/src/main/java/com/clara/memory/persistence/local/LocalConversationStore.java`
-4. `clara-memory/src/main/java/com/clara/memory/semantic/milvus/MilvusSemanticMemoryStore.java`
+4. `clara-memory-milvus/src/main/java/com/clara/memory/semantic/milvus/MilvusSemanticMemoryStore.java`
 5. `clara-orchestration/src/main/java/com/clara/orchestration/context/WindowCompressionCoordinator.java`
 6. `clara-orchestration/src/main/java/com/clara/orchestration/context/SemanticRecallCoordinator.java`
 

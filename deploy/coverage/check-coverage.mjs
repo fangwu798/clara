@@ -2,7 +2,7 @@
 /**
  * 代码覆盖率门禁：汇总各模块 JaCoCo 报告的总行覆盖率，低于阈值时以非零码退出。
  *
- * 用法：node tools/coverage/check-coverage.mjs [阈值]
+ * 用法：node deploy/coverage/check-coverage.mjs [阈值]
  *   阈值默认 0.80（80%）
  *
  * 口径：扫描当前目录下 clara-* 模块的 target/site/jacoco/jacoco.xml，取每个报告根节点最后一条

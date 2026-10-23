@@ -3,6 +3,7 @@ package com.clara.memory.persistence;
 import com.clara.core.message.IContent;
 import com.clara.enums.interaction.HistoryClearScopeEnum;
 import com.clara.kernel.message.delta.AssistantContent;
+import com.clara.kernel.message.delta.ToolContent;
 import com.clara.kernel.message.delta.UserContent;
 import org.junit.Test;
 
@@ -121,5 +122,49 @@ public class InMemoryConversationStoreTest {
 
     private static List<IContent> messages(String user, String assistant) {
         return Arrays.asList(new UserContent(user), new AssistantContent(assistant));
+    }
+
+    /**
+     * 未知会话返回空快照；版本冲突被拒绝；空批次仍推进版本。
+     */
+    @Test
+    public void handlesUnknownKeysConflictsAndEmptyBatches() {
+        assertEquals(0L, store.loadSnapshot(first).version());
+        assertTrue(store.loadSnapshot(first).messages().isEmpty());
+
+        store.append(first, messages("u1", "a1"), 0L);
+        assertThrows(com.clara.exception.ClaraException.class,
+                () -> store.append(first, messages("u2", "a2"), 0L));
+
+        store.append(first, Collections.<IContent>emptyList(), 1L);
+        assertEquals(2L, store.loadSnapshot(first).version());
+        assertEquals(2, store.loadSnapshot(first).messages().size());
+    }
+
+    /**
+     * 多模态内容按正文判断是否为聊天消息；只有工具消息的会话在清理后整体移除。
+     */
+    @Test
+    public void identifiesChatMessagesByRenderedContent() {
+        store.append(first, Collections.<IContent>singletonList(new ToolContent("call-1", "{}")), 0L);
+        assertEquals(0, store.deleteChatMessages(HistoryClearScopeEnum.FIRST, 1));
+
+        store.append(first, Arrays.<IContent>asList(new UserContent("u1"), new ToolContent("call-1", "{}")), 1L);
+        assertEquals(1, store.deleteChatMessages(HistoryClearScopeEnum.FIRST, 1));
+
+        assertTrue(store.loadSnapshot(first).messages().isEmpty());
+    }
+
+    /**
+     * close 清空全部会话，之后读取为空快照。
+     */
+    @Test
+    public void closeClearsAllSnapshots() {
+        store.append(first, messages("u1", "a1"), 0L);
+
+        store.close();
+
+        assertEquals(0L, store.loadSnapshot(first).version());
+        assertTrue(store.loadSnapshot(first).messages().isEmpty());
     }
 }

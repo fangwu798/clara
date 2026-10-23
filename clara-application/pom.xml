@@ -124,7 +124,7 @@
                                     <executable>node</executable>
                                     <workingDirectory>${project.basedir}/..</workingDirectory>
                                     <arguments>
-                                        <argument>tools/coverage/check-coverage.mjs</argument>
+                                        <argument>deploy/coverage/check-coverage.mjs</argument>
                                         <argument>0.80</argument>
                                     </arguments>
                                 </configuration>

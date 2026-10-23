@@ -53,7 +53,7 @@ deploy\sonar\gate.cmd
 
 | 指标 | Sonar way | Clara Gate | 原因 |
 |---|---|---|---|
-| 覆盖率 | `new_coverage` ≥ 80 | `new_line_coverage` ≥ 80 | `new_coverage` 是行 + 分支的综合口径；团队标准（`tools/coverage/check-coverage.mjs`）约定按行覆盖率 80% |
+| 覆盖率 | `new_coverage` ≥ 80 | `new_line_coverage` ≥ 80 | `new_coverage` 是行 + 分支的综合口径；团队标准（`deploy/coverage/check-coverage.mjs`）约定按行覆盖率 80% |
 
 其余条件（可靠性 / 安全性 / 可维护性评级、重复率 3%、安全热点复核率 100%）保持不变。
 脚本可重复执行，会在重建条件后重新绑定项目；门禁结果需在下次扫描分析后才刷新。

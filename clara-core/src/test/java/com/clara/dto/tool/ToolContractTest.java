@@ -121,4 +121,35 @@ public class ToolContractTest {
         assertEquals(Arrays.asList("role", "tool_call_id", "content"),
                 new java.util.ArrayList<>(empty.toCompletionMessage().keySet()));
     }
+
+    /**
+     * Messages 协议工具声明没有 type 外层、Schema 键名为 input_schema；无函数签名时为空映射。
+     */
+    @Test
+    public void rendersMessagesToolDeclarations() {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("type", "object");
+        ToolSpecification spec = new ToolSpecification("search", "search docs", parameters);
+
+        Map<String, Object> messages = new ToolContext(spec).toMessagesTool();
+        assertEquals("search", messages.get("name"));
+        assertEquals("search docs", messages.get("description"));
+        assertEquals(parameters, messages.get("input_schema"));
+        assertFalse(messages.containsKey("type"));
+        assertFalse(messages.containsKey("parameters"));
+
+        ToolSpecification noDescription = new ToolSpecification("search", null, parameters);
+        assertFalse(new ToolContext(noDescription).toMessagesTool().containsKey("description"));
+        assertTrue(new ToolContext("web_search", null).toMessagesTool().isEmpty());
+
+        assertThrows(IllegalArgumentException.class, () -> new ToolSpecification(" ", "d", parameters));
+        assertThrows(IllegalArgumentException.class, () -> new ToolSpecification("search", "d", null));
+
+        Map<String, Object> mutable = new HashMap<>();
+        mutable.put("type", "object");
+        ToolSpecification copied = new ToolSpecification("search", "d", mutable);
+        mutable.put("type", "changed");
+        assertEquals("object", copied.getParameters().get("type"));
+        assertThrows(UnsupportedOperationException.class, () -> copied.getParameters().put("x", 1));
+    }
 }

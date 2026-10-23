@@ -399,6 +399,7 @@ public final class StreamingExample {
 | `intentPlanning` | 复杂任务识别、动态计划与计划校验 |
 | `milvus` | 语义记忆与 BM25 / 向量召回配置 |
 | `telemetry` | 链路追踪、JSONL 保留、OTLP 与 Prometheus |
+| `modelCheck` | 启动模型检查的等待超时 `timeoutMillis` 与超时重试次数 `retries` |
 
 `enabledProviders` 同时决定三件事：哪些模型配置会被加载、`/model` 列出哪些模型、启动脚本检查哪些凭据环境变量。未启用的模型配置不会被加载。
 
@@ -636,6 +637,8 @@ root:
 
 启动时会探测模型可用性。若当前模型属于「平台不可用」（401 / 403 / 429 / 5xx、连接失败、超时、无响应字节等），会按首字符响应时间顺序自动切到下一个可用模型，并打印 `[failover]` 提示；已完成工具调用的轮次不会重放。
 
+同一 provider 配置了多条模型（例如 `deepseek-completion` 与 `deepseek-response`）时，启动检查只探测代表配置：优先 `RESPONSE` 协议，没有时取第一条；其余配置复用结果，仍保留在 `enabledProviders` 中供 `/model` 切换。
+
 探测的超时与重试由 `config/clara.yml` 的 `modelCheck` 节点控制：`timeoutMillis`（默认 60000）是等待首个流式响应事件的最长时间，`retries`（默认 1）只在超时时重试。经中转站或平台排队时首字可能到几十秒，30 秒级硬超时会把可用模型误判为不可用；遇到「等待首个响应超时」先调大 `timeoutMillis`。
 
 ## 工作流
@@ -732,7 +735,7 @@ mvn test
 mvn clean verify
 
 # 覆盖率门禁（默认 80%）
-node tools/coverage/check-coverage.mjs 0.80
+node deploy/coverage/check-coverage.mjs 0.80
 ```
 
 部分模型兼容性、图片 / 视频和外部服务测试会在检测到真实凭据或本地服务时发起实际调用，执行前请确认账号权限、配额与费用。纯离线验证可先移除对应环境变量或关闭 Milvus。
@@ -770,8 +773,7 @@ clara/
 |   |-- skill/                  # 提示词、工具声明与脚本
 |   |-- workflow/               # 内置工作流 + custom 自定义流程
 |   |-- standards/              # 开发规范（自动纳入方案 / 计划工作流）
-|-- deploy/                     # Milvus、知识图谱、观测栈、Sonar 与 SpotBugs 配置及脚本
-|-- tools/                      # 覆盖率等本地工具
+|-- deploy/                     # Milvus、知识图谱、观测栈、Sonar、覆盖率门禁与 SpotBugs 配置及脚本
 |-- clara.bat / clara.sh        # 启动脚本
 `-- clara.jar                   # 构建产物（不纳入版本库）
 ```

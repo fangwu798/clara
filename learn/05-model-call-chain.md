@@ -89,7 +89,7 @@ public <R extends IResponse> IStreamHandle chat(
 Clara 用两组注解描述平台差异：
 
 - `@ProviderAdapter`：字段在哪个平台、哪种能力下是否支持、默认值、取值范围。
-- `@ProtocolField`：同一字段在 Completion / Response 两种协议下的线格式名。
+- `@ProtocolField`：同一字段在 Completion / Response / Messages 三种协议下的线格式名。
 
 编码流程：
 
@@ -111,6 +111,30 @@ RawHttpResponse
 ```
 
 这样新增平台通常只改配置和少量字段规则，不需要在 `CompatibleStream` 里加 `if/else`。
+
+### 5.4.1 Anthropic Messages 协议
+
+`ProtocolEnum` 有三个值：`COMPLETION`、`RESPONSE`、`MESSAGES`。Messages 不属于 OpenAI 兼容家族，差异集中在五处：
+
+| 维度 | Chat Completions | Anthropic Messages |
+| --- | --- | --- |
+| 系统指令 | `messages` 中 `role=system` | 顶层 `system` 字符串 |
+| 输出上限 | `max_tokens` 可选 | `max_tokens` 必填 |
+| 工具声明 | `{type:function, function:{...}}` | `{name, description, input_schema}` |
+| 流式结束 | `data: [DONE]` | 具名事件 `message_stop` |
+| 工具调用 | `tool_calls` 数组分片 | `content_block_start(tool_use)` + `input_json_delta` |
+
+对应实现：
+
+```text
+MessagesRequestEncoder      请求编码：system 提升、max_tokens 兜底、工具历史转换
+MessagesResponseDecoder     同步响应：content[] / stop_reason / usage
+MessagesStreamAssembler     流式响应：content_block_delta / message_stop / error
+MessagesToolCalls           工具内容块与增量片段
+AnthropicConfigResolver     把 apiProfile: messages-v1 推导为 ProtocolEnum.MESSAGES
+```
+
+鉴权由 `ProviderConfiguration.authorizationHeaders` 统一处理：Messages 走 `x-api-key` + `anthropic-version`，其余平台走 `Authorization: Bearer`。编码器不接触密钥。
 
 ## 5.5 同步与流式
 
@@ -152,6 +176,10 @@ RawHttpResponse
 - 只收到思维链：也视为可用；
 - 错误、超时、正常结束但无任何输出：不可用；
 - 环境变量缺失：直接跳过，不发请求。
+
+同一 provider 的多条配置只探测代表（优先 `RESPONSE`），其余复用结果，避免对同一凭据与通道重复发请求。
+
+等待上限与重试由 `config/clara.yml` 的 `modelCheck` 控制：`timeoutMillis`（默认 60000）、`retries`（默认 1）。只有超时会重试；超时原因是「等待首个响应超时（xxxxxms）」，与平台返回的 4xx 错误明确区分。
 
 `PROBE_MAX_TOKENS` 不能设得太小。推理模型的思维链也计入输出 token，预算太小会只产出思维链、正文为空并以 `LENGTH` 结束，从而把可用模型误判为不可用。
 
@@ -241,8 +269,10 @@ RawHttpResponse
 4. `clara-model/src/main/java/com/clara/kernel/message/provider/ProviderResponseDecoder.java`
 5. `clara-model/src/main/java/com/clara/model/provider/CompatibleStream.java`
 6. `clara-model/src/main/java/com/clara/model/availability/StreamingModelProbe.java`
-7. `clara-application/src/main/java/com/clara/config/ModelRegistry.java`
-8. `clara-application/src/main/java/com/clara/config/ModelFailover.java`
+7. `clara-sdk/src/main/java/com/clara/config/ModelRegistry.java`
+8. `clara-sdk/src/main/java/com/clara/config/ModelFailover.java`
+9. `clara-sdk/src/main/java/com/clara/config/ModelCheckSettings.java`
+10. `clara-model/src/main/java/com/clara/kernel/message/provider/messages/`
 
 ## 5.12 练习
 
@@ -257,4 +287,5 @@ RawHttpResponse
 - `@ProviderAdapter` 和 `@ProtocolField` 分别解决什么问题？
 - 模型探活为什么把“只收到思维链”也判为可用？
 - 哪些错误不应该触发模型切换？
+- Messages 协议的 `system`、`max_tokens`、`message_stop` 分别与 Chat Completions 有什么不同？
 - 配置的 `maxTokens` 为什么可能被收敛？

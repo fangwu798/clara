@@ -105,7 +105,7 @@
 
 - Python 运行时；
 - 凭据环境变量检查（按变量名去重）；
-- 模型可用性检查（可用 / 跳过 / 不可用，带颜色与原因）；
+- 模型可用性检查（可用 / 跳过 / 不可用，带颜色与原因；超时按 `modelCheck` 重试）；
 - 当前默认模型与首字符响应时间；
 - MCP 服务端与外部工具数量；
 - 代码图谱状态；
@@ -221,12 +221,12 @@ try (ApplicationBootstrap bootstrap = new ApplicationBootstrap()) {
 ## 11.12 源码阅读路线
 
 1. `clara-application/src/main/java/com/clara/ClaraApplication.java`
-2. `clara-application/src/main/java/com/clara/ApplicationBootstrap.java`
+2. `clara-sdk/src/main/java/com/clara/ApplicationBootstrap.java`
 3. `clara-application/src/main/java/com/clara/adapter/console/SessionCommandHandler.java`
 4. `clara-application/src/main/java/com/clara/adapter/console/ConsoleView.java`
-5. `clara-application/src/main/java/com/clara/telemetry/TelemetryRuntime.java`
-6. `clara-application/src/main/java/com/clara/telemetry/TelemetryStore.java`
-7. `clara-application/src/main/java/com/clara/telemetry/TelemetryHttpServer.java`
+5. `clara-sdk/src/main/java/com/clara/telemetry/TelemetryRuntime.java`
+6. `clara-sdk/src/main/java/com/clara/telemetry/TelemetryStore.java`
+7. `clara-sdk/src/main/java/com/clara/telemetry/TelemetryHttpServer.java`
 
 ## 11.13 练习
 

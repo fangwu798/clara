@@ -25,7 +25,7 @@
 - 调用模型；
 - 装配具体实现。
 
-这些都在能力模块和 `clara-application` 中。
+这些都在能力模块中实现、由 `clara-sdk` 完成装配；`clara-application` 只负责交互展示。
 
 ## 3.2 五组契约
 
@@ -97,7 +97,7 @@
 - `TelemetrySpan`：一个进行中的阶段。
 - `TelemetryContext`：跨线程传递 traceId / spanId。
 
-`core` 只定义“怎么记”，不定义“记到哪里”。JSONL、Prometheus、OTLP 都在 `clara-application`。
+`core` 只定义“怎么记”，不定义“记到哪里”。JSONL、Prometheus、OTLP 的实现与装配都在 `clara-sdk`。
 
 ## 3.3 错误模型
 
@@ -182,7 +182,7 @@ Clara 没有在编码器里写大量 `if (provider == OPENAI)`。平台差异通
 2. `clara-core/src/main/java/com/clara/dto`：看请求、结果、消息、工作流 DTO。
 3. `clara-core/src/main/java/com/clara/exception`：看 `ClaraError`、`ClaraException`、`ErrorCodes`。
 4. `clara-core/src/main/java/com/clara/core/annotation`：看 `@ProviderAdapter`、`@ProtocolField`。
-5. 回到 `clara-application/ApplicationBootstrap`，用 IDE “Find Usages” 找每个接口的装配点。
+5. 回到 `clara-sdk/src/main/java/com/clara/ApplicationBootstrap.java`，用 IDE “Find Usages” 找每个接口的装配点。
 
 ## 3.8 练习
 

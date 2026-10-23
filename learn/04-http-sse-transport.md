@@ -71,6 +71,8 @@ HttpCall 读取 SSE 字节
   → IStreamObserver
 ```
 
+`DefaultSseEventParser` 同时解析 `event:` 与 `data:` 两类字段，因此既支持 OpenAI 的 `data: {json}`，也支持 Anthropic 的具名事件。两者终止方式不同：OpenAI 兼容协议以 `[DONE]` 结束，Anthropic 以 `message_stop` 结束；`MessagesStreamAssembler` 负责后者。
+
 `IStreamObserver` 的回调运行在读取线程上。不要在里面执行耗时操作，否则会阻塞整个流。
 
 ## 4.4 传输策略

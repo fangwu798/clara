@@ -80,7 +80,7 @@ java -Dfile.encoding=UTF-8 -jar clara.jar
 1. 由工作目录推导 conversationId
 2. 解析启动参数 LaunchOptions
 3. 打开终端、ConsoleView、ConsoleInput、ESC 监听
-4. ModelAvailabilityManager 检查全部模型配置，并把结果写回 clara.yml
+4. ModelAvailabilityManager 按 modelCheck 策略检查全部模型配置，并把结果写回 clara.yml
 5. 选择本次启动使用的模型
 6. 启动 TelemetryRuntime
 7. 创建 ApplicationBootstrap（装配各模块）
@@ -100,12 +100,15 @@ java -Dfile.encoding=UTF-8 -jar clara.jar
 
 ## 2.5 模型可用性检查
 
-`ModelAvailabilityManager.checkAndPersist` 做四件事：
+`ModelAvailabilityManager.checkAndPersist` 做五件事：
 
 1. 先本地预扫描配置，读取 `credential.environmentVariable`，确定列宽。
 2. 对每个模型：环境变量缺失则直接“跳过”，不发请求。
-3. 环境变量存在则用 `StreamingModelProbe` 发一个最小流式请求，等待首个正文或思维链字符，默认超时 30 秒。
-4. 每条结论在检查结束后立即输出，不攒到最后；最后按首字符响应时间排序并写回 `defaultModel`。
+3. 环境变量存在则用 `StreamingModelProbe` 发一个最小流式请求，等待首个正文或思维链字符；等待上限取 `modelCheck.timeoutMillis`（默认 60000ms）。
+4. 只有“等待首个响应超时”会按 `modelCheck.retries`（默认 1）重试；凭据错误、4xx、余额不足等不重试，避免无意义地拖长启动。
+5. 每条结论在检查结束后立即输出，不攒到最后；最后按首字符响应时间排序并写回 `defaultModel`。
+
+同平台去重：一个 provider 配了多条时只探测一个代表——优先 `RESPONSE` 协议，没有时取第一条；其余同平台配置复用代表结果（不单独发请求），并继续保留在 `enabledProviders` 中。代表不可用时，同平台其余配置也不会被写入启用列表。
 
 判定口径：
 
@@ -113,6 +116,16 @@ java -Dfile.encoding=UTF-8 -jar clara.jar
 - 只收到 `REASONING_DELTA`：也视为可用，因为平台、凭据、模型已经确认可用。
 - 错误、超时、正常结束但无任何输出：不可用。
 - 环境变量缺失：跳过，不发起请求。
+
+超时与重试配置：
+
+```yaml
+modelCheck:
+  timeoutMillis: 60000
+  retries: 1
+```
+
+为什么默认不是 30 秒：直连官方接口通常 1~3 秒，但经中转站、代理或平台排队时首字可能到几十秒。30 秒硬超时会把可用模型误判为不可用；遇到「等待首个响应超时」，先调大 `timeoutMillis`，而不是改代码。
 
 这解释了一个常见现象：某个模型在网页上能用，但 Clara 显示不可用。先看启动横幅里的原因，通常是环境变量没进当前进程、余额不足、模型 ID 变更或网络不可达。
 
@@ -152,6 +165,7 @@ config/
 | `intentPlanning` | 复杂任务识别、计划步数、修正次数 |
 | `milvus` | 语义记忆开关、BM25 / vector 模式、集合与分词器 |
 | `telemetry` | Span、JSONL、采样、OTLP、Prometheus |
+| `modelCheck` | 启动检查的等待超时与超时重试次数 |
 
 `enabledProviders` 同时决定三件事：加载哪些配置、列出哪些模型、检查哪些凭据。未启用的配置不会被加载。
 

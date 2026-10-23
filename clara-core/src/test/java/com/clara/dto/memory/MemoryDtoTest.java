@@ -255,4 +255,39 @@ public class MemoryDtoTest {
         assertEquals(entry, match.getEntry());
         assertEquals(0.8, match.getScore(), 0.0);
     }
+
+    /**
+     * 上下文配置的边界与值语义：轮次下限不可为负、预算超 int 时封顶、同值配置可比。
+     */
+    @Test
+    public void validatesContextControlConfigBoundsAndEquality() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ContextControlConfig.builder().contextWindowTokens(-1L).windowMaxMessages(-1)
+                        .recentTurnsKept(-1).build());
+        assertEquals(0, ContextControlConfig.builder().contextWindowTokens(-1L).windowMaxMessages(-1)
+                .recentTurnsKept(0).build().getRecentTurnsKept());
+
+        ContextControlConfig huge = ContextControlConfig.builder()
+                .contextWindowTokens(-1L)
+                .windowMaxMessages(-1)
+                .toolOutputMaxChars(Integer.MAX_VALUE)
+                .build();
+        assertEquals(Integer.MAX_VALUE, huge.getToolOutputBudgetChars());
+
+        ContextControlConfig one = ContextControlConfig.builder()
+                .contextWindowTokens(1000L).windowMaxMessages(10).windowMaxSizeBytes(2048L)
+                .windowMaxTokensPercent(50).recentTurnsKept(2).compressEnabled(true)
+                .vectorizeEnabled(true).retrievalCount(5).similarityThreshold(0.9)
+                .toolOutputMaxChars(100).build();
+        ContextControlConfig same = ContextControlConfig.builder()
+                .contextWindowTokens(1000L).windowMaxMessages(10).windowMaxSizeBytes(2048L)
+                .windowMaxTokensPercent(50).recentTurnsKept(2).compressEnabled(true)
+                .vectorizeEnabled(true).retrievalCount(5).similarityThreshold(0.9)
+                .toolOutputMaxChars(100).build();
+
+        assertEquals(one, same);
+        assertEquals(one.hashCode(), same.hashCode());
+        assertFalse(one.equals(ContextControlConfig.defaults()));
+        assertTrue(one.toString().contains("recentTurnsKept=2"));
+    }
 }

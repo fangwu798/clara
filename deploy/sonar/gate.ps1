@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Sonar 内置的 Sonar way 门禁用 new_coverage（行覆盖 + 分支覆盖的综合口径）判定新代码覆盖率，
-    而团队约定的覆盖率标准是 JaCoCo 行覆盖率 80%（见 tools/coverage/check-coverage.mjs）。
+    而团队约定的覆盖率标准是 JaCoCo 行覆盖率 80%（见 deploy/coverage/check-coverage.mjs）。
     本脚本创建的 Clara Gate 用 new_line_coverage 替换 new_coverage，其余条件与 Sonar way 保持一致
     （可靠性 / 安全性 / 可维护性评级、重复率、安全热点复核率），不会放宽非覆盖率类要求。
 

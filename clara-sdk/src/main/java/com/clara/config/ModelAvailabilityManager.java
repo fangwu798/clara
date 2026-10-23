@@ -2,6 +2,7 @@ package com.clara.config;
 
 import com.clara.utils.StringUtils;
 import com.clara.enums.CapabilityKindEnum;
+import com.clara.enums.ProtocolEnum;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.model.availability.ModelCheckResult;
@@ -20,7 +21,9 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -33,6 +36,11 @@ import java.util.function.UnaryOperator;
  * <p>输出时机：每个模型的结论在它自己的检查结束后立刻发送给输出接收器，跳过、配置不可用等无需请求的项也
  * 随即输出，**不等整批检查结束**——单条探测最长要等一次网络往返，全部攒到最后会让启动长时间没有任何反馈。
  * 为保证先输出的行与后输出的行对齐，列宽由一次本地预扫描提前确定（见 {@link AvailabilityLine#widths}）。
+ *
+ * <p>同一平台的去重：一个平台常常同时配置 Chat Completions 与 Responses 两条线（如 deepseek-completion /
+ * deepseek-response）。两者共用同一个凭据与网络通道，逐个探测只会把启动时间翻倍。因此每个平台只探测一个
+ * 代表配置——优先 {@link ProtocolEnum#RESPONSE}，没有时取第一条；其余同平台配置复用代表的结果，仍保留在
+ * {@code enabledProviders} 中供 {@code /model} 切换。
  */
 public final class ModelAvailabilityManager {
 
@@ -133,11 +141,14 @@ public final class ModelAvailabilityManager {
         // 这样每条结论在它自己的检查结束时就可见，同时各列仍然对齐。
         List<PendingCheck> pending = prescan(configFiles);
         AvailabilityColumnWidths widths = AvailabilityLine.widths(aliasesOf(pending), identitiesOf(pending));
-        List<ModelCheckResult> results = new ArrayList<>();
+        List<ModelCheckResult> checked = new ArrayList<>();
         try {
             for (PendingCheck check : pending) {
+                if (!check.isRepresentative()) {
+                    continue;
+                }
                 ModelCheckResult result = checkWithRetry(check);
-                results.add(result);
+                checked.add(result);
                 sink.accept(AvailabilityLine.line(result, widths));
             }
         } finally {
@@ -147,25 +158,27 @@ public final class ModelAvailabilityManager {
         }
 
         List<ModelCheckResult> available = new ArrayList<>();
-        for (ModelCheckResult result : results) {
+        for (ModelCheckResult result : checked) {
             if (result.isAvailable()) {
                 available.add(result);
             }
         }
         available.sort(Comparator.comparingLong(ModelCheckResult::getFirstCharacterMillis));
-        ModelCheckResult preferred = preferred(available, readDefaultModel(claraConfig));
+        List<ModelCheckResult> enabled = new ArrayList<>(available);
+        enabled.addAll(inheritedResults(pending, checked));
+        ModelCheckResult preferred = preferred(enabled, readDefaultModel(claraConfig));
         try {
-            persist(claraConfig, available, preferred == null ? null : preferred.getAlias());
+            persist(claraConfig, enabled, preferred == null ? null : preferred.getAlias());
         } catch (IOException failure) {
             throw new IllegalStateException("无法更新 " + claraConfig + ": " + failure.getMessage(), failure);
         }
-        if (available.isEmpty()) {
+        if (enabled.isEmpty()) {
             sink.accept(AvailabilityLine.fail("未发现可用模型。"));
         } else {
             sink.accept(AvailabilityLine.ok("默认模型：" + preferred.getAlias() + "（首字符响应 " + preferred.getFirstCharacterMillis() + "ms）"));
         }
         List<Path> paths = new ArrayList<>();
-        for (ModelCheckResult result : available) {
+        for (ModelCheckResult result : enabled) {
             paths.add(result.getPath());
         }
         return paths;
@@ -238,7 +251,76 @@ public final class ModelAvailabilityManager {
                 }
             }
         }
+        markRepresentatives(pending);
         return pending;
+    }
+
+    /**
+     * 为同一平台挑选唯一代表配置，其余标记为复用。
+     *
+     * <p>代表优先取 {@link ProtocolEnum#RESPONSE}：Responses 是较新的线格式，同平台的 Completion 配置通常
+     * 只是兼容入口，共用同一凭据与通道；没有 Response 配置时取配置顺序中的第一条。
+     *
+     * @param pending 预扫描得到的待检查项，非 null
+     */
+    private static void markRepresentatives(List<PendingCheck> pending) {
+        Map<String, List<PendingCheck>> groups = new LinkedHashMap<>();
+        for (PendingCheck check : pending) {
+            if (check.isReady()) {
+                groups.computeIfAbsent(check.providerName(), key -> new ArrayList<>()).add(check);
+            }
+        }
+        for (List<PendingCheck> group : groups.values()) {
+            if (group.size() <= 1) {
+                continue;
+            }
+            PendingCheck chosen = group.get(0);
+            for (PendingCheck check : group) {
+                if (check.protocol() == ProtocolEnum.RESPONSE) {
+                    chosen = check;
+                    break;
+                }
+            }
+            for (PendingCheck check : group) {
+                if (check != chosen) {
+                    check.representative = false;
+                }
+            }
+        }
+    }
+
+    /**
+     * 为未探测的同平台配置生成「继承可用」结果。
+     *
+     * <p>只有代表配置可用时才继承；代表不可用（凭据、余额、网络问题）时同平台其它配置一并不可用，
+     * 不再单独写入 {@code enabledProviders}。
+     *
+     * @param pending 全部待检查项，非 null
+     * @param checked 实际探测过的结果，非 null
+     * @return 按配置顺序排列的继承结果，非 null
+     */
+    private static List<ModelCheckResult> inheritedResults(List<PendingCheck> pending,
+            List<ModelCheckResult> checked) {
+        Map<String, ModelCheckResult> owners = new LinkedHashMap<>();
+        for (ModelCheckResult result : checked) {
+            if (result.isAvailable() && result.getProvider() != null) {
+                owners.putIfAbsent(result.getProvider(), result);
+            }
+        }
+        List<ModelCheckResult> inherited = new ArrayList<>();
+        for (PendingCheck check : pending) {
+            if (!check.isReady() || check.isRepresentative()) {
+                continue;
+            }
+            ModelCheckResult owner = owners.get(check.providerName());
+            if (owner == null) {
+                continue;
+            }
+            inherited.add(ModelCheckResult.available(check.path, check.alias, owner.getProvider(),
+                    check.chat.getModelId(), owner.getFirstCharacterMillis(),
+                    "与 " + owner.getAlias() + " 共用同一平台检查"));
+        }
+        return inherited;
     }
 
     /**
@@ -250,7 +332,9 @@ public final class ModelAvailabilityManager {
     private static List<String> aliasesOf(List<PendingCheck> pending) {
         List<String> aliases = new ArrayList<>();
         for (PendingCheck check : pending) {
-            aliases.add(check.alias());
+            if (check.isRepresentative()) {
+                aliases.add(check.alias());
+            }
         }
         return aliases;
     }
@@ -266,7 +350,9 @@ public final class ModelAvailabilityManager {
     private static List<String> identitiesOf(List<PendingCheck> pending) {
         List<String> identities = new ArrayList<>();
         for (PendingCheck check : pending) {
-            identities.add(check.identity());
+            if (check.isRepresentative()) {
+                identities.add(check.identity());
+            }
         }
         return identities;
     }
@@ -477,6 +563,21 @@ public final class ModelAvailabilityManager {
         private final ModelConfig chat;
 
         /**
+         * 平台名称；已判定项为 null。
+         */
+        private final String providerName;
+
+        /**
+         * 对话能力的协议档位；已判定项为 null。
+         */
+        private final ProtocolEnum protocol;
+
+        /**
+         * 是否为本平台唯一需要真实探测的代表配置。
+         */
+        private boolean representative = true;
+
+        /**
          * 是否已释放平台配置，避免重复关闭。
          */
         private boolean closed;
@@ -488,6 +589,44 @@ public final class ModelAvailabilityManager {
             this.alias = alias;
             this.configuration = configuration;
             this.chat = chat;
+            this.providerName = configuration == null ? null : configuration.getProvider().name();
+            this.protocol = chat == null ? null : chat.getProtocol();
+        }
+
+        /**
+         * 是否需要真实探测。
+         *
+         * @return 预扫描未给出终态结果时返回 true
+         */
+        private boolean isReady() {
+            return terminal == null;
+        }
+
+        /**
+         * 是否为本平台代表配置。
+         *
+         * @return 需要发起探测时返回 true
+         */
+        private boolean isRepresentative() {
+            return representative;
+        }
+
+        /**
+         * 平台名称。
+         *
+         * @return 平台名；已判定项返回 null
+         */
+        private String providerName() {
+            return providerName;
+        }
+
+        /**
+         * 对话能力协议。
+         *
+         * @return 协议枚举；已判定项返回 null
+         */
+        private ProtocolEnum protocol() {
+            return protocol;
         }
 
         /**

@@ -24,7 +24,14 @@ public final class MilvusSemanticMemoryProvider implements ISemanticMemoryBacken
 
     @Override
     public SemanticMemoryBackend open(Path claraConfig, int defaultDimension, String projectName) {
-        MilvusSettings settings = MilvusSettings.load(claraConfig, defaultDimension, projectName);
+        MilvusSettings settings;
+        try {
+            settings = MilvusSettings.load(claraConfig, defaultDimension, projectName);
+        } catch (IllegalArgumentException invalid) {
+            // 配置写错（端口非数字、集合名为空等）与「没配」一样，都只降级、不阻断应用启动。
+            System.err.println("[memory] Milvus 配置非法，语义记忆回退为进程内实现：" + invalid.getMessage()); // NOSONAR CLI output by design
+            return null;
+        }
         if (settings == null) {
             return null;
         }

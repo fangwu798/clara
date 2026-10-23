@@ -31,10 +31,12 @@ clara-core/src/test/java/com/clara/...
 clara-transport/src/test/java/com/clara/...
 clara-model/src/test/java/com/clara/...
 clara-memory/src/test/java/com/clara/...
+clara-memory-milvus/src/test/java/com/clara/...
 clara-mcp/src/test/java/com/clara/...
 clara-skill/src/test/java/com/clara/...
 clara-workflow/src/test/java/com/clara/...
 clara-orchestration/src/test/java/com/clara/...
+clara-sdk/src/test/java/com/clara/...
 clara-application/src/test/java/com/clara/...
 ```
 
@@ -45,12 +47,14 @@ clara-application/src/test/java/com/clara/...
 | core | `ClaraExceptionTest` | 错误模型 |
 | transport | `DefaultSseEventParserTest` | SSE 边界 |
 | model | `StreamingModelProbeTest` | 探活判定 |
+| model | `HttpRequestAnthropicTest` | Messages 协议编码 / 解码契约 |
 | memory | `LocalConversationStoreTest` | 本地持久化 |
 | mcp | `DefaultMcpGatewayTest` | 契约校验 |
 | skill | `SkillSchemaValidatorTest` | Schema 校验 |
 | workflow | `DefaultWorkflowEngineTest` | 暂停 / 恢复 |
 | orchestration | `DefaultConversationOrchestratorLoopTest` | Agent Loop |
-| application | `ApplicationBootstrapMcpConfigTest` | MCP 装配 |
+| sdk | `ApplicationBootstrapMcpConfigTest` | MCP 装配 |
+| sdk | `ModelAvailabilityManagerTest` | 探活排序与超时重试 |
 
 ## 14.3 运行测试
 
@@ -90,13 +94,13 @@ mvn -q -pl clara-application -am package -DskipTests
 项目提供的汇总门禁：
 
 ```powershell
-node tools/coverage/check-coverage.mjs
+node deploy/coverage/check-coverage.mjs
 ```
 
 默认阈值 80%，也可以显式传：
 
 ```powershell
-node tools/coverage/check-coverage.mjs 0.85
+node deploy/coverage/check-coverage.mjs 0.85
 ```
 
 口径是“各模块 LINE 计数器的合计行覆盖率”。注意：
@@ -230,7 +234,7 @@ public void shouldReturnWaitingInputWhenHumanNodeHasNoInput() {
 1. 根 `pom.xml`：Surefire、JaCoCo、SpotBugs 配置。
 2. `sonar-project.properties`：扫描范围与质量门禁。
 3. `deploy/sonar/scan.ps1`：本地扫描流程。
-4. `tools/coverage/check-coverage.mjs`：覆盖率门禁口径。
+4. `deploy/coverage/check-coverage.mjs`：覆盖率门禁口径。
 5. 各模块 `src/test`：挑一个测试看 fake 的写法。
 
 ## 14.11 练习

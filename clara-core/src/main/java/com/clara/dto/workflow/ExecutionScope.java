@@ -7,12 +7,17 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
  * 执行作用域：工作流实例执行期间累积的变量、节点结果、已完成执行标识与控制状态。
  *
  * <p>线程安全：所有读写方法同步，副本通过 {@link #copy()} 获取，用于并行分支隔离。
+ *
+ * <p>相等语义：按「变量 + 节点结果 + 已完成执行 + 控制状态 + 版本号」逐项比较，因此 {@link #copy()} 得到的
+ * 副本与源作用域相等。工作流结果与检查点依赖该语义判断两份快照是否描述同一状态；本类可变，不应作为
+ * 哈希容器的键使用。
  */
 public final class ExecutionScope {
 
@@ -119,6 +124,38 @@ public final class ExecutionScope {
     public synchronized void addInputs(Map<String, Object> values) {
         variables.putAll(MapUtils.copyMap(values));
         version++;
+    }
+
+    /**
+     * 按快照内容比较：副本与源作用域相等，任一变量、节点结果、控制状态或版本不同即不相等。
+     *
+     * @param other 比较对象
+     * @return 描述同一状态时返回 true
+     */
+    @Override
+    public synchronized boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof ExecutionScope)) {
+            return false;
+        }
+        ExecutionScope that = (ExecutionScope) other;
+        return version == that.version
+                && Objects.equals(variables, that.variables)
+                && Objects.equals(nodeResults, that.nodeResults)
+                && Objects.equals(completedExecutions, that.completedExecutions)
+                && Objects.equals(controls, that.controls);
+    }
+
+    /**
+     * 与 {@link #equals(Object)} 保持一致的哈希值。
+     *
+     * @return 基于快照内容的哈希值
+     */
+    @Override
+    public synchronized int hashCode() {
+        return Objects.hash(variables, nodeResults, completedExecutions, controls, version);
     }
 
     public synchronized void merge(ExecutionScope base, ExecutionScope branch) {

@@ -47,27 +47,30 @@ Clara 是一套面向 Java 8 的本地 AI 智能体运行时与控制台。它�
 | `clara-core` | 跨模块契约、DTO、枚举、错误模型、通用工具 | `com.clara.core.*`、`com.clara.dto.*` |
 | `clara-transport` | 通用 HTTP / SSE、超时、体积上限、有界流 | `JdkHttpTransport`、`HttpCall`、`DefaultSseEventParser` |
 | `clara-model` | Provider 配置、请求编码、响应解码、流式模型、探活、媒体模型 | `CompatibleStream`、`ProviderRequestEncoder`、`ProviderResponseDecoder` |
-| `clara-memory` | 窗口记忆、会话持久化、摘要压缩、语义记忆、Milvus | `DefaultWindowMemory`、`ConversationStore`、`MilvusSemanticMemoryStore` |
+| `clara-memory` | 窗口记忆、会话持久化、摘要压缩、语义记忆契约 | `DefaultWindowMemory`、`ConversationStore`、`ISemanticMemoryStore` |
+| `clara-memory-milvus` | 可选语义记忆后端：Milvus 向量 / BM25 检索 | `MilvusSemanticMemoryProvider`、`MilvusGrpcBackend` |
 | `clara-mcp` | MCP 注册、发现、能力快照、网关、stdio / Streamable HTTP | `DefaultMcpDiscoveryService`、`DefaultMcpGateway` |
 | `clara-workflow` | YAML 定义、节点引擎、检查点、人工交互、动态计划 | `WorkflowDefinitionLoader`、`DefaultWorkflowEngine`、`WorkflowRunner` |
 | `clara-skill` | 技能注册、Schema 校验、权限、脚本执行 | `SkillRegistry`、`DefaultToolExecutor` |
 | `clara-orchestration` | 对话主循环、上下文装配、工具往返、意图计划 | `DefaultConversationOrchestrator`、`ContextAssembler` |
-| `clara-application` | 总装配、配置、控制台、图谱 / 观测接入、媒体落盘 | `ApplicationBootstrap`、`ClaraApplication` |
+| `clara-sdk` | 嵌入装配入口：模块装配、配置加载、图谱 / 可观测接入、媒体落盘 | `ApplicationBootstrap` |
+| `clara-application` | 基于 SDK 的交互式 CLI 外壳 | `ClaraApplication` |
 
 ## 1.4 依赖方向
 
-最重要的约束只有一句：**依赖只能向下，装配只能发生在 application。**
+最重要的约束只有一句：**依赖只能向下，装配只能发生在 sdk。**
 
 ```text
-clara-application
-    ├── clara-orchestration
-    ├── clara-model
-    ├── clara-memory
-    ├── clara-skill
-    ├── clara-mcp
-    ├── clara-workflow
-    ├── clara-transport
-    └── clara-core
+clara-application（CLI 外壳，可选引入 clara-memory-milvus）
+    └── clara-sdk（装配入口）
+            ├── clara-orchestration
+            ├── clara-model
+            ├── clara-memory
+            ├── clara-skill
+            ├── clara-mcp
+            ├── clara-workflow
+            ├── clara-transport
+            └── clara-core
 ```
 
 更准确地说：
@@ -76,7 +79,8 @@ clara-application
 - `clara-transport` 只依赖 `clara-core`。
 - 能力模块按需依赖 `clara-core` / `clara-transport`。
 - `clara-orchestration` 只通过接口使用能力模块。
-- `clara-application` 是唯一知道“用哪个实现”的地方。
+- `clara-sdk` 是唯一知道“用哪个实现”的地方；`clara-application` 只负责终端交互。
+- `clara-memory-milvus` 通过 `META-INF/services` 注册记忆后端，未引入时自动使用进程内实现。
 
 这套结构带来的直接好处：替换模型协议、向量库、工具执行器时，通常只改装配点和对应模块，不需要动 Agent Loop。
 
@@ -130,7 +134,7 @@ ConsoleInput
 新增脚本工具  → config/skill/scripts + --describe
 新增 MCP 服务 → config/mcp/*.json
 新增工作流    → config/workflow/*.yml
-新增记忆后端  → 实现 core / memory 接口 + application 装配
+新增记忆后端  → 实现 core / memory 接口 + sdk 装配（或按 SPI 打包为独立模块）
 新增宿主入口  → 使用 ApplicationBootstrap，不要复制 Agent Loop
 ```
 
@@ -139,7 +143,7 @@ ConsoleInput
 建议按下面的顺序打开文件，而不是从目录树平铺开始：
 
 1. `clara-application/src/main/java/com/clara/ClaraApplication.java`：看主流程和启动顺序。
-2. `clara-application/src/main/java/com/clara/ApplicationBootstrap.java`：看谁 new 了谁。
+2. `clara-sdk/src/main/java/com/clara/ApplicationBootstrap.java`：看谁 new 了谁。
 3. `clara-orchestration/src/main/java/com/clara/orchestration/DefaultConversationOrchestrator.java`：看 Agent Loop。
 4. `clara-core/src/main/java/com/clara/core`：回到契约，确认边界。
 5. 再按兴趣进入 model / memory / mcp / skill / workflow。
@@ -153,7 +157,7 @@ ConsoleInput
 
 ## 1.9 练习
 
-1. 画出 `clara-core`、`clara-orchestration`、`clara-application` 三者的依赖箭头，并标注“谁 new 谁”。
+1. 画出 `clara-core`、`clara-orchestration`、`clara-sdk`、`clara-application` 四者的依赖箭头，并标注“谁 new 谁”。
 2. 用 IDE 搜索 `new ApplicationBootstrap`，确认生产代码和测试分别在哪里创建它。
 3. 找出 `clara-orchestration` 中所有 `import com.clara.` 的语句，判断它是否直接依赖了某个实现模块。
 4. 用一句话解释：为什么“新增一个模型平台”通常不需要改 `DefaultConversationOrchestrator`？

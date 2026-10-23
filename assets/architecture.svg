@@ -25,7 +25,7 @@
 
   <!-- 装配层 -->
   <rect x="40" y="184" width="860" height="164" rx="12" fill="#FFF8EE" stroke="#F0D2A8"/>
-  <text x="56" y="208" font-size="13" font-weight="700" fill="#B26A00">装配层 · clara-application</text>
+  <text x="56" y="208" font-size="13" font-weight="700" fill="#B26A00">装配层 · clara-sdk / clara-application</text>
   <rect x="60" y="220" width="820" height="40" rx="8" fill="#FFFFFF" stroke="#E0A94C"/>
   <text x="470" y="245" font-size="13" font-weight="700" fill="#7A4A00" text-anchor="middle">ApplicationBootstrap —— 唯一装配点：把 core 契约绑定到各模块实现</text>
 

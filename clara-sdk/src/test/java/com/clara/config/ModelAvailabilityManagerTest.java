@@ -92,8 +92,9 @@ public class ModelAvailabilityManagerTest {
         assertEquals(Arrays.asList(configs.get(1), configs.get(0)), usable);
         JsonNode root = new ObjectMapper(new YAMLFactory()).readTree(Files.readAllBytes(clara));
         assertEquals("deepseek-completion", root.get("defaultModel").asText());
+        // completion 未单独探测，复用同平台 response 的首字符响应时间。
         assertTrue(texts(output).stream().anyMatch(line ->
-                line.contains("默认模型：deepseek-completion") && line.contains("120ms")));
+                line.contains("默认模型：deepseek-completion") && line.contains("35ms")));
     }
     @Test
     public void skipsMissingCredentialWithoutProbingAndWritesEmptyList() throws Exception {
@@ -210,17 +211,17 @@ public class ModelAvailabilityManagerTest {
         new ModelAvailabilityManager(name -> "test-key", probe, 1000L)
                 .checkAndPersist(configs, clara, output::add);
 
-        assertEquals(3, probes.get());
+        // 同一平台只探测 response 代表，deepseek-completion 复用结果，因此只有 2 次探测。
+        assertEquals(2, probes.get());
         assertTrue("探测第二个模型前应已输出第一个模型的结果，实际输出：" + emittedBeforeSecondProbe,
-                emittedBeforeSecondProbe.stream().anyMatch(line -> line.contains("deepseek-completion")));
-        // 结果行（带「平台与模型」列）恰好 3 条，顺序与配置顺序一致；末尾的「默认模型」汇总行不计入
+                emittedBeforeSecondProbe.stream().anyMatch(line -> line.contains("deepseek-response")));
+        // 结果行（带「平台与模型」列）恰好 2 条，顺序与配置顺序一致；末尾的「默认模型」汇总行不计入
         List<String> rows = texts(output).stream()
                 .filter(line -> line.contains("provider="))
                 .collect(Collectors.toList());
-        assertEquals(3, rows.size());
-        assertTrue(rows.get(0).contains("deepseek-completion"));
-        assertTrue(rows.get(1).contains("deepseek-response"));
-        assertTrue(rows.get(2).contains("kimi-completion"));
+        assertEquals(2, rows.size());
+        assertTrue(rows.get(0).contains("deepseek-response"));
+        assertTrue(rows.get(1).contains("kimi-completion"));
     }
 
     /**
@@ -259,6 +260,54 @@ public class ModelAvailabilityManagerTest {
                 .checkAndPersist(configs, clara, line -> { });
 
         assertEquals(1, probes.get());
+    }
+
+    /**
+     * 同一平台只探测一个代表配置：有 Response 时优先 Response，没有时取第一条；单配置平台照常探测。
+     */
+    @Test
+    public void probesResponseConfigOnlyPerProvider() throws Exception {
+        Path clara = temporary.newFile("dedupe.yml").toPath();
+        List<Path> configs = Arrays.asList(config("deepseek-completion.yml"),
+                config("deepseek-response.yml"), config("kimi-completion.yml"),
+                config("kimi-response.yml"), config("alibaba-completion.yml"));
+        List<String> probed = new ArrayList<>();
+        IModelProbe probe = (path, alias, provider, chat, timeout) -> {
+            probed.add(alias);
+            return ModelCheckResult.available(path, alias, provider.getProvider().name(), chat.getModelId(), 9L);
+        };
+        List<AvailabilityLine> output = new ArrayList<>();
+
+        List<Path> usable = new ModelAvailabilityManager(name -> "test-key", probe, 1000L)
+                .checkAndPersist(configs, clara, output::add);
+
+        assertEquals(Arrays.asList("deepseek-response", "kimi-response", "alibaba-completion"), probed);
+        assertEquals(Arrays.asList(configs.get(1), configs.get(3), configs.get(4),
+                configs.get(0), configs.get(2)), usable);
+        JsonNode root = new ObjectMapper(new YAMLFactory()).readTree(Files.readAllBytes(clara));
+        assertEquals(5, root.get("enabledProviders").size());
+        long rows = texts(output).stream().filter(line -> line.contains("provider=")).count();
+        assertEquals(3, rows);
+    }
+
+    /**
+     * 同平台代表不可用时，其余配置不继承为可用，避免把同一故障通道写进启用列表。
+     */
+    @Test
+    public void doesNotInheritWhenProviderRepresentativeFails() throws Exception {
+        Path clara = temporary.newFile("dedupe-fail.yml").toPath();
+        List<Path> configs = Arrays.asList(config("deepseek-completion.yml"),
+                config("deepseek-response.yml"));
+        IModelProbe probe = (path, alias, provider, chat, timeout) -> ModelCheckResult.unavailable(
+                path, alias, provider.getProvider().name(), chat.getModelId(), "denied");
+        List<AvailabilityLine> output = new ArrayList<>();
+
+        List<Path> usable = new ModelAvailabilityManager(name -> "test-key", probe, 1000L)
+                .checkAndPersist(configs, clara, output::add);
+
+        assertTrue(usable.isEmpty());
+        JsonNode root = new ObjectMapper(new YAMLFactory()).readTree(Files.readAllBytes(clara));
+        assertEquals(0, root.get("enabledProviders").size());
     }
 
     /**

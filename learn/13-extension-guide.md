@@ -15,7 +15,7 @@
 | 需求 | 优先改哪里 | 通常不需要改 |
 | --- | --- | --- |
 | 同一平台新增一个模型 | `config/model-providers/*.yml` | Java 代码 |
-| 接入一个全新平台 | `ModelProviderEnum` + 注解规则 + 配置 | 编排层 |
+| 接入一个全新平台 | `ModelProviderEnum` + 注解规则 + YAML（线格式不同时再加编解码器） | 编排层、`CompatibleStream` |
 | 新增一个脚本工具 | `config/skill/scripts/**.py` | `DefaultToolExecutor` |
 | 新增一个声明式工具 | `config/skill/tools/**.json` | 注册表 |
 | 接入外部 MCP | `config/mcp/*.json` | `clara-mcp` |
@@ -47,14 +47,30 @@
 
 如果 `ModelProviderEnum` 中没有该平台，需要：
 
-1. 在 `clara-core` / `clara-enums` 中增加平台枚举；
+1. 在 `clara-core` 中增加平台枚举（`ModelProviderEnum`）；
 2. 在请求 / 响应字段上补充 `@ProviderAdapter` 规则；
-3. 如果协议不同，补充 `@ProtocolField` 或新的编码器 / 解码器；
-4. 增加 YAML；
-5. 在 `enabledProviders` 中启用；
-6. 用探活和一条最小对话验证。
+3. 如果线格式不同，在 `ProtocolEnum` 增加协议值，并补充 `@ProtocolField` / `@ProtocolResponse`；
+4. 协议差异较大时新增编码器 / 解码器（参考 `Messages*`）；
+5. 增加 YAML，并声明 `protocol`（或让 `ConfigResolver` 从 `apiProfile` 推导）；
+6. 把别名加入 `enabledProviders`；
+7. 用探活和一条最小对话验证，工具平台再补一轮工具往返。
 
-原则：**平台差异放注解和配置，不要放 `CompatibleStream` 或编排层。**
+以 Anthropic Messages 为例，一次完整接入的落点：
+
+| 步骤 | 文件 |
+| --- | --- |
+| 平台枚举 | `clara-core/src/main/java/com/clara/enums/ModelProviderEnum.java` |
+| 协议枚举 | `clara-core/src/main/java/com/clara/enums/ProtocolEnum.java` |
+| 请求编码 | `clara-model/src/main/java/com/clara/kernel/message/provider/messages/MessagesRequestEncoder.java` |
+| 同步解码 | `.../messages/MessagesResponseDecoder.java` |
+| 流式组装 | `.../messages/MessagesStreamAssembler.java` |
+| 工具内容块 | `.../messages/MessagesToolCalls.java` |
+| 配置推导 | `clara-model/src/main/java/com/clara/kernel/config/resolver/AnthropicConfigResolver.java` |
+| 参数 / 响应注解 | `BasicParameters.java`、`HttpResponse.java` |
+| YAML | `config/model-providers/anthropic.yml` |
+| 契约测试 | `clara-model/src/test/java/com/clara/kernel/http/HttpRequestAnthropicTest.java` |
+
+原则：**平台差异放注解和配置，不要放 `CompatibleStream` 或编排层。** 新增协议前先判断差异是否真在“线格式”；只是字段名不同的话，优先用 `@ProtocolField`，不必新增编码器。
 
 ## 13.4 新增脚本工具
 

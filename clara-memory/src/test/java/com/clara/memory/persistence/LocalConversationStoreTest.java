@@ -4,6 +4,7 @@ import com.clara.core.message.IContent;
 import com.clara.enums.interaction.HistoryClearScopeEnum;
 import com.clara.exception.ClaraException;
 import com.clara.kernel.message.delta.AssistantContent;
+import com.clara.kernel.message.delta.ToolContent;
 import com.clara.kernel.message.delta.UserContent;
 import com.clara.memory.persistence.local.LocalConversationStore;
 import org.junit.After;
@@ -14,6 +15,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -139,5 +141,96 @@ public class LocalConversationStoreTest {
     private static List<IContent> chatMessages() {
         return Arrays.asList(new UserContent("u1"), new AssistantContent("a1"),
                 new UserContent("u2"), new AssistantContent("a2"));
+    }
+
+    /**
+     * 构造参数与目录占用：目录必填、上限必须为正、同一目录不能开两个存储。
+     */
+    @Test
+    public void validatesConfigurationAndExclusiveLock() {
+        assertThrows(IllegalArgumentException.class, () -> new LocalConversationStore(null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new LocalConversationStore(tempFolder.getRoot().toPath(), 0L));
+        assertThrows(ClaraException.class, () -> new LocalConversationStore(tempFolder.getRoot().toPath()));
+    }
+
+    /**
+     * 写入参数校验：键与消息必填、空批次不改变版本、消息元素不得为 null。
+     */
+    @Test
+    public void validatesAppendArguments() {
+        assertThrows(IllegalArgumentException.class, () -> store.loadSnapshot(null));
+        assertThrows(IllegalArgumentException.class, () -> store.append(null, messages(), 0L));
+        assertThrows(IllegalArgumentException.class, () -> store.append(key, null, 0L));
+
+        store.append(key, Collections.<IContent>emptyList(), 0L);
+        assertEquals(0L, store.loadSnapshot(key).version());
+
+        List<IContent> withNull = new ArrayList<>();
+        withNull.add(new UserContent("u1"));
+        withNull.add(null);
+        assertThrows(IllegalArgumentException.class, () -> store.append(key, withNull, 0L));
+    }
+
+    /**
+     * 超出单会话文件上限时拒绝写入，避免磁盘被单次对话占满。
+     */
+    @Test
+    public void rejectsOversizedConversationFile() throws Exception {
+        LocalConversationStore limited = new LocalConversationStore(tempFolder.newFolder("limited").toPath(), 16L);
+        try {
+            assertThrows(ClaraException.class, () -> limited.append(key, messages(), 0L));
+        } finally {
+            limited.close();
+        }
+    }
+
+    /**
+     * 清理参数校验与空目录语义。
+     */
+    @Test
+    public void validatesDeleteArgumentsAndEmptyDirectory() {
+        assertThrows(IllegalArgumentException.class, () -> store.deleteChatMessages(null, 1));
+        assertThrows(IllegalArgumentException.class,
+                () -> store.deleteChatMessages(HistoryClearScopeEnum.FIRST, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> store.deleteChatMessages(HistoryClearScopeEnum.LAST, -1));
+
+        assertEquals(0, store.deleteChatMessages(HistoryClearScopeEnum.FIRST, 1));
+        assertEquals(0, store.deleteChatMessages(HistoryClearScopeEnum.ALL, 0));
+    }
+
+    /**
+     * ALL 范围直接删除全部历史文件，并返回删除前的聊天消息条数。
+     */
+    @Test
+    public void deletesAllChatHistoryFiles() {
+        store.append(key, chatMessages(), 0L);
+
+        assertEquals(4, store.deleteChatMessages(HistoryClearScopeEnum.ALL, 0));
+
+        assertTrue(store.loadAllSnapshots().isEmpty());
+    }
+
+    /**
+     * 只有工具消息的会话不计入聊天清理范围，也不会被误删。
+     */
+    @Test
+    public void ignoresConversationsWithoutChatMessages() {
+        store.append(key, Collections.<IContent>singletonList(new ToolContent("call-1", "{}")), 0L);
+
+        assertEquals(0, store.deleteChatMessages(HistoryClearScopeEnum.FIRST, 1));
+        assertEquals(1, store.loadSnapshot(key).messages().size());
+    }
+
+    /**
+     * 关闭后拒绝继续读写，重复关闭无副作用。
+     */
+    @Test
+    public void closedStoreRejectsOperations() {
+        store.close();
+        store.close();
+
+        assertThrows(IllegalStateException.class, () -> store.loadSnapshot(key));
     }
 }

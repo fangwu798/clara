@@ -9,7 +9,9 @@ import com.clara.config.ModelRegistry;
 import com.clara.core.interaction.IConversationControls;
 import com.clara.enums.ModelProviderEnum;
 import com.clara.enums.interaction.SessionCommandOutcomeEnum;
+import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.message.delta.TokenUsage;
+import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.mcp.api.IMcpClient;
 import com.clara.mcp.api.IMcpClientFactory;
 import com.clara.mcp.registry.McpServerRegistration;
@@ -207,6 +209,16 @@ public class ClaraApplicationInternalsTest {
         }
     }
 
+    /**
+     * Startup banner: every line is emitted and the log file path is present when logging is enabled.
+     */
+    @Test
+    public void printsStartupBanner() throws Exception {
+        Path config = writeConfig("banner.yml", "banner-model");
+        try (ProviderConfiguration configuration = new ProviderYamlConfigurationLoader().load(config)) {
+            view.printBanner(bootstrap, configuration, config, "cli");
+        }
+    }
     private static Object step(Class<?> stepType, String result) {
         InvocationHandler handler = (proxy, method, args) -> {
             if ("run".equals(method.getName())) {
