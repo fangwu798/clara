@@ -224,6 +224,44 @@ public class ModelAvailabilityManagerTest {
     }
 
     /**
+     * 首次探测「等待首个响应超时」时按配置重试；重试成功则该模型判定为可用。
+     */
+    @Test
+    public void retriesOnceAfterTimeout() throws Exception {
+        Path clara = temporary.newFile("retry.yml").toPath();
+        List<Path> configs = Collections.singletonList(config("deepseek-completion.yml"));
+        AtomicInteger probes = new AtomicInteger();
+        IModelProbe probe = (path, alias, provider, chat, timeout) -> probes.incrementAndGet() == 1
+                ? ModelCheckResult.unavailable(path, alias, provider.getProvider().name(), chat.getModelId(),
+                        "等待首个响应超时（60000ms）")
+                : ModelCheckResult.available(path, alias, provider.getProvider().name(), chat.getModelId(), 120L);
+        List<Path> usable = new ModelAvailabilityManager(name -> "test-key", probe, 60_000L, 1)
+                .checkAndPersist(configs, clara, line -> { });
+
+        assertEquals(2, probes.get());
+        assertEquals(1, usable.size());
+    }
+
+    /**
+     * 非超时类失败不重试：平台返回错误时重复请求不会改变结果。
+     */
+    @Test
+    public void doesNotRetryNonTimeoutFailure() throws Exception {
+        Path clara = temporary.newFile("no-retry.yml").toPath();
+        List<Path> configs = Collections.singletonList(config("deepseek-completion.yml"));
+        AtomicInteger probes = new AtomicInteger();
+        IModelProbe probe = (path, alias, provider, chat, timeout) -> {
+            probes.incrementAndGet();
+            return ModelCheckResult.unavailable(path, alias, provider.getProvider().name(), chat.getModelId(),
+                    "模型平台调用失败：平台 DEEPSEEK，返回 401：invalid key");
+        };
+        new ModelAvailabilityManager(name -> "test-key", probe, 60_000L, 1)
+                .checkAndPersist(configs, clara, line -> { });
+
+        assertEquals(1, probes.get());
+    }
+
+    /**
      * 取出输出行的纯文本，便于按文案断言。
      *
      * @param lines 输出行

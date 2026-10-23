@@ -7,6 +7,7 @@ import com.clara.config.ConfigLocator;
 import com.clara.config.IntentPlanSettings;
 import com.clara.config.ModelRegistry;
 import com.clara.context.ConvContext;
+import com.clara.core.annotation.PublicApi;
 import com.clara.core.memory.IContextSupplementProvider;
 import com.clara.core.memory.IContextTraceSink;
 import com.clara.core.telemetry.Telemetry;
@@ -52,12 +53,8 @@ import com.clara.memory.persistence.ConversationSnapshot;
 import com.clara.memory.persistence.InMemoryConversationStore;
 import com.clara.memory.persistence.local.LocalConversationStore;
 import com.clara.memory.semantic.local.LocalSemanticMemoryStore;
-import com.clara.memory.semantic.milvus.MilvusBackend;
-import com.clara.memory.semantic.milvus.MilvusBackendConfig;
-import com.clara.memory.semantic.milvus.MilvusBackendFactory;
-import com.clara.memory.semantic.milvus.MilvusCollectionSpec;
-import com.clara.memory.semantic.milvus.MilvusSemanticMemoryStore;
-import com.clara.memory.semantic.milvus.MilvusSettings;
+import com.clara.memory.semantic.spi.ISemanticMemoryBackendProvider;
+import com.clara.memory.semantic.spi.SemanticMemoryBackend;
 import com.clara.memory.summarize.DefaultSummarizeCoordinator;
 import com.clara.memory.window.ConversationIndexingWindowMemory;
 import com.clara.memory.window.DefaultWindowMemory;
@@ -112,8 +109,6 @@ import com.clara.workflow.runtime.WorkflowRunner;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -123,9 +118,8 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * 程序装配入口：按默认配置构造各模块实现，并组合成可运行的对话编排能力。
@@ -172,6 +166,7 @@ import java.util.logging.Logger;
  * 也不创建对话历史目录 / 不取历史文件锁（首次真正读写历史时才创建）；{@link #close()} 释放会话存储、
  * 语义记忆存储与工作流引擎，无状态组件（模型、估算器）自然随之释放。
  */
+@PublicApi("SDK 装配入口")
 public final class ApplicationBootstrap implements Closeable {
 
     /**
@@ -193,11 +188,6 @@ public final class ApplicationBootstrap implements Closeable {
      * MCP 客户端单次请求超时（毫秒）：装配期给出的默认值，随宿主登记服务端后生效。
      */
     private static final long MCP_REQUEST_TIMEOUT_MILLIS = 30_000L;
-
-    /**
-     * Milvus SDK 的 JUL 日志器：必须由本类强引用持有，否则 LogManager 的弱引用会让层级设置失效。
-     */
-    private static final Logger MILVUS_SDK_LOGGER = Logger.getLogger("io.milvus");
 
     /**
      * MCP 发现支持的协议版本列表：当前仅支持 {@code 2024-11-05}，服务端协商出其它版本将标记为不兼容。
@@ -356,15 +346,13 @@ public final class ApplicationBootstrap implements Closeable {
         this.embeddingClient = embeddingClient;
         this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
 
-        // 语义记忆：clara.yml 配了 milvus 就用 Milvus（对话记录写入并召回），否则维持进程内实现、行为不变。
-        MilvusSettings milvus = MilvusSettings.load(ConfigLocator.claraConfigFile(), embeddingDimension, ConfigLocator.projectName());
-        MilvusSemanticMemoryStore milvusStore = milvus == null ? null : connectMilvus(milvus);
-        this.semanticMemoryStore = milvusStore == null ? new LocalSemanticMemoryStore(embeddingDimension) : milvusStore;
-        this.conversationIndexing = milvusStore != null;
-        this.semanticMemoryDescription = milvusStore == null
-                ? "进程内 local（不写对话记录）"
-                : "milvus " + milvus.getHost() + ":" + milvus.getPort() + "/" + milvus.getCollection()
-                + "（" + semanticModeOf(milvus) + "，对话记录写入并召回）";
+        // 语义记忆：可选后端（如 Milvus）通过 ServiceLoader 发现；未引入或不可用时回退进程内实现。
+        SemanticMemoryBackend optionalBackend = openSemanticBackend(embeddingDimension);
+        this.semanticMemoryStore = optionalBackend == null
+                ? new LocalSemanticMemoryStore(embeddingDimension) : optionalBackend.getStore();
+        this.conversationIndexing = optionalBackend != null;
+        this.semanticMemoryDescription = optionalBackend == null
+                ? "进程内 local（不写对话记录）" : optionalBackend.getDescription();
 
         this.tokenCountEstimator = new TiktokenTokenCountEstimator(TiktokenTokenCountEstimator.DEFAULT_ENCODING);
 
@@ -1096,116 +1084,24 @@ public final class ApplicationBootstrap implements Closeable {
     }
 
     /**
-     * 连接 Milvus 语义记忆存储：构造期即校验集合存在且维度一致。
+     * 发现并打开可选的语义记忆后端。
      *
-     * <p>连不上时给出原因并返回 null，由调用方回退为进程内实现——配了向量库但没起服务不该让整个应用起不来，
-     * 横幅上的 {@code semantic} 一行会写明最终用的是哪一个。
+     * <p>后端模块通过 {@link ServiceLoader} 注册；某个提供者返回 null（未配置 / 不可用）时继续尝试
+     * 下一个，全部失败则返回 null，由调用方回退到进程内实现。未引入可选模块时不会报错。
      *
-     * @param settings Milvus 配置，非 null
-     * @return Milvus 语义记忆存储；不可用时 null
+     * @param dimension 默认向量维度
+     * @return 已打开的后端；没有可用后端时 null
      */
-    private static MilvusSemanticMemoryStore connectMilvus(MilvusSettings settings) {
-        quietMilvusLogging();
-        warnOnBm25NonUtf8Charset(settings);
-        MilvusBackend backend = null;
-        boolean handedOff = false;
-        try {
-            MilvusCollectionSpec spec = collectionSpec(settings);
-            backend = MilvusBackendFactory.create(new MilvusBackendConfig(
-                    settings.getHost(), settings.getPort(), settings.getUsername(), settings.getPassword(),
-                    MilvusBackendConfig.DEFAULT_DATABASE,
-                    MilvusBackendConfig.DEFAULT_CONNECT_TIMEOUT_MILLIS,
-                    MilvusBackendConfig.DEFAULT_IDLE_TIMEOUT_MILLIS), spec);
-            MilvusSemanticMemoryStore store = createMilvusStore(spec, backend, settings);
-            handedOff = true;
-            return store;
-        } catch (RuntimeException unavailable) {
-            System.err.println("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）：" + unavailable.getMessage()); // NOSONAR CLI output by design
-            return null;
-        } finally {
-            if (!handedOff && backend != null) {
-                closeQuietly(backend);
+    private static SemanticMemoryBackend openSemanticBackend(int dimension) {
+        Path claraConfig = ConfigLocator.claraConfigFile();
+        String projectName = ConfigLocator.projectName();
+        for (ISemanticMemoryBackendProvider provider : ServiceLoader.load(ISemanticMemoryBackendProvider.class)) {
+            SemanticMemoryBackend backend = provider.open(claraConfig, dimension, projectName);
+            if (backend != null) {
+                return backend;
             }
         }
-    }
-
-    private static MilvusSemanticMemoryStore createMilvusStore(MilvusCollectionSpec spec, MilvusBackend backend,
-                                                               MilvusSettings settings) {
-        try {
-            return new MilvusSemanticMemoryStore(spec, backend);
-        } catch (RuntimeException mismatch) {
-            if (!settings.isRecreateOnSchemaMismatch()) {
-                throw mismatch;
-            }
-            // 旧集合结构与当前配置不一致（切了检索模式 / 换了嵌入维度）：旧向量与新查询不可比，重建是唯一选项。
-            // 只在配置里显式开了重建才动手（删集合会丢旧记录）；重建失败会被外层兜回进程内实现。
-            System.err.println("[memory] Milvus 集合结构与配置不匹配，按配置重建：" + mismatch.getMessage()); // NOSONAR CLI output by design
-            backend.dropCollection(spec.getCollection());
-            return new MilvusSemanticMemoryStore(spec, backend);
-        }
-    }
-
-    private static void closeQuietly(MilvusBackend backend) {
-        try {
-            backend.close();
-        } catch (RuntimeException closeFailure) {
-            // 关闭失败不应覆盖原始的连接失败原因，调用方已经回退到进程内实现。
-        }
-    }
-
-    /**
-     * BM25 模式下检查 JVM 默认字符集：不是 UTF-8 时打印明确警告。
-     *
-     * <p>为什么必须提醒：milvus-sdk-java 拼 VarChar 全文检索占位符时用的是 {@code String.getBytes()}（平台
-     * 默认字符集），不是 UTF-8。中文 Windows 上未加 {@code -Dfile.encoding=UTF-8} 时默认字符集是 GBK，
-     * 中文正文会以 GBK 字节发出，Milvus 的分词器收到非法 UTF-8 会 panic 并让服务端整个 abort——代价不是
-     * 这一次检索失败，而是整个记忆库掉线。启动脚本 clara.bat / clara.sh 已带该参数，只有手工 java -jar 才会踩到。
-     *
-     * @param settings Milvus 配置，非 null
-     */
-    private static void warnOnBm25NonUtf8Charset(MilvusSettings settings) {
-        if (!settings.isBm25Mode()) {
-            return;
-        }
-        Charset charset = Charset.defaultCharset();
-        if (!StandardCharsets.UTF_8.equals(charset)) {
-            System.err.println("[memory] 警告：JVM 默认字符集是 " + charset.name() // NOSONAR CLI output by design
-                    + "，Milvus 全文检索的正文会按它编码，可能让 Milvus 服务端 abort；"
-                    + "请用 clara.bat / clara.sh 启动（已带 -Dfile.encoding=UTF-8）。");
-        }
-    }
-
-    /**
-     * 按配置构造集合规格：BM25 模式用分词器定义集合身份（不存向量），向量模式用维度。
-     *
-     * @param settings Milvus 配置，非 null
-     * @return 集合规格，非 null
-     */
-    private static MilvusCollectionSpec collectionSpec(MilvusSettings settings) {
-        return settings.isBm25Mode()
-                ? new MilvusCollectionSpec(settings.getCollection(), settings.getAnalyzer())
-                : new MilvusCollectionSpec(settings.getCollection(), settings.getDimension());
-    }
-
-    /**
-     * 取语义记忆的检索模式描述，供启动横幅展示。
-     *
-     * @param settings Milvus 配置，非 null
-     * @return 模式描述，非 null
-     */
-    private static String semanticModeOf(MilvusSettings settings) {
-        return settings.isBm25Mode() ? "bm25 全文检索" : "向量检索";
-    }
-
-    /**
-     * 抑制 Milvus SDK 自带 gRPC 的告警噪音。
-     *
-     * <p>milvus-sdk-java 内部打包了 shaded gRPC，并以 {@code java.util.logging} 打日志；空闲连接保活 ping
-     * 超时或关连接时会打印告警堆栈（含其 shaded 内部类的 {@code NoClassDefFoundError}），属 SDK 内部行为、
-     * 不影响功能。这里把 {@code io.milvus} 日志层级抬到 {@code SEVERE}，只保留严重错误，避免控制台刷屏。
-     */
-    private static void quietMilvusLogging() {
-        MILVUS_SDK_LOGGER.setLevel(Level.SEVERE);
+        return null;
     }
 
     @Override

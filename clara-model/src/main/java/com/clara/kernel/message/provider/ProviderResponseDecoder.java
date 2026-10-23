@@ -7,6 +7,7 @@ import com.clara.kernel.api.execute.IResponseDecoder;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.core.transport.RawHttpResponse;
 import com.clara.kernel.message.provider.completion.CompletionResponseDecoder;
+import com.clara.kernel.message.provider.messages.MessagesResponseDecoder;
 import com.clara.kernel.message.provider.response.ResponseResponseDecoder;
 
 /**
@@ -19,6 +20,7 @@ public final class ProviderResponseDecoder {
 
     private static final IResponseDecoder COMPLETION = new CompletionResponseDecoder();
     private static final IResponseDecoder RESPONSE = new ResponseResponseDecoder();
+    private static final IResponseDecoder MESSAGES = new MessagesResponseDecoder();
 
     private ProviderResponseDecoder() {
     }
@@ -49,6 +51,13 @@ public final class ProviderResponseDecoder {
     private static IResponseDecoder decoder() {
         ConvContext context = ConvContext.current();
         ModelConfig config = context.getProviderConfiguration().toConfig(context.getCapabilityKind());
-        return config.getProtocol() == ProtocolEnum.RESPONSE ? RESPONSE : COMPLETION;
+        ProtocolEnum protocol = config.getProtocol();
+        if (protocol == ProtocolEnum.RESPONSE) {
+            return RESPONSE;
+        }
+        if (protocol == ProtocolEnum.MESSAGES) {
+            return MESSAGES;
+        }
+        return COMPLETION;
     }
 }

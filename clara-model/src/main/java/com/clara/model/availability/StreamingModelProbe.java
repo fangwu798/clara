@@ -75,7 +75,7 @@ public final class StreamingModelProbe implements IModelProbe {
         try (ConvContext.Scope ignored = ConvContext.open(new ConvContext(null, "startup-model-check-" + alias, provider, CapabilityKindEnum.CHAT))) {
             handle = new CompatibleStream(new Jdk8HttpTransport()).chat(request, HttpResponse.class, observation::accept);
             if (!observation.await(timeoutMillis)) {
-                observation.fail("检查超时（" + timeoutMillis + "ms）");
+                observation.fail("等待首个响应超时（" + timeoutMillis + "ms）");
             }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();

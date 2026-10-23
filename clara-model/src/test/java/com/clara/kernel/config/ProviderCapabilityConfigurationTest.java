@@ -30,6 +30,8 @@ public class ProviderCapabilityConfigurationTest {
     public void derivesProtocolFromApiProfile() {
         assertEquals(ProtocolEnum.RESPONSE,
                 capability(ENDPOINT, null, null, "codex-response", null, null, null).getProtocol());
+        assertEquals(ProtocolEnum.MESSAGES,
+                capability(ENDPOINT, null, null, "messages-v1", null, null, null).getProtocol());
         assertEquals(ProtocolEnum.COMPLETION,
                 capability(ENDPOINT, null, null, "openai-completion", null, null, null).getProtocol());
         assertEquals(ProtocolEnum.COMPLETION,

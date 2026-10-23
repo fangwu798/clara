@@ -23,21 +23,6 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
-        <!-- 读取 config/clara.yml 的 milvus 语义记忆节点（MilvusSettings）。 -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.milvus</groupId>
-            <artifactId>milvus-sdk-java</artifactId>
-        </dependency>
-        <!-- Milvus SDK 经 SLF4J 打日志；提供 no-op binding，消除启动告警并保持控制台整洁。 -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-nop</artifactId>
-            <scope>runtime</scope>
-        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

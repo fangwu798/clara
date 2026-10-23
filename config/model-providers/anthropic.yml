@@ -1,0 +1,30 @@
+provider: ANTHROPIC
+credential:
+  secretRef: anthropic
+  # apiKey: xxx
+  environmentVariable: CLARA_ANTHROPIC_API_KEY
+transport:
+  allowedOrigins:
+    - https://yurouter.cn
+  connectTimeoutMillis: 10000
+  readTimeoutMillis: 600000
+  maxRequestBytes: 8388608
+  maxResponseBytes: 33554432
+  allowHttp: false
+capabilities:
+  CHAT:
+    endpoint: https://yurouter.cn/v1/messages
+    modelId: claude-opus-4-8
+    apiProfile: messages-v1
+    # Messages API 与 OpenAI 兼容家族线格式不同：system 提升为顶层、max_tokens 必填、工具用
+    # {name, description, input_schema}、流式用具名事件（content_block_delta / message_stop）。
+    protocol: MESSAGES
+    parameters:
+      # 鉴权头 anthropic-version 的取值（官方要求显式声明）。
+      apiVersion: "2023-06-01"
+      # max_tokens 在 Messages API 中是必填项（不是可选项），请求未指定时编码器取本值。
+      # 官方模型页（https://docs.anthropic.com/en/docs/about-claude/models/overview）给出的输出上限口径：
+      #   Claude Opus 4.x / Sonnet 4.x 32000（Opus 4.5 起 64000）、Claude 3.7 Sonnet 64000、Claude 3.5 Sonnet 8192。
+      # claude-opus-4-8 未在公开模型页单独列出，这里保守取 32000；若中转站开通的实际上限更低，
+      # 平台会返回 400 "max_tokens: ... > ..."，按提示改小本值即可。
+      maxTokens: 32000

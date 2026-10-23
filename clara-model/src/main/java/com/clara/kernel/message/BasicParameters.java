@@ -41,6 +41,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT)
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT)
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT)
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, note = "系统指令由编码器提升为顶层 system")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, name = "input")
     private List<IContent> messages;
     /**
@@ -54,6 +55,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "enabled", allowed = {"enabled", "disabled", "auto"})
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, defaultValue = "enabled", allowed = {"enabled", "disabled"}, note = "k2.x 支持；k2.7-code 仅 enabled 且 keep 恒 all")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "千问用 enable_thinking（布尔）控制，本字段不直接下发，由请求编码器转换")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 用 thinking:{type,budget_tokens} 且仅部分模型支持，不通用，先不下发")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private Thinking thinking;
 
@@ -65,6 +67,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "1", min = 0d, max = 2d)
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false, note = "固定值不可改（k3/k2.7 固定 1.0，k2.6 思考 1.0/非思考 0.6）")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, min = 0d, max = 2d, note = "官方取值范围 [0,2)，不建议取 0")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, defaultValue = "1", min = 0d, max = 1d, note = "官方取值范围 [0,1]，默认 1")
     private Double temperature;
 
     /**
@@ -77,6 +80,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "0.7", min = 0d, max = 1d)
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false, note = "固定 0.95 不可改")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, min = 0d, max = 1d, note = "官方取值范围 (0,1.0)")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, defaultValue = "1", min = 0d, max = 1d, note = "官方取值范围 (0,1]，默认 1")
     private Double topP;
 
 
@@ -92,6 +96,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "4096", min = 1d)
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, min = 1d)
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, min = 1d, note = "qwen3.8-max 最大输出 131072，且受上下文长度约束")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, min = 1d, note = "Messages API 必填；未给出时编码器取能力参数 maxTokens，再兜底 4096")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, name = "max_output_tokens")
     private Integer maxTokens;
 
@@ -106,6 +111,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false)
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "官方 OpenAI 兼容参数表未提供，使用 max_tokens")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, min = 0d, max = 65536d, note = "与 maxTokens 互斥；设置后 maxTokens 的默认值失效")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 只接受 max_tokens")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private Integer maxCompletionTokens;
 
@@ -123,6 +129,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "medium", allowed = {"minimal", "low", "medium", "high"}, note = "minimal 等同关闭思考")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, defaultValue = "max", allowed = {"low", "high", "max"}, note = "仅 k3 支持；k2.x 不支持")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "qwen3.8-max 用 enable_thinking 控制；官方兼容表未列出 reasoning_effort")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 的推理强度走 thinking / output_config，本字段不直接下发")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, name = "reasoning.effort")
     private String reasoningEffort;
 
@@ -137,6 +144,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "0", min = -2d, max = 2d)
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false, note = "固定 0 不可改")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "官方 OpenAI 兼容参数表未列出 frequency_penalty")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 不提供频率惩罚")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private Double frequencyPenalty;
 
@@ -151,6 +159,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "0", min = -2d, max = 2d)
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false, note = "固定 0 不可改")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, min = -2d, max = 2d, note = "仅千问商业模型和 qwen1.5+ 开源模型生效")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 不提供存在惩罚")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private Double presencePenalty;
 
@@ -173,6 +182,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, name = "response_format.type", defaultValue = "text", allowed = {"text", "json_object", "json_schema"}, note = "qwen3.8-max 支持结构化输出；json_schema 仅部分模型支持")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "url", allowed = {"url", "b64_json"}, note = "图片返回形式；url 链接 24 小时内有效，需自行转存；生成的图片固定为 jpeg 格式")
     @ProviderAdapter(type = ModelProviderEnum.OPENAI, capability = CapabilityKindEnum.IMAGE, allowed = {"url", "b64_json"}, note = "gpt-image-1 系列仅返回 b64_json；dall-e-3 支持 url")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 无 response_format，结构化输出用 tools 约束")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private String responseFormat;
 
@@ -184,6 +194,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, maxCount = 4, note = "深度思考模型不支持该字段")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, maxCount = 5, note = "每条不超过 32 字节")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT)
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, name = "stop_sequences", maxCount = 4, note = "官方最多 4 条停止序列")
     private List<String> stops;
 
     /**
@@ -199,6 +210,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.DEEPSEEK, capability = CapabilityKindEnum.CHAT, allowed = {"none", "auto", "required"}, note = "未传 tools 时默认 none；传了 tools 时默认 auto；指定具体工具需下发对象形式")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, allowed = {"none", "auto", "required"}, note = "k3 支持 auto/none/required；k2.6/k2.7-code 不支持 required")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "官方 OpenAI 兼容参数表未列出 tool_choice，不传时按模型默认策略")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 用对象形式 {type:auto|any|tool|none}，由编码器转换")
     private String toolChoice;
 
     /**
@@ -211,6 +223,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "true")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, note = "支持多步工具调用")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "官方 OpenAI 兼容参数表未列出 parallel_tool_calls")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 用 tool_choice.disable_parallel_tool_use 表达，由编码器转换")
     private Boolean parallelToolCalls;
 
     /**
@@ -224,6 +237,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "false", note = "深度思考模型不支持该字段")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false)
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "官方 OpenAI 兼容参数表未列出 logprobs")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 不提供 logprobs")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private Boolean logprobs;
 
@@ -237,6 +251,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "0", min = 0d, max = 20d, note = "深度思考模型不支持；仅当 logprobs 为 true 时可设置")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false)
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "官方 OpenAI 兼容参数表未列出 top_logprobs")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 不提供 top_logprobs")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private Integer topLogprobs;
 
@@ -250,6 +265,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "auto", allowed = {"auto", "default"})
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false)
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "官方 OpenAI 兼容参数表未列出 service_tier")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 不提供 service_tier")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private String serviceTier;
 
@@ -264,6 +280,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, supported = false, note = "方舟对话接口未提供该字段")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, supported = false)
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, supported = false, note = "官方 OpenAI 兼容参数表未列出 user_id")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, name = "metadata.user_id", note = "Messages API 放在 metadata.user_id")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private String userId;
 
@@ -280,6 +297,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, defaultValue = "false")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, defaultValue = "false")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, defaultValue = "false")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, defaultValue = "false")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, defaultValue = "false", note = "仅 4.5/4.0 支持流式生图，按 SSE 逐张返回")
     private Boolean stream;
 
@@ -300,6 +318,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "不开启则流式响应不带 usage")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "不开启则流式响应不带 usage")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, streamingOnly = true, defaultValue = "true", note = "官方示例用 stream_options.include_usage 取流式 token 用量")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, supported = false, note = "Messages API 流式默认在 message_start / message_delta 返回 usage")
     @ProtocolField(protocol = ProtocolEnum.RESPONSE, supported = false)
     private Boolean includeUsage;
 
@@ -319,6 +338,7 @@ public abstract class BasicParameters implements IRequest {
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.CHAT, note = "方舟对话接口的 function 工具；能否下发 tool_choice 以模型能力文档为准")
     @ProviderAdapter(type = ModelProviderEnum.KIMI, capability = CapabilityKindEnum.CHAT, note = "支持多步工具调用")
     @ProviderAdapter(type = ModelProviderEnum.ALIBABA, capability = CapabilityKindEnum.CHAT, note = "官方兼容接口支持 function 工具，parameters 必须是合法 JSON Schema")
+    @ProviderAdapter(type = ModelProviderEnum.ANTHROPIC, capability = CapabilityKindEnum.CHAT, note = "Messages API 用 {name,description,input_schema}，由编码器转换")
     @ProviderAdapter(type = ModelProviderEnum.VOLCENGINE, capability = CapabilityKindEnum.IMAGE, note = "图片生成侧仅支持联网搜索工具 {\"type\":\"web_search\"}，且仅 Seedream 5.0 lite 支持")
     private List<ToolContext> tools;
 }

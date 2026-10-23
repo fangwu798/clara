@@ -106,4 +106,25 @@ public class ToolContext {
         }
         return item;
     }
+
+    /**
+     * Anthropic Messages 协议：渲染为 {@code {name, description, input_schema}} 工具声明。
+     *
+     * <p>与 OpenAI 兼容家族的区别：没有 {@code type=function} 外层，JSON Schema 的键名是
+     * {@code input_schema} 而不是 {@code parameters}。
+     *
+     * @return 线格式声明节点，非 null；没有函数签名时返回空映射
+     */
+    public Map<String, Object> toMessagesTool() {
+        Map<String, Object> item = new LinkedHashMap<>();
+        if (function == null) {
+            return item;
+        }
+        item.put("name", function.getName());
+        if (function.getDescription() != null) {
+            item.put("description", function.getDescription());
+        }
+        item.put("input_schema", function.getParameters());
+        return item;
+    }
 }

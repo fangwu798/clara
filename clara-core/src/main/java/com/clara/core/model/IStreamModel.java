@@ -1,5 +1,6 @@
 package com.clara.core.model;
 
+import com.clara.core.annotation.PublicApi;
 import com.clara.exception.ClaraException;
 
 /**
@@ -43,6 +44,7 @@ import com.clara.exception.ClaraException;
  * com.clara.kernel.http.HttpResponse#getRaw() 中由调用方判断。流式调用的运行期失败不抛出，而是以
  * {@link com.clara.enums.StreamEventEnum#ERROR} 事件结束本次流。调用失败后实现仍可继续使用。
  */
+@PublicApi("模型调用的唯一入口")
 public interface IStreamModel {
 
     /**

@@ -36,10 +36,6 @@ import java.util.function.UnaryOperator;
  */
 public final class ModelAvailabilityManager {
 
-    /**
-     * 单个模型启动检查的默认超时时间，单位为毫秒。
-     */
-    private static final long DEFAULT_TIMEOUT_MILLIS = 30_000L;
 
     /**
      * 根据环境变量名读取当前进程环境变量值的函数，生产环境使用 {@link System#getenv(String)}。
@@ -57,23 +53,61 @@ public final class ModelAvailabilityManager {
     private final long timeoutMillis;
 
     /**
-     * 创建生产环境使用的管理器，使用系统环境变量、默认流式探测器和 30 秒探测超时。
+     * 超时后重新探测的次数；只对「等待首个响应超时」重试，配置错误、鉴权失败等不重试。
+     */
+    private final int retries;
+
+    /**
+     * 创建生产环境使用的管理器：使用系统环境变量、默认流式探测器和默认检查策略。
      */
     public ModelAvailabilityManager() {
-        this(System::getenv, new StreamingModelProbe(), DEFAULT_TIMEOUT_MILLIS);
+        this(System::getenv, new StreamingModelProbe(), ModelCheckSettings.defaults());
     }
 
     /**
-     * 创建可注入依赖的管理器，供测试或其他受控启动场景使用。
+     * 创建生产环境使用的管理器，超时与重试由 {@code config/clara.yml} 的 {@code modelCheck} 决定。
+     *
+     * @param settings 检查策略，非 null
+     */
+    public ModelAvailabilityManager(ModelCheckSettings settings) {
+        this(System::getenv, new StreamingModelProbe(), settings);
+    }
+
+    /**
+     * 使用指定策略创建可注入依赖的管理器。
+     *
+     * @param environment 环境变量读取函数
+     * @param probe       模型可用性探测器
+     * @param settings    检查策略，非 null
+     */
+    ModelAvailabilityManager(UnaryOperator<String> environment, IModelProbe probe, ModelCheckSettings settings) {
+        this(environment, probe, settings.getTimeoutMillis(), settings.getRetries());
+    }
+
+    /**
+     * 创建不重试的可注入依赖管理器，供测试或其他受控启动场景使用。
      *
      * @param environment   环境变量读取函数
      * @param probe         模型可用性探测器
      * @param timeoutMillis 单个模型的探测超时时间，单位为毫秒
      */
     ModelAvailabilityManager(UnaryOperator<String> environment, IModelProbe probe, long timeoutMillis) {
+        this(environment, probe, timeoutMillis, 0);
+    }
+
+    /**
+     * 创建可注入依赖的管理器。
+     *
+     * @param environment   环境变量读取函数
+     * @param probe         模型可用性探测器
+     * @param timeoutMillis 单个模型的探测超时时间，单位为毫秒
+     * @param retries       超时后的重试次数，负数按 0 处理
+     */
+    ModelAvailabilityManager(UnaryOperator<String> environment, IModelProbe probe, long timeoutMillis, int retries) {
         this.environment = environment;
         this.probe = probe;
         this.timeoutMillis = timeoutMillis;
+        this.retries = Math.max(0, retries);
     }
 
     /**
@@ -102,7 +136,7 @@ public final class ModelAvailabilityManager {
         List<ModelCheckResult> results = new ArrayList<>();
         try {
             for (PendingCheck check : pending) {
-                ModelCheckResult result = check.check(probe, timeoutMillis);
+                ModelCheckResult result = checkWithRetry(check);
                 results.add(result);
                 sink.accept(AvailabilityLine.line(result, widths));
             }
@@ -135,6 +169,34 @@ public final class ModelAvailabilityManager {
             paths.add(result.getPath());
         }
         return paths;
+    }
+
+    /**
+     * 执行单项检查，并在「等待首个响应超时」时按配置重试。
+     *
+     * <p>为什么只重试超时：中转站排队、连接抖动会让首字偶发超过阈值，重试一次通常即可恢复；而凭据缺失、
+     * 配置错误、平台返回 4xx 等结果重试也不会改变，重试只会拖长启动时间。
+     *
+     * @param check 待检查项，非 null
+     * @return 最终检查结果，非 null
+     */
+    private ModelCheckResult checkWithRetry(PendingCheck check) {
+        ModelCheckResult result = check.check(probe, timeoutMillis);
+        for (int attempt = 1; attempt <= retries && isTimeout(result); attempt++) {
+            result = check.check(probe, timeoutMillis);
+        }
+        return result;
+    }
+
+    /**
+     * 判断结果是否属于「等待首个响应超时」。
+     *
+     * @param result 检查结果，非 null
+     * @return 未跳过、不可用且原因包含超时字样时返回 true
+     */
+    private static boolean isTimeout(ModelCheckResult result) {
+        String detail = result.getDetail();
+        return !result.isAvailable() && !result.isSkipped() && detail != null && detail.contains("超时");
     }
 
     /**

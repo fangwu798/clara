@@ -1,5 +1,6 @@
 package com.clara.orchestration.api;
 
+import com.clara.core.annotation.PublicApi;
 import com.clara.exception.ClaraError;
 import com.clara.kernel.message.delta.TokenUsage;
 import lombok.Builder;
@@ -10,6 +11,7 @@ import lombok.Data;
  */
 @Data
 @Builder
+@PublicApi("对话编排出参")
 public final class ConversationResult {
 
     /** 会话标识。 */

@@ -14,6 +14,7 @@ import com.clara.codegraph.CodeGraphConsole;
 import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
 import com.clara.config.ModelAvailabilityManager;
+import com.clara.config.ModelCheckSettings;
 import com.clara.config.ModelFailover;
 import com.clara.config.ModelRegistry;
 import com.clara.context.CancellationToken;
@@ -129,7 +130,8 @@ public final class ClaraApplication {
              ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(), options.forcedColor());
              ConsoleInput reader = ConsoleInput.create(terminal);
              CancelKeyMonitor monitor = CancelKeyMonitor.create(view, terminal)) {
-            List<Path> candidates = new ModelAvailabilityManager().checkAndPersist(ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(), line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
+            ModelCheckSettings checkSettings = ModelCheckSettings.load(ConfigLocator.claraConfigFile());
+            List<Path> candidates = new ModelAvailabilityManager(checkSettings).checkAndPersist(ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(), line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
             ModelChoice choice = selectModelConfig(view, reader, options, candidates);
             runSession(view, reader, options, candidates, choice, monitor);
         }
@@ -198,9 +200,9 @@ public final class ClaraApplication {
                     ConsoleView.ANSI_GRAY);
             // 重新装配会创建新的调用台账，旧趋势的累计基数已不存在，重置后从新台账重新累计。
             usageTrend.reset();
-            sessionCandidates = new ModelAvailabilityManager().checkAndPersist(
-                    ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(),
-                    line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
+            sessionCandidates = new ModelAvailabilityManager(ModelCheckSettings.load(ConfigLocator.claraConfigFile()))
+                    .checkAndPersist(ConfigLocator.allModelConfigs(), ConfigLocator.claraConfigFile(),
+                            line -> view.emit(line.getText(), ConsoleView.colorOf(line.getLevel())));
             sessionChoice = reselectModel(view, reader, options, sessionCandidates, sessionChoice);
             view.emit("", ConsoleView.ANSI_GRAY);
         }

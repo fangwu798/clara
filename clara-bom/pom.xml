@@ -33,6 +33,11 @@
             </dependency>
             <dependency>
                 <groupId>com.clara</groupId>
+                <artifactId>clara-memory-milvus</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.clara</groupId>
                 <artifactId>clara-mcp</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -44,6 +49,16 @@
             <dependency>
                 <groupId>com.clara</groupId>
                 <artifactId>clara-skill</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.clara</groupId>
+                <artifactId>clara-workflow</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.clara</groupId>
+                <artifactId>clara-sdk</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

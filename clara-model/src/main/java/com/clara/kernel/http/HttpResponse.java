@@ -58,6 +58,7 @@ public class HttpResponse implements IResponse {
      */
     @ResponseAdapter(path = "choices[0].message.content", streamPath = "choices[0].delta.content", event = StreamEventEnum.TEXT_DELTA)
     @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "output[type=message].content[0].text", streamPath = "delta", streamEvent = "response.output_text.delta")
+    @ProtocolResponse(protocol = ProtocolEnum.MESSAGES, path = "content[type=text].text", streamPath = "delta.text", streamEvent = "content_block_delta")
     private String content;
 
     /**
@@ -65,12 +66,14 @@ public class HttpResponse implements IResponse {
      */
     @ResponseAdapter(path = "choices[0].message.reasoning_content", streamPath = "choices[0].delta.reasoning_content", event = StreamEventEnum.REASONING_DELTA)
     @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "output[type=reasoning].content[0].text", streamPath = "delta", streamEvent = "response.reasoning_text.delta")
+    @ProtocolResponse(protocol = ProtocolEnum.MESSAGES, path = "content[type=thinking].thinking", streamPath = "delta.thinking", streamEvent = "content_block_delta")
     private String reasoning;
 
     /**
      * 工具调用列表；流式下 OpenAI 兼容家族以 {@code delta.tool_calls} 分片下发。
      */
     @ResponseAdapter(path = "choices[0].message.tool_calls", streamPath = "choices[0].delta.tool_calls", event = StreamEventEnum.TOOL_ARGUMENT_DELTA)
+    @ProtocolResponse(protocol = ProtocolEnum.MESSAGES, path = "content[type=tool_use]", streamDisabled = true)
     private List<ToolCall> toolCalls;
 
     /**
@@ -89,6 +92,7 @@ public class HttpResponse implements IResponse {
      */
     @ResponseAdapter(path = "choices[0].finish_reason", terminalPath = "choices[0].finish_reason")
     @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "status", terminalPath = "status")
+    @ProtocolResponse(protocol = ProtocolEnum.MESSAGES, path = "stop_reason", terminalPath = "delta.stop_reason")
     private FinishReasonEnum finishReason;
 
     /**
@@ -108,6 +112,7 @@ public class HttpResponse implements IResponse {
      */
     @ResponseAdapter(path = "usage.prompt_tokens")
     @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "usage.input_tokens")
+    @ProtocolResponse(protocol = ProtocolEnum.MESSAGES, path = "usage.input_tokens")
     private Integer inputTokens;
 
     /**
@@ -115,6 +120,7 @@ public class HttpResponse implements IResponse {
      */
     @ResponseAdapter(path = "usage.completion_tokens")
     @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "usage.output_tokens")
+    @ProtocolResponse(protocol = ProtocolEnum.MESSAGES, path = "usage.output_tokens")
     private Integer outputTokens;
 
     /**
@@ -122,6 +128,7 @@ public class HttpResponse implements IResponse {
      */
     @ResponseAdapter(path = "usage.total_tokens")
     @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "usage.total_tokens")
+    @ProtocolResponse(protocol = ProtocolEnum.MESSAGES, path = "usage.total_tokens")
     private Integer totalTokens;
 
     /**
@@ -129,7 +136,9 @@ public class HttpResponse implements IResponse {
      */
     @ResponseAdapter(type = {ModelProviderEnum.DEEPSEEK}, path = "usage.prompt_cache_hit_tokens", note = "DeepSeek 用 prompt_cache_hit_tokens")
     @ResponseAdapter(type = {ModelProviderEnum.VOLCENGINE, ModelProviderEnum.OPENAI, ModelProviderEnum.ALIBABA}, path = "usage.prompt_tokens_details.cached_tokens", note = "方舟 / OpenAI / 通义用 prompt_tokens_details.cached_tokens")
+    @ResponseAdapter(type = {ModelProviderEnum.ANTHROPIC}, path = "usage.cache_read_input_tokens", note = "Anthropic 用 cache_read_input_tokens")
     @ProtocolResponse(protocol = ProtocolEnum.RESPONSE, path = "usage.input_tokens_details.cached_tokens")
+    @ProtocolResponse(protocol = ProtocolEnum.MESSAGES, path = "usage.cache_read_input_tokens")
     private Integer cachedTokens;
 
     /**

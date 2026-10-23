@@ -8,6 +8,7 @@ import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.core.transport.RawHttpRequest;
 import com.clara.kernel.message.provider.completion.CompletionRequestEncoder;
+import com.clara.kernel.message.provider.messages.MessagesRequestEncoder;
 import com.clara.kernel.message.provider.response.ResponseRequestEncoder;
 
 /**
@@ -19,6 +20,7 @@ public final class ProviderRequestEncoder {
 
     private static final IRequestEncoder COMPLETION = new CompletionRequestEncoder();
     private static final IRequestEncoder RESPONSE = new ResponseRequestEncoder();
+    private static final IRequestEncoder MESSAGES = new MessagesRequestEncoder();
 
     private ProviderRequestEncoder() {
     }
@@ -32,7 +34,23 @@ public final class ProviderRequestEncoder {
      */
     public static RawHttpRequest encode(IRequest request, ProviderConfiguration providerConfiguration) {
         ModelConfig config = providerConfiguration.toConfig(ConvContext.current().getCapabilityKind());
-        IRequestEncoder encoder = config.getProtocol() == ProtocolEnum.RESPONSE ? RESPONSE : COMPLETION;
+        IRequestEncoder encoder = encoderOf(config.getProtocol());
         return encoder.encode(request, providerConfiguration);
+    }
+
+    /**
+     * 按协议档位选择编码器，未识别的档位按 Chat Completions 处理。
+     *
+     * @param protocol 协议档位，可为 null
+     * @return 编码器，非 null
+     */
+    private static IRequestEncoder encoderOf(ProtocolEnum protocol) {
+        if (protocol == ProtocolEnum.RESPONSE) {
+            return RESPONSE;
+        }
+        if (protocol == ProtocolEnum.MESSAGES) {
+            return MESSAGES;
+        }
+        return COMPLETION;
     }
 }

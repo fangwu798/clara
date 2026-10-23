@@ -17,11 +17,16 @@ package com.clara.enums;
  *       也是 DeepSeek、火山方舟、阿里通义等兼容家族的默认线格式；</li>
  *   <li>{@link #RESPONSE}：OpenAI Responses 协议（{@code /v1/responses}），请求体用 {@code input} /
  *       {@code max_output_tokens}，响应体用 {@code output[]} / {@code usage.input_tokens} 等。</li>
+ *   <li>{@link #MESSAGES}：Anthropic Messages 协议（{@code /v1/messages}），请求体用 {@code messages} /
+ *       {@code system} / {@code max_tokens}（必填） / {@code input_schema} 工具声明，响应体用
+ *       {@code content[]}（{@code text} / {@code thinking} / {@code tool_use} 块）与 {@code stop_reason}。</li>
  * </ul>
  */
 public enum ProtocolEnum {
     /** OpenAI Chat Completions 兼容协议，默认档位。 */
     COMPLETION,
     /** OpenAI Responses 协议。 */
-    RESPONSE
+    RESPONSE,
+    /** Anthropic Messages 协议（Claude）。 */
+    MESSAGES
 }

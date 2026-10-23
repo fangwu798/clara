@@ -44,12 +44,14 @@ import java.util.List;
  */
 public final class ConfigResolvers {
     /**
-     * 已登记的解析器，按登记顺序线性查找；初始化后只读、不可变。当前只登记了
-     * {@link CompatibleConfigResolver}（覆盖 OpenAI 兼容家族的对话与图片）。
+     * 已登记的解析器，按登记顺序线性查找；初始化后只读、不可变。当前登记了
+     * {@link CompatibleConfigResolver}（OpenAI 兼容家族的对话 / 图片 / 视频）与
+     * {@link AnthropicConfigResolver}（Anthropic 对话）。
      */
     private static final List<IConfigResolver> RESOLVERS = Collections.unmodifiableList(
             Arrays.<IConfigResolver>asList(
-                    new CompatibleConfigResolver()
+                    new CompatibleConfigResolver(),
+                    new AnthropicConfigResolver()
             ));
 
     static {

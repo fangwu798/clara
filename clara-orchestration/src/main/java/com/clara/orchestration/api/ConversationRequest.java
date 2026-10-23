@@ -1,6 +1,7 @@
 package com.clara.orchestration.api;
 
 import com.clara.context.CancellationToken;
+import com.clara.core.annotation.PublicApi;
 import com.clara.dto.memory.ContextControlConfig;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
@@ -20,6 +21,7 @@ import java.util.List;
  */
 @Data
 @Builder
+@PublicApi("对话编排入参")
 public final class ConversationRequest {
 
     /** 会话所属用户或服务主体标识，可为 null。 */

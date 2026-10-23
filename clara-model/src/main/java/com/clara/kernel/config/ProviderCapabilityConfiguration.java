@@ -102,16 +102,22 @@ public final class ProviderCapabilityConfiguration {
      * 从 API 协议档位字符串推导协议枚举。
      *
      * <p>未显式配置 {@code protocol} 时，用 {@code apiProfile} 推导：含 {@code response}（忽略大小写）视为
-     * Responses 协议，否则视为 Chat Completions 兼容协议。这样只改 {@code apiProfile} 也能切换线格式，
+     * Responses 协议，含 {@code message}（如 {@code messages-v1}）视为 Anthropic Messages 协议，
+     * 否则视为 Chat Completions 兼容协议。这样只改 {@code apiProfile} 也能切换线格式，
      * 避免两个字段口径不一致导致发错协议。
      *
      * @param apiProfile API 协议档位字符串，可为 null
      * @return 协议枚举，非 null
      */
     private static ProtocolEnum deriveProtocol(String apiProfile) {
-        return apiProfile != null && apiProfile.toUpperCase(Locale.ROOT).contains("RESPONSE")
-                ? ProtocolEnum.RESPONSE
-                : ProtocolEnum.COMPLETION;
+        if (apiProfile == null) {
+            return ProtocolEnum.COMPLETION;
+        }
+        String profile = apiProfile.toUpperCase(Locale.ROOT);
+        if (profile.contains("RESPONSE")) {
+            return ProtocolEnum.RESPONSE;
+        }
+        return profile.contains("MESSAGE") ? ProtocolEnum.MESSAGES : ProtocolEnum.COMPLETION;
     }
 
     /**

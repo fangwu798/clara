@@ -7,54 +7,37 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
     <artifactId>clara-application</artifactId>
-    <name>Clara :: Application</name>
+    <name>Clara :: CLI</name>
     <dependencies>
+        <!-- 嵌入能力全部来自 SDK；本模块只保留 CLI 外壳。 -->
+        <dependency>
+            <groupId>com.clara</groupId>
+            <artifactId>clara-sdk</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.clara</groupId>
             <artifactId>clara-core</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- POI 经 Log4j2 API 打日志；桥接到 SLF4J（再经 slf4j-nop 静默），消除启动告警。 -->
-        <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
-        <!-- 读取 config/clara.yml 的嵌套配置（如 milvus 语义记忆节点）。 -->
-        <dependency><groupId>com.fasterxml.jackson.dataformat</groupId><artifactId>jackson-dataformat-yaml</artifactId></dependency>
-        <dependency><groupId>junit</groupId><artifactId>junit</artifactId><scope>test</scope></dependency>
         <dependency>
             <groupId>com.clara</groupId>
             <artifactId>clara-model</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 可选语义记忆后端：CLI 打包时带上，宿主嵌入 SDK 时按需自行引入。 -->
         <dependency>
             <groupId>com.clara</groupId>
-            <artifactId>clara-memory</artifactId>
+            <artifactId>clara-memory-milvus</artifactId>
             <version>${project.version}</version>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.clara</groupId>
-            <artifactId>clara-mcp</artifactId>
-            <version>${project.version}</version>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.clara</groupId>
-            <artifactId>clara-orchestration</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.clara</groupId>
-            <artifactId>clara-workflow</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.clara</groupId>
-            <artifactId>clara-skill</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!-- 汉字转拼音：工作目录名为中文时转写为 ASCII 项目名（供 Milvus 集合命名）。 -->
-        <dependency>
-            <groupId>com.belerweb</groupId>
-            <artifactId>pinyin4j</artifactId>
-        </dependency>
-        <!-- 控制台单键 ESC 监听（执行中取消本轮模型调用与工具执行）。 -->
+        <!-- CLI 专用的终端依赖，不应传递给 SDK 使用方。 -->
         <dependency>
             <groupId>org.jline</groupId>
             <artifactId>jline-terminal</artifactId>
@@ -66,6 +49,12 @@
         <dependency>
             <groupId>org.jline</groupId>
             <artifactId>jline-terminal-jna</artifactId>
+        </dependency>
+        <!-- 只有可执行 CLI 需要静默第三方日志；库使用方自行选择 SLF4J binding。 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
     <build>

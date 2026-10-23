@@ -28,25 +28,28 @@ public final class FinishReasonUtils {
     /**
      * 映射结束原因。
      *
-     * <p>取值约定：Chat Completions 的 {@code stop} / Responses 的 {@code completed} → {@link FinishReasonEnum#STOP}、
-     * {@code length} / {@code incomplete} → {@link FinishReasonEnum#LENGTH}、
-     * {@code tool_calls} 与 {@code function_call} → {@link FinishReasonEnum#TOOL_CALLS}、
-     * {@code content_filter} → {@link FinishReasonEnum#CONTENT_FILTER}、{@code failed} → {@link FinishReasonEnum#ERROR}。
+ * <p>取值约定：Chat Completions 的 {@code stop} / Responses 的 {@code completed} / Anthropic 的
+ * {@code end_turn}、{@code stop_sequence} → {@link FinishReasonEnum#STOP}、
+ * {@code length} / {@code incomplete} / Anthropic 的 {@code max_tokens} → {@link FinishReasonEnum#LENGTH}、
+ * {@code tool_calls}、{@code function_call} 与 Anthropic 的 {@code tool_use} → {@link FinishReasonEnum#TOOL_CALLS}、
+ * {@code content_filter} / Anthropic 的 {@code refusal} → {@link FinishReasonEnum#CONTENT_FILTER}、
+ * {@code failed} → {@link FinishReasonEnum#ERROR}。
      *
      * @param value 平台返回的 {@code finish_reason} 或 Responses 的 {@code status}，可为 null
      * @return 领域结束原因；未知取值或缺失时为 {@link FinishReasonEnum#ERROR}
      */
     public static FinishReasonEnum of(String value) {
-        if ("stop".equals(value) || "completed".equals(value)) {
+        if ("stop".equals(value) || "completed".equals(value)
+                || "end_turn".equals(value) || "stop_sequence".equals(value)) {
             return FinishReasonEnum.STOP;
         }
-        if ("length".equals(value) || "incomplete".equals(value)) {
+        if ("length".equals(value) || "incomplete".equals(value) || "max_tokens".equals(value)) {
             return FinishReasonEnum.LENGTH;
         }
-        if ("tool_calls".equals(value) || "function_call".equals(value)) {
+        if ("tool_calls".equals(value) || "function_call".equals(value) || "tool_use".equals(value)) {
             return FinishReasonEnum.TOOL_CALLS;
         }
-        if ("content_filter".equals(value)) {
+        if ("content_filter".equals(value) || "refusal".equals(value)) {
             return FinishReasonEnum.CONTENT_FILTER;
         }
         return FinishReasonEnum.ERROR;

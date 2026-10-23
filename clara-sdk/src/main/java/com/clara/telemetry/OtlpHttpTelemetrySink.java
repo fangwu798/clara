@@ -17,6 +17,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,9 +41,12 @@ public final class OtlpHttpTelemetrySink implements ITelemetrySink, Closeable {
     private final TelemetryOtlpSettings settings;
     private final BlockingQueue<TelemetryEvent> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
     private final AtomicBoolean running = new AtomicBoolean(true);
+    private final AtomicLong accepted = new AtomicLong();
+    private final AtomicLong attempted = new AtomicLong();
     private final LongAdder dropped = new LongAdder();
     private final LongAdder failures = new LongAdder();
     private final Object sendLock = new Object();
+    private final Object flushMonitor = new Object();
     private final Thread worker;
 
     private OtlpHttpTelemetrySink(TelemetryOtlpSettings settings) {
@@ -70,22 +74,41 @@ public final class OtlpHttpTelemetrySink implements ITelemetrySink, Closeable {
         if (event == null || !running.get()) {
             return;
         }
-        if (!queue.offer(event)) {
+        if (queue.offer(event)) {
+            accepted.incrementAndGet();
+        } else {
             dropped.increment();
         }
     }
 
     /**
-     * 同步把当前队列中的事件发送出去；主要供测试和关闭前兜底使用。
+     * 等待调用前已提交的事件全部尝试发送完毕，主要供测试和关闭前兜底使用。
+     *
+     * <p>只排空队列并不够：后台线程可能已把事件取进本地批次并在等待下一次轮询。这里先唤醒后台线程立即
+     * 发送本地批次，再等待「已提交数」与「已尝试数」对齐；超过配置超时后返回，避免网络故障拖住调用方。
      */
     public void flush() {
-        List<TelemetryEvent> batch = new ArrayList<>();
-        queue.drainTo(batch, BATCH_SIZE);
-        while (!batch.isEmpty()) {
-            send(batch);
-            batch.clear();
-            queue.drainTo(batch, BATCH_SIZE);
+        long target = accepted.get();
+        if (attempted.get() >= target) {
+            return;
         }
+        worker.interrupt();
+        long deadline = System.currentTimeMillis() + Math.max(settings.getTimeoutMillis(), 1000L);
+        synchronized (flushMonitor) {
+            while (attempted.get() < target) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0L) {
+                    break;
+                }
+                try {
+                    flushMonitor.wait(remaining);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        drainRemaining();
     }
 
     /**
@@ -131,15 +154,45 @@ public final class OtlpHttpTelemetrySink implements ITelemetrySink, Closeable {
                 }
                 if (!batch.isEmpty() && (batch.size() >= BATCH_SIZE || event == null)) {
                     send(batch);
+                    markAttempted(batch.size());
                     batch.clear();
                 }
             } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                break;
+                if (!running.get()) {
+                    break;
+                }
+                queue.drainTo(batch, BATCH_SIZE - batch.size());
+                if (!batch.isEmpty()) {
+                    send(batch);
+                    markAttempted(batch.size());
+                    batch.clear();
+                }
             }
         }
         if (!batch.isEmpty()) {
             send(batch);
+            markAttempted(batch.size());
+        }
+    }
+
+    private void drainRemaining() {
+        List<TelemetryEvent> batch = new ArrayList<>();
+        queue.drainTo(batch, BATCH_SIZE);
+        while (!batch.isEmpty()) {
+            send(batch);
+            markAttempted(batch.size());
+            batch.clear();
+            queue.drainTo(batch, BATCH_SIZE);
+        }
+    }
+
+    private void markAttempted(int count) {
+        if (count <= 0) {
+            return;
+        }
+        attempted.addAndGet(count);
+        synchronized (flushMonitor) {
+            flushMonitor.notifyAll();
         }
     }
 

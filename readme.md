@@ -1,8 +1,8 @@
 # Clara
 
-Clara 是一套面向 Java 8 的本地 AI 智能体运行时与控制台。它把模型调用、上下文管理、工具调用、MCP、工作流、技能、代码知识图谱和可观测能力拆成独立 Maven 模块，既可整套运行，也可按需嵌入 Java 系统。
+Clara 是一套面向 Java 8 的可嵌入 AI Agent 客户端库，附带一个交互式 CLI。它把模型调用、上下文管理、工具调用、MCP、工作流、技能、代码知识图谱和可观测能力拆成独立 Maven 模块，既可整套运行，也可按需嵌入 Java 系统。
 
-> Clara 当前是「运行时库 + 交互式 CLI」形态，不是开箱即用的 Web 服务。仓库没有 Spring Boot / Web 容器；`clara-application` 提供装配入口和控制台，REST、SSE 等 Web 接入由宿主应用自行实现。
+> Clara 当前是「运行时库 + 交互式 CLI」形态，不是开箱即用的 Web 服务。仓库没有 Spring Boot / Web 容器；`clara-sdk` 提供装配入口供宿主嵌入，`clara-application` 只是基于 SDK 实现的命令行外壳，REST、SSE 等 Web 接入由宿主应用自行实现。
 
 ## 架构总览
 
@@ -19,7 +19,7 @@ Clara 是一套面向 Java 8 的本地 AI 智能体运行时与控制台。它�
 
 ## 功能概览
 
-- 多模型对话：OpenAI、DeepSeek、火山方舟、Kimi、Anthropic、阿里通义；支持 Completion / Response 等调用方式。
+- 多模型对话：OpenAI、DeepSeek、火山方舟、Kimi、Anthropic、阿里通义；支持 Completion / Response / Messages 等调用方式。
 - 上下文编排：窗口裁剪、历史压缩、语义召回、提示词匹配、技能匹配、复杂任务动态计划。
 - 工具与 MCP：内置文件、命令、图谱、工作流工具；启动时自动发现 `config/mcp` 中的 MCP 服务，未配置 MCP 时仅使用内置工具与技能。
 - 工作流：顺序、条件、并行、循环、人工确认、多角色评审等节点；支持运行期生成并发布自定义工作流。
@@ -39,12 +39,14 @@ Clara 是一套面向 Java 8 的本地 AI 智能体运行时与控制台。它�
 | `clara-model` | Provider 配置、协议编解码、流式模型、Embedding、Token 估算与媒体模型 |
 | `clara-mcp` | MCP 客户端、stdio / Streamable HTTP 传输、服务注册与能力目录（可选，未配置时不启用） |
 | `clara-workflow` | 工作流定义、DAG 执行、任务规划、预算台账与人工交互网关 |
-| `clara-memory` | 窗口记忆、会话持久化、语义记忆、Milvus 接入 |
+| `clara-memory` | 窗口记忆、会话持久化、语义记忆（本地实现） |
+| `clara-memory-milvus` | 可选语义记忆后端：Milvus 向量 / BM25 检索 |
 | `clara-skill` | 技能注册、Schema 校验、权限控制与工具执行 |
 | `clara-orchestration` | 对话主循环、上下文组装、工具往返、意图计划与技能匹配 |
-| `clara-application` | 整体装配、配置加载、交互式控制台、图谱与可观测接入 |
+| `clara-sdk` | 嵌入入口：整体装配、配置加载、图谱与可观测接入 |
+| `clara-application` | 基于 SDK 的交互式控制台（CLI），宿主通常不直接依赖 |
 
-依赖方向保持单向：`core` 不依赖业务模块；`transport` 只依赖 `core`；能力模块按需依赖 `core` / `transport`；`orchestration` 只通过接口使用能力模块；`application` 负责最终装配。
+依赖方向保持单向：`core` 不依赖业务模块；`transport` 只依赖 `core`；能力模块按需依赖 `core` / `transport`；`orchestration` 只通过接口使用能力模块；`sdk` 负责最终装配，`application` 只在其上提供 CLI。
 
 ## 环境要求
 
@@ -81,10 +83,13 @@ mvn -q -pl clara-application -am package -DskipTests
 | OpenAI | `CLARA_OPENAI_API_KEY` |
 | 火山方舟 | `CLARA_VOLCENGINE_API_KEY` |
 | 阿里云百炼（通义千问） | `CLARA_ALIBABA_API_KEY` |
+| Anthropic（Claude） | `CLARA_ANTHROPIC_API_KEY` |
 
 启动脚本会扫描所有模型配置，按环境变量去重后检查凭据；缺失时会在终端提示输入本次启动使用的值。
 
 阿里云百炼官方示例使用 `DASHSCOPE_API_KEY`，Clara 统一按 `CLARA_ALIBABA_API_KEY` 检查凭据，把前者的值设置到后者即可。内置的 `alibaba-completion.yml` 走官方共享接入点 `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`；若要使用官方推荐的业务空间专属域名 `https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/...`，需要同时修改 `transport.allowedOrigins`。
+
+Anthropic 的 `anthropic.yml` 直连 Messages API：鉴权头是 `x-api-key`，版本由能力参数 `apiVersion` 决定（默认 `2023-06-01`），能力节点必须声明 `protocol: MESSAGES`。Messages API 的 `max_tokens` 是必填项，配置里的 `parameters.maxTokens` 会在请求未指定时补齐；默认按 Claude Opus 4.x 的 32000 输出上限保守设置，实际上限以官方模型页与中转站开通的模型为准。
 
 ### 3. 启动
 
@@ -124,19 +129,45 @@ Clara 既可以作为整套 CLI 运行，也可以作为 Java 基础库嵌入宿
 mvn -DskipTests install
 ```
 
-宿主项目引入完整能力：
+发布到 Maven Central（需先配置 `ossrh` 凭据与 GPG 私钥）：
+
+```powershell
+mvn -Prelease clean deploy
+```
+
+`release` profile 会附加 source jar、javadoc jar 并签名；`clara-bom` 统一管理各模块版本。
+
+宿主项目引入 SDK（嵌入完整能力）：
 
 ```xml
 <dependency>
     <groupId>com.clara</groupId>
-    <artifactId>clara-application</artifactId>
+    <artifactId>clara-sdk</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 
-`clara-application` 会传递依赖编排、模型、记忆、技能、MCP 与工作流模块；只需要模型调用时，也可以只引入 `clara-model`。
+`clara-sdk` 会传递依赖编排、模型、记忆、技能、MCP 与工作流模块；`clara-application` 只包含 CLI，不要作为库依赖。语义记忆默认走本地实现，需要 Milvus 时再额外引入：
+
+```xml
+<dependency>
+    <groupId>com.clara</groupId>
+    <artifactId>clara-memory-milvus</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+只需要模型调用时，也可以只引入 `clara-model`。
 
 > 示例默认进程工作目录能找到 `config/`（`ConfigLocator` 会从当前目录向上回溯最多 6 层）。生产环境建议把 `config/` 随应用一起部署，或显式传入配置文件路径。
+
+### 0. 公共 API 契约
+
+- `@PublicApi`：对外承诺兼容，次版本升级保持二进制兼容。
+- `@Internal`：模块间协作用，宿主不应直接依赖。
+- `@Experimental`：可用但不承诺兼容。
+
+嵌入入口 `ApplicationBootstrap` 与 `ConversationRequest` / `ConversationResult` / `IStreamModel` 均已标记 `@PublicApi`，契约守卫用例见 `clara-sdk/src/test/java/com/clara/PublicApiContractTest.java`。
 
 ### 1. 嵌入完整对话编排
 
@@ -420,7 +451,7 @@ capabilities:
 | `taskQueryEndpoint` | 异步任务查询地址；视频等异步能力使用，支持 `{id}` 占位 |
 | `modelId` | 平台模型 ID；生产配置必须写固定模型 ID，不要依赖会变化的别名 |
 | `apiProfile` | 平台协议档位，自由字符串，用于区分同平台的接口变体 |
-| `protocol` | 线格式：`COMPLETION`（Chat Completions）或 `RESPONSE`（OpenAI Responses） |
+| `protocol` | 线格式：`COMPLETION`（Chat Completions）、`RESPONSE`（OpenAI Responses）或 `MESSAGES`（Anthropic Messages） |
 | `parameters` | 标量扩展参数，例如 `maxTokens`、`maxPromptChars`、`maxOutputs`、轮询参数 |
 | `control` | 上下文窗口、压缩、召回等单能力覆盖配置 |
 
@@ -605,6 +636,8 @@ root:
 
 启动时会探测模型可用性。若当前模型属于「平台不可用」（401 / 403 / 429 / 5xx、连接失败、超时、无响应字节等），会按首字符响应时间顺序自动切到下一个可用模型，并打印 `[failover]` 提示；已完成工具调用的轮次不会重放。
 
+探测的超时与重试由 `config/clara.yml` 的 `modelCheck` 节点控制：`timeoutMillis`（默认 60000）是等待首个流式响应事件的最长时间，`retries`（默认 1）只在超时时重试。经中转站或平台排队时首字可能到几十秒，30 秒级硬超时会把可用模型误判为不可用；遇到「等待首个响应超时」先调大 `timeoutMillis`。
+
 ## 工作流
 
 内置工作流位于 `config/workflow/*.yml`：
@@ -723,9 +756,11 @@ clara/
 |-- clara-mcp/                  # MCP 客户端与能力发现
 |-- clara-workflow/             # 工作流引擎与任务规划
 |-- clara-memory/               # 会话、窗口与语义记忆
+|-- clara-memory-milvus/        # 可选 Milvus 语义记忆后端
 |-- clara-orchestration/        # 对话编排与工具往返
 |-- clara-skill/                # 技能注册与执行
-|-- clara-application/          # 装配入口与交互式控制台
+|-- clara-sdk/                  # 嵌入入口（ApplicationBootstrap）
+|-- clara-application/          # 基于 SDK 的交互式控制台
 |-- assets/                     # README 架构图与静态资源
 |-- config/                     # 运行期配置根目录
 |   |-- clara.yml               # 主配置：默认模型、图谱、记忆、观测等

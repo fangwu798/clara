@@ -6,6 +6,38 @@
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Clara</name>
+    <description>可嵌入宿主服务的 Java Agent 客户端库，提供模型调用、编排、工具、工作流、记忆与 MCP 能力。</description>
+    <url>https://github.com/fangwu798/clara</url>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <id>fangwu798</id>
+            <name>fangwu798</name>
+            <url>https://github.com/fangwu798</url>
+        </developer>
+    </developers>
+    <scm>
+        <connection>scm:git:git@github.com:fangwu798/clara.git</connection>
+        <developerConnection>scm:git:git@github.com:fangwu798/clara.git</developerConnection>
+        <url>https://github.com/fangwu798/clara</url>
+        <tag>HEAD</tag>
+    </scm>
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
     <modules>
         <module>clara-bom</module>
         <module>clara-core</module>
@@ -14,8 +46,10 @@
         <module>clara-mcp</module>
         <module>clara-workflow</module>
         <module>clara-memory</module>
+        <module>clara-memory-milvus</module>
         <module>clara-orchestration</module>
         <module>clara-skill</module>
+        <module>clara-sdk</module>
         <module>clara-application</module>
     </modules>
     <properties>
@@ -33,12 +67,16 @@
         <milvus.version>2.6.25</milvus.version>
         <jline.version>3.30.15</jline.version>
         <pinyin4j.version>2.5.1</pinyin4j.version>
+        <lombok.version>1.18.28</lombok.version>
         <maven.compiler.version>3.11.0</maven.compiler.version>
         <maven.resources.version>3.3.1</maven.resources.version>
         <maven.surefire.version>3.2.5</maven.surefire.version>
         <maven.enforcer.version>3.4.1</maven.enforcer.version>
         <maven.shade.version>3.5.1</maven.shade.version>
         <jacoco.version>0.8.11</jacoco.version>
+        <maven.source.version>3.3.1</maven.source.version>
+        <maven.javadoc.version>3.6.3</maven.javadoc.version>
+        <maven.gpg.version>3.2.7</maven.gpg.version>
         <!-- surefire 的 JVM 参数入口；JaCoCo prepare-agent 会在该值后追加 -javaagent。 -->
         <argLine>-Dfile.encoding=UTF-8</argLine>
     </properties>
@@ -65,6 +103,12 @@
                 <groupId>org.yaml</groupId>
                 <artifactId>snakeyaml</artifactId>
                 <version>${snakeyaml.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -295,6 +339,54 @@
             <properties>
                 <maven.compiler.release>8</maven.compiler.release>
             </properties>
+        </profile>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>${maven.source.version}</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <phase>package</phase>
+                                <goals><goal>jar-no-fork</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>${maven.javadoc.version}</version>
+                        <configuration>
+                            <encoding>UTF-8</encoding>
+                            <doclint>none</doclint>
+                            <failOnError>false</failOnError>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <phase>package</phase>
+                                <goals><goal>jar</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${maven.gpg.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals><goal>sign</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>
