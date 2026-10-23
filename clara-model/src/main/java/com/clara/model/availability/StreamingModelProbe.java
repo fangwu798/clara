@@ -8,6 +8,7 @@ import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.FinishReasonEnum;
 import com.clara.enums.StreamEventEnum;
 import com.clara.exception.ClaraError;
+import com.clara.exception.ClaraException;
 import com.clara.kernel.config.ModelConfig;
 import com.clara.kernel.config.ProviderConfiguration;
 import com.clara.kernel.http.HttpRequest;
@@ -50,6 +51,11 @@ public final class StreamingModelProbe implements IModelProbe {
     private static final int PROBE_MAX_TOKENS = 512;
 
     /**
+     * 可重试失败后的重试间隔：只覆盖「上游瞬时抖动」，不放大启动等待时间。
+     */
+    private static final long RETRY_BACKOFF_MILLIS = 300L;
+
+    /**
      * 发起一次最小流式对话请求并测量首个非空正文字符的响应时间。
      *
      * <p>该方法会为本次探测创建独立的 {@link ConvContext}。等待达到超时时间或流进入可判定状态后，
@@ -64,6 +70,34 @@ public final class StreamingModelProbe implements IModelProbe {
      */
     @Override
     public ModelCheckResult probe(Path path, String alias, ProviderConfiguration provider, ModelConfig chat, long timeoutMillis) {
+        Observation observation = attempt(provider, chat, alias, timeoutMillis);
+        ModelCheckResult result = observation.result(path, alias, provider.getProvider().name(), chat.getModelId());
+        if (result.isAvailable() || !observation.retryable()) {
+            return result;
+        }
+        // 启动探测宁可多花一次请求，也不要把一次上游抖动（5xx / 429 / 连接失败）当成模型不可用：
+        // 中转站与推理平台的上游 500 通常是瞬时的，重试一次即可恢复。
+        try {
+            Thread.sleep(RETRY_BACKOFF_MILLIS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return result;
+        }
+        return attempt(provider, chat, alias, timeoutMillis)
+                .result(path, alias, provider.getProvider().name(), chat.getModelId());
+    }
+
+    /**
+     * 发起一次探测请求；不等待重试，只负责单次请求的生命周期与结果收集。
+     *
+     * @param provider      已加载的供应商配置，非 null
+     * @param chat          对话能力配置，非 null
+     * @param alias         模型别名，非 null
+     * @param timeoutMillis 等待首字符或终态事件的最长时间，单位为毫秒
+     * @return 单次探测的观测状态，非 null
+     */
+    private static Observation attempt(ProviderConfiguration provider, ModelConfig chat, String alias,
+            long timeoutMillis) {
         Observation observation = new Observation(System.nanoTime());
         HttpRequest request = HttpRequest.builder()
                 .model(chat.getModelId())
@@ -81,13 +115,14 @@ public final class StreamingModelProbe implements IModelProbe {
             Thread.currentThread().interrupt();
             observation.fail("检查被中断");
         } catch (RuntimeException exception) {
+            observation.markRetryable(exception);
             observation.fail(concise(exception));
         } finally {
             if (handle != null && !handle.isDone()) {
                 handle.cancel();
             }
         }
-        return observation.result(path, alias, provider.getProvider().name(), chat.getModelId());
+        return observation;
     }
 
     /**
@@ -112,6 +147,9 @@ public final class StreamingModelProbe implements IModelProbe {
 
         /** 失败原因，先到者胜出；尚未失败时为 null。 */
         private final AtomicReference<String> failure = new AtomicReference<>();
+
+        /** 失败对应的领域错误，用于判断是否值得重试；不是领域错误时为 null。 */
+        private final AtomicReference<ClaraError> failureError = new AtomicReference<>();
 
         /** 终态响应，用于在缺少正文时补充结束原因；未收到终态事件时为 null。 */
         private final AtomicReference<HttpResponse> terminal = new AtomicReference<>();
@@ -146,6 +184,30 @@ public final class StreamingModelProbe implements IModelProbe {
         }
 
         /**
+         * 记录可重试的调用异常；只有领域错误明确标记可重试时才允许重试。
+         *
+         * @param failure 调用异常，可为 null
+         */
+        void markRetryable(Throwable failure) {
+            if (failure instanceof ClaraException) {
+                ClaraError error = ((ClaraException) failure).getError();
+                if (error != null && error.isRetryable()) {
+                    failureError.compareAndSet(null, error);
+                }
+            }
+        }
+
+        /**
+         * 本次失败是否值得重试一次。
+         *
+         * @return 失败来自可重试的领域错误时返回 true
+         */
+        boolean retryable() {
+            ClaraError error = failureError.get();
+            return error != null && error.isRetryable();
+        }
+
+        /**
          * 处理模型流事件。
          *
          * <p>非空正文增量记录首次出现的时间并结束等待；非空思维链增量只记录时间，是否据此判定可用交给
@@ -166,6 +228,7 @@ public final class StreamingModelProbe implements IModelProbe {
                     firstReasoning.compareAndSet(-1L, elapsed());
                 }
             } else if (type == StreamEventEnum.ERROR) {
+                failureError.compareAndSet(null, event.getError());
                 fail(describe(event.getError()));
                 finished.countDown();
             } else if (type == StreamEventEnum.RESPONSE_COMPLETE) {

@@ -20,6 +20,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -36,6 +37,7 @@ public class StreamingModelProbeTest {
 
     private HttpServer server;
     private volatile String mode = "text";
+    private final AtomicInteger requests = new AtomicInteger();
     private ProviderConfiguration configuration;
     private Path configPath;
 
@@ -45,6 +47,7 @@ public class StreamingModelProbeTest {
         server.createContext("/chat", new HttpHandler() {
             @Override
             public void handle(HttpExchange exchange) throws IOException {
+                requests.incrementAndGet();
                 read(exchange.getRequestBody());
                 try {
                     respond(exchange);
@@ -131,6 +134,17 @@ public class StreamingModelProbeTest {
     }
 
     @Test
+    public void transientServerErrorIsRetriedOnce() {
+        mode = "flaky";
+        requests.set(0);
+
+        ModelCheckResult result = probe(3000L);
+
+        assertTrue("一次上游抖动不应把模型判成不可用", result.isAvailable());
+        assertEquals(2, requests.get());
+    }
+
+    @Test
     public void slowServerTimesOut() {
         mode = "slow";
 
@@ -163,7 +177,7 @@ public class StreamingModelProbeTest {
         byte[] body;
         String contentType;
         int status = 200;
-        if ("error".equals(mode)) {
+        if ("error".equals(mode) || ("flaky".equals(mode) && requests.get() == 1)) {
             status = 500;
             contentType = "application/json";
             body = "{\"error\":{\"message\":\"boom\",\"type\":\"server_error\"}}".getBytes(StandardCharsets.UTF_8);

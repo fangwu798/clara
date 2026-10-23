@@ -88,7 +88,18 @@ public final class SkillLoader {
                 segments.add(new PromptSegment(text(segment, "role"), text(segment, "content")));
             }
         }
-        return new PromptDefinition(id, description, segments);
+        return new PromptDefinition(id, description, segments, autoMatch(root));
+    }
+
+    /**
+     * 读取提示词是否参与语义召回：缺省为 true，显式 {@code "autoMatch": false} 表示只能按 id 引用。
+     *
+     * @param root 提示词 JSON 根节点
+     * @return true 表示参与按用户输入的语义召回
+     */
+    private boolean autoMatch(JsonNode root) {
+        JsonNode node = root.get("autoMatch");
+        return node == null || node.isNull() || node.asBoolean(true);
     }
 
     private ScriptTypeEnum type(JsonNode root) {

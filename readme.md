@@ -520,6 +520,7 @@ tester: deepseek-completion
 
 - `id` 是工作流 `prompt`、`context.alwaysPrompts` 引用的标识。
 - `description` 用于检索匹配。
+- `autoMatch` 默认 `true`：参与按用户输入的语义召回；设为 `false` 时只按 `id` 被工作流或 `alwaysPrompts` 引用，不进入召回索引。图片、视频、方案生成等专用提示词必须设为 `false`，否则会被无关问题误命中。
 - `segments` 按顺序拼接成消息段；`role` 使用模型消息角色（如 `system`）。
 
 工具声明协议（`skill/tools/**/*.json`）：

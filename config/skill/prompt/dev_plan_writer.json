@@ -1,6 +1,7 @@
 {
   "id": "dev_plan_writer",
   "description": "开发计划生成：依据《需求与技术方案》规划可执行的开发计划（阶段、里程碑、任务拆分、依赖与验收标准）。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

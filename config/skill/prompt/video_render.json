@@ -1,6 +1,7 @@
 {
   "id": "video_render",
   "description": "视频生成提示词",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

@@ -1,6 +1,7 @@
 {
   "id": "workflow_author",
   "description": "自定义工作流生成第一步：把用户诉求转写成一份可直接加载执行的 YAML 工作流定义。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

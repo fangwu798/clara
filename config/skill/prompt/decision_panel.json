@@ -1,6 +1,7 @@
 {
   "id": "decision_panel",
   "description": "多角色自由讨论并共同决议：角色先给立场，主持人统计立场并给出最终决议。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

@@ -1,6 +1,7 @@
 {
   "id": "image_describer",
   "description": "图片识别提示词：对随消息下发的图片做客观描述与要点提取。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

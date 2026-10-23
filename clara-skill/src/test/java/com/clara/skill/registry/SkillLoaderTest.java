@@ -56,6 +56,7 @@ public class SkillLoaderTest {
         assertEquals("summarize", definition.getId());
         assertNotNull(definition.getDescription());
         assertFalse(definition.getSegments().isEmpty());
+        assertFalse("压缩总结提示词只按 id 引用，不参与语义召回", definition.isAutoMatch());
         boolean hasSystem = false;
         for (PromptSegment segment : definition.getSegments()) {
             if ("system".equals(segment.getRole())) {
@@ -74,8 +75,19 @@ public class SkillLoaderTest {
         Files.write(file.toPath(), json.getBytes(StandardCharsets.UTF_8));
         PromptDefinition definition = loader.parsePrompt(file);
         assertEquals("p1", definition.getId());
+        assertTrue("未声明 autoMatch 的提示词默认参与语义召回", definition.isAutoMatch());
         assertEquals(2, definition.getSegments().size());
         assertEquals("system", definition.getSegments().get(0).getRole());
         assertEquals("user", definition.getSegments().get(1).getRole());
+    }
+
+    @Test
+    public void parsesAutoMatchFlag() throws Exception {
+        String json = "{ \"id\": \"p2\", \"description\": \"d\", \"autoMatch\": false, \"segments\": ["
+                + "{ \"role\": \"system\", \"content\": \"x\" } ] }";
+        File file = tempFolder.newFile("p2.json");
+        Files.write(file.toPath(), json.getBytes(StandardCharsets.UTF_8));
+
+        assertFalse(loader.parsePrompt(file).isAutoMatch());
     }
 }

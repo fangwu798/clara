@@ -1,6 +1,7 @@
 {
   "id": "repo_doc_writer",
   "description": "仓库技术文档整理的第二步：根据用户目标、规划与已读取源码内容撰写结构化中文技术文档。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

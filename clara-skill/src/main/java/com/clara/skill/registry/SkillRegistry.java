@@ -375,6 +375,9 @@ public final class SkillRegistry {
 
     private void changedPrompts(List<MemoryEntry> entries, Map<String, PromptDefinition> previousPrompts) {
         for (PromptDefinition prompt : prompts.values()) {
+            if (!prompt.isAutoMatch()) {
+                continue;
+            }
             PromptDefinition before = previousPrompts.get(prompt.getId());
             if (before == null || !before.equals(prompt)) {
                 entries.add(indexPrompt(prompt));
@@ -394,6 +397,12 @@ public final class SkillRegistry {
         for (String id : previousPrompts.keySet()) {
             if (!prompts.containsKey(id)) {
                 memoryStore.deleteById(entryId(MemorySourceTypeEnum.PROMPT, id));
+            }
+        }
+        // 由「参与召回」改为「仅按 id 引用」的提示词，旧索引可能已在持久化存储里，需要显式清掉。
+        for (PromptDefinition prompt : prompts.values()) {
+            if (!prompt.isAutoMatch()) {
+                memoryStore.deleteById(entryId(MemorySourceTypeEnum.PROMPT, prompt.getId()));
             }
         }
     }

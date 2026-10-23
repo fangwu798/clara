@@ -1,6 +1,7 @@
 {
   "id": "video_generator",
   "description": "视频生成提示词优化",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

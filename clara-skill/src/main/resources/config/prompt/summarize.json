@@ -1,6 +1,7 @@
 {
   "id": "summarize",
   "description": "把超长对话历史压缩为结构化摘要的总结提示词",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

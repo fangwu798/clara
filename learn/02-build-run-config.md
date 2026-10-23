@@ -241,7 +241,7 @@ tester: deepseek-completion
 
 ### `skill/`
 
-- `prompt/`：提示词 JSON，含 `id`、`description`、`segments`。
+- `prompt/`：提示词 JSON，含 `id`、`description`、`segments`；`autoMatch: false` 表示只按 `id` 引用、不参与语义召回。
 - `tools/`：JSON 工具声明，适合内置工具或简单声明式工具。
 - `scripts/`：Python 脚本，通过 `--describe` 自描述工具元数据。
 

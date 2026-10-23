@@ -18,6 +18,10 @@ public final class PromptDefinition {
     private final String id;
     private final String description;
     private final List<PromptSegment> segments;
+    /**
+     * 是否参与按用户输入的语义召回：false 表示只能按 id 显式引用（例如工作流节点里的 prompt）。
+     */
+    private final boolean autoMatch;
 
     /**
      * 创建提示词定义。
@@ -28,6 +32,19 @@ public final class PromptDefinition {
      * @throws IllegalArgumentException id 为空白、segments 为 null / 空或含 null 元素时
      */
     public PromptDefinition(String id, String description, List<PromptSegment> segments) {
+        this(id, description, segments, true);
+    }
+
+    /**
+     * 创建提示词定义，并指定是否参与语义召回。
+     *
+     * @param id          提示词标识，不可为空白
+     * @param description 提示词描述，可为 null
+     * @param segments    提示词分段列表，不可为 null 或空
+     * @param autoMatch   是否参与按用户输入的语义召回；false 表示只能按 id 显式引用
+     * @throws IllegalArgumentException id 为空白、segments 为 null / 空或含 null 元素时
+     */
+    public PromptDefinition(String id, String description, List<PromptSegment> segments, boolean autoMatch) {
         if (StringUtils.isBlank(id) || segments == null || segments.isEmpty()) {
             throw new IllegalArgumentException("prompt definition is invalid");
         }
@@ -41,6 +58,7 @@ public final class PromptDefinition {
         this.id = id;
         this.description = description;
         this.segments = Collections.unmodifiableList(copied);
+        this.autoMatch = autoMatch;
     }
 
 }

@@ -1,6 +1,7 @@
 {
   "id": "workflow_author_reviewer",
   "description": "自定义工作流生成第二步：按同一套规范逐项自检草稿定义，并只输出可发布的最终 YAML。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -80,6 +81,25 @@ public class SkillRegistrySemanticTest {
         registry.reload();
 
         assertEquals("blank", find(store.lastUpsert(), "PROMPT:blank").getContent());
+    }
+
+    @Test
+    public void skipsPromptsMarkedAutoMatchFalseAndPurgesTheirEntries() throws Exception {
+        File root = folder.newFolder("semantic-auto-match");
+        File promptDir = newFolder(root, "prompt");
+        write(new File(promptDir, "manual.json"),
+                "{\"id\":\"manual\",\"description\":\"only by id\",\"autoMatch\":false,"
+                        + "\"segments\":[{\"role\":\"system\",\"content\":\"x\"}]}");
+        write(new File(promptDir, "auto.json"), prompt("auto", "say hi"));
+
+        RecordingStore store = new RecordingStore();
+        new SkillRegistry(null, root, null, new Hashing(), store).reload();
+
+        assertEquals(1, store.lastUpsert().size());
+        assertNotNull(find(store.lastUpsert(), "PROMPT:auto"));
+        assertNull("autoMatch=false 的提示词不应进入语义索引",
+                find(store.lastUpsert(), "PROMPT:manual"));
+        assertEquals(Collections.singletonList("PROMPT:manual"), store.deleted);
     }
 
     private static MemoryEntry find(List<MemoryEntry> entries, String id) {

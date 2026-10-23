@@ -1,6 +1,7 @@
 {
   "id": "solution_architect",
   "description": "业务方案生成的第二步：依据用户目标、规划与已读取的源码/文档，撰写前后端一体的需求与技术方案。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

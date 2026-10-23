@@ -1,6 +1,7 @@
 {
   "id": "review_panel",
   "description": "多角色评审讨论的发言提示词：按 isFinal 区分「角色发言」与「主持人汇总结论」。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

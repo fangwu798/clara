@@ -1,6 +1,7 @@
 {
   "id": "solution_file_planner",
   "description": "业务方案生成的第一步：根据业务目标与目录文件清单，挑选最能反映业务与架构的文件并给出方案大纲。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

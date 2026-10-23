@@ -1,6 +1,7 @@
 {
   "id": "image_generator",
   "description": "图片生成提示词：把业务主题转成一句精炼的画面描述，作为生图模型的提示词。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

@@ -1,6 +1,7 @@
 {
   "id": "image_render",
   "description": "图片渲染提示词：把上游精炼好的画面描述原样作为文生图模型的提示词。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

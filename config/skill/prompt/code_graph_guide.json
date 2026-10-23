@@ -1,6 +1,7 @@
 {
   "id": "code_graph_guide",
   "description": "代码阅读约定：读代码先查本地代码知识图谱（code_graph 工具），图谱未覆盖的再读本地文件。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

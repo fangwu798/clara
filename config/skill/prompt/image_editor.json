@@ -1,6 +1,7 @@
 {
   "id": "image_editor",
   "description": "图生图提示词：把编辑要求转成一句精炼的画面编辑指令，配合参考图一起下发。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",

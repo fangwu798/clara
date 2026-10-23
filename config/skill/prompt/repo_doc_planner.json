@@ -1,6 +1,7 @@
 {
   "id": "repo_doc_planner",
   "description": "仓库技术文档整理的第一步：根据用户目标与目录文件清单挑选要阅读的文件并给出文档大纲。",
+  "autoMatch": false,
   "segments": [
     {
       "role": "system",
