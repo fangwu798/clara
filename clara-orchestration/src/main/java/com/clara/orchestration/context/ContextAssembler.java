@@ -8,6 +8,7 @@ import com.clara.core.telemetry.Telemetry;
 import com.clara.core.telemetry.TelemetrySpan;
 import com.clara.core.telemetry.TelemetrySpanKindEnum;
 import com.clara.dto.memory.ContextControlConfig;
+import com.clara.dto.memory.TopicIsolationConfig;
 import com.clara.dto.memory.WindowPolicy;
 import com.clara.enums.RoleEnum;
 import com.clara.kernel.message.delta.SystemContent;
@@ -24,10 +25,11 @@ import java.util.Set;
 /**
  * 上下文装配器：把「历史恢复、窗口裁剪、超限压缩、检索注入、技能装配」组合成一份本轮请求消息。
  *
- * <p>装配顺序：先按窗口策略裁剪历史；窗口发生淘汰且启用压缩时，把被淘汰的消息组压缩为摘要；随后压缩历史
- * 工具结果（只压当前提问之前的历史部分，控制请求体膨胀）；再完成技能匹配（提示词 + 工具声明）、外部知识
- * 补充（代码知识图谱：先查图谱、图谱里没有再让模型自己查本地文件）与对话知识找回；最后把 system 指令
- * （常驻提示词 + 技能提示词 + 图谱补充信息 + 压缩摘要 + 检索知识）归一化到消息首位。
+ * <p>装配顺序：先按话题段筛选历史（明确切换话题时旧话题段不进入本轮），再按窗口策略裁剪；窗口发生淘汰且
+ * 启用压缩时，只把当前话题段内被淘汰的消息组压缩为摘要；随后压缩历史工具结果（只压当前提问之前的历史部分，
+ * 控制请求体膨胀）；再完成技能匹配（提示词 + 工具声明）、外部知识补充（代码知识图谱：先查图谱、图谱里没有
+ * 再让模型自己查本地文件）与对话知识找回；最后把 system 指令（常驻提示词 + 话题边界说明 + 技能提示词 +
+ * 图谱补充信息 + 压缩摘要 + 检索知识）归一化到消息首位。
  *
  * <p>提示词分两类：{@code basePrompts} 是常驻的，每轮原样注入，承载「读代码先查图谱」这类与输入无关的
  * 固定约定；技能提示词是按输入相似度检索出来的，承载随输入变化的用法说明。前者靠检索注入会因阈值与
@@ -35,10 +37,24 @@ import java.util.Set;
  */
 public final class ContextAssembler {
 
+    /**
+     * 话题切换时追加到 system 的边界说明。
+     *
+     * <p>代码层已经做了话题段隔离，这条提示词用于再明确一次「当前任务以最后一条用户消息为准」，
+     * 避免模型在少数边界不明确的场景里自行延续上一话题。
+     */
+    private static final String TOPIC_BOUNDARY_PROMPT =
+            "当前任务以最后一条用户消息为准。历史对话仅作参考，不要自动延续上一话题；"
+            + "只有用户明确要求“继续刚才/回到上面”时，才使用旧话题内容。";
+
     private final WindowCompressionCoordinator windowCompressionCoordinator;
     private final SemanticRecallCoordinator semanticRecallCoordinator;
     private final IContextSupplementProvider supplementProvider;
     private final SkillMatchCoordinator skillMatchCoordinator;
+    /** 话题隔离配置；为 null 时按默认配置处理。 */
+    private final TopicIsolationConfig topicIsolationConfig;
+    /** 按话题段选择本轮可携带的历史消息。 */
+    private final TopicSegmentPlanner topicSegmentPlanner;
 
     /**
      * 常驻提示词：每轮原样拼进 system 指令，不参与按输入的相似度检索；不可变，可能为空。
@@ -58,7 +74,7 @@ public final class ContextAssembler {
                             SemanticRecallCoordinator semanticRecallCoordinator,
                             SkillMatchCoordinator skillMatchCoordinator) {
         this(windowCompressionCoordinator, semanticRecallCoordinator, null, skillMatchCoordinator, null,
-                Telemetry.noop());
+                TopicIsolationConfig.defaults(), Telemetry.noop());
     }
 
 
@@ -77,7 +93,7 @@ public final class ContextAssembler {
                             SkillMatchCoordinator skillMatchCoordinator,
                             List<String> basePrompts) {
         this(windowCompressionCoordinator, semanticRecallCoordinator, supplementProvider,
-                skillMatchCoordinator, basePrompts, Telemetry.noop());
+                skillMatchCoordinator, basePrompts, TopicIsolationConfig.defaults(), Telemetry.noop());
     }
 
     /**
@@ -95,6 +111,27 @@ public final class ContextAssembler {
                             IContextSupplementProvider supplementProvider,
                             SkillMatchCoordinator skillMatchCoordinator,
                             List<String> basePrompts, Telemetry telemetry) {
+        this(windowCompressionCoordinator, semanticRecallCoordinator, supplementProvider,
+                skillMatchCoordinator, basePrompts, TopicIsolationConfig.defaults(), telemetry);
+    }
+
+    /**
+     * 创建上下文装配器并接入话题隔离配置。
+     *
+     * @param windowCompressionCoordinator 窗口压缩协调器，不可为 null
+     * @param semanticRecallCoordinator    知识找回协调器，不可为 null
+     * @param supplementProvider           外部知识补充提供者（如代码知识图谱）；可为 null（不补充）
+     * @param skillMatchCoordinator        技能匹配协调器，不可为 null
+     * @param basePrompts                  常驻提示词（每轮原样注入，不参与检索）；可为 null（视为无）
+     * @param topicIsolation               话题隔离配置；可为 null（使用默认配置）
+     * @param telemetry                    链路追踪入口，可为 null（按空实现处理）
+     */
+    public ContextAssembler(WindowCompressionCoordinator windowCompressionCoordinator,
+                            SemanticRecallCoordinator semanticRecallCoordinator,
+                            IContextSupplementProvider supplementProvider,
+                            SkillMatchCoordinator skillMatchCoordinator,
+                            List<String> basePrompts, TopicIsolationConfig topicIsolation,
+                            Telemetry telemetry) {
         if (windowCompressionCoordinator == null || semanticRecallCoordinator == null
                 || skillMatchCoordinator == null) {
             throw new IllegalArgumentException("context assembler dependencies are invalid");
@@ -106,6 +143,9 @@ public final class ContextAssembler {
         this.basePrompts = basePrompts == null
                 ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(basePrompts));
+        this.topicIsolationConfig = topicIsolation == null
+                ? TopicIsolationConfig.defaults() : topicIsolation;
+        this.topicSegmentPlanner = new TopicSegmentPlanner(this.topicIsolationConfig);
         this.telemetry = telemetry == null ? Telemetry.noop() : telemetry;
     }
 
@@ -143,9 +183,15 @@ public final class ContextAssembler {
         List<IContent> history;
         List<IContent> windowed;
         List<IContent> prepared;
+        String userInput;
+        TopicSelection topicSelection;
         try (TelemetrySpan span = telemetry.startSpan("context.window", TelemetrySpanKindEnum.CONTEXT)) {
             history = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.messages());
-            windowed = HistorySanitizer.dropInvalidAssistantMessages(windowMemory.window(policy, estimator));
+            userInput = latestUserInput(windowMemory.conversationId(), history);
+            topicSelection = topicSegmentPlanner.plan(history, userInput);
+            List<IContent> rawWindow = HistorySanitizer.dropInvalidAssistantMessages(
+                    windowMemory.window(policy, estimator));
+            windowed = filterByTopic(rawWindow, topicSelection);
             // 按「总量预算 + 最近优先」压缩工具结果：历史与本轮一视同仁，只保留最近一段原样，其余按预算截断。
             // 注意：淘汰判定仍用未压缩的 windowed（按对象同一性比对），避免压缩后的新对象被误判为淘汰。
             prepared = ToolOutputCompactor.compact(windowed,
@@ -153,21 +199,35 @@ public final class ContextAssembler {
             span.attribute("history_messages", history.size())
                     .attribute("window_messages", windowed.size())
                     .attribute("prepared_messages", prepared.size())
-                    .attribute("recent_turns_kept", effective.getRecentTurnsKept());
+                    .attribute("recent_turns_kept", effective.getRecentTurnsKept())
+                    .attribute("topic_relation", topicSelection.getRelation().name())
+                    .attribute("topic_selected", topicSelection.size())
+                    .attribute("topic_reason", topicSelection.getReason());
         }
-        String userInput = latestUserInput(windowMemory.conversationId(), history);
 
         List<IContent> systemParts = new ArrayList<>();
         if (effective.isCompressEnabled()) {
             try (TelemetrySpan span = telemetry.startSpan("context.compress", TelemetrySpanKindEnum.CONTEXT)) {
-                List<IContent> evictedMessages = evicted(history, windowed);
+                List<IContent> evictedMessages = evictedWithin(history, windowed, topicSelection);
                 IContent summary = windowCompressionCoordinator.summarize(evictedMessages);
                 if (summary != null) {
                     systemParts.add(summary);
                 }
+                int archivedCount = 0;
+                IContent archivedSummary = null;
+                if (topicIsolationConfig.isInjectArchivedSummary()) {
+                    List<IContent> archivedMessages = archived(history, topicSelection);
+                    archivedCount = archivedMessages.size();
+                    archivedSummary = windowCompressionCoordinator.summarize(archivedMessages);
+                    if (archivedSummary != null) {
+                        systemParts.add(archivedSummary);
+                    }
+                }
                 span.attribute("summary", summary != null)
                         .attribute("reason", "window")
-                        .attribute("evicted", evictedMessages.size());
+                        .attribute("evicted", evictedMessages.size())
+                        .attribute("archived", archivedCount)
+                        .attribute("archived_summary", archivedSummary != null);
             }
         }
         MatchedSkill matched;
@@ -196,7 +256,9 @@ public final class ContextAssembler {
                     .attribute("source", "semantic_recall");
         }
 
-        String systemText = systemText(systemParts, extraPrompts, basePrompts, matched.getPrompts(), supplement, recall);
+        String topicPrompt = topicSelection.isShifted() ? TOPIC_BOUNDARY_PROMPT : null;
+        String systemText = systemText(systemParts, extraPrompts, basePrompts, topicPrompt,
+                matched.getPrompts(), supplement, recall);
         List<IContent> messages = new ArrayList<>();
         if (!systemText.isEmpty()) {
             messages.add(new SystemContent(systemText));
@@ -206,18 +268,79 @@ public final class ContextAssembler {
     }
 
     /**
-     * 取完整历史中最早被窗口淘汰的消息（窗口裁剪从最旧开始整组淘汰）。
+     * 只保留当前话题段内的窗口消息；system 指令始终保留。
+     *
+     * @param messages  窗口裁剪后的消息，可为 null
+     * @param selection 话题选择结果，不可为 null
+     * @return 过滤后的消息，非 null
      */
-    private static List<IContent> evicted(List<IContent> history, List<IContent> windowed) {
-        Set<IContent> kept = Collections.newSetFromMap(new IdentityHashMap<>());
-        kept.addAll(windowed);
+    private static List<IContent> filterByTopic(List<IContent> messages, TopicSelection selection) {
+        if (messages == null || messages.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<IContent> filtered = new ArrayList<>();
+        for (IContent message : messages) {
+            if (message != null && (message.getRoleType() == RoleEnum.SYSTEM
+                    || selection.includes(message))) {
+                filtered.add(message);
+            }
+        }
+        return filtered;
+    }
+
+    /**
+     * 取当前话题段内、被 token 窗口淘汰的消息，用于生成当前话题摘要。
+     *
+     * <p>旧话题段不在这里返回：它们不属于当前请求，不能把旧话题摘要带进新话题。
+     *
+     * @param history   完整历史，不可为 null
+     * @param windowed  当前窗口消息，不可为 null
+     * @param selection 话题选择结果，不可为 null
+     * @return 当前话题段内被淘汰的消息，非 null
+     */
+    private static List<IContent> evictedWithin(List<IContent> history, List<IContent> windowed,
+            TopicSelection selection) {
+        Set<IContent> kept = identitySet(windowed);
         List<IContent> evicted = new ArrayList<>();
         for (IContent message : history) {
-            if (!kept.contains(message)) {
+            if (message != null && message.getRoleType() != RoleEnum.SYSTEM
+                    && selection.includes(message) && !kept.contains(message)) {
                 evicted.add(message);
             }
         }
         return evicted;
+    }
+
+    /**
+     * 取不属于当前话题段的归档消息。
+     *
+     * @param history   完整历史，不可为 null
+     * @param selection 话题选择结果，不可为 null
+     * @return 归档消息，非 null
+     */
+    private static List<IContent> archived(List<IContent> history, TopicSelection selection) {
+        List<IContent> archived = new ArrayList<>();
+        for (IContent message : history) {
+            if (message != null && message.getRoleType() != RoleEnum.SYSTEM
+                    && !selection.includes(message)) {
+                archived.add(message);
+            }
+        }
+        return archived;
+    }
+
+    /**
+     * 构造按对象同一性判断的集合。
+     *
+     * @param messages 消息列表，可为 null
+     * @return 同一性集合，非 null
+     */
+    private static Set<IContent> identitySet(List<IContent> messages) {
+        Set<IContent> set = Collections.newSetFromMap(new IdentityHashMap<IContent, Boolean>());
+        if (messages != null) {
+            set.addAll(messages);
+        }
+        return set;
     }
 
     /**
@@ -237,7 +360,8 @@ public final class ContextAssembler {
      * 归一化 system 指令文本：常驻提示词、技能提示词、图谱补充信息、压缩摘要、检索知识按序拼接。
      */
     private static String systemText(List<IContent> systemParts, List<String> extraPrompts,
-            List<String> basePrompts, List<String> prompts, List<String> supplement, List<String> recall) {
+            List<String> basePrompts, String topicPrompt, List<String> prompts,
+            List<String> supplement, List<String> recall) {
         StringBuilder text = new StringBuilder();
         if (extraPrompts != null) {
             for (String prompt : extraPrompts) {
@@ -247,6 +371,7 @@ public final class ContextAssembler {
         for (String prompt : basePrompts) {
             append(text, prompt);
         }
+        append(text, topicPrompt);
         for (String prompt : prompts) {
             append(text, prompt);
         }

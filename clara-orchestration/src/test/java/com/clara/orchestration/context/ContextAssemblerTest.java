@@ -11,6 +11,7 @@ import com.clara.dto.memory.ContextControlConfig;
 import com.clara.dto.memory.MemoryEntry;
 import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
+import com.clara.dto.memory.TopicIsolationConfig;
 import com.clara.dto.memory.WindowPolicy;
 import com.clara.enums.memory.MemorySourceTypeEnum;
 import com.clara.kernel.message.delta.AssistantContent;
@@ -65,9 +66,9 @@ public class ContextAssemblerTest {
 
     @Test
     public void assembleMergesCompressionSummaryIntoSystemWhenWindowEvicts() {
-        UserContent u1 = new UserContent("one");
-        UserContent u2 = new UserContent("two");
-        UserContent u3 = new UserContent("three");
+        UserContent u1 = new UserContent("订单服务异常怎么排查");
+        UserContent u2 = new UserContent("继续排查订单服务异常");
+        UserContent u3 = new UserContent("订单服务异常的调用方有哪些");
         List<IContent> evicted = new ArrayList<>();
         ISummarizeCoordinator summarize = messages -> {
             evicted.addAll(messages);
@@ -89,6 +90,70 @@ public class ContextAssemblerTest {
         assertTrue(messages.get(0) instanceof SystemContent);
         assertEquals("SUMMARY", ((SystemContent) messages.get(0)).instructionText());
         assertSame(u3, messages.get(1));
+    }
+
+    @Test
+    public void assembleDropsPreviousTopicMessagesWhenTopicShifts() {
+        UserContent a1 = new UserContent("订单服务异常怎么排查");
+        AssistantContent a2 = new AssistantContent("先检查订单服务日志");
+        UserContent b = new UserContent("今天天气怎么样");
+        FakeWindowMemory window = new FakeWindowMemory("c1", Arrays.<IContent>asList(a1, a2, b));
+
+        ContextAssembler assembler = topicAssembler();
+        AssembledContext assembled = assembler.assemble(window, control(false), null);
+
+        List<IContent> messages = assembled.getMessages();
+        assertFalse(containsMessage(messages, a1));
+        assertFalse(containsMessage(messages, a2));
+        assertTrue(containsMessage(messages, b));
+        assertTrue(systemText(assembled).contains("当前任务以最后一条用户消息为准"));
+    }
+
+    @Test
+    public void assembleBringsBackExplicitlyReferencedTopic() {
+        UserContent a1 = new UserContent("订单服务异常怎么排查");
+        AssistantContent a2 = new AssistantContent("先检查订单服务日志");
+        UserContent b1 = new UserContent("今天天气怎么样");
+        AssistantContent b2 = new AssistantContent("今天晴");
+        UserContent c = new UserContent("继续刚才订单服务的问题");
+        FakeWindowMemory window = new FakeWindowMemory("c1",
+                Arrays.<IContent>asList(a1, a2, b1, b2, c));
+
+        AssembledContext assembled = topicAssembler().assemble(window, control(false), null);
+
+        List<IContent> messages = assembled.getMessages();
+        assertTrue(containsMessage(messages, a1));
+        assertTrue(containsMessage(messages, a2));
+        assertFalse(containsMessage(messages, b1));
+        assertFalse(containsMessage(messages, b2));
+        assertTrue(containsMessage(messages, c));
+    }
+
+    @Test
+    public void assembleDoesNotSummarizeArchivedTopic() {
+        UserContent a1 = new UserContent("订单服务异常怎么排查");
+        UserContent b = new UserContent("今天天气怎么样");
+        List<IContent> summarized = new ArrayList<>();
+        ISummarizeCoordinator summarize = messages -> {
+            summarized.addAll(messages);
+            return new SystemContent("SUMMARY");
+        };
+        ContextAssembler assembler = new ContextAssembler(
+                new WindowCompressionCoordinator(summarize),
+                new SemanticRecallCoordinator(null, null),
+                null,
+                new SkillMatchCoordinator(null, null, null),
+                null,
+                TopicIsolationConfig.defaults(),
+                null);
+        FakeWindowMemory window = new FakeWindowMemory("c1", Arrays.<IContent>asList(a1, b),
+                Collections.<IContent>singletonList(b));
+
+        AssembledContext assembled = assembler.assemble(window, control(true), null);
+
+        assertTrue(summarized.isEmpty());
+        assertFalse(containsMessage(assembled.getMessages(), a1));
+        assertTrue(containsMessage(assembled.getMessages(), b));
     }
 
     @Test
@@ -211,6 +276,35 @@ public class ContextAssemblerTest {
                 .contextWindowTokens(-1L).windowMaxMessages(-1).windowMaxSizeBytes(-1L)
                 .windowMaxTokensPercent(80).compressEnabled(compressEnabled)
                 .retrievalCount(3).similarityThreshold(0.5).build();
+    }
+
+    private static ContextAssembler topicAssembler() {
+        return new ContextAssembler(
+                new WindowCompressionCoordinator(null),
+                new SemanticRecallCoordinator(null, null),
+                null,
+                new SkillMatchCoordinator(null, null, null),
+                null,
+                TopicIsolationConfig.defaults(),
+                null);
+    }
+
+    private static boolean containsMessage(List<IContent> messages, IContent target) {
+        for (IContent message : messages) {
+            if (message == target) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String systemText(AssembledContext assembled) {
+        for (IContent message : assembled.getMessages()) {
+            if (message instanceof SystemContent) {
+                return ((SystemContent) message).instructionText();
+            }
+        }
+        return "";
     }
 
     private static MemoryEntry entry(MemorySourceTypeEnum sourceType, String sourceId) {

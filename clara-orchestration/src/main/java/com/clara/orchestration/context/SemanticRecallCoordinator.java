@@ -28,8 +28,8 @@ import java.util.Set;
  * <p>可观测性：每次检索都把「命中几条 / 耗时 / 阈值与候选数 / 命中片段（带相似度）」报给可选的
  * {@link IContextTraceSink}，供控制台观察；未接入宿主时不上报。
  * <p>判重：命中内容若本轮请求里已经带着（本轮提问、最近窗口内的历史、刚返回的工具结果），直接静默丢弃、
- * 不进补充信息，也不产生逐条「丢弃」日志——最近 {@code recentTurnsKept} 轮由窗口保证可见，本类只补充
- * 窗口外的历史。与写入端共用 {@link ConversationMemoryText} 折算文本，一个字不差才算重复。
+ * 不进补充信息，也不产生逐条「丢弃」日志——当前话题段内的最近轮次由窗口保证可见，旧话题段由本类按
+ * 当前输入检索，命中才补充。与写入端共用 {@link ConversationMemoryText} 折算文本，一个字不差才算重复。
  */
 public final class SemanticRecallCoordinator {
 

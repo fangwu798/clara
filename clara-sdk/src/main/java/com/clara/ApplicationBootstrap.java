@@ -6,6 +6,7 @@ import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
 import com.clara.config.IntentPlanSettings;
 import com.clara.config.ModelRegistry;
+import com.clara.config.TopicIsolationSettings;
 import com.clara.context.ConvContext;
 import com.clara.core.annotation.PublicApi;
 import com.clara.core.diagnostics.Diagnostics;
@@ -24,6 +25,7 @@ import com.clara.core.skill.IPromptProvider;
 import com.clara.core.skill.IToolInvoker;
 import com.clara.core.workflow.IWorkflowActionFactory;
 import com.clara.core.workflow.IWorkflowEngine;
+import com.clara.dto.memory.TopicIsolationConfig;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ModelProviderEnum;
@@ -414,8 +416,12 @@ public final class ApplicationBootstrap implements Closeable {
         // 为什么要单独一条通道见 {@link AlwaysPromptSettings} 的类注释。
         List<String> basePrompts = alwaysPrompts(AlwaysPromptSettings.load(ConfigLocator.claraConfigFile()),
                 promptProvider, codeGraphSettings.isEnabled());
+        // 话题隔离：默认启用。用户从 A 话题切到 B 话题时，旧话题轮次不进入本轮请求；
+        // 旧话题仍可通过语义召回或用户显式引用带回。配置见 config/clara.yml 的 context.topicIsolation。
+        TopicIsolationConfig topicIsolation = TopicIsolationSettings
+                .load(ConfigLocator.claraConfigFile()).toConfig();
         ContextAssembler contextAssembler = new ContextAssembler(windowCompression, semanticRecall,
-                codeGraphSupplement, skillMatch, basePrompts, telemetry);
+                codeGraphSupplement, skillMatch, basePrompts, topicIsolation, telemetry);
         CapabilityDispatcher capabilityDispatcher = new CapabilityDispatcher(streamModel);
         ToolRoundTripCoordinator toolRoundTrip = new ToolRoundTripCoordinator(toolInvoker, telemetry);
         // 调用记录接收方：进程内保留最近若干条记录，供上层读取（不打印、不落盘）
