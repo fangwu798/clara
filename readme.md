@@ -123,10 +123,43 @@ java -Dfile.encoding=UTF-8 -jar clara.jar
 
 ## 代码使用示例
 
-Clara 既可以作为整套 CLI 运行，也可以作为 Java 基础库嵌入宿主系统。当前版本尚未发布到 Maven Central，先在仓库根执行：
+Clara 既可以作为整套 CLI 运行，也可以作为 Java 基础库嵌入宿主系统。本地开发先在仓库根执行：
 
 ```powershell
 mvn -DskipTests install
+```
+
+### 从 GitHub Packages 引入
+
+`github` profile 会把发布地址指向 `https://maven.pkg.github.com/fangwu798/clara`：
+
+```powershell
+mvn -Pgithub deploy -DskipTests
+```
+
+推送版本标签（例如 `v1.0.1` 或 `1.0.1`）时，`.github/workflows/publish.yml` 会自动用标签作为版本号发布。`clara-application` 是可执行 CLI，已跳过发布，只发布库模块。
+
+宿主项目需要在 `settings.xml` 配置凭据（PAT 需包含 `read:packages`）：
+
+```xml
+<servers>
+  <server>
+    <id>github</id>
+    <username>GitHub 用户名</username>
+    <password>你的 PAT</password>
+  </server>
+</servers>
+```
+
+并声明仓库：
+
+```xml
+<repositories>
+  <repository>
+    <id>github</id>
+    <url>https://maven.pkg.github.com/fangwu798/clara</url>
+  </repository>
+</repositories>
 ```
 
 发布到 Maven Central（需先配置 `ossrh` 凭据与 GPG 私钥）：
@@ -143,7 +176,7 @@ mvn -Prelease clean deploy
 <dependency>
     <groupId>com.clara</groupId>
     <artifactId>clara-sdk</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
@@ -153,7 +186,7 @@ mvn -Prelease clean deploy
 <dependency>
     <groupId>com.clara</groupId>
     <artifactId>clara-memory-milvus</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 

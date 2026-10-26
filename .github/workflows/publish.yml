@@ -1,7 +1,13 @@
 name: publish
+
+# 发布到 GitHub Packages（Maven）。触发方式：
+#   1) 推送版本标签（例如 v1.0.1 或 1.0.1）后自动发布；
+#   2) Actions 页面手动 Run workflow。
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]*'
   workflow_dispatch:
 
 jobs:
@@ -12,13 +18,23 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
         with:
           java-version: '8'
-          distribution: 'temurin'
+          distribution: temurin
           server-id: github
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
-      - run: mvn -B deploy -DskipTests
+
+      # Release 触发时用 tag 作为发布版本（v0.1.0 -> 0.1.0），避免手工改 pom。
+      - name: Use tag as release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: mvn -B versions:set -DnewVersion="${GITHUB_REF_NAME#v}" -DgenerateBackupPoms=false
+
+      # 跳过测试：单测中的联调用例依赖真实模型凭据，CI 中不执行。
+      - name: Publish to GitHub Packages
+        run: mvn -B -Pgithub deploy -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

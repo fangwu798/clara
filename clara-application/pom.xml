@@ -4,10 +4,14 @@
     <parent>
         <groupId>com.clara</groupId>
         <artifactId>clara-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>1.0.1</version>
     </parent>
     <artifactId>clara-application</artifactId>
     <name>Clara :: CLI</name>
+    <properties>
+        <!-- 可执行 CLI 不作为依赖发布：只发布库模块到 Maven 仓库。 -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
     <dependencies>
         <!-- 嵌入能力全部来自 SDK；本模块只保留 CLI 外壳。 -->
         <dependency>
