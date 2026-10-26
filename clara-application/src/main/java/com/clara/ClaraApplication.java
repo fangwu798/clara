@@ -7,6 +7,7 @@ import com.clara.adapter.console.ConsoleDiagnosticsSink;
 import com.clara.adapter.console.ConsoleInput;
 import com.clara.adapter.console.ConsoleTerminalFactory;
 import com.clara.adapter.console.ConsoleView;
+import com.clara.adapter.console.ConsoleWorkflowProgressSink;
 import com.clara.adapter.console.ConversationHistoryFormatter;
 import com.clara.adapter.console.LaunchOptions;
 import com.clara.adapter.console.SessionCommandHandler;
@@ -54,6 +55,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * 交互式对话入口：从 {@code config/model-providers} 选择模型（可多平台 / 多调用方式），装配各模块后逐行对话。
@@ -114,6 +116,19 @@ public final class ClaraApplication {
      */
     private static final int RECENT_HISTORY_MESSAGES = 3;
 
+    /** 用户明确要求多角色 / 多模型讨论的识别词：命中时本轮追加执行约束，避免模型只在回答里演角色。 */
+    private static final Pattern MULTI_ROLE_INTENT = Pattern.compile(
+            "(采用|使用|用|通过|让|请|需要).{0,8}(多角色|多模型|多个模型)"
+                    + "|(多角色|多模型|多个模型).{0,8}(讨论|评审|核对|交流|决议|分别|执行|过堂)"
+                    + "|评审团|多方讨论|交叉评审|共同决议|圆桌"
+                    + "|不同角色.{0,8}(讨论|评审|核对|分别)");
+
+    /** 多角色诉求的本轮执行约束：追加在 system 末尾，比常驻提示词更靠近当前输入。 */
+    private static final String MULTI_ROLE_HINT = "【多角色执行约束】本轮用户明确要求多角色 / 多模型讨论："
+            + "必须调用 run_workflow 启动真实工作流，禁止在单轮回答里自行模拟多个角色。"
+            + "评审并汇总结论用 workflow=review_panel，多轮讨论并共同决议用 workflow=decision_panel；"
+            + "inputs 必须包含 topic（完整评审对象、范围与期望产出）。";
+
     private static final CodeGraphConsole codeGraphConsole = new CodeGraphConsole();
 
     /**
@@ -166,7 +181,12 @@ public final class ClaraApplication {
                 try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(new ConsoleContextTrace(view), telemetry)) {
                     ModelRegistry registry = bootstrap.modelRegistry();
                     registry.select(sessionChoice.configPath());
-                    reader.setStatusLine(() -> inputStatusLine(registry));
+                    reader.setStatusLine(() -> inputStatusLine(registry, view.speakerStatus(),
+                            view.workingElapsedLabel()));
+                    // 只有终端支持固定状态栏时才接刷新回调；不支持的终端仍由 Working 行原地刷新。
+                    if (reader.hasBottomStatus()) {
+                        view.setStatusRefresh(reader::refreshStatus);
+                    }
                     SessionCommandHandler commands = new SessionCommandHandler(view, reader, registry,
                             sessionCandidates, contextControls(view, bootstrap, registry, telemetryRuntime.store(),
                                     telemetryRuntime.metrics(), telemetryRuntime.metricsAddress()));
@@ -583,19 +603,66 @@ public final class ClaraApplication {
     }
 
     /**
+     * 识别用户是否明确要求多角色 / 多模型讨论。
+     *
+     * @param input 本轮用户输入，可为 null
+     * @return 命中时返回本轮执行约束；未命中返回空串
+     */
+    static String multiRoleHint(String input) {
+        if (input == null || !MULTI_ROLE_INTENT.matcher(input).find()) {
+            return "";
+        }
+        return MULTI_ROLE_HINT;
+    }
+
+    /**
+     * 合并两段运行时提示：空值忽略，两段都存在时按「上一轮续接提示 + 本轮约束」顺序拼接。
+     *
+     * @param first  第一段提示，可为 null / 空白
+     * @param second 第二段提示，可为 null / 空白
+     * @return 合并后的提示；两段都为空时返回 null
+     */
+    static String combineRuntimeHints(String first, String second) {
+        boolean hasFirst = first != null && !first.trim().isEmpty();
+        boolean hasSecond = second != null && !second.trim().isEmpty();
+        if (hasFirst && hasSecond) {
+            return first.trim() + "\n\n" + second.trim();
+        }
+        if (hasFirst) {
+            return first;
+        }
+        return hasSecond ? second : null;
+    }
+
+    /**
      * 输入框下方状态行：当前模型别名、模型 ID 与工作目录。
      *
      * <p>模型别名用黄色、模型 ID 用灰色、工作目录用绿色，便于在输入时快速确认当前会话环境。
      * 读取失败时只显示工作目录，不影响输入。
      *
-     * @param registry 模型注册表，非 null
+     * @param registry       模型注册表，非 null
+     * @param speakerStatus  多角色讨论当前的「角色 · 模型」；null 表示按会话当前模型展示
+     * @param workingElapsed Working 计时文本（如 {@code 12s}）；未在执行为 null
      * @return 带 ANSI 颜色的状态行文本，非 null
      */
-    private static String inputStatusLine(ModelRegistry registry) {
+    private static String inputStatusLine(ModelRegistry registry, String speakerStatus, String workingElapsed) {
         String workDir = ConfigLocator.workspaceRoot().toString();
         try {
+            if (speakerStatus != null && !speakerStatus.isEmpty()) {
+                // 多角色讨论进行中：底部优先展示「谁在说、用哪个模型」，比会话当前模型更贴近当下状态。
+                String activity = workingElapsed == null ? speakerStatus : speakerStatus + " · " + workingElapsed;
+                return ConsoleView.ANSI_LIGHT_BLUE + "▶ " + activity + ConsoleView.ANSI_RESET
+                        + ConsoleView.ANSI_GRAY + " · " + ConsoleView.ANSI_RESET
+                        + ConsoleView.ANSI_GREEN + workDir + ConsoleView.ANSI_RESET;
+            }
             String alias = registry.currentAlias();
             String model = registry.currentConfiguration().toConfig(CapabilityKindEnum.CHAT).getModelId();
+            if (workingElapsed != null) {
+                // 思考 / 工具执行期间：把 Working 放在固定底部状态栏，流式正文再多也不会冲掉。
+                return ConsoleView.ANSI_LIGHT_BLUE + "● Working (" + workingElapsed + ")" + ConsoleView.ANSI_RESET
+                        + ConsoleView.ANSI_GRAY + " · " + alias + " · " + model + " · " + ConsoleView.ANSI_RESET
+                        + ConsoleView.ANSI_GREEN + workDir + ConsoleView.ANSI_RESET;
+            }
             return ConsoleView.ANSI_YELLOW + alias + ConsoleView.ANSI_RESET
                     + ConsoleView.ANSI_GRAY + " · " + model + " · " + ConsoleView.ANSI_RESET
                     + ConsoleView.ANSI_GREEN + workDir + ConsoleView.ANSI_RESET;
@@ -848,11 +915,10 @@ public final class ClaraApplication {
         // 传入工具用途解析器：调用工具时在日志里附一句「这次调用是为了什么」（结合本次入参推导）。
         ConsoleView.ConsoleStreamObserver observer = view.newObserver(bootstrap::describeToolInvocation);
         view.startWorking();
-        // 轮流式观察者与提示通道注册到线程：工作流节点执行时可复用（文本节点实时显示思考、各节点输出进度）。
-        try (WorkflowProgress.Scope ignored1 = WorkflowProgress.open(observer, text -> {
-                    observer.endStream();
-                    view.emit(text, ConsoleView.ANSI_GRAY);
-                })) {
+        // 轮流式观察者与输出端口注册到线程：工作流节点执行时可复用（文本节点实时显示思考、各节点输出进度、
+        // 多角色讨论按角色着色并联动底部状态行）。
+        try (WorkflowProgress.Scope ignored1 = WorkflowProgress.open(observer,
+                new ConsoleWorkflowProgressSink(view, observer))) {
             ConversationResult result = bootstrap.orchestrator().converse(ConversationRequest.builder()
                     .conversationId(conversationId)
                     .provider(providerConfig.getProvider())
@@ -864,8 +930,10 @@ public final class ClaraApplication {
                     .observer(observer)
                     .cancellationToken(cancellationToken)
                     .userIntervention(intervention)
-                    // 工作流暂停后即使发生模型故障转移，也要把「用哪个 instanceId 续接」提示给当前模型。
-                    .runtimeHint(bootstrap.pendingWorkflows().hint(conversationId))
+                    // 工作流暂停后即使发生模型故障转移，也要把「用哪个 instanceId 续接」提示给当前模型；
+                    // 多角色诉求再追加本轮执行约束，避免模型只在回答里模拟角色而不调用工作流。
+                    .runtimeHint(combineRuntimeHints(
+                            bootstrap.pendingWorkflows().hint(conversationId), multiRoleHint(input)))
                     .build());
             // 思考与正文已实时流式展示，这里只把完整记录写进详细日志文件（控制台不重复打印）。
             view.logTurn(result);

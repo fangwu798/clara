@@ -6,6 +6,8 @@ import com.clara.dto.workflow.ExecutionScope;
 import com.clara.dto.workflow.WorkflowActionSpec;
 import com.clara.kernel.http.HttpRequest;
 import com.clara.workflow.runtime.ReviewNodeOptions;
+import com.clara.workflow.runtime.IWorkflowProgressSink;
+import com.clara.workflow.runtime.WorkflowProgress;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -14,9 +16,11 @@ import org.junit.rules.TemporaryFolder;
 
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -38,7 +42,9 @@ public class ReviewWorkflowActionTest {
     @Before
     public void setUp() throws Exception {
         Path config = WorkflowActionTestSupport.providerConfig(folder.getRoot().toPath(), "alpha");
-        registry = new ModelRegistry(Collections.singletonList(config), Collections.<String, String>emptyMap());
+        Map<String, String> roles = new LinkedHashMap<>();
+        roles.put("beta", "alpha");
+        registry = new ModelRegistry(Collections.singletonList(config), roles);
         registry.select(config);
     }
 
@@ -84,6 +90,28 @@ public class ReviewWorkflowActionTest {
         assertFalse(WorkflowActionTestSupport.userInput((HttpRequest) model.requests().get(0)).contains("${"));
     }
 
+    /**
+     * 每位角色的发言与主持人决议都要输出到当轮控制台，否则用户只能看到「发言中…」而看不到讨论内容。
+     */
+    @Test
+    public void reportsEveryStatementAndTheConclusion() {
+        WorkflowActionTestSupport.FakeModel model = WorkflowActionTestSupport.orchestrator(
+                WorkflowActionTestSupport.response("发言内容", 5, 3));
+        List<String> notices = new ArrayList<>();
+
+        try (WorkflowProgress.Scope ignored = WorkflowProgress.open(null, notices::add)) {
+            action(model, spec(Collections.singletonList("alpha"), "alpha", 2, null))
+                    .execute(new ExecutionScope(new HashMap<String, Object>()));
+        }
+
+        assertTrue(notices.stream().anyMatch(text -> text.contains("alpha（第 1/2 轮）")
+                && text.contains("发言内容")));
+        assertTrue(notices.stream().anyMatch(text -> text.contains("alpha（第 2/2 轮）")
+                && text.contains("发言内容")));
+        assertTrue(notices.stream().anyMatch(text -> text.contains("汇总决议 · alpha")
+                && text.contains("发言内容")));
+    }
+
     @Test
     public void blankStatementFailsWithRoleAndRound() {
         WorkflowActionTestSupport.FakeModel model = WorkflowActionTestSupport.orchestrator(
@@ -95,6 +123,44 @@ public class ReviewWorkflowActionTest {
             assertTrue(expected.getMessage().contains("角色 alpha"));
             assertTrue(expected.getMessage().contains("第 1 轮"));
         }
+    }
+
+    /**
+     * 多角色讨论必须逐位发言：语句带发言人（宿主据此着色），并实时切换「当前角色 · 模型」，
+     * 讨论结束（含异常）后复位，避免底部状态行停留在最后一个角色。
+     */
+    @Test
+    public void reportsSpeakerAndSpeakingStatusForEveryRole() {
+        WorkflowActionTestSupport.FakeModel model = WorkflowActionTestSupport.orchestrator(
+                WorkflowActionTestSupport.response("发言内容", 5, 3));
+        List<String> speakers = new ArrayList<>();
+        List<String> statuses = new ArrayList<>();
+        IWorkflowProgressSink sink = new IWorkflowProgressSink() {
+            @Override
+            public void notice(String text) {
+                // 本用例只关心角色发言与状态切换
+            }
+
+            @Override
+            public void statement(String speaker, String text) {
+                speakers.add(speaker + "|" + text);
+            }
+
+            @Override
+            public void speaking(String speaker, String modelId) {
+                statuses.add(speaker + "/" + modelId);
+            }
+        };
+
+        try (WorkflowProgress.Scope ignored = WorkflowProgress.open(null, sink)) {
+            action(model, spec(Arrays.asList("alpha", "beta"), "alpha", 2, null))
+                    .execute(new ExecutionScope(new HashMap<String, Object>()));
+        }
+
+        assertEquals(Arrays.asList("alpha", "beta", "alpha", "beta", "alpha"),
+                speakers.stream().map(text -> text.substring(0, text.indexOf('|'))).collect(java.util.stream.Collectors.toList()));
+        assertEquals(Arrays.asList("alpha/alpha", "beta/alpha", "alpha/alpha", "beta/alpha",
+                "alpha/alpha", "null/null"), statuses);
     }
 
     @Test

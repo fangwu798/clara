@@ -135,6 +135,27 @@ public final class ConsoleInput extends BufferedReader {
     }
 
     /**
+     * 立即刷新底部状态栏。
+     *
+     * <p>多角色讨论切换发言人、模型切换等场景需要在输入行之外（模型执行期间）更新状态，
+     * 由宿主显式触发；没有行编辑器时为空操作。
+     */
+    public void refreshStatus() {
+        if (lineReader != null) {
+            lineReader.refreshStatus();
+        }
+    }
+
+    /**
+     * 当前终端是否支持固定底部状态栏；支持时 Working 与角色状态都由状态栏展示。
+     *
+     * @return 支持时为 true
+     */
+    public boolean hasBottomStatus() {
+        return lineReader != null && lineReader.hasBottomStatus();
+    }
+
+    /**
      * 读取一行输入。
      *
      * @return 用户输入（可含多行）；EOF 时返回 null；Ctrl+C 中断当前行时返回空串
@@ -146,6 +167,8 @@ public final class ConsoleInput extends BufferedReader {
             return super.readLine();
         }
         try {
+            // 每次取输入前刷新一次：/model 切换、工作目录变化等都会在底部状态栏及时生效。
+            lineReader.refreshStatus();
             return lineReader.readLine(PROMPT);
         } catch (EndOfFileException eof) {
             return null;

@@ -1,6 +1,8 @@
 package com.clara.adapter.console;
 
+import org.jline.terminal.Size;
 import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import org.jline.terminal.impl.DumbTerminal;
 import org.junit.Test;
 
@@ -27,6 +29,7 @@ public class ConsoleInputTest {
     public void fallsBackToPlainReading() throws Exception {
         ConsoleInput input = new ConsoleInput(null, new StringReader("hello\nworld\n"));
         assertFalse(input.isLineEditingAvailable());
+        assertFalse(input.hasBottomStatus());
         assertEquals("hello", input.readLine());
         assertEquals("world", input.readLine());
         assertNull(input.readLine());
@@ -95,6 +98,26 @@ public class ConsoleInputTest {
         assertTrue(rendered.contains("输入任务"));
         assertTrue(rendered.contains("deepseek-response"));
         input.setStatusLine(null);
+        input.close();
+        terminal.close();
+    }
+
+    /**
+     * 终端支持滚动区域时，状态行固定在最后一行（预留 1..rows-1 的滚动区域），
+     * 因此模型思考期间持续输出也不会把它冲掉。
+     */
+    @Test
+    public void pinsStatusLineToBottomWhenScrollRegionSupported() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        Terminal terminal = TerminalBuilder.builder().system(false).type("xterm")
+                .streams(new ByteArrayInputStream(new byte[0]), output).build();
+        terminal.setSize(new Size(120, 30));
+        ConsoleInput input = new ConsoleInput(terminal, new StringReader(""));
+        assertTrue(input.hasBottomStatus());
+        input.setStatusLine(() -> "deepseek-response · deepseek-v4-pro · E:/work");
+        String rendered = new String(output.toByteArray(), StandardCharsets.UTF_8);
+        assertTrue("应把最后一行留给状态栏", rendered.contains("\033[1;29r"));
+        assertTrue(rendered.contains("deepseek-response"));
         input.close();
         terminal.close();
     }

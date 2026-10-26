@@ -94,6 +94,47 @@ public class ClaraApplicationInternalsTest {
     }
 
     /**
+     * 多角色讨论期间，底部状态行优先展示「角色 · 模型」，并保留工作目录。
+     */
+    @Test
+    public void statusLineShowsCurrentSpeakerAndModel() throws Exception {
+        String line = (String) call("inputStatusLine",
+                new Class<?>[]{ModelRegistry.class, String.class, String.class},
+                registry, "architect · alpha-model", "5s");
+
+        assertTrue(line.contains("▶"));
+        assertTrue(line.contains("architect · alpha-model"));
+        assertTrue(line.contains("5s"));
+        assertTrue(line.contains(System.getProperty("user.dir")));
+
+        String working = (String) call("inputStatusLine",
+                new Class<?>[]{ModelRegistry.class, String.class, String.class},
+                registry, null, "12s");
+        assertTrue(working.contains("Working (12s)"));
+        assertTrue(working.contains("alpha"));
+    }
+
+    /**
+     * 多角色诉求才追加执行约束，普通请求不能背上工作流提示；两段提示按续接优先顺序合并。
+     */
+    @Test
+    public void addsMultiRoleHintOnlyForMultiRoleRequests() throws Exception {
+        String hint = (String) call("multiRoleHint", new Class<?>[]{String.class},
+                "采用多角色的方式核对一遍大纲和剧情");
+        assertTrue(hint.contains("run_workflow"));
+        assertTrue(hint.contains("review_panel"));
+        assertEquals("", call("multiRoleHint", new Class<?>[]{String.class}, "帮我解释一下这个方法"));
+        assertEquals("", call("multiRoleHint", new Class<?>[]{String.class}, "这个系统支持多模型吗"));
+        assertEquals("", call("multiRoleHint", new Class<?>[]{String.class}, "多角色怎么配置"));
+
+        assertEquals("pending\n\nrole", call("combineRuntimeHints", new Class<?>[]{String.class, String.class},
+                "pending", "role"));
+        assertEquals("pending", call("combineRuntimeHints", new Class<?>[]{String.class, String.class},
+                "pending", " "));
+        assertEquals(null, call("combineRuntimeHints", new Class<?>[]{String.class, String.class}, null, ""));
+    }
+
+    /**
      * 用量趋势记录与新的会话标识。
      */
     @Test

@@ -31,7 +31,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 控制台视图：集中承担「显示」相关的全部职责——颜色与日志模式、框架标准输出的接管、详细日志落盘、
@@ -74,9 +77,26 @@ public final class ConsoleView implements Closeable {
     public static final String ANSI_YELLOW = "\u001B[93m";
 
     /**
+     * ANSI 控制码：青色（多角色讨论的第一种角色色）。
+     */
+    public static final String ANSI_CYAN = "\u001B[96m";
+
+    /**
+     * ANSI 控制码：品红（多角色讨论的第二种角色色）。
+     */
+    public static final String ANSI_MAGENTA = "\u001B[95m";
+
+    /**
      * ANSI 控制码：重置。
      */
     public static final String ANSI_RESET = "\u001B[0m";
+
+    /**
+     * 多角色讨论的角色配色：按首次出现顺序分配，保证同一角色每次都用同一种颜色、不同角色尽量不同色。
+     */
+    private static final String[] ROLE_COLORS = {
+            ANSI_CYAN, ANSI_MAGENTA, ANSI_YELLOW, ANSI_GREEN, ANSI_LIGHT_BLUE, ANSI_RED
+    };
 
     /**
      * 取可用性检查行的 ANSI 颜色码：可用为绿色、跳过为黄色、不可用为红色，普通信息不染色。
@@ -192,6 +212,9 @@ public final class ConsoleView implements Closeable {
     /** Working 行开始时间。 */
     private volatile long workingStartedAt;
 
+    /** 固定状态栏上一次展示的 Working 秒数：只在秒数变化时重绘，避免高频刷新干扰流式正文。 */
+    private long workingLastStatusSecond;
+
     /** Working 行标题。 */
     private volatile String workingLabel = "Working";
     /** 是否暂停 Working 行刷新（执行期补充输入时避免覆盖输入行）；受 {@code outputLock} 保护。 */
@@ -204,11 +227,26 @@ public final class ConsoleView implements Closeable {
     /** 是否显示 ESC 取消提示。 */
     private volatile boolean interruptHintAvailable = true;
 
+    /** 底部状态行里的「当前发言人 · 模型」；null 表示当前不在多角色讨论中。 */
+    private volatile String speakerStatus;
+
+    /** 底部状态行刷新回调：状态内容变化时立即重绘；未接行编辑器时为 null。 */
+    private volatile Runnable statusRefresh;
+
+    /** 角色 → 颜色：首次出现时按 {@link #ROLE_COLORS} 顺序分配，保证稳定且不串色。 */
+    private final Map<String, String> roleColors = new ConcurrentHashMap<>();
+
+    /** 角色配色游标。 */
+    private final AtomicInteger roleColorCursor = new AtomicInteger();
+
     /** Working 行后台线程。 */
     private Thread workingThread;
 
     /** Working 行当前已绘制的字符宽度，用于原地清除。 */
     private int workingRenderedWidth;
+
+    /** 当前是否有一个流式段正在输出；为 true 时不能再原地刷新 Working 行，否则会覆盖思考正文。 */
+    private boolean streamSegmentOpen;
 
     /**
      * 创建控制台视图：接管应用输出、打开详细日志、按参数初始化颜色与日志模式。
@@ -282,7 +320,8 @@ public final class ConsoleView implements Closeable {
      * @param label 进度标题，可为 null（回退为 Working）
      */
     public void startWorking(String label) {
-        if (!workingEnabled) {
+        // 固定底部状态栏可用时，即使 System.console() 为空也要启动计时线程（由状态栏负责展示）。
+        if (!workingEnabled && statusRefresh == null) {
             return;
         }
         synchronized (outputLock) {
@@ -294,11 +333,13 @@ public final class ConsoleView implements Closeable {
             workingGeneration++;
             long generation = workingGeneration;
             workingStartedAt = System.currentTimeMillis();
+            workingLastStatusSecond = 0L;
             workingActive = true;
             workingThread = new Thread(() -> runWorkingLoop(generation), "clara-working");
             workingThread.setDaemon(true);
             workingThread.start();
         }
+        notifyStatusRefresh();
     }
 
     /**
@@ -361,6 +402,7 @@ public final class ConsoleView implements Closeable {
         if (thread != null && thread != Thread.currentThread()) {
             thread.interrupt();
         }
+        notifyStatusRefresh();
     }
 
     /**
@@ -370,11 +412,23 @@ public final class ConsoleView implements Closeable {
      */
     private void runWorkingLoop(long generation) {
         while (workingActive && generation == workingGeneration) {
+            boolean statusTick = false;
             synchronized (outputLock) {
                 if (!workingActive || generation != workingGeneration) {
                     return;
                 }
-                renderWorkingLineLocked();
+                if (statusRefresh != null) {
+                    long elapsedSeconds = elapsedWorkingSeconds();
+                    if (elapsedSeconds != workingLastStatusSecond) {
+                        workingLastStatusSecond = elapsedSeconds;
+                        statusTick = true;
+                    }
+                } else {
+                    renderWorkingLineLocked();
+                }
+            }
+            if (statusTick) {
+                notifyStatusRefresh();
             }
             try {
                 Thread.sleep(WORKING_TICK_MILLIS);
@@ -389,10 +443,11 @@ public final class ConsoleView implements Closeable {
      * 绘制 Working 行：覆盖上一次内容，避免残影。
      */
     private void renderWorkingLineLocked() {
-        if (workingPaused) {
+        // 固定状态栏可用时由状态栏展示 Working；流式段输出期间原地刷新会覆盖正文，必须让位。
+        if (workingPaused || statusRefresh != null || streamSegmentOpen) {
             return;
         }
-        long elapsedSeconds = Math.max(0L, (System.currentTimeMillis() - workingStartedAt) / 1000L);
+        long elapsedSeconds = elapsedWorkingSeconds();
         String hint = interruptHintAvailable ? " • esc cancel • Tab steer" : "";
         String line = "• " + workingLabel + " (" + elapsedSeconds + "s" + hint + ")";
         StringBuilder rendered = new StringBuilder();
@@ -523,6 +578,109 @@ public final class ConsoleView implements Closeable {
             }
             clearWorkingLineLocked();
             out.println(rendered);
+        }
+    }
+
+    /**
+     * 输出某个角色的一整段发言，按角色着色。
+     *
+     * <p>同一角色（按角色名）始终使用同一种颜色，不同角色按首次出现顺序取不同颜色；
+     * 这样多轮讨论里「谁说的」一眼可辨，也便于在日志里对照。
+     *
+     * @param speaker 发言人（角色名），可为 null（使用默认颜色）
+     * @param text    发言正文（可含换行，通常首行是角色与轮次标题），非 null
+     */
+    public void emitSpeaker(String speaker, String text) {
+        emit(text, roleColor(speaker));
+    }
+
+    /**
+     * 取角色对应的颜色码：首次出现时按调色板顺序分配。
+     *
+     * @param speaker 角色名，可为 null
+     * @return ANSI 颜色码，非 null
+     */
+    String roleColor(String speaker) {
+        String key = speaker == null || speaker.trim().isEmpty() ? "?" : speaker.trim();
+        return roleColors.computeIfAbsent(key,
+                ignored -> ROLE_COLORS[Math.floorMod(roleColorCursor.getAndIncrement(), ROLE_COLORS.length)]);
+    }
+
+    /**
+     * 设置底部状态行的「当前发言人 · 模型」，并立即刷新状态行。
+     *
+     * @param speaker 当前角色名；null 或空串表示讨论结束、恢复默认模型信息
+     * @param model   该角色使用的模型标识，可为 null
+     */
+    public void setSpeakerStatus(String speaker, String model) {
+        String next = null;
+        if (speaker != null && !speaker.trim().isEmpty()) {
+            next = model == null || model.trim().isEmpty()
+                    ? speaker.trim() : speaker.trim() + " · " + model.trim();
+        }
+        speakerStatus = next;
+        // Working 行同样位于终端底部：行编辑器不支持固定状态栏时，靠它实时展示「角色 · 模型」。
+        synchronized (outputLock) {
+            workingLabel = next == null ? "Working" : "多角色 · " + next;
+            if (workingActive && !workingPaused) {
+                renderWorkingLineLocked();
+            }
+        }
+        notifyStatusRefresh();
+    }
+
+    /**
+     * 当前发言人状态文本（「角色 · 模型」）；讨论结束后为 null。
+     *
+     * @return 状态文本，可为 null
+     */
+    public String speakerStatus() {
+        return speakerStatus;
+    }
+
+    /**
+     * 注册底部状态行刷新回调：行编辑器可用时传入 {@code ConsoleInput::refreshStatus}。
+     *
+     * @param statusRefresh 刷新动作，可为 null（不刷新）
+     */
+    public void setStatusRefresh(Runnable statusRefresh) {
+        this.statusRefresh = statusRefresh;
+        notifyStatusRefresh();
+    }
+
+    /**
+     * 当前 Working 计时文本（如 {@code 12s}）；未在执行为 null。
+     *
+     * @return 计时文本，可为 null
+     */
+    public String workingElapsedLabel() {
+        if (!workingActive) {
+            return null;
+        }
+        return elapsedWorkingSeconds() + "s";
+    }
+
+    /**
+     * 本轮执行已用秒数：Working 行、底部状态栏共用同一口径。
+     *
+     * @return 已用秒数，非负
+     */
+    private long elapsedWorkingSeconds() {
+        return Math.max(0L, (System.currentTimeMillis() - workingStartedAt) / 1000L);
+    }
+
+    /**
+     * 通知宿主刷新固定状态栏；未接状态栏或刷新失败时静默，不能影响本轮执行。
+     */
+    private void notifyStatusRefresh() {
+        Runnable refresh = statusRefresh;
+        if (refresh == null) {
+            return;
+        }
+        try {
+            refresh.run();
+        } catch (RuntimeException ignored) {
+            // 状态栏只是展示：刷新失败不能影响本轮执行
         }
     }
 
@@ -916,6 +1074,8 @@ public final class ConsoleView implements Closeable {
      */
     void beginStreamSegment(String prefix, String color) {
         synchronized (outputLock) {
+            // 流式正文开始后不再原地刷新 Working，但固定状态栏仍持续显示进度。
+            streamSegmentOpen = true;
             beginLogStreamLineLocked(prefix);
             if (interactiveInputActive) {
                 deferredConsole.append('\n');
@@ -940,6 +1100,7 @@ public final class ConsoleView implements Closeable {
      */
     void endStreamSegment() {
         synchronized (outputLock) {
+            streamSegmentOpen = false;
             closeLogStreamLineLocked();
             logStreamPrefix = null;
             if (interactiveInputActive) {
@@ -1096,7 +1257,6 @@ public final class ConsoleView implements Closeable {
             if (mode == nextMode) {
                 return;
             }
-            view.stopWorking();
             end();
             mode = nextMode;
             printed = true;
@@ -1119,10 +1279,8 @@ public final class ConsoleView implements Closeable {
             if (!notedCalls.add(key)) {
                 return;
             }
-            view.stopWorking();
             end();
             view.emit(toolLine(name, event.getPayload()), ANSI_LIGHT_BLUE);
-            view.startWorking();
         }
 
         /**

@@ -3,8 +3,6 @@ package com.clara.workflow.runtime;
 import com.clara.core.diagnostics.Diagnostics;
 import com.clara.core.model.IStreamObserver;
 
-import java.util.function.Consumer;
-
 /**
  * 工作流节点执行期的「当轮输出通道」：把当前对话轮的流式观察者与提示输出注册到线程，供工作流 AGENT 节点复用。
  *
@@ -29,23 +27,23 @@ public final class WorkflowProgress {
     private static final ThreadLocal<WorkflowProgress> CURRENT = new ThreadLocal<>();
 
     private final IStreamObserver observer;
-    private final Consumer<String> notice;
+    private final IWorkflowProgressSink sink;
 
-    private WorkflowProgress(IStreamObserver observer, Consumer<String> notice) {
+    private WorkflowProgress(IStreamObserver observer, IWorkflowProgressSink sink) {
         this.observer = observer;
-        this.notice = notice;
+        this.sink = sink;
     }
 
     /**
      * 打开当轮通道作用域：进入时注册，退出时还原上一层的注册（支持嵌套）。
      *
      * @param observer 当轮流式观察者，可为 null（不显示思考 / 正文）
-     * @param notice   提示输出（如控制台），可为 null（退化为写标准输出）
+     * @param sink     输出端口（如控制台），可为 null（退化为诊断输出）
      * @return 作用域句柄，非 null
      */
-    public static Scope open(IStreamObserver observer, Consumer<String> notice) {
+    public static Scope open(IStreamObserver observer, IWorkflowProgressSink sink) {
         Scope scope = new Scope(CURRENT.get());
-        CURRENT.set(new WorkflowProgress(observer, notice));
+        CURRENT.set(new WorkflowProgress(observer, sink));
         return scope;
     }
 
@@ -66,11 +64,39 @@ public final class WorkflowProgress {
      */
     public static void notice(String text) {
         WorkflowProgress current = CURRENT.get();
-        if (current != null && current.notice != null) {
-            current.notice.accept(text);
+        if (current != null && current.sink != null) {
+            current.sink.notice(text);
             return;
         }
         Diagnostics.info(text);
+    }
+
+    /**
+     * 输出某个角色的发言。
+     *
+     * @param speaker 发言人（角色名），非 null
+     * @param text    发言正文（含标题），非 null
+     */
+    public static void statement(String speaker, String text) {
+        WorkflowProgress current = CURRENT.get();
+        if (current != null && current.sink != null) {
+            current.sink.statement(speaker, text);
+            return;
+        }
+        Diagnostics.info(text);
+    }
+
+    /**
+     * 声明当前发言人：宿主据此在底部状态行实时展示「角色 · 模型」。
+     *
+     * @param speaker 发言人（角色名）；null 表示讨论结束
+     * @param model   该角色使用的模型标识，可为 null
+     */
+    public static void speaking(String speaker, String model) {
+        WorkflowProgress current = CURRENT.get();
+        if (current != null && current.sink != null) {
+            current.sink.speaking(speaker, model);
+        }
     }
 
     /**

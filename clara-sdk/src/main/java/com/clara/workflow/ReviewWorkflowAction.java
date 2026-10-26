@@ -29,6 +29,11 @@ import java.util.Map;
  * 汇总结论作为输出。每个角色 / 主持人经 {@link ModelRegistry} 按角色名选到各自的平台与模型（可同模型、
  * 也可异模型），均以 {@link CapabilityKindEnum#CHAT} 调用。
  *
+ * <p>可见性：讨论稿是内部累积状态，用户看不到；因此每位角色的发言与主持人的最终决议都会经
+ * {@link WorkflowProgress#statement(String, String)} 输出到当轮控制台（宿主按角色着色，未接入控制台时
+ * 降级为诊断输出），同时 {@link WorkflowProgress#speaking(String, String)} 让宿主把「当前角色 · 模型」
+ * 实时显示在底部状态行，让用户能看出这是多个模型在交流，而不是一个模型自演。
+ *
  * <p>提示词变量：{@code topic}（主题）、{@code role}（发言人角色）、{@code round}（轮次）、
  * {@code discussion}（此前累积的讨论稿）、{@code isFinal}（主持人汇总轮为 {@code true}）。
  *
@@ -77,25 +82,47 @@ public final class ReviewWorkflowAction implements IWorkflowAction {
         String instanceId = instanceValue == null ? nodeId : String.valueOf(instanceValue);
         String topic = resolveTopic(scope);
 
-        StringBuilder discussion = new StringBuilder();
-        for (int round = 1; round <= options.rounds(); round++) {
-            for (String role : options.roles()) {
-                WorkflowProgress.notice("[workflow] 多角色讨论 第 " + round + "/" + options.rounds()
-                        + " 轮：" + role + " 发言中…");
-                String statement = speak(instanceId, role, round, topic, discussion.toString(), false);
-                discussion.append("\n### ").append(role).append("（第 ").append(round).append(" 轮）\n")
-                        .append(statement);
+        try {
+            StringBuilder discussion = new StringBuilder();
+            for (int round = 1; round <= options.rounds(); round++) {
+                for (String role : options.roles()) {
+                    WorkflowProgress.notice("[workflow] 多角色讨论 第 " + round + "/" + options.rounds()
+                            + " 轮：" + role + " 发言中…");
+                    String statement = speak(instanceId, role, round, topic, discussion.toString(), false);
+                    discussion.append("\n### ").append(role).append("（第 ").append(round).append(" 轮）\n")
+                            .append(statement);
+                    // 讨论过程必须对用户可见：否则控制台只有「发言中…」，看不到任何角色观点。
+                    report(role, role + "（第 " + round + "/" + options.rounds() + " 轮）", statement);
+                }
             }
-        }
-        WorkflowProgress.notice("[workflow] 讨论结束：" + options.moderator() + " 汇总决议中…");
-        String conclusion = speak(instanceId, options.moderator(), options.rounds(), topic,
-                discussion.toString(), true);
-        WorkflowProgress.notice("[workflow] 多角色讨论完成（" + options.roles().size() + " 个角色 × "
-                + options.rounds() + " 轮 + 主持人汇总）");
+            WorkflowProgress.notice("[workflow] 讨论结束：" + options.moderator() + " 汇总决议中…");
+            String conclusion = speak(instanceId, options.moderator(), options.rounds(), topic,
+                    discussion.toString(), true);
+            report(options.moderator(), "汇总决议 · " + options.moderator(), conclusion);
+            WorkflowProgress.notice("[workflow] 多角色讨论完成（" + options.roles().size() + " 个角色 × "
+                    + options.rounds() + " 轮 + 主持人汇总）");
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("output", conclusion);
-        return response;
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("output", conclusion);
+            return response;
+        } finally {
+            // 无论成功、失败还是取消，都要把底部状态行从「多角色角色名」恢复为会话当前模型。
+            WorkflowProgress.speaking(null, null);
+        }
+    }
+
+    /**
+     * 把一段多行内容连同标题输出到当轮控制台。
+     *
+     * <p>一次调用输出整段（含换行）而不是逐行调用：减少控制台与详细日志的逐行刷写，也让同一角色的发言在
+     * 日志里保持连续、不被其它线程的输出打断。
+     *
+     * @param speaker 发言人（角色名），用于宿主着色
+     * @param header  标题，如「architect（第 1/2 轮）」
+     * @param content 发言或决议正文，不可为 null
+     */
+    private static void report(String speaker, String header, String content) {
+        WorkflowProgress.statement(speaker, header + "：\n" + content);
     }
 
     private String speak(String instanceId, String role, int round, String topic, String discussion,
@@ -103,6 +130,8 @@ public final class ReviewWorkflowAction implements IWorkflowAction {
         ProviderConfiguration configuration = modelRegistry.resolve(role, null);
         configuration.getCapability(CapabilityKindEnum.CHAT);
         String model = configuration.toConfig(CapabilityKindEnum.CHAT).getModelId();
+        // 底部状态行实时展示「当前角色 · 模型」：用户据此看出这是不同模型在交流。
+        WorkflowProgress.speaking(role, model);
 
         ConversationResult result = orchestrator.converse(ConversationRequest.builder()
                 .conversationId("wf:" + instanceId + ":review:" + nodeId + ":" + role + ":r" + round)
