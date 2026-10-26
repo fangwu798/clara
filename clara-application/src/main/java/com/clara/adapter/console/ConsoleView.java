@@ -819,6 +819,7 @@ public final class ConsoleView implements Closeable {
             Files.createDirectories(logsDirectory);
             Path logFile = logsDirectory.resolve("clara-" + timestamp() + ".log");
             fileOut = new PrintStream(new FileOutputStream(logFile.toFile(), true), true, UTF_8);
+            LogRetention.prune(logsDirectory, LogRetention.keepCount());
             return logFile.toString();
         } catch (IOException | RuntimeException failure) {
             fileOut = null;

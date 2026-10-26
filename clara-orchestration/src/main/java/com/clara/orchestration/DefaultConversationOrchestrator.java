@@ -1,5 +1,6 @@
 package com.clara.orchestration;
 
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.core.memory.ITokenCountEstimator;
 import com.clara.core.memory.IWindowMemory;
 import com.clara.core.message.IContent;
@@ -230,8 +231,8 @@ public final class DefaultConversationOrchestrator {
                     Math.min(MAX_OUTPUT_TOKENS_PER_CALL, budgetBytes / BYTES_PER_OUTPUT_TOKEN));
             int effective = Math.min(configured, safe);
             if (effective < configured) {
-                System.out.println("  [model]    单次输出上限=" + effective + "（配置 " + configured
-                        + "，按响应体积上限收敛）"); // NOSONAR CLI output by design
+                Diagnostics.info("  [model]    单次输出上限=" + effective + "（配置 " + configured
+                        + "，按响应体积上限收敛）");
             }
             return effective;
         } catch (RuntimeException ignored) {
@@ -399,8 +400,8 @@ public final class DefaultConversationOrchestrator {
             return false;
         }
         state.interventionRounds++;
-        System.out.println("  [intervene] 收到执行期补充 " + applied + " 条，已重新请求模型校准方向（第 "
-                + state.interventionRounds + " 次）"); // NOSONAR CLI output by design
+        Diagnostics.info("  [intervene] 收到执行期补充 " + applied + " 条，已重新请求模型校准方向（第 "
+                + state.interventionRounds + " 次）");
         return true;
     }
 
@@ -480,10 +481,10 @@ public final class DefaultConversationOrchestrator {
         }
         state.maxTokensOverride = ContextOverflowPolicy.outputTokens(failure, state.overflowRetries,
                 plan.maxTokensPerCall);
-        System.out.println(outputTooLarge
+        Diagnostics.info(outputTooLarge
                 ? "  [context] 响应体超限，单次输出上限收紧到 " + state.maxTokensOverride
                         + " 后重试（第 " + state.overflowRetries + " 次）"
-                : "  [context] 上下文超限，已压缩上下文后重试（第 " + state.overflowRetries + " 次）"); // NOSONAR CLI output by design
+                : "  [context] 上下文超限，已压缩上下文后重试（第 " + state.overflowRetries + " 次）");
         return true;
     }
 
@@ -569,8 +570,8 @@ public final class DefaultConversationOrchestrator {
         }
         state.continuationPrompt = CONTINUE_PROMPT;
         state.outputContinuations++;
-        System.out.println("  [output] 模型输出达到长度上限，已自动续写（第 "
-                + state.outputContinuations + " 次）"); // NOSONAR CLI output by design
+        Diagnostics.info("  [output] 模型输出达到长度上限，已自动续写（第 "
+                + state.outputContinuations + " 次）");
         return true;
     }
 

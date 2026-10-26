@@ -8,6 +8,7 @@ import com.clara.config.IntentPlanSettings;
 import com.clara.config.ModelRegistry;
 import com.clara.context.ConvContext;
 import com.clara.core.annotation.PublicApi;
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.core.memory.IContextSupplementProvider;
 import com.clara.core.memory.IContextTraceSink;
 import com.clara.core.telemetry.Telemetry;
@@ -574,7 +575,7 @@ public final class ApplicationBootstrap implements Closeable {
         try {
             semanticMemoryStore.deleteByConversation(conversationId);
         } catch (RuntimeException failure) {
-            System.err.println("[memory] 清理会话语义记忆失败（历史已清理）：" + failure.getMessage()); // NOSONAR 控制台告警
+            Diagnostics.warn("[memory] 清理会话语义记忆失败（历史已清理）：" + failure.getMessage());
         }
         return removed;
     }
@@ -1077,7 +1078,7 @@ public final class ApplicationBootstrap implements Closeable {
         try {
             return new LocalConversationStore(ConfigLocator.workspaceRoot());
         } catch (RuntimeException unavailable) {
-            System.err.println("[memory] 本地对话历史不可用，本次运行的历史不会保留：" // NOSONAR CLI output by design
+            Diagnostics.warn("[memory] 本地对话历史不可用，本次运行的历史不会保留："
                     + unavailable.getMessage());
             return new InMemoryConversationStore();
         }

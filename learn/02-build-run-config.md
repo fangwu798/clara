@@ -273,6 +273,12 @@ tester: deepseek-completion
 | `standards/` | 工作流运行时读取 |
 | `deploy/sonar/`、`deploy/static-analysis/` | 执行扫描时读取（不属于运行期配置） |
 
+### 运行期文件与日志
+
+- CLI 每轮对话都会在 `logs/` 下新建 `clara-<时间戳>.log`；启动后自动清理旧文件，默认保留最近 30 份。
+- 保留份数可用 `-Dclara.logs.keep=N` 调整；`N` 非法或不大于 0 时回退默认值。
+- 清理只匹配 `clara-*.log`，不会删除目录中的其他文件；单个文件删除失败不影响本轮对话。
+
 ## 2.8 常见启动问题
 
 | 现象 | 优先检查 |

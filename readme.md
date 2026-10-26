@@ -1,5 +1,7 @@
 # Clara
 
+[![ci](https://github.com/fangwu798/clara/actions/workflows/ci.yml/badge.svg)](https://github.com/fangwu798/clara/actions/workflows/ci.yml)
+
 Clara 是一套面向 Java 8 的可嵌入 AI Agent 客户端库，附带一个交互式 CLI。它把模型调用、上下文管理、工具调用、MCP、工作流、技能、代码知识图谱和可观测能力拆成独立 Maven 模块，既可整套运行，也可按需嵌入 Java 系统。
 
 > Clara 当前是「运行时库 + 交互式 CLI」形态，不是开箱即用的 Web 服务。仓库没有 Spring Boot / Web 容器；`clara-sdk` 提供装配入口供宿主嵌入，`clara-application` 只是基于 SDK 实现的命令行外壳，REST、SSE 等 Web 接入由宿主应用自行实现。
@@ -134,10 +136,10 @@ mvn -DskipTests install
 `github` profile 会把发布地址指向 `https://maven.pkg.github.com/fangwu798/clara`：
 
 ```powershell
-mvn -Pgithub deploy -DskipTests
+mvn -Pgithub deploy
 ```
 
-推送版本标签（例如 `v1.0.1` 或 `1.0.1`）时，`.github/workflows/publish.yml` 会自动用标签作为版本号发布。`clara-application` 是可执行 CLI，已跳过发布，只发布库模块。
+发布物附带 `-sources.jar` 与 `-javadoc.jar`。推送版本标签（例如 `v1.0.1` 或 `1.0.1`）时，`.github/workflows/publish.yml` 会自动用标签作为版本号、先跑完整测试再发布，并创建同名 GitHub Release 附上可执行的 `clara.jar`。`clara-application` 是可执行 CLI，已跳过 Maven 制品发布，只发布库模块。
 
 宿主项目需要在 `settings.xml` 配置凭据（PAT 需包含 `read:packages`）：
 
@@ -168,7 +170,7 @@ mvn -Pgithub deploy -DskipTests
 mvn -Prelease clean deploy
 ```
 
-`release` profile 会附加 source jar、javadoc jar 并签名；`clara-bom` 统一管理各模块版本。
+`release` profile 会附加 source jar、javadoc jar 并签名；`clara-bom` 统一管理对外发布的库模块版本。
 
 宿主项目引入 SDK（嵌入完整能力）：
 
@@ -252,6 +254,7 @@ public final class EmbeddedChatExample {
 - `ApplicationBootstrap` 是装配入口，负责加载 `config/clara.yml`、模型配置、技能、MCP 与记忆；使用完必须 `close()`。
 - `ConversationRequest` 绑定会话、平台配置、模型 ID 和能力种类；`providerConfiguration` 决定本次调用走哪个平台。
 - `ConversationResult` 返回最终文本、思考内容、工具往返次数、token 用量和结构化错误。
+- 库模块不直接写标准输出：进度与告警统一走 `com.clara.core.diagnostics.Diagnostics`。CLI 在 `main` 中安装控制台实现；宿主可安装自己的日志实现，未安装时进度静默、告警写标准错误。
 
 ### 2. 只调用模型
 

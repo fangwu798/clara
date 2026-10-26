@@ -4,9 +4,11 @@
 #-------------------------------------------------------------------------------#
 version: "1.0"
 
-#Specify inspection profile for code analysis
+# Qodana 只作为 IDE 侧辅助检查：项目的强制标准以 deploy/sonar/quality-profile-java.xml
+# 与 config/standards/java-coding-standards.md（Sonar 规则集）为准。
+# 这里使用 recommended 而不是 starter，尽量与 Sonar 的严格度对齐。
 profile:
-  name: qodana.starter
+  name: qodana.recommended
 
 #Enable inspections
 #include:

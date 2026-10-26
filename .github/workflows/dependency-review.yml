@@ -1,0 +1,19 @@
+name: dependency-review
+
+# PR 依赖审查：新增/升级的依赖如果命中已知漏洞或使用禁用许可证，直接阻断合并。
+# 与 Dependabot 的分工：Dependabot 负责发现与提 PR，本工作流负责在合并前把关。
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high

@@ -63,6 +63,18 @@
     </dependencies>
     <build>
         <plugins>
+            <!-- 覆盖率统计排除交互式入口与 JLine 平台补丁类：前者需要真实终端与模型，
+                 由手动冒烟覆盖；后者的分支取决于终端实现，单测无法稳定驱动。 -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>com/clara/ClaraApplication*</exclude>
+                        <exclude>org/jline/terminal/impl/jna/win/ClaraWinSysTerminal*</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
             <!-- 打成可直接 `java -jar` 运行的可执行 fat jar，输出到仓库根目录 clara.jar。 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

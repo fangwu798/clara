@@ -195,6 +195,25 @@ Clara 负责：
 - 记忆；
 - 可观测。
 
+库模块不直接写标准输出：进度信息和告警统一走 `com.clara.core.diagnostics.Diagnostics`。CLI 在 `main` 中安装 `ConsoleDiagnosticsSink`；宿主应安装自己的实现（例如转发到 SLF4J），否则进度静默、告警写标准错误：
+
+```java
+import com.clara.core.diagnostics.Diagnostics;
+import com.clara.core.diagnostics.IDiagnosticsSink;
+
+Diagnostics.install(new IDiagnosticsSink() {
+    @Override
+    public void info(String message) {
+        logger.info(message);
+    }
+
+    @Override
+    public void warn(String message) {
+        logger.warn(message);
+    }
+});
+```
+
 ## 13.11 扩展检查清单
 
 - [ ] 新代码是否放在正确的模块？

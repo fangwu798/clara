@@ -14,7 +14,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -33,8 +33,20 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: mvn -B versions:set -DnewVersion="${GITHUB_REF_NAME#v}" -DgenerateBackupPoms=false
 
-      # 跳过测试：单测中的联调用例依赖真实模型凭据，CI 中不执行。
+      # deploy 会先跑完整测试（CI 中没有模型凭据，联调用例自动跳过），测试不过不会发布。
       - name: Publish to GitHub Packages
-        run: mvn -B -Pgithub deploy -DskipTests
+        run: mvn -B -Pgithub deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 把可执行 clara.jar 附到 Release，免去使用者本地构建；重复执行时覆盖同名附件。
+      - name: Attach CLI jar to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" clara.jar --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" clara.jar --title "$GITHUB_REF_NAME" --generate-notes
+          fi

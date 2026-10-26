@@ -1,5 +1,6 @@
 package com.clara.memory.window;
 
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.core.memory.ConversationMemoryText;
 import com.clara.core.memory.IEmbeddingClient;
 import com.clara.core.memory.ISemanticMemoryStore;
@@ -142,6 +143,6 @@ public final class ConversationIndexingWindowMemory implements IWindowMemory {
     }
 
     private void warn(RuntimeException failure) {
-        System.err.println("[memory] 对话记录写入语义记忆失败（本轮继续）：" + failure.getMessage()); // NOSONAR CLI output by design
+        Diagnostics.warn("[memory] 对话记录写入语义记忆失败（本轮继续）：" + failure.getMessage());
     }
 }

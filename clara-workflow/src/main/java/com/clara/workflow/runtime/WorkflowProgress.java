@@ -1,5 +1,6 @@
 package com.clara.workflow.runtime;
 
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.core.model.IStreamObserver;
 
 import java.util.function.Consumer;
@@ -14,10 +15,11 @@ import java.util.function.Consumer;
  * 实时显示思考 / 正文；同时提供一个提示通道，让各节点输出「正在做什么」的进度行。
  *
  * <p>为什么用线程局部：工作流的顺序节点在调用线程上执行（与当轮对话同线程），可直接取到；并行分支在引擎线程池
- * 执行，取不到时退化为直接写标准输出（仅落日志）。
+ * 执行，取不到时退化为 {@link com.clara.core.diagnostics.Diagnostics#info(String)}（库内不直接写标准输出）。
  *
  * <p>生命周期：由宿主（{@code ClaraApplication}）在每轮对话期间用 {@link #open} 打开、退出时通过
- * {@link Scope#close()} 还原；未打开时 {@link #observer()} 返回 null、{@link #notice(String)} 写标准输出。
+ * {@link Scope#close()} 还原；未打开时 {@link #observer()} 返回 null、{@link #notice(String)} 交给
+ * {@link com.clara.core.diagnostics.Diagnostics}（未安装输出端口则静默）。
  */
 public final class WorkflowProgress {
 
@@ -68,7 +70,7 @@ public final class WorkflowProgress {
             current.notice.accept(text);
             return;
         }
-        System.out.println(text); // NOSONAR CLI output by design
+        Diagnostics.info(text);
     }
 
     /**

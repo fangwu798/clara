@@ -1,5 +1,7 @@
 package com.clara.skill.tool.script;
 
+import com.clara.core.diagnostics.Diagnostics;
+import com.clara.core.diagnostics.IDiagnosticsSink;
 import com.clara.enums.skill.ScriptTypeEnum;
 import com.clara.skill.tool.ScriptExecutionSpec;
 import org.junit.Assume;
@@ -35,9 +37,21 @@ public class ScriptStderrEchoTest {
         String result;
         try {
             System.setOut(new PrintStream(captured, true, "UTF-8"));
+            Diagnostics.install(new IDiagnosticsSink() {
+                @Override
+                public void info(String message) {
+                    System.out.println(message);
+                }
+
+                @Override
+                public void warn(String message) {
+                    System.err.println(message);
+                }
+            });
             result = new PythonScriptExecutor().execute(new ScriptExecutionSpec(
                     ScriptTypeEnum.PYTHON, SCRIPT, "{}", 30_000L));
         } finally {
+            Diagnostics.reset();
             System.setOut(original);
         }
 

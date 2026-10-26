@@ -44,6 +44,21 @@ public class MilvusBm25IntegrationTest {
     @BeforeClass
     public static void requireMilvusReachable() {
         Assume.assumeTrue("Milvus not reachable at " + HOST + ":" + PORT, reachable());
+        // 端口可连不等于服务可用：容器启动中、依赖（etcd/minio）未就绪时会接受 TCP 连接但 RPC 超时。
+        // 这里用一次真实的建/删集合探测服务端是否在服务，避免把环境问题误判成功能回归。
+        String probe = "clara_it_probe_" + System.nanoTime();
+        MilvusCollectionSpec probeSpec = new MilvusCollectionSpec(probe, MilvusSettings.DEFAULT_ANALYZER);
+        MilvusBackend backend = MilvusBackendFactory.create(new MilvusBackendConfig(HOST, PORT, null, null,
+                MilvusBackendConfig.DEFAULT_DATABASE, 3000L, 10000L), probeSpec);
+        try {
+            backend.ensureCollection(probeSpec);
+            backend.dropCollection(probe);
+        } catch (RuntimeException unavailable) {
+            Assume.assumeNoException("Milvus accepts connections but is not serving requests at "
+                    + HOST + ":" + PORT, unavailable);
+        } finally {
+            backend.close();
+        }
     }
 
     @Test

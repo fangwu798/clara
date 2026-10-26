@@ -1,5 +1,6 @@
 package com.clara.skill.registry;
 
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.utils.StringUtils;
 import com.clara.dto.skill.ToolMethod;
 import com.clara.enums.skill.ScriptTypeEnum;
@@ -147,7 +148,7 @@ public final class ScriptToolLoader {
             return;
         }
         pythonMissingWarned = true;
-        System.err.println("[skill] 无法执行 Python 以加载脚本工具（" + script.getName() + "）：" // NOSONAR CLI output by design
+        Diagnostics.warn("[skill] 无法执行 Python 以加载脚本工具（" + script.getName() + "）："
                 + cause.getMessage() + "；请确认已安装 Python 并加入 PATH（或设置 PYTHON_PATH）。");
     }
 

@@ -67,7 +67,7 @@
         <milvus.version>2.6.25</milvus.version>
         <jline.version>3.30.15</jline.version>
         <pinyin4j.version>2.5.1</pinyin4j.version>
-        <lombok.version>1.18.28</lombok.version>
+        <lombok.version>1.18.34</lombok.version>
         <maven.compiler.version>3.11.0</maven.compiler.version>
         <maven.resources.version>3.3.1</maven.resources.version>
         <maven.surefire.version>3.2.5</maven.surefire.version>
@@ -356,6 +356,41 @@
                     <url>https://maven.pkg.github.com/fangwu798/clara</url>
                 </snapshotRepository>
             </distributionManagement>
+            <!-- 发布物附带源码与 Javadoc：GitHub Packages 没有 Central 的强制要求，
+                 但 IDE 反编译体验依赖它们；这里不复用 release profile，避免连带触发 GPG 签名。 -->
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>${maven.source.version}</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <phase>package</phase>
+                                <goals><goal>jar-no-fork</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>${maven.javadoc.version}</version>
+                        <configuration>
+                            <encoding>UTF-8</encoding>
+                            <doclint>none</doclint>
+                            <failOnError>false</failOnError>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <phase>package</phase>
+                                <goals><goal>jar</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
             <id>release</id>

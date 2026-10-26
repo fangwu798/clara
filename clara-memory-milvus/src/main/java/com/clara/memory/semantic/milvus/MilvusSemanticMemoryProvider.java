@@ -1,5 +1,6 @@
 package com.clara.memory.semantic.milvus;
 
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.memory.semantic.spi.ISemanticMemoryBackendProvider;
 import com.clara.memory.semantic.spi.SemanticMemoryBackend;
 
@@ -29,7 +30,7 @@ public final class MilvusSemanticMemoryProvider implements ISemanticMemoryBacken
             settings = MilvusSettings.load(claraConfig, defaultDimension, projectName);
         } catch (IllegalArgumentException invalid) {
             // 配置写错（端口非数字、集合名为空等）与「没配」一样，都只降级、不阻断应用启动。
-            System.err.println("[memory] Milvus 配置非法，语义记忆回退为进程内实现：" + invalid.getMessage()); // NOSONAR CLI output by design
+            Diagnostics.warn("[memory] Milvus 配置非法，语义记忆回退为进程内实现：" + invalid.getMessage());
             return null;
         }
         if (settings == null) {
@@ -63,7 +64,7 @@ public final class MilvusSemanticMemoryProvider implements ISemanticMemoryBacken
             handedOff = true;
             return store;
         } catch (RuntimeException unavailable) {
-            System.err.println("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）：" // NOSONAR CLI output by design
+            Diagnostics.warn("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）："
                     + unavailable.getMessage());
             return null;
         } finally {
@@ -83,7 +84,7 @@ public final class MilvusSemanticMemoryProvider implements ISemanticMemoryBacken
             }
             // 旧集合结构与当前配置不一致（切了检索模式 / 换了嵌入维度）：旧向量与新查询不可比，重建是唯一选项。
             // 只在配置里显式开了重建才动手（删集合会丢旧记录）；重建失败会被外层兜回进程内实现。
-            System.err.println("[memory] Milvus 集合结构与配置不匹配，按配置重建：" + mismatch.getMessage()); // NOSONAR CLI output by design
+            Diagnostics.warn("[memory] Milvus 集合结构与配置不匹配，按配置重建：" + mismatch.getMessage());
             backend.dropCollection(spec.getCollection());
             return new MilvusSemanticMemoryStore(spec, backend);
         }
@@ -113,7 +114,7 @@ public final class MilvusSemanticMemoryProvider implements ISemanticMemoryBacken
         }
         Charset charset = Charset.defaultCharset();
         if (!StandardCharsets.UTF_8.equals(charset)) {
-            System.err.println("[memory] 警告：JVM 默认字符集是 " + charset.name() // NOSONAR CLI output by design
+            Diagnostics.warn("[memory] 警告：JVM 默认字符集是 " + charset.name()
                     + "，Milvus 全文检索的正文会按它编码，可能让 Milvus 服务端 abort；"
                     + "请用 clara.bat / clara.sh 启动（已带 -Dfile.encoding=UTF-8）。");
         }

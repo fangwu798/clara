@@ -1,5 +1,6 @@
 package com.clara.skill.tool.script;
 
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.skill.SkillErrors;
 import com.clara.api.IScriptExecutor;
 import com.clara.skill.tool.ScriptExecutionSpec;
@@ -194,7 +195,7 @@ abstract class AbstractScriptExecutor implements IScriptExecutor {
      */
     private static void echo(StringBuilder pending) {
         if (pending.length() > 0) {
-            System.out.println(SCRIPT_LOG_PREFIX + pending); // NOSONAR CLI output by design
+            Diagnostics.info(SCRIPT_LOG_PREFIX + pending.toString());
         }
         pending.setLength(0);
     }

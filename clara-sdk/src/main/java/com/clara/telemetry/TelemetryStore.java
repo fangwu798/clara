@@ -1,5 +1,6 @@
 package com.clara.telemetry;
 
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.core.telemetry.ITelemetrySink;
 import com.clara.core.telemetry.TelemetryEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -172,7 +173,7 @@ public final class TelemetryStore implements ITelemetrySink, Closeable {
             Files.createDirectories(directory);
             return directory;
         } catch (IOException failure) {
-            System.err.println("[telemetry] 链路目录不可用，本次只保留内存记录：" + failure.getMessage()); // NOSONAR CLI output by design
+            Diagnostics.warn("[telemetry] 链路目录不可用，本次只保留内存记录：" + failure.getMessage());
             return null;
         }
     }
@@ -196,7 +197,7 @@ public final class TelemetryStore implements ITelemetrySink, Closeable {
             } catch (IOException failure) {
                 if (!writeFailureReported) {
                     writeFailureReported = true;
-                    System.err.println("[telemetry] 链路写盘失败，后续只保留内存记录：" + failure.getMessage()); // NOSONAR CLI output by design
+                    Diagnostics.warn("[telemetry] 链路写盘失败，后续只保留内存记录：" + failure.getMessage());
                 }
                 closeWriter();
             }

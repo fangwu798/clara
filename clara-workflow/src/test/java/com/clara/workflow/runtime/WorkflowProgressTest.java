@@ -1,19 +1,17 @@
 package com.clara.workflow.runtime;
 
+import com.clara.core.diagnostics.Diagnostics;
+import com.clara.core.diagnostics.IDiagnosticsSink;
 import com.clara.core.model.IStreamObserver;
 import org.junit.After;
 import org.junit.Test;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for the thread-local channel in {@link WorkflowProgress}: nested scope restore, notice routing,
@@ -52,19 +50,27 @@ public class WorkflowProgressTest {
     }
 
     @Test
-    public void noticeFallsBackToStdoutWhenChannelMissing() {
-        PrintStream original = System.out;
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+    public void noticeFallsBackToDiagnosticsWhenChannelMissing() {
+        // 库模块不直接写标准输出：未注册通道时交给 Diagnostics 端口。
+        final List<String> info = new ArrayList<>();
+        Diagnostics.install(new IDiagnosticsSink() {
+            @Override
+            public void info(String message) {
+                info.add(message);
+            }
+
+            @Override
+            public void warn(String message) {
+                // 本用例只关心进度通道
+            }
+        });
         try {
-            System.setOut(new PrintStream(captured, true, "UTF-8"));
             WorkflowProgress.notice("notice-without-channel");
-        } catch (Exception failure) {
-            throw new AssertionError(failure);
         } finally {
-            System.setOut(original);
+            Diagnostics.reset();
         }
-        String text = new String(captured.toByteArray(), StandardCharsets.UTF_8);
-        assertTrue(text.contains("notice-without-channel"));
+        assertEquals(1, info.size());
+        assertEquals("notice-without-channel", info.get(0));
     }
 
     @Test
