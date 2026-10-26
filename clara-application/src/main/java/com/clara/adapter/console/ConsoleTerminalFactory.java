@@ -1,5 +1,6 @@
 package com.clara.adapter.console;
 
+import com.clara.core.diagnostics.Diagnostics;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.terminal.impl.jna.JnaTerminalProvider;
@@ -70,6 +71,9 @@ public final class ConsoleTerminalFactory {
                     "clara", resolveTerminalType(), false, resolveEncoding(), false, null, false);
             return terminalIfUsable(terminal);
         } catch (IOException | RuntimeException | LinkageError unsupported) {
+            // 这里是「已确认是 Windows 控制台但创建失败」的分支：静默回退会让 Shift+Enter 换行能力悄悄失效，
+            // 以后遇到同类问题很难发现，因此至少留一条告警。
+            Diagnostics.warn("[WARN] 自定义终端创建失败，已回退默认终端（Shift+Enter 换行不可用）：" + unsupported);
             return null;
         }
     }

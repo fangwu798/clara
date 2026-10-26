@@ -15,10 +15,11 @@ import java.io.Writer;
 import java.nio.charset.Charset;
 
 /**
- * Windows 系统终端：在 JLine 默认实现上补齐 Ctrl+Enter 的区分能力。
+ * Windows 系统终端：在 JLine 默认实现上补齐 Shift+Enter / Ctrl+Enter 的区分能力。
  *
  * <p>Windows 控制台把 Enter 与 Ctrl+Enter 都上报为回车字符，JLine 会再次写回回车，行编辑器只能看到提交。
- * 本类覆写 getEscapeSequence，把 Ctrl+Enter 改写为 ConsoleKeySequences.CTRL_ENTER，由行编辑器绑定为换行。
+ * 本类覆写 getEscapeSequence，把 Shift+Enter / Ctrl+Enter 改写为 ConsoleKeySequences 中定义的序列，
+ * 由行编辑器绑定为换行；单独 Enter 保持提交语义。
  *
  * <p>放在 JLine 包下是因为其 Windows 终端构造器包级可见，只有同包类型才能复用原生控制台句柄与写回逻辑。
  */
@@ -49,6 +50,10 @@ public final class ClaraWinSysTerminal extends JnaWinSysTerminal {
     /**
      * 创建 Windows 系统终端：输出编码、VTP 探测、ConEmu 兼容与 JLine 默认实现保持一致。
      *
+     * <p>JLine 的终端构造器要求信号处理器非空（内部会把它逐个登记到信号表，而 ConcurrentHashMap 不允许
+     * null 值），宿主不注册原生信号时传 null 会抛 NPE，导致自定义终端创建失败并静默退回默认终端，
+     * Shift+Enter 的区分能力随之丢失。这里统一把 null 兜底为 {@code SIG_DFL}。
+     *
      * @param provider        终端提供者
      * @param systemStream    终端对应的系统流
      * @param name            终端名称
@@ -56,7 +61,7 @@ public final class ClaraWinSysTerminal extends JnaWinSysTerminal {
      * @param ansiPassThrough 是否直通 ANSI 序列
      * @param encoding        字符集
      * @param nativeSignals   是否注册原生信号处理器
-     * @param signalHandler   信号处理器
+     * @param signalHandler   信号处理器；为 null 时使用 {@link Terminal.SignalHandler#SIG_DFL}
      * @param paused          是否以暂停状态创建
      * @return 终端实例
      * @throws IOException 控制台初始化失败时
@@ -95,8 +100,9 @@ public final class ClaraWinSysTerminal extends JnaWinSysTerminal {
             writer = new WindowsAnsiWriter(new BufferedWriter(new JnaWinConsoleWriter(console)), console);
         }
 
+        Terminal.SignalHandler handler = signalHandler != null ? signalHandler : Terminal.SignalHandler.SIG_DFL;
         Terminal terminal = new ClaraWinSysTerminal(provider, systemStream, writer, name, type, encoding,
-                nativeSignals, signalHandler, CONSOLE_IN, inMode.getValue(), console, outMode.getValue());
+                nativeSignals, handler, CONSOLE_IN, inMode.getValue(), console, outMode.getValue());
         if (!paused) {
             terminal.resume();
         }
@@ -104,7 +110,7 @@ public final class ClaraWinSysTerminal extends JnaWinSysTerminal {
     }
 
     /**
-     * 把 Ctrl+Enter 改写为行编辑器可识别的序列；其余按键保持 JLine 默认映射。
+     * 把 Shift+Enter / Ctrl+Enter 改写为行编辑器可识别的序列；其余按键保持 JLine 默认映射。
      *
      * @param virtualKey 虚拟键码
      * @param modifier   修饰键位（Ctrl=4、Alt=2、Shift=1）
