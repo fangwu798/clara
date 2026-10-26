@@ -28,9 +28,9 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      # Release 触发时用 tag 作为发布版本（v0.1.0 -> 0.1.0），避免手工改 pom。
+      # 标签触发时用标签作为发布版本（v1.0.1 / 1.0.1 -> 1.0.1），避免手工改 pom。
       - name: Use tag as release version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/')
         run: mvn -B versions:set -DnewVersion="${GITHUB_REF_NAME#v}" -DgenerateBackupPoms=false
 
       # 跳过测试：单测中的联调用例依赖真实模型凭据，CI 中不执行。
