@@ -58,7 +58,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <junit.version>4.13.2</junit.version>
         <jackson.version>2.18.11</jackson.version>
-        <slf4j.version>1.7.36</slf4j.version>
+        <slf4j.version>2.0.20</slf4j.version>
         <poi.version>5.4.0</poi.version>
         <pdfbox.version>2.0.29</pdfbox.version>
         <jtokkit.version>1.1.0</jtokkit.version>
