@@ -167,8 +167,7 @@ public final class ClaraApplication {
      * @param monitor    ESC 取消监听器，非 null
      * @throws IOException 读取标准输入失败时
      */
-    private static void runSession(ConsoleView view, ConsoleInput reader, LaunchOptions options,
-            List<Path> candidates, ModelChoice choice, CancelKeyMonitor monitor) throws IOException {
+    private static void runSession(ConsoleView view, ConsoleInput reader, LaunchOptions options, List<Path> candidates, ModelChoice choice, CancelKeyMonitor monitor) throws IOException {
         view.setInterruptHintAvailable(monitor.isAvailable());
         List<Path> sessionCandidates = candidates;
         ModelChoice sessionChoice = choice;

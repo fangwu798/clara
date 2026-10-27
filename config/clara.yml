@@ -12,7 +12,7 @@ defaultModel: deepseek-response
 #   启动脚本（clara.bat / clara.sh）会逐个检查这些供应商凭据声明的环境变量
 #   （config/model-providers/<别名>.yml 的 credential.environmentVariable），缺失时提示输入。
 #   写法：单行方括号列表（启动脚本按此格式解析）；本行也兼容 YAML 块式序列。
-enabledProviders: [volcengine-response, openai, deepseek-response, alibaba-completion, kimi-response, anthropic, deepseek-completion, kimi-completion, volcengine-completion]
+enabledProviders: [deepseek-response, alibaba-completion, volcengine-response, kimi-response, openai, anthropic, deepseek-completion, kimi-completion, volcengine-completion]
 
 # modelCheck：启动时逐个模型的可用性检查策略。
 #   timeoutMillis：等待模型首个流式响应事件的最长时间。直连官方接口通常 1~3 秒，但经中转站、
