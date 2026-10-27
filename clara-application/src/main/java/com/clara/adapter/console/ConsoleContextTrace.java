@@ -1,6 +1,7 @@
 package com.clara.adapter.console;
 
 import com.clara.core.memory.IContextTraceSink;
+import com.clara.utils.DurationUtils;
 import com.clara.utils.StringUtils;
 
 import java.util.ArrayList;
@@ -161,7 +162,7 @@ public final class ConsoleContextTrace implements IContextTraceSink {
         List<String> rendered = new ArrayList<>();
         String label = "[" + label(source) + "]";
         rendered.add(LINE_INDENT + StringUtils.padRight(label, LABEL_WIDTH) + status
-                + "（" + elapsedMillis + "ms）");
+                + "（" + DurationUtils.formatMillis(elapsedMillis) + "）");
         if (details != null) {
             for (String detail : details) {
                 if (detail != null && !detail.trim().isEmpty()) {

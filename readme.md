@@ -388,7 +388,7 @@ public final class StreamingExample {
 | `/init` | 重新检测模型可用性并重建配置、技能、MCP 连接 |
 | `/compress` / `/compact` | 把当前上下文压缩为摘要 |
 | `/new` | 开始新对话，旧历史保留 |
-| `/usage` / `/tokens` | 统计 token 用量与平台分布 |
+| `/usage` / `/tokens` | 统计 token 用量与模型分布（按模型着色，趋势图含总量与各模型曲线） |
 | `/history` | 查看历史聊天记录 |
 | `/history clear` | 清空全部历史记录 |
 | `/history clear -n N` | 清理最早的 N 条 |

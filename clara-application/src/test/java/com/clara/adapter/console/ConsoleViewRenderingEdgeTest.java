@@ -125,6 +125,17 @@ public class ConsoleViewRenderingEdgeTest {
         setField("workingEnabled", false);
     }
 
+    /**
+     * Working 计时超过一分钟后改用「x分y秒」，避免长时间任务显示成上百秒。
+     */
+    @Test
+    public void formatsWorkingElapsedLabelInMinutesAfterOneMinute() throws Exception {
+        setField("workingActive", true);
+        setField("workingStartedAt", System.currentTimeMillis() - 65_500L);
+
+        assertEquals("1分5秒", view.workingElapsedLabel());
+    }
+
     @Test
     public void rendersStreamSegmentsOutsideIntervention() throws Exception {
         view.beginStreamSegment("[assistant] ", ConsoleView.ANSI_GREEN);

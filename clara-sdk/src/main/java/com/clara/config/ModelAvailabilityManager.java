@@ -1,5 +1,6 @@
 package com.clara.config;
 
+import com.clara.utils.DurationUtils;
 import com.clara.utils.StringUtils;
 import com.clara.enums.CapabilityKindEnum;
 import com.clara.enums.ProtocolEnum;
@@ -175,7 +176,7 @@ public final class ModelAvailabilityManager {
         if (enabled.isEmpty()) {
             sink.accept(AvailabilityLine.fail("未发现可用模型。"));
         } else {
-            sink.accept(AvailabilityLine.ok("默认模型：" + preferred.getAlias() + "（首字符响应 " + preferred.getFirstCharacterMillis() + "ms）"));
+            sink.accept(AvailabilityLine.ok("默认模型：" + preferred.getAlias() + "（首字符响应 " + DurationUtils.formatMillis(preferred.getFirstCharacterMillis()) + "）"));
         }
         List<Path> paths = new ArrayList<>();
         for (ModelCheckResult result : enabled) {

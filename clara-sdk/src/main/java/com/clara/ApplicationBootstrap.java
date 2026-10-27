@@ -91,6 +91,7 @@ import com.clara.tool.CompositeToolCatalog;
 import com.clara.tool.CompositeToolInvoker;
 import com.clara.media.VideoDownloader;
 import com.clara.usage.CapabilityUsageLedger;
+import com.clara.usage.IUsageLineColorizer;
 import com.clara.usage.ProviderTokenUsage;
 import com.clara.usage.TokenCountFormatter;
 import com.clara.utils.StringUtils;
@@ -183,9 +184,9 @@ public final class ApplicationBootstrap implements Closeable {
     private static final String DEFAULT_PROVIDER = "default";
 
     /**
-     * {@code /usage} 平台列宽：平台名按此宽度右侧补空格，纵向对齐。
+     * {@code /usage} 模型列宽上限：超长模型标识按此宽度截断，避免单行过宽。
      */
-    private static final int PROVIDER_COLUMN_WIDTH = 12;
+    private static final int MODEL_COLUMN_MAX_WIDTH = 48;
 
     /**
      * MCP 客户端单次请求超时（毫秒）：装配期给出的默认值，随宿主登记服务端后生效。
@@ -592,7 +593,7 @@ public final class ApplicationBootstrap implements Closeable {
      * <p>统计两类口径：
      * <ol>
      *   <li>当前会话全部历史记录占用的 token 估算（基于持久化历史 + token 估算器，跨重启有效）；</li>
-     *   <li>本次会话内已发生的模型调用累计用量，并按平台拆分（累计值不受调用记录容量淘汰影响）。</li>
+     *   <li>本次会话内已发生的模型调用累计用量，并按「平台/模型」拆分（累计值不受调用记录容量淘汰影响）。</li>
      * </ol>
      *
      * @param conversationId        会话标识，不可为空白
@@ -602,30 +603,126 @@ public final class ApplicationBootstrap implements Closeable {
      */
     public String conversationUsageReport(String conversationId, ProviderConfiguration providerConfiguration,
                                           String model) {
+        return conversationUsageReport(conversationId, providerConfiguration, model, null);
+    }
+
+    /**
+     * 生成会话用量报告，并允许宿主编排每一行的颜色。
+     *
+     * @param conversationId        会话标识，不可为空白
+     * @param providerConfiguration 当前平台配置，可为 null（未绑定时只统计进程内调用）
+     * @param model                 当前模型标识，可为 null
+     * @param colorizer             行着色器；null 表示返回纯文本
+     * @return 多行用量说明，非 null
+     */
+    public String conversationUsageReport(String conversationId, ProviderConfiguration providerConfiguration,
+                                          String model, IUsageLineColorizer colorizer) {
         StringBuilder report = new StringBuilder();
         report.append("会话：").append(conversationId);
         appendHistorySummary(report, conversationId, providerConfiguration, model);
 
         ProviderTokenUsage total = callRecordSink.totalUsage();
-        report.append('\n').append("本次会话累计调用：").append(total.getCalls()).append(" 次")
-                .append("（输入 ").append(TokenCountFormatter.format(total.getInputTokens()))
-                .append(" / 输出 ").append(TokenCountFormatter.format(total.getOutputTokens()))
-                .append(" / 合计 ").append(TokenCountFormatter.format(total.getTotalTokens())).append(" tokens）");
-        report.append('\n').append("按平台统计：");
-        Map<ModelProviderEnum, ProviderTokenUsage> byProvider = callRecordSink.usageByProvider();
-        if (byProvider.isEmpty()) {
+        String summary = "本次会话累计调用：" + total.getCalls() + " 次"
+                + "（输入 " + TokenCountFormatter.format(total.getInputTokens())
+                + " / 输出 " + TokenCountFormatter.format(total.getOutputTokens())
+                + " / 合计 " + TokenCountFormatter.format(total.getTotalTokens()) + " tokens）";
+        report.append('\n').append(colorize(colorizer, IUsageLineColorizer.TOTAL_KEY, summary));
+        report.append('\n').append("按模型统计：");
+        Map<String, ProviderTokenUsage> byModel = callRecordSink.usageByModel();
+        if (byModel.isEmpty()) {
             report.append('\n').append("  （暂无模型调用）");
             return report.toString();
         }
-        for (Map.Entry<ModelProviderEnum, ProviderTokenUsage> entry : byProvider.entrySet()) {
-            ProviderTokenUsage usage = entry.getValue();
-            report.append('\n').append("  ").append(StringUtils.padRight(entry.getKey().name(), PROVIDER_COLUMN_WIDTH))
-                    .append(" 调用 ").append(usage.getCalls()).append(" 次")
-                    .append("，输入 ").append(TokenCountFormatter.format(usage.getInputTokens()))
-                    .append("，输出 ").append(TokenCountFormatter.format(usage.getOutputTokens()))
-                    .append("，合计 ").append(TokenCountFormatter.format(usage.getTotalTokens())).append(" tokens");
-        }
+        appendModelUsage(report, byModel, total, colorizer);
         return report.toString();
+    }
+
+    /**
+     * 追加按模型统计的明细与总计行。
+     *
+     * @param report    报告缓冲，非 null
+     * @param byModel   模型到用量的映射，非空
+     * @param total     全部模型合计，非 null
+     * @param colorizer 行着色器，可为 null
+     */
+    private static void appendModelUsage(StringBuilder report, Map<String, ProviderTokenUsage> byModel,
+                                         ProviderTokenUsage total, IUsageLineColorizer colorizer) {
+        int columnWidth = modelColumnWidth(byModel);
+        for (Map.Entry<String, ProviderTokenUsage> entry : byModel.entrySet()) {
+            String line = "  " + StringUtils.padRight(fitModelLabel(entry.getKey(), columnWidth), columnWidth)
+                    + usageText(entry.getValue());
+            report.append('\n').append(colorize(colorizer, entry.getKey(), line));
+        }
+        String totalLine = "  " + StringUtils.padRight("总计", columnWidth) + usageText(total);
+        report.append('\n').append(colorize(colorizer, IUsageLineColorizer.TOTAL_KEY, totalLine));
+    }
+
+    /**
+     * 渲染一份用量的调用次数与 token 明细。
+     *
+     * @param usage 用量快照，非 null
+     * @return 形如 {@code  调用 1 次，输入 ...，合计 ... tokens} 的文本，非 null
+     */
+    private static String usageText(ProviderTokenUsage usage) {
+        return " 调用 " + usage.getCalls() + " 次"
+                + "，输入 " + TokenCountFormatter.format(usage.getInputTokens())
+                + "，输出 " + TokenCountFormatter.format(usage.getOutputTokens())
+                + "，合计 " + TokenCountFormatter.format(usage.getTotalTokens()) + " tokens";
+    }
+
+    /**
+     * 计算模型列宽：取最长模型标识的显示宽度，并留出总计行所需宽度。
+     *
+     * @param byModel 模型到用量的映射，非空
+     * @return 列宽，非负
+     */
+    private static int modelColumnWidth(Map<String, ProviderTokenUsage> byModel) {
+        int width = StringUtils.displayWidth("总计");
+        for (String key : byModel.keySet()) {
+            width = Math.max(width, StringUtils.displayWidth(key));
+        }
+        return Math.min(width, MODEL_COLUMN_MAX_WIDTH);
+    }
+
+    /**
+     * 按显示宽度截断超长模型标识，避免单行过宽。
+     *
+     * @param label 模型标识，非 null
+     * @param width 最大显示宽度
+     * @return 不超过指定宽度的标签，非 null
+     */
+    private static String fitModelLabel(String label, int width) {
+        if (StringUtils.displayWidth(label) <= width) {
+            return label;
+        }
+        StringBuilder fitted = new StringBuilder();
+        int used = 0;
+        for (int index = 0; index < label.length(); index++) {
+            char value = label.charAt(index);
+            int charWidth = value > 0xFF ? 2 : 1;
+            if (used + charWidth > width - 1) {
+                break;
+            }
+            fitted.append(value);
+            used += charWidth;
+        }
+        return fitted.append('…').toString();
+    }
+
+    /**
+     * 调用宿主的行着色器；未提供或返回 null 时保留原始行。
+     *
+     * @param colorizer 行着色器，可为 null
+     * @param key       系列标识，非 null
+     * @param line      原始行，非 null
+     * @return 着色后的行，非 null
+     */
+    private static String colorize(IUsageLineColorizer colorizer, String key, String line) {
+        if (colorizer == null) {
+            return line;
+        }
+        String colored = colorizer.colorize(key, line);
+        return colored == null ? line : colored;
     }
 
     private void appendHistorySummary(StringBuilder report, String conversationId,

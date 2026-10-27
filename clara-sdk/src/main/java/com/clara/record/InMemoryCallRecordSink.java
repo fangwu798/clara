@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,7 +25,8 @@ import java.util.Map;
  * <p>容量语义：满容量后写入新记录时淘汰最旧的一条，只保留最近 {@code capacity} 条。
  *
  * <p>用量语义：除保留原始记录外，每次写入还会按平台累计调用次数与 token 用量。累计值不随原始记录淘汰，
- * 因此 {@code /usage} 看到的是本次进程内该平台的全部调用，而不是最近 N 条记录的局部和。
+ * 因此 {@code /usage} 看到的是本次进程内该平台的全部调用，而不是最近 N 条记录的局部和；
+ * 同时按「平台/模型」累计一份明细，供按模型展示与趋势图使用。
  */
 public final class InMemoryCallRecordSink implements ICallRecordSink {
 
@@ -36,6 +38,7 @@ public final class InMemoryCallRecordSink implements ICallRecordSink {
     private final int capacity;
     private final Deque<CallRecord> records = new ArrayDeque<>();
     private final Map<ModelProviderEnum, ProviderTokenUsage> providerUsage = new EnumMap<>(ModelProviderEnum.class);
+    private final Map<String, ProviderTokenUsage> modelUsage = new LinkedHashMap<>();
     private ProviderTokenUsage totalUsage = ProviderTokenUsage.EMPTY;
 
     /**
@@ -89,6 +92,21 @@ public final class InMemoryCallRecordSink implements ICallRecordSink {
     }
 
     /**
+     * 按「平台/模型」返回累计用量快照，键按字典序排序，保证报告与趋势图的配色顺序稳定。
+     *
+     * @return 模型标识到用量快照的不可变映射，非 null；无调用时为空映射
+     */
+    public synchronized Map<String, ProviderTokenUsage> usageByModel() {
+        List<String> keys = new ArrayList<>(modelUsage.keySet());
+        Collections.sort(keys);
+        Map<String, ProviderTokenUsage> sorted = new LinkedHashMap<>();
+        for (String key : keys) {
+            sorted.put(key, modelUsage.get(key));
+        }
+        return Collections.unmodifiableMap(sorted);
+    }
+
+    /**
      * 返回全部平台的累计用量快照。
      *
      * @return 累计用量，非 null；无调用时各项均为 0
@@ -103,6 +121,7 @@ public final class InMemoryCallRecordSink implements ICallRecordSink {
     public synchronized void clear() {
         records.clear();
         providerUsage.clear();
+        modelUsage.clear();
         totalUsage = ProviderTokenUsage.EMPTY;
     }
 
@@ -128,6 +147,21 @@ public final class InMemoryCallRecordSink implements ICallRecordSink {
         ProviderTokenUsage delta = new ProviderTokenUsage(1L, input, output, total);
         ProviderTokenUsage previous = providerUsage.get(callRecord.getProvider());
         providerUsage.put(callRecord.getProvider(), previous == null ? delta : previous.plus(delta));
+        String modelKey = modelKey(callRecord);
+        ProviderTokenUsage modelPrevious = modelUsage.get(modelKey);
+        modelUsage.put(modelKey, modelPrevious == null ? delta : modelPrevious.plus(delta));
         totalUsage = totalUsage.plus(delta);
+    }
+
+    /**
+     * 生成模型累计键：平台名 + 模型标识；模型标识缺失时用 {@code unknown} 占位。
+     *
+     * @param callRecord 调用记录，非 null
+     * @return 形如 {@code DEEPSEEK/deepseek-v4-pro} 的键，非 null
+     */
+    private static String modelKey(CallRecord callRecord) {
+        String model = callRecord.getModelType();
+        String normalized = model == null || model.trim().isEmpty() ? "unknown" : model.trim();
+        return callRecord.getProvider().name() + "/" + normalized;
     }
 }

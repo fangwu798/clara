@@ -1,6 +1,7 @@
 package com.clara.model.availability;
 
 import com.clara.enums.AvailabilityLevelEnum;
+import com.clara.utils.DurationUtils;
 import com.clara.utils.StringUtils;
 import lombok.Getter;
 
@@ -266,7 +267,7 @@ public final class AvailabilityLine {
         if (!result.isAvailable()) {
             return StringUtils.isBlank(result.getDetail()) ? "" : result.getDetail();
         }
-        String latency = "首字符响应=" + result.getFirstCharacterMillis() + "ms";
+        String latency = "首字符响应=" + DurationUtils.formatMillis(result.getFirstCharacterMillis());
         return StringUtils.isBlank(result.getDetail()) ? latency : latency + GAP + result.getDetail();
     }
 

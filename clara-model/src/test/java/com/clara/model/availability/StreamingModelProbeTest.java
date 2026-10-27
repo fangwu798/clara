@@ -59,10 +59,12 @@ public class StreamingModelProbeTest {
         server.start();
         int port = server.getAddress().getPort();
         configPath = folder.newFile("probe.yml").toPath();
+        // 可用性探测测试必须自包含：CI 上没有 CLARA_DEEPSEEK_API_KEY，
+        // 依赖环境变量会让鉴权头组装失败，六个用例会被误判为模型不可用。
         String yaml = "provider: DEEPSEEK\n"
                 + "credential:\n"
                 + "  secretRef: deepseek\n"
-                + "  environmentVariable: CLARA_DEEPSEEK_API_KEY\n"
+                + "  apiKey: test-key\n"
                 + "transport:\n"
                 + "  allowedOrigins:\n"
                 + "    - http://127.0.0.1:" + port + "\n"

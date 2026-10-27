@@ -11,6 +11,7 @@ import com.clara.adapter.console.ConsoleWorkflowProgressSink;
 import com.clara.adapter.console.ConversationHistoryFormatter;
 import com.clara.adapter.console.LaunchOptions;
 import com.clara.adapter.console.SessionCommandHandler;
+import com.clara.adapter.console.UsageColorPalette;
 import com.clara.adapter.console.UsageTrendChart;
 import com.clara.codegraph.CodeGraphConsole;
 import com.clara.config.CodeGraphSettings;
@@ -42,6 +43,9 @@ import com.clara.telemetry.TelemetryMetrics;
 import com.clara.telemetry.TelemetryRuntime;
 import com.clara.telemetry.TelemetrySettings;
 import com.clara.telemetry.TelemetryStore;
+import com.clara.usage.IUsageLineColorizer;
+import com.clara.usage.ProviderTokenUsage;
+import com.clara.utils.DurationUtils;
 import com.clara.workflow.WorkflowCatalog;
 import com.clara.adapter.console.TraceRenderer;
 import com.clara.workflow.runtime.WorkflowProgress;
@@ -54,7 +58,10 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -318,7 +325,7 @@ public final class ClaraApplication {
         if (headline.startsWith(RESULT_PREFIX)) {
             headline = headline.substring(RESULT_PREFIX.length()).trim();
         }
-        emitCodeGraph(view, label + " " + elapsedMillis + "ms："
+        emitCodeGraph(view, label + " " + DurationUtils.formatMillis(elapsedMillis) + "："
                 + (headline.isEmpty() ? "（脚本没有输出，可能没装 Python）" : headline));
         for (int index = 1; index < lines.length; index++) {
             String detail = lines[index].trim();
@@ -431,10 +438,25 @@ public final class ClaraApplication {
             @Override
             public void showUsage() {
                 try {
-                    String report = bootstrap.conversationUsageReport(conversationId, registry.currentConfiguration(), registry.currentConfiguration().toConfig(CapabilityKindEnum.CHAT).getModelId());
+                    Map<String, ProviderTokenUsage> modelUsage = bootstrap.callRecordSink().usageByModel();
+                    Map<String, Integer> colorIndexes = new HashMap<>();
+                    int colorIndex = 0;
+                    for (String key : modelUsage.keySet()) {
+                        colorIndexes.put(key, colorIndex);
+                        colorIndex++;
+                    }
+                    IUsageLineColorizer colorizer = (key, line) -> {
+                        Integer index = colorIndexes.get(key);
+                        return UsageColorPalette.colorize(key, index == null ? 0 : index, line,
+                                view.isColorsEnabled());
+                    };
+                    String report = bootstrap.conversationUsageReport(conversationId,
+                            registry.currentConfiguration(),
+                            registry.currentConfiguration().toConfig(CapabilityKindEnum.CHAT).getModelId(),
+                            colorizer);
                     view.println(report);
                     view.println("");
-                    view.println(usageTrend.render());
+                    view.println(usageTrend.render(view.isColorsEnabled()));
                     view.println("");
                     view.println(bootstrap.capabilityUsage().report());
                     if (telemetryMetrics != null) {
@@ -543,7 +565,11 @@ public final class ClaraApplication {
     private static void recordUsageTrend(ApplicationBootstrap bootstrap, TokenUsage usage) {
         long total = bootstrap.callRecordSink().totalUsage().getTotalTokens();
         if (total > 0L) {
-            usageTrend.addCumulative(total);
+            Map<String, Long> modelTokens = new LinkedHashMap<>();
+            for (Map.Entry<String, ProviderTokenUsage> entry : bootstrap.callRecordSink().usageByModel().entrySet()) {
+                modelTokens.put(entry.getKey(), entry.getValue().getTotalTokens());
+            }
+            usageTrend.addSnapshot(modelTokens, total);
             return;
         }
         if (usage == null) {
@@ -953,7 +979,7 @@ public final class ClaraApplication {
                 view.emit("  [tool] 工具调用往返 " + result.getToolRoundTrips() + " 次",
                         ConsoleView.ANSI_LIGHT_BLUE);
             }
-            view.emit("  (status=" + result.getStatus() + (result.getUsage() == null ? "" : ", tokens=" + result.getUsage()) + ", 用时=" + (System.currentTimeMillis() - started) + "ms)", ConsoleView.ANSI_GRAY);
+            view.emit("  (status=" + result.getStatus() + (result.getUsage() == null ? "" : ", tokens=" + result.getUsage()) + ", 用时=" + DurationUtils.formatMillis(System.currentTimeMillis() - started) + ")", ConsoleView.ANSI_GRAY);
             if (result.getError() != null) {
                 ClaraError failure = result.getError();
                 String details = failure.getSafeDetails().isEmpty() ? "" : " details=" + failure.getSafeDetails();

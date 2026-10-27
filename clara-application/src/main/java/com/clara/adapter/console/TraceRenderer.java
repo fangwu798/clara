@@ -2,6 +2,8 @@ package com.clara.adapter.console;
 
 import com.clara.core.telemetry.TelemetryEvent;
 import com.clara.core.telemetry.TelemetryStatusEnum;
+import com.clara.utils.DurationUtils;
+import com.clara.utils.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,6 +23,8 @@ public final class TraceRenderer {
 
     private static final int NAME_WIDTH = 24;
     private static final int DURATION_WIDTH = 7;
+    /** 一分钟对应的毫秒数：达到该值后耗时改用「x分y秒」展示。 */
+    private static final long MINUTE_MILLIS = 60_000L;
 
     private static final Set<String> ATTRIBUTE_ORDER = new LinkedHashSet<>();
 
@@ -186,6 +190,9 @@ public final class TraceRenderer {
     }
 
     private static String formatDuration(long millis) {
+        if (millis >= MINUTE_MILLIS) {
+            return DurationUtils.formatMillis(millis);
+        }
         if (millis < 1000L) {
             return millis + "ms";
         }
@@ -207,7 +214,7 @@ public final class TraceRenderer {
     private static String padLeft(String text, int width) {
         String value = text == null ? "" : text;
         StringBuilder builder = new StringBuilder();
-        for (int index = value.length(); index < width; index++) {
+        for (int index = StringUtils.displayWidth(value); index < width; index++) {
             builder.append(' ');
         }
         return builder.append(value).toString();

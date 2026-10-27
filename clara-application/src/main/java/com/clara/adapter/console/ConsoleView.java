@@ -10,6 +10,7 @@ import com.clara.enums.AvailabilityLevelEnum;
 import com.clara.model.configuration.ProviderYamlConfigurationLoader;
 import com.clara.orchestration.api.ConversationResult;
 import com.clara.tool.ToolInvocationPurpose;
+import com.clara.utils.DurationUtils;
 import com.clara.utils.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jline.terminal.Terminal;
@@ -87,6 +88,11 @@ public final class ConsoleView implements Closeable {
      * ANSI 控制码：品红（多角色讨论的第二种角色色）。
      */
     public static final String ANSI_MAGENTA = "\u001B[95m";
+
+    /**
+     * ANSI 控制码：亮白色（{@code /usage} 的总量强调）。
+     */
+    public static final String ANSI_WHITE = "\u001B[97m";
 
     /**
      * ANSI 控制码：重置。
@@ -311,7 +317,7 @@ public final class ConsoleView implements Closeable {
     /**
      * 当前是否启用颜色。
      */
-    boolean isColorsEnabled() {
+    public boolean isColorsEnabled() {
         return colorsEnabled;
     }
 
@@ -484,7 +490,7 @@ public final class ConsoleView implements Closeable {
         }
         long elapsedSeconds = elapsedWorkingSeconds();
         String hint = interruptHintAvailable ? " • esc cancel • Tab steer" : "";
-        String line = "• " + workingLabel + " (" + elapsedSeconds + "s" + hint + ")";
+        String line = "• " + workingLabel + " (" + DurationUtils.formatSeconds(elapsedSeconds) + hint + ")";
         StringBuilder rendered = new StringBuilder();
         rendered.append('\r');
         if (colorsEnabled) {
@@ -692,7 +698,7 @@ public final class ConsoleView implements Closeable {
     }
 
     /**
-     * 当前 Working 计时文本（如 {@code 12s}）；未在执行为 null。
+     * 当前 Working 计时文本（如 {@code 12s}，超过一分钟为 {@code 1分5秒}）；未在执行为 null。
      *
      * @return 计时文本，可为 null
      */
@@ -700,7 +706,7 @@ public final class ConsoleView implements Closeable {
         if (!workingActive) {
             return null;
         }
-        return elapsedWorkingSeconds() + "s";
+        return DurationUtils.formatSeconds(elapsedWorkingSeconds());
     }
 
     /**
@@ -1206,6 +1212,17 @@ public final class ConsoleView implements Closeable {
             return text;
         }
         return color + text + ANSI_RESET;
+    }
+
+    /**
+     * 按当前颜色开关给文本着色，供 {@code /usage} 等需要在多行内分段着色的调用方使用。
+     *
+     * @param color ANSI 颜色码，可为 null
+     * @param text  待着色文本，可为 null
+     * @return 着色后的文本；颜色关闭或入参为空时原样返回
+     */
+    public String colorize(String color, String text) {
+        return wrapColor(color, text);
     }
 
     /**
