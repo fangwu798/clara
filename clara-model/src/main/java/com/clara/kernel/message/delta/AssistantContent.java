@@ -39,12 +39,20 @@ public final class AssistantContent implements IContent {
     private final TokenUsage usage;
 
     /**
+     * 产生本回答的模型标识（形如 {@code PROVIDER/model}）；仅用于历史展示与持久化，不参与协议渲染。
+     *
+     * <p>与 {@link #usage} 一起记录，使 {@code /usage} 能按模型统计历史消耗；旧历史文件没有该字段时为 null。
+     */
+    @JsonIgnore
+    private final String model;
+
+    /**
      * 创建助手消息。
      *
      * @param content 正文文本，可为 null
      */
     public AssistantContent(String content) {
-        this(content, null);
+        this(content, null, null);
     }
 
     /**
@@ -54,8 +62,20 @@ public final class AssistantContent implements IContent {
      * @param usage   本次模型调用用量，可为 null
      */
     public AssistantContent(String content, TokenUsage usage) {
+        this(content, usage, null);
+    }
+
+    /**
+     * 创建带 token 用量与模型标识的助手消息。
+     *
+     * @param content 正文文本，可为 null
+     * @param usage   本次模型调用用量，可为 null
+     * @param model   产生本回答的模型标识，可为 null（旧历史或来源未知）
+     */
+    public AssistantContent(String content, TokenUsage usage, String model) {
         this.content = content;
         this.usage = usage;
+        this.model = model;
     }
 
     /**

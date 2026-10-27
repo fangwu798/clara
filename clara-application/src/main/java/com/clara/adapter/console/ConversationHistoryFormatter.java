@@ -182,27 +182,31 @@ public final class ConversationHistoryFormatter {
     }
 
     /**
-     * 助手消息的 token 用量后缀；用户消息或旧历史没有用量时返回空串。
+     * 助手消息的模型与 token 用量后缀；用户消息、旧历史没有记录时返回空串。
      *
      * @param message 历史消息，非 null
-     * @return 形如 {@code [tokens 输入=12，输出=34，合计=46]} 的后缀，或空串
+     * @return 形如 {@code [模型=DEEPSEEK/x，tokens 输入=12，输出=34，合计=46]} 的后缀，或空串
      */
     private static String usageSuffix(IContent message) {
         if (!(message instanceof AssistantContent)) {
             return "";
         }
-        TokenUsage usage = ((AssistantContent) message).getUsage();
+        AssistantContent assistant = (AssistantContent) message;
+        String model = assistant.getModel();
+        boolean hasModel = model != null && !model.trim().isEmpty();
+        TokenUsage usage = assistant.getUsage();
         if (usage == null) {
-            return "";
+            return hasModel ? "  [模型=" + model + "]" : "";
         }
         long input = usage.getInputTokens();
         long output = usage.getOutputTokens();
         long total = usage.getTotalTokens() == null || usage.getTotalTokens() <= 0
                 ? input + output : usage.getTotalTokens();
         if (total <= 0L) {
-            return "";
+            return hasModel ? "  [模型=" + model + "]" : "";
         }
-        return "  [tokens 输入=" + TokenCountFormatter.format(input)
+        return "  [" + (hasModel ? "模型=" + model + "，" : "") + "tokens 输入="
+                + TokenCountFormatter.format(input)
                 + "，输出=" + TokenCountFormatter.format(output)
                 + "，合计=" + TokenCountFormatter.format(total) + "]";
     }

@@ -87,6 +87,7 @@ public class DefaultConversationOrchestratorLoopTest {
         AssistantContent assistant = (AssistantContent) memory.messages().get(1);
         assertEquals(11, assistant.getUsage().getInputTokens());
         assertEquals(7, assistant.getUsage().getOutputTokens());
+        assertEquals("test-model", assistant.getModel());
         assertFalse(result.isPausedForUserInput());
     }
 

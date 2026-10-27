@@ -34,6 +34,11 @@ public final class ConversationCodec {
      */
     private static final String FIELD_USAGE = "clara_usage";
 
+    /**
+     * 持久化专用的模型标识字段（形如 {@code PROVIDER/model}）；不进入协议渲染。
+     */
+    private static final String FIELD_MODEL = "clara_model";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP_TYPE =
             new TypeReference<Map<String, Object>>() {
@@ -54,7 +59,7 @@ public final class ConversationCodec {
         List<Map<String, Object>> messages = new ArrayList<>();
         for (IContent message : snapshot.messages()) {
             Map<String, Object> wire = new LinkedHashMap<>(message.toCompletionMessage());
-            attachUsage(wire, message);
+            attachMetadata(wire, message);
             messages.add(wire);
         }
         root.put("messages", messages);
@@ -122,7 +127,8 @@ public final class ConversationCodec {
                 return new ToolCallContent(text(message.get(FIELD_CONTENT)),
                         decodeToolCalls((List<Object>) toolCalls));
             }
-            return new AssistantContent(text(message.get(FIELD_CONTENT)), decodeUsage(message.get(FIELD_USAGE)));
+            return new AssistantContent(text(message.get(FIELD_CONTENT)),
+                    decodeUsage(message.get(FIELD_USAGE)), text(message.get(FIELD_MODEL)));
         }
         throw ConversationStoreErrors.corrupted();
     }
@@ -153,16 +159,23 @@ public final class ConversationCodec {
 
 
     /**
-     * 把助手消息的 token 用量写入持久化副本，协议渲染（{@code toCompletionMessage()}）不包含该字段。
+     * 把助手消息的 token 用量与模型标识写入持久化副本。
+     *
+     * <p>这些字段只存在于落盘副本：协议渲染（{@code toCompletionMessage()}）不包含它们，
+     * 因此不会把本地统计信息发给模型平台。
      *
      * @param wire    持久化消息副本，非 null
      * @param message 原始消息，非 null
      */
-    private static void attachUsage(Map<String, Object> wire, IContent message) {
+    private static void attachMetadata(Map<String, Object> wire, IContent message) {
         if (!(message instanceof AssistantContent)) {
             return;
         }
-        TokenUsage usage = ((AssistantContent) message).getUsage();
+        AssistantContent assistant = (AssistantContent) message;
+        TokenUsage usage = assistant.getUsage();
+        if (assistant.getModel() != null && !assistant.getModel().trim().isEmpty()) {
+            wire.put(FIELD_MODEL, assistant.getModel());
+        }
         if (usage == null) {
             return;
         }

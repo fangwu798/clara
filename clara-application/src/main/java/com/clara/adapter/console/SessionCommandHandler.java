@@ -248,7 +248,7 @@ public final class SessionCommandHandler {
         view.println("  /init         重新初始化：重新检测模型可用性并重建配置 / 技能 / MCP 连接（保留当前会话）");
         view.println("  /compress     压缩当前上下文：把历史归纳为摘要（别名 /compact）");
         view.println("  /new          开始新对话：上下文清空，旧历史保留在磁盘");
-        view.println("  /usage        统计 token 用量：全部历史记录估算 + 本次进程累计调用（别名 /tokens）");
+        view.println("  /usage        统计 token 用量：历史记录已记录的 token + 本次进程累计调用（别名 /tokens）");
         view.println("  /history      查看历史聊天记录（仅用户与助手消息，助手消息带 token 用量）");
         view.println("  /history clear      清空全部历史记录");
         view.println("  /history clear -n N 清理最早的 N 条历史记录");

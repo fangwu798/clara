@@ -265,6 +265,22 @@ public final class DefaultConversationOrchestrator {
     }
 
     /**
+     * 历史消息记录的模型标识：优先「平台/模型」，缺少平台配置时退回模型本身。
+     *
+     * <p>与 {@code /usage} 的按模型统计使用同一口径，便于把跨重启的历史消耗归到具体模型上。
+     *
+     * @param plan 本轮编排计划，非 null
+     * @return 模型标识；模型未知时返回 null
+     */
+    private static String historyModelKey(ConversationPlan plan) {
+        String model = plan.request.getModel();
+        if (model == null || model.trim().isEmpty()) {
+            return null;
+        }
+        return plan.provider == null ? model : plan.provider.name() + "/" + model;
+    }
+
+    /**
      * 在进入 Agent Loop 前识别意图：复杂任务生成并校验执行计划，简单任务直接跳过。
      *
      * <p>计划只作为本轮 system 指令注入，不写入历史；内部结构化调用（工作流节点）通过
@@ -314,7 +330,8 @@ public final class DefaultConversationOrchestrator {
             if (!toolRoundTripCoordinator.hasToolCalls(response)) {
                 // 推理平台在达到输出上限时仍会返回一段正文；继续一轮，让模型从中断处接着做，
                 // 避免把半截回答当成已完成结果交给用户。
-                if (isOutputTruncated(response) && continueTruncatedOutput(state, response)) {
+                if (isOutputTruncated(response)
+                        && continueTruncatedOutput(state, response, historyModelKey(plan))) {
                     continue;
                 }
                 if (replanForIntervention(plan, state, response)) {
@@ -338,7 +355,8 @@ public final class DefaultConversationOrchestrator {
             appendInterventions(state);
             String userInputRequest = toolRoundTripCoordinator.userInputRequest(toolMessages);
             if (userInputRequest != null) {
-                state.windowMemory.append(Collections.singletonList(new AssistantContent(userInputRequest, takePendingUsage(state))));
+                state.windowMemory.append(Collections.singletonList(
+                        new AssistantContent(userInputRequest, takePendingUsage(state), historyModelKey(plan))));
                 return conversationResult(plan.request.getConversationId(), userInputRequest,
                         OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,
                         state.reasoning.toString(), true);
@@ -393,7 +411,8 @@ public final class DefaultConversationOrchestrator {
         }
         String finalPart = capabilityDispatcher.extract(plan.capabilityKind, response);
         if (finalPart != null && !finalPart.trim().isEmpty()) {
-            state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart, takePendingUsage(state))));
+            state.windowMemory.append(Collections.singletonList(
+                    new AssistantContent(finalPart, takePendingUsage(state), historyModelKey(plan))));
         }
         int applied = appendInterventions(state);
         if (applied == 0) {
@@ -557,16 +576,18 @@ public final class DefaultConversationOrchestrator {
      *
      * @param state    本轮状态，非 null
      * @param response 被截断的响应，非 null
+     * @param model    历史消息要记录的模型标识，可为 null
      * @return 已安排续写时返回 true；达到续写次数上限时返回 false
      */
-    private static boolean continueTruncatedOutput(ConversationState state, HttpResponse response) {
+    private static boolean continueTruncatedOutput(ConversationState state, HttpResponse response, String model) {
         if (state.outputContinuations >= MAX_OUTPUT_CONTINUATIONS) {
             return false;
         }
         String content = response.getContent();
         if (content != null && !content.trim().isEmpty()) {
             state.answer.append(content);
-            state.windowMemory.append(Collections.singletonList(new AssistantContent(content, takePendingUsage(state))));
+            state.windowMemory.append(Collections.singletonList(
+                    new AssistantContent(content, takePendingUsage(state), model)));
         }
         state.continuationPrompt = CONTINUE_PROMPT;
         state.outputContinuations++;
@@ -586,7 +607,8 @@ public final class DefaultConversationOrchestrator {
         // （Invalid assistant message: content or tool_calls must be set），因此不写入历史。
         if (plan.capabilityKind == CapabilityKindEnum.CHAT
                 && finalPart != null && !finalPart.trim().isEmpty()) {
-            state.windowMemory.append(Collections.singletonList(new AssistantContent(finalPart, takePendingUsage(state))));
+            state.windowMemory.append(Collections.singletonList(
+                    new AssistantContent(finalPart, takePendingUsage(state), historyModelKey(plan))));
         }
         ConversationResult result = conversationResult(plan.request.getConversationId(), content,
                 OrchestrationStatusEnum.COMPLETED, toolRoundTrips, usage(response), null,

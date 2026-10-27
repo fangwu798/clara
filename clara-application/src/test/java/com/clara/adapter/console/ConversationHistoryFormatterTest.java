@@ -55,6 +55,21 @@ public class ConversationHistoryFormatterTest {
     }
 
     /**
+     * 新历史同时展示回答所用的模型，便于确认每轮由哪个模型产生。
+     */
+    @Test
+    public void rendersAssistantModelAndTokenUsage() {
+        List<IContent> messages = Arrays.asList(
+                new UserContent("问"),
+                new AssistantContent("答", new TokenUsage(1200, 300, 1500, null), "DEEPSEEK/deepseek-chat"));
+
+        List<String> lines = ConversationHistoryFormatter.render(messages, 0);
+
+        assertEquals("  [2] 助手：答  [模型=DEEPSEEK/deepseek-chat，tokens 输入=1200，输出=300，合计=1500]",
+                lines.get(1));
+    }
+
+    /**
      * 只渲染最近 N 条，但保留整体编号。
      */
     @Test

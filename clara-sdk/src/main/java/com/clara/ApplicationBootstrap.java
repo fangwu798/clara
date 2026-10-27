@@ -91,6 +91,7 @@ import com.clara.tool.CompositeToolCatalog;
 import com.clara.tool.CompositeToolInvoker;
 import com.clara.media.VideoDownloader;
 import com.clara.usage.CapabilityUsageLedger;
+import com.clara.usage.HistoryUsageSummary;
 import com.clara.usage.IUsageLineColorizer;
 import com.clara.usage.ProviderTokenUsage;
 import com.clara.usage.TokenCountFormatter;
@@ -124,6 +125,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * 程序装配入口：按默认配置构造各模块实现，并组合成可运行的对话编排能力。
@@ -592,7 +594,7 @@ public final class ApplicationBootstrap implements Closeable {
      *
      * <p>统计两类口径：
      * <ol>
-     *   <li>当前会话全部历史记录占用的 token 估算（基于持久化历史 + token 估算器，跨重启有效）；</li>
+     *   <li>当前会话全部历史记录占用的真实 token（模型响应返回后随消息落盘，跨重启有效）；</li>
      *   <li>本次会话内已发生的模型调用累计用量，并按「平台/模型」拆分（累计值不受调用记录容量淘汰影响）。</li>
      * </ol>
      *
@@ -619,7 +621,7 @@ public final class ApplicationBootstrap implements Closeable {
                                           String model, IUsageLineColorizer colorizer) {
         StringBuilder report = new StringBuilder();
         report.append("会话：").append(conversationId);
-        appendHistorySummary(report, conversationId, providerConfiguration, model);
+        appendHistorySummary(report, conversationId, providerConfiguration, model, colorizer);
 
         ProviderTokenUsage total = callRecordSink.totalUsage();
         String summary = "本次会话累计调用：" + total.getCalls() + " 次"
@@ -648,13 +650,28 @@ public final class ApplicationBootstrap implements Closeable {
     private static void appendModelUsage(StringBuilder report, Map<String, ProviderTokenUsage> byModel,
                                          ProviderTokenUsage total, IUsageLineColorizer colorizer) {
         int columnWidth = modelColumnWidth(byModel);
-        for (Map.Entry<String, ProviderTokenUsage> entry : byModel.entrySet()) {
-            String line = "  " + StringUtils.padRight(fitModelLabel(entry.getKey(), columnWidth), columnWidth)
-                    + usageText(entry.getValue());
-            report.append('\n').append(colorize(colorizer, entry.getKey(), line));
-        }
+        appendModelRows(report, byModel, columnWidth, colorizer, ApplicationBootstrap::usageText);
         String totalLine = "  " + StringUtils.padRight("总计", columnWidth) + usageText(total);
         report.append('\n').append(colorize(colorizer, IUsageLineColorizer.TOTAL_KEY, totalLine));
+    }
+
+    /**
+     * 逐行追加「模型 + 用量」明细，不输出总计行。
+     *
+     * @param report      报告缓冲，非 null
+     * @param byModel     模型到用量的映射，非空
+     * @param columnWidth 模型列宽
+     * @param colorizer   行着色器，可为 null
+     * @param formatter   单条用量的渲染函数，非 null
+     */
+    private static void appendModelRows(StringBuilder report, Map<String, ProviderTokenUsage> byModel,
+                                        int columnWidth, IUsageLineColorizer colorizer,
+                                        Function<ProviderTokenUsage, String> formatter) {
+        for (Map.Entry<String, ProviderTokenUsage> entry : byModel.entrySet()) {
+            String line = "  " + StringUtils.padRight(fitModelLabel(entry.getKey(), columnWidth), columnWidth)
+                    + formatter.apply(entry.getValue());
+            report.append('\n').append(colorize(colorizer, entry.getKey(), line));
+        }
     }
 
     /**
@@ -665,6 +682,21 @@ public final class ApplicationBootstrap implements Closeable {
      */
     private static String usageText(ProviderTokenUsage usage) {
         return " 调用 " + usage.getCalls() + " 次"
+                + "，输入 " + TokenCountFormatter.format(usage.getInputTokens())
+                + "，输出 " + TokenCountFormatter.format(usage.getOutputTokens())
+                + "，合计 " + TokenCountFormatter.format(usage.getTotalTokens()) + " tokens";
+    }
+
+    /**
+     * 渲染一条历史记录的用量明细。
+     *
+     * <p>历史以「助手回答」为单位落盘，一轮内的多次模型调用已经合并，因此这里按回答条数展示。
+     *
+     * @param usage 用量快照，非 null
+     * @return 形如 {@code N 条回答，输入 ...，合计 ... tokens} 的文本，非 null
+     */
+    private static String historyUsageText(ProviderTokenUsage usage) {
+        return " " + usage.getCalls() + " 条回答"
                 + "，输入 " + TokenCountFormatter.format(usage.getInputTokens())
                 + "，输出 " + TokenCountFormatter.format(usage.getOutputTokens())
                 + "，合计 " + TokenCountFormatter.format(usage.getTotalTokens()) + " tokens";
@@ -725,8 +757,20 @@ public final class ApplicationBootstrap implements Closeable {
         return colored == null ? line : colored;
     }
 
+    /**
+     * 追加历史记录的 token 摘要与按模型明细。
+     *
+     * <p>只累加消息落盘时记录的真实用量；升级前没有用量的旧消息只计数提示，不做估算。
+     *
+     * @param report                报告缓冲，非 null
+     * @param conversationId        会话标识，不可为空白
+     * @param providerConfiguration 当前平台配置，可为 null
+     * @param model                 当前模型标识，可为 null
+     * @param colorizer             行着色器，可为 null
+     */
     private void appendHistorySummary(StringBuilder report, String conversationId,
-                                      ProviderConfiguration providerConfiguration, String model) {
+                                      ProviderConfiguration providerConfiguration, String model,
+                                      IUsageLineColorizer colorizer) {
         if (providerConfiguration == null || model == null || model.trim().isEmpty()) {
             report.append('\n').append("历史记录：未知（未绑定模型配置）");
             return;
@@ -734,9 +778,14 @@ public final class ApplicationBootstrap implements Closeable {
         ModelProviderEnum provider = providerConfiguration.getProvider();
         IWindowMemory memory = windowMemoryFactory.create(conversationId, provider.name(), model);
         List<IContent> history = HistorySanitizer.dropInvalidAssistantMessages(memory.messages());
-        long tokens = tokenCountEstimator == null ? 0L : tokenCountEstimator.estimate(history);
-        report.append('\n').append("历史记录：").append(history.size()).append(" 条")
-                .append("，估算 token：").append(TokenCountFormatter.format(tokens));
+        HistoryUsageSummary summary = HistoryUsageSummary.of(history);
+        report.append('\n').append(summary.summaryLine());
+        Map<String, ProviderTokenUsage> byModel = summary.getByModel();
+        if (!byModel.isEmpty()) {
+            report.append('\n').append("历史按模型统计：");
+            appendModelRows(report, byModel, modelColumnWidth(byModel), colorizer,
+                    ApplicationBootstrap::historyUsageText);
+        }
     }
 
     /**

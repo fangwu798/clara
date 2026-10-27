@@ -99,6 +99,37 @@ public class ConversationCodecTest {
         assertNull(assistant.getUsage());
     }
 
+    /**
+     * 模型标识与用量一起落盘，且都不得污染下发给平台的协议消息。
+     */
+    @Test
+    public void roundTripsAssistantModelWithoutPollutingProtocol() {
+        TokenUsage usage = new TokenUsage(10, 20, 30, null);
+        ConversationSnapshot decoded = codec.decode(codec.encode(new ConversationSnapshot(1L,
+                Collections.singletonList(new AssistantContent("hi", usage, "DEEPSEEK/deepseek-chat")))));
+
+        AssistantContent assistant = (AssistantContent) decoded.messages().get(0);
+        assertEquals("DEEPSEEK/deepseek-chat", assistant.getModel());
+        assertEquals(10, assistant.getUsage().getInputTokens());
+        assertFalse(assistant.toCompletionMessage().containsKey("clara_model"));
+        assertFalse(assistant.toCompletionMessage().containsKey("clara_usage"));
+    }
+
+    /**
+     * 升级前的历史文件没有模型字段，解码后模型为 null，仍可正常续接。
+     */
+    @Test
+    public void decodesLegacyAssistantMessageWithoutModel() {
+        ConversationSnapshot decoded = codec.decode(
+                ("{\"version\":1,\"messages\":[{\"role\":\"assistant\",\"content\":\"old\","
+                        + "\"clara_usage\":{\"input\":1,\"output\":2}}]}")
+                        .getBytes(StandardCharsets.UTF_8));
+        AssistantContent assistant = (AssistantContent) decoded.messages().get(0);
+        assertEquals("old", assistant.getContent());
+        assertNull(assistant.getModel());
+        assertEquals(1, assistant.getUsage().getInputTokens());
+    }
+
     @Test
     public void rejectsNullArguments() {
         assertIllegalArgument(() -> codec.encode(null));

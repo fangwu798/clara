@@ -84,7 +84,7 @@ public class ApplicationBootstrapBehaviorTest {
 
             String bound = bootstrap.conversationUsageReport("c1", configuration, "alpha-model");
             assertTrue(bound.contains("历史记录：0 条"));
-            assertTrue(bound.contains("估算 token：0"));
+            assertTrue(bound.contains("暂无 token 记录"));
         } finally {
             configuration.close();
             bootstrap.close();
