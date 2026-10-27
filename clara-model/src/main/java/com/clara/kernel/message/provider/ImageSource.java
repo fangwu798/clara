@@ -184,12 +184,33 @@ public final class ImageSource {
                 return new ImageSource(bytes, fileNameFromUrl(value, index, type), type);
             }
         } catch (IOException exception) {
-            throw new IllegalStateException("下载参考图失败：" + exception.getMessage(), exception);
+            throw downloadFailure(exception);
+        } catch (RuntimeException exception) {
+            throw downloadFailure(exception);
         } finally {
             if (connection != null) {
                 connection.disconnect();
             }
         }
+    }
+
+    /**
+     * 把下载参考图阶段的失败统一包装成业务异常。
+     *
+     * <p>部分 JDK 实现不会在构造 {@link URL} 时拒绝缺少主机名的地址，而是延迟到
+     * {@code getResponseCode()} 才抛出 {@link IllegalArgumentException} 之类的运行时异常，
+     * 因此这里必须把 {@link RuntimeException} 一并包装，避免上游只看到原始异常。
+     * 已经带有可读原因的 {@link IllegalStateException}（如 HTTP 状态码非 2xx、超过大小上限）
+     * 直接向上抛出，不再二次包装。</p>
+     *
+     * @param cause 底层失败原因，不可为 null
+     * @return 可直接抛出的业务异常
+     */
+    private static IllegalStateException downloadFailure(Throwable cause) {
+        if (cause instanceof IllegalStateException) {
+            return (IllegalStateException) cause;
+        }
+        return new IllegalStateException("下载参考图失败：" + cause.getMessage(), cause);
     }
 
     private static byte[] decode(String encoded) {
