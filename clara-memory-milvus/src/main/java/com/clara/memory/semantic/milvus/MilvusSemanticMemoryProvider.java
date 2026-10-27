@@ -63,7 +63,7 @@ public final class MilvusSemanticMemoryProvider implements ISemanticMemoryBacken
             MilvusSemanticMemoryStore store = createStore(spec, backend, settings);
             handedOff = true;
             return store;
-        } catch (RuntimeException unavailable) {
+        } catch (RuntimeException | LinkageError unavailable) {
             Diagnostics.warn("[memory] Milvus 不可用，语义记忆回退为进程内实现（本次不写对话记录）："
                     + unavailable.getMessage());
             return null;
@@ -93,7 +93,7 @@ public final class MilvusSemanticMemoryProvider implements ISemanticMemoryBacken
     private static void closeQuietly(MilvusBackend backend) {
         try {
             backend.close();
-        } catch (RuntimeException closeFailure) {
+        } catch (RuntimeException | LinkageError closeFailure) {
             // 关闭失败不应覆盖原始的连接失败原因，调用方已经回退到进程内实现。
         }
     }
@@ -147,8 +147,9 @@ public final class MilvusSemanticMemoryProvider implements ISemanticMemoryBacken
      * 抑制 Milvus SDK 自带 gRPC 的告警噪音。
      *
      * <p>milvus-sdk-java 内部打包了 shaded gRPC，并以 {@code java.util.logging} 打日志；空闲连接保活 ping
-     * 超时或关连接时会打印告警堆栈（含其 shaded 内部类的 {@code NoClassDefFoundError}），属 SDK 内部行为、
-     * 不影响功能。这里把 {@code io.milvus} 日志层级抬到 {@code SEVERE}，只保留严重错误，避免控制台刷屏。
+     * 超时或关连接时会打印告警堆栈（含其 shaded 内部类的 {@code NoClassDefFoundError}）。这里把
+     * {@code io.milvus} 日志层级抬到 {@code SEVERE} 少刷屏；真正逃出 SDK 的 {@link LinkageError}
+     * 由 {@link MilvusSemanticMemoryStore} 兜成「后端不可用」，不会打断对话。
      */
     private static void quietMilvusLogging() {
         MILVUS_SDK_LOGGER.setLevel(Level.SEVERE);

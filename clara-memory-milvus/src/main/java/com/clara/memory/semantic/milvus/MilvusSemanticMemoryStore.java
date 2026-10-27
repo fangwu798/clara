@@ -1,9 +1,11 @@
 package com.clara.memory.semantic.milvus;
 
 import com.clara.core.memory.ISemanticMemoryStore;
+import com.clara.core.diagnostics.Diagnostics;
 import com.clara.dto.memory.MemoryEntry;
 import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
+import com.clara.exception.ClaraException;
 import com.clara.memory.semantic.SemanticMemoryErrors;
 
 import java.util.ArrayList;
@@ -73,6 +75,8 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
             backend.upsert(spec.getCollection(), entries);
         } catch (MilvusBackendException e) {
             throw SemanticMemoryErrors.backendFailed(e.isRetryable());
+        } catch (LinkageError e) {
+            throw linkageFailure(e);
         }
     }
 
@@ -111,6 +115,8 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
             return backend.search(spec.getCollection(), new MilvusBackendQuery(query, query.getTopK()));
         } catch (MilvusBackendException e) {
             throw SemanticMemoryErrors.backendFailed(e.isRetryable());
+        } catch (LinkageError e) {
+            throw linkageFailure(e);
         }
     }
 
@@ -144,6 +150,8 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
             backend.deleteById(spec.getCollection(), entryId);
         } catch (MilvusBackendException e) {
             throw SemanticMemoryErrors.backendFailed(e.isRetryable());
+        } catch (LinkageError e) {
+            throw linkageFailure(e);
         }
     }
 
@@ -157,6 +165,8 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
             backend.deleteByConversation(spec.getCollection(), conversationId);
         } catch (MilvusBackendException e) {
             throw SemanticMemoryErrors.backendFailed(e.isRetryable());
+        } catch (LinkageError e) {
+            throw linkageFailure(e);
         }
     }
 
@@ -170,7 +180,25 @@ public final class MilvusSemanticMemoryStore implements ISemanticMemoryStore {
             backend.close();
         } catch (Exception e) {
             throw SemanticMemoryErrors.backendFailed(false);
+        } catch (LinkageError e) {
+            throw linkageFailure(e);
         }
+    }
+
+    /**
+     * 把后端类加载失败转成领域错误。
+     *
+     * <p>为什么连 {@link LinkageError} 也要兜：Milvus SDK 内部打包了 shaded gRPC，在取消 / 关闭连接
+     * 这条很少走到的路径上会抛 {@code NoClassDefFoundError}（典型是
+     * {@code io.milvus.shaded.io.grpc.internal.NoopClientStream}）。对宿主来说这等价于「这个可选后端
+     * 用不了」，应当降级成一次语义记忆失败，而不是让整个对话进程带着 Error 崩掉。
+     *
+     * @param error 类加载失败，非 null
+     * @return 语义记忆后端不可用的领域错误
+     */
+    private static ClaraException linkageFailure(LinkageError error) {
+        Diagnostics.warn("[memory] Milvus 后端类加载失败，按后端不可用处理：" + error);
+        return SemanticMemoryErrors.backendFailed(false);
     }
 
     private void open() {

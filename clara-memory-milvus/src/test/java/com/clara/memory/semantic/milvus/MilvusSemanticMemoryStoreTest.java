@@ -243,6 +243,36 @@ public class MilvusSemanticMemoryStoreTest {
     }
 
     @Test
+    public void searchConvertsBackendLinkageErrorToDomainFailure() {
+        FakeBackend backend = new FakeBackend(spec());
+        backend.searchLinkageFailure = new NoClassDefFoundError(
+                "io/milvus/shaded/io/grpc/internal/NoopClientStream");
+        MilvusSemanticMemoryStore store = new MilvusSemanticMemoryStore(spec(), backend);
+
+        try {
+            store.search(query(new float[] {1f, 2f, 3f}, 5, 0d));
+            fail("后端类加载失败应按后端不可用处理");
+        } catch (ClaraException expected) {
+            // 期望：领域错误，而不是 Error 穿透到对话主循环
+        }
+    }
+
+    @Test
+    public void closeConvertsBackendLinkageErrorToDomainFailure() {
+        FakeBackend backend = new FakeBackend(spec());
+        backend.closeLinkageFailure = new NoClassDefFoundError(
+                "io/milvus/shaded/io/grpc/internal/NoopClientStream");
+        MilvusSemanticMemoryStore store = new MilvusSemanticMemoryStore(spec(), backend);
+
+        try {
+            store.close();
+            fail("关闭时的类加载失败应按后端不可用处理");
+        } catch (ClaraException expected) {
+            // 期望：领域错误
+        }
+    }
+
+    @Test
     public void searchTruncatesWhenHitsExceedTopK() {
         FakeBackend backend = new FakeBackend(spec());
         backend.results = Arrays.asList(
@@ -312,6 +342,8 @@ public class MilvusSemanticMemoryStoreTest {
         private RuntimeException searchFailure;
         private RuntimeException deleteFailure;
         private RuntimeException closeFailure;
+        private LinkageError searchLinkageFailure;
+        private LinkageError closeLinkageFailure;
 
         private FakeBackend(MilvusCollectionSpec actual) {
             this.actual = actual;
@@ -335,6 +367,9 @@ public class MilvusSemanticMemoryStoreTest {
             searchCalls.incrementAndGet();
             if (searchFailure != null) {
                 throw searchFailure;
+            }
+            if (searchLinkageFailure != null) {
+                throw searchLinkageFailure;
             }
             return results;
         }
@@ -364,6 +399,9 @@ public class MilvusSemanticMemoryStoreTest {
             closeCalls.incrementAndGet();
             if (closeFailure != null) {
                 throw closeFailure;
+            }
+            if (closeLinkageFailure != null) {
+                throw closeLinkageFailure;
             }
         }
     }

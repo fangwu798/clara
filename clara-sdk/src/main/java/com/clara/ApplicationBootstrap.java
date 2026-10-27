@@ -1224,8 +1224,9 @@ public final class ApplicationBootstrap implements Closeable {
         }
         try {
             closeable.close();
-        } catch (IOException ignored) {
-            // 释放失败不阻断关闭
+        } catch (IOException | RuntimeException | LinkageError ignored) {
+            // 释放失败不阻断关闭：可选的图谱 / 向量库后端可能因为依赖类缺失抛 LinkageError，
+            // 关闭阶段再抛出去只会掩盖真正的退出原因。
         }
     }
 }
