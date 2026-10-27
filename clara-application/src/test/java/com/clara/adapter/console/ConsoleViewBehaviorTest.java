@@ -10,8 +10,12 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 import java.io.StringReader;
@@ -58,6 +62,26 @@ public class ConsoleViewBehaviorTest {
             view.close();
         }
         System.setOut(originalOut);
+    }
+
+    @Test
+    public void writesThroughSharedTerminalWriterWhenTerminalProvided() throws Exception {
+        ByteArrayOutputStream terminalOutput = new ByteArrayOutputStream();
+        Terminal terminal = TerminalBuilder.builder().system(false).type("xterm")
+                .streams(new ByteArrayInputStream(new byte[0]), terminalOutput).build();
+        try {
+            ConsoleView terminalView = new ConsoleView(folder.newFolder("terminal-logs").toPath(),
+                    false, "always", terminal);
+            try {
+                terminalView.emit("terminal-output");
+                String rendered = new String(terminalOutput.toByteArray(), StandardCharsets.UTF_8);
+                assertTrue("控制台输出必须走行编辑器共用的终端 writer", rendered.contains("terminal-output"));
+            } finally {
+                terminalView.close();
+            }
+        } finally {
+            terminal.close();
+        }
     }
 
     @Test

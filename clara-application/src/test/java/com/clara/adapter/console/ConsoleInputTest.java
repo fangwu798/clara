@@ -121,4 +121,29 @@ public class ConsoleInputTest {
         input.close();
         terminal.close();
     }
+
+    /**
+     * 状态行每次刷新都要整行重画：JLine 只做差异重绘，开头字符被并发输出冲掉后不会自动补回。
+     */
+    @Test
+    public void redrawsWholeStatusLineEvenWhenContentUnchanged() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        Terminal terminal = TerminalBuilder.builder().system(false).type("xterm")
+                .streams(new ByteArrayInputStream(new byte[0]), output).build();
+        terminal.setSize(new Size(120, 30));
+        ConsoleInput input = new ConsoleInput(terminal, new StringReader(""));
+        try {
+            assertTrue(input.hasBottomStatus());
+            input.setStatusLine(() -> "deepseek-response · deepseek-v4-pro · E:/work");
+            output.reset();
+            input.setStatusLine(() -> "deepseek-response · deepseek-v4-pro · E:/work");
+            String redrawn = new String(output.toByteArray(), StandardCharsets.UTF_8);
+            assertTrue("内容未变时也要整行重画", redrawn.contains("  deepseek-response"));
+            assertTrue("重画必须绝对定位到最后一行的第 1 列", redrawn.contains("\033[30;1H"));
+            assertTrue("重画前要擦掉整行，避免残留", redrawn.contains("\033[K"));
+        } finally {
+            input.close();
+            terminal.close();
+        }
+    }
 }

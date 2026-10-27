@@ -146,7 +146,8 @@ public final class ClaraApplication {
         LaunchOptions options = LaunchOptions.parse(args);
 
         try (Terminal terminal = ConsoleTerminalFactory.open();
-             ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(), options.forcedColor());
+             ConsoleView view = new ConsoleView(ConfigLocator.logsDirectory(), options.fullLogging(),
+                     options.forcedColor(), terminal);
              ConsoleInput reader = ConsoleInput.create(terminal);
              CancelKeyMonitor monitor = CancelKeyMonitor.create(view, terminal)) {
             ModelCheckSettings checkSettings = ModelCheckSettings.load(ConfigLocator.claraConfigFile());
@@ -173,15 +174,13 @@ public final class ClaraApplication {
         ModelChoice sessionChoice = choice;
         while (true) {
             TelemetrySettings telemetrySettings = TelemetrySettings.load(ConfigLocator.claraConfigFile());
-            try (TelemetryRuntime telemetryRuntime = TelemetryRuntime.start(telemetrySettings,
-                    ConfigLocator.workspaceRoot())) {
+            try (TelemetryRuntime telemetryRuntime = TelemetryRuntime.start(telemetrySettings, ConfigLocator.workspaceRoot())) {
                 Telemetry telemetry = telemetryRuntime.telemetry();
-                // 控制台观测：每轮把图谱补充与向量召回的命中情况打在控制台（同时落详细日志）。
+                // 控制台观测：每轮把图谱补充与向量召回的命中情况打印在控制台（同时落详细日志）。
                 try (ApplicationBootstrap bootstrap = new ApplicationBootstrap(new ConsoleContextTrace(view), telemetry)) {
                     ModelRegistry registry = bootstrap.modelRegistry();
                     registry.select(sessionChoice.configPath());
-                    reader.setStatusLine(() -> inputStatusLine(registry, view.speakerStatus(),
-                            view.workingElapsedLabel()));
+                    reader.setStatusLine(() -> inputStatusLine(registry, view.speakerStatus(), view.workingElapsedLabel()));
                     // 只有终端支持固定状态栏时才接刷新回调；不支持的终端仍由 Working 行原地刷新。
                     if (reader.hasBottomStatus()) {
                         view.setStatusRefresh(reader::refreshStatus);

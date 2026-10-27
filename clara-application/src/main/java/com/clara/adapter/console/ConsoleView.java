@@ -12,6 +12,8 @@ import com.clara.orchestration.api.ConversationResult;
 import com.clara.tool.ToolInvocationPurpose;
 import com.clara.utils.StringUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jline.terminal.Terminal;
+import org.jline.utils.WriterOutputStream;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -257,13 +259,46 @@ public final class ConsoleView implements Closeable {
      * @throws UnsupportedEncodingException 应用输出流初始化失败时
      */
     public ConsoleView(Path logsDirectory, boolean fullLogging, String forcedColor) throws UnsupportedEncodingException {
+        this(logsDirectory, fullLogging, forcedColor, null);
+    }
+
+    /**
+     * 创建控制台视图，并与行编辑器共用同一个终端写出通道。
+     *
+     * <p>为什么必须共用：JLine 在 Windows 控制台走 {@code WriteConsoleW}，而本类若另开
+     * {@code FileOutputStream(FileDescriptor.out)} 则走 {@code WriteFile}。两条通道并发写同一屏幕
+     * 缓冲区时会互相覆盖，典型现象就是底部状态行首字符被吃掉；共用一个 {@code PrintWriter} 后，
+     * 写入顺序由它内部的锁保证。
+     *
+     * @param logsDirectory 详细日志目录，可为 null（不可用时降级为不落盘）
+     * @param fullLogging   是否以全量日志模式启动
+     * @param forcedColor   命令行强制的颜色取值（如 {@code never}），可为 null
+     * @param terminal      与行编辑器共用的终端；为 null 时退回直接写标准输出
+     * @throws UnsupportedEncodingException 应用输出流初始化失败时
+     */
+    public ConsoleView(Path logsDirectory, boolean fullLogging, String forcedColor, Terminal terminal)
+            throws UnsupportedEncodingException {
         this.frameworkTarget = System.out; // NOSONAR CLI output by design
-        this.out = new PrintStream(new FileOutputStream(FileDescriptor.out), true, UTF_8);
+        this.out = consoleOutput(terminal);
         this.fullLogging = fullLogging;
         this.logFilePath = openLogFile(logsDirectory);
         writeLogHeader();
         this.colorsEnabled = detectColors(forcedColor);
         applyLogMode();
+    }
+
+    /**
+     * 创建控制台输出流：接入终端时与 JLine 共用 writer，未接入时直接写标准输出。
+     *
+     * @param terminal 与行编辑器共用的终端，可为 null
+     * @return 控制台输出流，非 null
+     * @throws UnsupportedEncodingException 输出流初始化失败时
+     */
+    private static PrintStream consoleOutput(Terminal terminal) throws UnsupportedEncodingException {
+        if (terminal == null) {
+            return new PrintStream(new FileOutputStream(FileDescriptor.out), true, UTF_8);
+        }
+        return new PrintStream(new WriterOutputStream(terminal.writer(), StandardCharsets.UTF_8), true, UTF_8);
     }
 
     /**
@@ -945,6 +980,7 @@ public final class ConsoleView implements Closeable {
      */
     @Override
     public void close() {
+        out.flush();
         if (fileOut != null) {
             fileOut.flush();
         }

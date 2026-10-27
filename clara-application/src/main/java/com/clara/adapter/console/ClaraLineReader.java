@@ -10,6 +10,7 @@ import org.jline.utils.InfoCmp;
 import org.jline.utils.Status;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
@@ -44,6 +45,14 @@ final class ClaraLineReader extends LineReaderImpl {
             AttributedStyle.DEFAULT.foreground(AttributedStyle.BRIGHT + AttributedStyle.BLACK);
 
     /**
+     * 底部状态行的固定缩进。
+     *
+     * <p>为什么留缩进：部分 Windows 控制台在行尾待折行 / 滚动区域切换时会把最后一行的首列
+     * 清掉，且不会自行恢复。状态行首列固定为空格后，模型别名不会再落在这一格上。
+     */
+    private static final String BOTTOM_LINE_INDENT = "  ";
+
+    /**
      * 输入行下方状态行的供应器；为 null 时不显示状态行。
      */
     private Supplier<String> statusLine;
@@ -76,7 +85,11 @@ final class ClaraLineReader extends LineReaderImpl {
     }
 
     /**
-     * 立即刷新底部状态栏：模型切换后在下一次读取输入前生效。
+     * 立即刷新底部状态栏。
+     *
+     * <p>先交给 {@code Status} 记账（行编辑器据此预留底部行），随后再自己绝对定位整行重画：
+     * {@code Status} 只做差异重绘，并且会把行补齐到终端宽度，Windows 控制台在行尾待折行状态下
+     * 会丢掉最后一行的首列且不再补回；整行重画是单次绝对定位写入，不依赖任何差异状态。
      */
     void refreshStatus() {
         if (bottomStatus == null) {
@@ -85,9 +98,37 @@ final class ClaraLineReader extends LineReaderImpl {
         String status = statusText();
         if (status == null || status.isEmpty()) {
             bottomStatus.update(Collections.<AttributedString>emptyList());
+            repaintBottomLine(null);
             return;
         }
-        bottomStatus.update(Collections.singletonList(AttributedString.fromAnsi(status)));
+        String rendered = BOTTOM_LINE_INDENT + status;
+        bottomStatus.update(Collections.singletonList(AttributedString.fromAnsi(rendered)));
+        repaintBottomLine(rendered);
+    }
+
+    /**
+     * 绝对定位重画底部状态行：擦掉整行后从第 1 列写入。
+     *
+     * @param status 带 ANSI 颜色的状态行文本；null 或空串表示只擦除
+     */
+    private void repaintBottomLine(String status) {
+        int rows = terminal.getSize().getRows();
+        if (rows <= 0) {
+            return;
+        }
+        PrintWriter writer = terminal.writer();
+        // 整段序列必须原子写入：中途插入其它输出会让光标停在状态行上，反而把内容写坏。
+        synchronized (writer) {
+            terminal.puts(InfoCmp.Capability.save_cursor);
+            // cursor_address 的行号是 0 基，最后一行即 rows - 1。
+            terminal.puts(InfoCmp.Capability.cursor_address, rows - 1, 0);
+            terminal.puts(InfoCmp.Capability.clr_eol);
+            if (status != null && !status.isEmpty()) {
+                writer.print(status);
+            }
+            terminal.puts(InfoCmp.Capability.restore_cursor);
+            writer.flush();
+        }
     }
 
     /**
