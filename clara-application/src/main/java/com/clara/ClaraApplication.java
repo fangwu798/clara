@@ -651,7 +651,7 @@ public final class ClaraApplication {
             if (speakerStatus != null && !speakerStatus.isEmpty()) {
                 // 多角色讨论进行中：底部优先展示「谁在说、用哪个模型」，比会话当前模型更贴近当下状态。
                 String activity = workingElapsed == null ? speakerStatus : speakerStatus + " · " + workingElapsed;
-                return ConsoleView.ANSI_LIGHT_BLUE + "▶ " + activity + ConsoleView.ANSI_RESET
+                return ConsoleView.ANSI_LIGHT_BLUE + "* " + activity + ConsoleView.ANSI_RESET
                         + ConsoleView.ANSI_GRAY + " · " + ConsoleView.ANSI_RESET
                         + ConsoleView.ANSI_GREEN + workDir + ConsoleView.ANSI_RESET;
             }
@@ -659,7 +659,7 @@ public final class ClaraApplication {
             String model = registry.currentConfiguration().toConfig(CapabilityKindEnum.CHAT).getModelId();
             if (workingElapsed != null) {
                 // 思考 / 工具执行期间：把 Working 放在固定底部状态栏，流式正文再多也不会冲掉。
-                return ConsoleView.ANSI_LIGHT_BLUE + "● Working (" + workingElapsed + ")" + ConsoleView.ANSI_RESET
+                return ConsoleView.ANSI_LIGHT_BLUE + "* Working (" + workingElapsed + ")" + ConsoleView.ANSI_RESET
                         + ConsoleView.ANSI_GRAY + " · " + alias + " · " + model + " · " + ConsoleView.ANSI_RESET
                         + ConsoleView.ANSI_GREEN + workDir + ConsoleView.ANSI_RESET;
             }

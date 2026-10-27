@@ -102,7 +102,7 @@ public class ClaraApplicationInternalsTest {
                 new Class<?>[]{ModelRegistry.class, String.class, String.class},
                 registry, "architect · alpha-model", "5s");
 
-        assertTrue(line.contains("▶"));
+        assertTrue(line.startsWith(ConsoleView.ANSI_LIGHT_BLUE + "* "));
         assertTrue(line.contains("architect · alpha-model"));
         assertTrue(line.contains("5s"));
         assertTrue(line.contains(System.getProperty("user.dir")));

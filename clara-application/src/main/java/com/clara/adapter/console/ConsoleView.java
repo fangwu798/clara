@@ -641,10 +641,18 @@ public final class ConsoleView implements Closeable {
     /**
      * 注册底部状态行刷新回调：行编辑器可用时传入 {@code ConsoleInput::refreshStatus}。
      *
+     * <p>回调统一包在控制台输出锁里：状态行由 JLine 终端写入，思考 / 正文由本类直接写标准输出，
+     * 两者并发写终端时会在最后一行交错，把状态行开头字符覆盖掉；而 JLine 只做差异重绘，不会补回
+     * 未变化的开头。串行化后每次刷新都能画出一整行。
+     *
      * @param statusRefresh 刷新动作，可为 null（不刷新）
      */
     public void setStatusRefresh(Runnable statusRefresh) {
-        this.statusRefresh = statusRefresh;
+        this.statusRefresh = statusRefresh == null ? null : () -> {
+            synchronized (outputLock) {
+                statusRefresh.run();
+            }
+        };
         notifyStatusRefresh();
     }
 
