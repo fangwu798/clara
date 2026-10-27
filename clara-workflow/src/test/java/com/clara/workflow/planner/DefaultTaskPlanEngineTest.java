@@ -1,7 +1,7 @@
 package com.clara.workflow.planner;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 
 import com.clara.core.planner.ICapabilityAuthorizer;
 import com.clara.core.planner.ITaskHandler;
@@ -155,8 +155,12 @@ public class DefaultTaskPlanEngineTest {
 
     @Test
     public void timeoutIsTreatedAsUnknownSideEffect() {
+        CountDownLatch neverReleased = new CountDownLatch(1);
         TaskNode task = node("T", null, "outT", new RetryPolicy(3, 0L), 50L, context -> {
-            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500L));
+            // 不能用 LockSupport.parkNanos：线程池 worker 可能残留 unpark 许可，park 会立刻返回，
+            // 用例就会偶发不超时（实测拿到的 park 时长是 0ms）。CountDownLatch.await 内部会
+            // 循环重试，直到超时或中断才返回，行为稳定。
+            neverReleased.await(500L, TimeUnit.MILLISECONDS);
             return new TaskExecutionResult(Collections.<String, Object>singletonMap("outT", "late"),
                     BudgetAmount.ZERO);
         });
