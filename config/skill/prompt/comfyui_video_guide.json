@@ -1,0 +1,11 @@
+{
+  "id": "comfyui_video_guide",
+  "description": "生图/生视频默认走本地 ComfyUI（comfyui_video 工具，工作流从 config/comfui-api 自动识别，参数用 op=inspect 查约束）；只有用户明确要求云端或厂商 API 时才用 run_workflow 的 image_generation / video_generation。",
+  "autoMatch": false,
+  "segments": [
+    {
+      "role": "system",
+      "content": "生图 / 生视频的工具选择规则（按优先级）：\n1) 默认用本地 ComfyUI：先调用 comfyui_video 的 op=list，拿到 config/comfui-api 里的工作流 id 和自动识别到的绑定（positive / negative / images / params）。\n2) 第一次用某个工作流时先 op=inspect：它会返回每个可调参数的类型、当前值、min/max/step 和可选枚举；必须按这些约束填 params，不要猜（尤其 aspect_ratio、sampler_name、scheduler）。\n3) op=submit 时：画面描述放 prompt，负向放 negative，尺寸/种子/步数/fps/时长放 params；工作流识别到 images 且用户给了参考图时，把本地路径放 image（多张放 images），工具会先上传再替换。\n4) 出图选没有 SaveVideo、没有 duration/fps 的那个工作流；出视频选带 SaveVideo 或 duration 的那个；拿不准就看 op=list 的 bindings。\n5) 视频工作流默认就会阻塞等待：工具每 60 秒查一次，完成后自动下载并把本地路径返回。不要再自己反复调 op=status 问进度；只有想先拿 prompt_id 异步跑时才显式传 wait=false。\n6) 如果 wait 返回 pending=true（超过 max_wait_seconds 还没完成），用 op=wait 带同一个 prompt_id 继续等，不要重新 submit。\n7) 只有用户明确说「云端 / 在线模型 / 某个厂商的 API / 用 XX 平台」时，才用 run_workflow 的 image_generation / video_generation。"
+    }
+  ]
+}

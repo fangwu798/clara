@@ -41,17 +41,30 @@ public final class ConsoleTerminalFactory {
     public static Terminal open() {
         Terminal terminal = openWindowsTerminal();
         if (terminal != null) {
-            return terminal;
+            return bind(terminal);
         }
         terminal = null;
         try {
             terminal = TerminalBuilder.builder().system(true).build();
-            return terminalIfUsable(terminal);
+            return bind(terminalIfUsable(terminal));
         } catch (IOException | RuntimeException ignored) {
             // 终端不可用时静默降级，由调用方使用普通行输入
         }
         closeQuietly(terminal);
         return null;
+    }
+
+    /**
+     * 把可用终端登记给异常兜底：输入泵线程挂掉时由它恢复控制台并退出。
+     *
+     * @param terminal 可用终端，可为 null
+     * @return 原样返回入参，便于链式调用
+     */
+    private static Terminal bind(Terminal terminal) {
+        if (terminal != null) {
+            TerminalFailureGuard.bind(terminal);
+        }
+        return terminal;
     }
 
     /**

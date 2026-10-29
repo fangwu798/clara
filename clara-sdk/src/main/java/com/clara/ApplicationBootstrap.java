@@ -6,6 +6,7 @@ import com.clara.config.CodeGraphSettings;
 import com.clara.config.ConfigLocator;
 import com.clara.config.IntentPlanSettings;
 import com.clara.config.ModelRegistry;
+import com.clara.config.ToolExecutionSettings;
 import com.clara.config.TopicIsolationSettings;
 import com.clara.context.ConvContext;
 import com.clara.core.annotation.PublicApi;
@@ -381,7 +382,8 @@ public final class ApplicationBootstrap implements Closeable {
         // 工具调用：本地 skill 优先、外部 mcp 兜底，交给编排层的工具往返协调器
         // 脚本执行器注册表默认含 Python / JavaScript / Shell，稍后追加内置执行器（工具名 run_workflow）
         ScriptExecutorRegistry scriptExecutors = new ScriptExecutorRegistry();
-        IToolInvoker localToolInvoker = new DefaultToolInvoker(new DefaultToolExecutor(skillRegistry, scriptExecutors, new SkillSchemaValidator(), new SkillPermissionAuthorizer(), 30_000L));
+        ToolExecutionSettings toolSettings = ToolExecutionSettings.load(ConfigLocator.claraConfigFile());
+        IToolInvoker localToolInvoker = new DefaultToolInvoker(new DefaultToolExecutor(skillRegistry, scriptExecutors, new SkillSchemaValidator(), new SkillPermissionAuthorizer(), toolSettings.getTimeoutMillis()));
         IToolInvoker toolInvoker = new CompositeToolInvoker(skillRegistry, localToolInvoker, mcpGateway,
                 externalToolCatalog, capabilityUsage, telemetry);
         // 意图识别与动态执行计划：复杂任务先生成计划，并交给内置工具 validate_execution_plan 校验；

@@ -698,7 +698,7 @@ public final class ConsoleView implements Closeable {
     }
 
     /**
-     * 当前 Working 计时文本（如 {@code 12s}，超过一分钟为 {@code 1分5秒}）；未在执行为 null。
+     * 当前 Working 计时文本（如 {@code 12s}，超过一分钟为 {@code 1分5秒}，超过一小时为 {@code 1小时1分1秒}，超过一天为 {@code 1天1小时1分1秒}）；未在执行为 null。
      *
      * @return 计时文本，可为 null
      */

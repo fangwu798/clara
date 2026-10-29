@@ -6,6 +6,7 @@ import com.clara.adapter.console.ConsoleContextTrace;
 import com.clara.adapter.console.ConsoleDiagnosticsSink;
 import com.clara.adapter.console.ConsoleInput;
 import com.clara.adapter.console.ConsoleTerminalFactory;
+import com.clara.adapter.console.TerminalFailureGuard;
 import com.clara.adapter.console.ConsoleView;
 import com.clara.adapter.console.ConsoleWorkflowProgressSink;
 import com.clara.adapter.console.ConversationHistoryFormatter;
@@ -147,6 +148,8 @@ public final class ClaraApplication {
      */
     public static void main(String[] args) throws Exception {
         // CLI 安装控制台诊断端口：库模块本身不直接写 stdout，宿主嵌入时默认不会被打扰。
+        // 终端输入泵线程一旦退出，控制台就再也收不到按键；先挂好兜底，避免进程卡死。
+        TerminalFailureGuard.install();
         Diagnostics.install(new ConsoleDiagnosticsSink());
         // 会话标识由工作目录推导：同一目录再次进入即续接上次的对话历史（历史落盘位置见启动横幅）。
         conversationId = ConfigLocator.cliSessionId();

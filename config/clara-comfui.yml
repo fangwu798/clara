@@ -1,0 +1,34 @@
+# Clara × ComfyUI 配置
+#
+# 只需要配地址：工作流由工具自动扫描 apiDir 下的 API 格式 JSON，
+# 自动识别正向/负向提示词、参考图（LoadImage）与常用参数（宽高/种子/步数/fps/时长等），
+# 调用时只替换这些位置，其余节点保持导出时的样子。
+
+# 是否启用（false 时工具直接拒绝提交）。
+enabled: true
+
+# ComfyUI 服务地址。仓库内使用本机默认值，避免提交真实公网 IP；
+# 远程部署时改为实际地址，或在调用时通过 server 参数覆盖。
+server: http://127.0.0.1:8188
+
+# 单次 HTTP 请求超时（秒）：探活、提交、轮询都用它。
+# 参考图上传会按文件体积自动放宽，不受这里限制；宿主硬超时见 clara.yml 的 tools.timeoutMillis。
+requestTimeoutSeconds: 20
+
+# 阻塞轮询：submit 带 wait=true 时，每 pollSeconds 秒查一次，最多等 maxWaitSeconds 秒。
+# 视频建议 wait=true，一次调用里等到完成并自动下载，避免模型反复来问进度。
+pollSeconds: 60
+maxWaitSeconds: 1500
+
+# API 格式工作流目录、产物下载目录（相对仓库根）。
+apiDir: config/comfui-api
+outputDir: output/comfyui
+
+# 可选：只为个别工作流补/改绑定。不配时全部走自动识别。
+# workflows:
+#   image_workflow:
+#     prompts:
+#       positive: "67.text"
+#       negative: "71.text"
+#     params:
+#       width: "68.width"

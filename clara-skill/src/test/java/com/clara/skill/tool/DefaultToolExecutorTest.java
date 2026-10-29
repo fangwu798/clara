@@ -133,7 +133,37 @@ public class DefaultToolExecutorTest {
         }
     }
 
+    @Test
+    public void usesTimeoutDeclaredByToolMetadata() throws Exception {
+        SkillRegistry registry = registry("video", null, "{\"timeoutMillis\":\"1700000\"}");
+        RecordingExecutor executor = new RecordingExecutor("{\"ok\":true}");
+        ScriptExecutorRegistry executors = new ScriptExecutorRegistry();
+        executors.register(executor);
+        DefaultToolExecutor toolExecutor = new DefaultToolExecutor(registry, executors,
+                new SkillSchemaValidator(), new SkillPermissionAuthorizer(), 5000L);
+
+        toolExecutor.execute("video", "{}");
+        assertEquals(1_700_000L, executor.lastSpec.getTimeoutMillis());
+    }
+
+    @Test
+    public void fallsBackWhenMetadataTimeoutIsInvalid() throws Exception {
+        SkillRegistry registry = registry("video", null, "{\"timeoutMillis\":\"abc\"}");
+        RecordingExecutor executor = new RecordingExecutor("{\"ok\":true}");
+        ScriptExecutorRegistry executors = new ScriptExecutorRegistry();
+        executors.register(executor);
+        DefaultToolExecutor toolExecutor = new DefaultToolExecutor(registry, executors,
+                new SkillSchemaValidator(), new SkillPermissionAuthorizer(), 5000L);
+
+        toolExecutor.execute("video", "{}");
+        assertEquals(5000L, executor.lastSpec.getTimeoutMillis());
+    }
+
     private SkillRegistry registry(String name, String parameters) throws Exception {
+        return registry(name, parameters, null);
+    }
+
+    private SkillRegistry registry(String name, String parameters, String metadata) throws Exception {
         File root = folder.newFolder("executor-skill");
         File tools = new File(root, "tools");
         if (!tools.isDirectory() && !tools.mkdirs()) {
@@ -144,6 +174,9 @@ public class DefaultToolExecutorTest {
                 .append("\",\"type\":\"BUILTIN\",\"description\":\"demo\",\"script\":\"").append(name).append('"');
         if (parameters != null) {
             json.append(",\"parameters\":").append(parameters);
+        }
+        if (metadata != null) {
+            json.append(",\"metadata\":").append(metadata);
         }
         json.append('}');
         Files.write(new File(tools, name + ".json").toPath(), json.toString().getBytes(StandardCharsets.UTF_8));

@@ -23,7 +23,7 @@ public final class TraceRenderer {
 
     private static final int NAME_WIDTH = 24;
     private static final int DURATION_WIDTH = 7;
-    /** 一分钟对应的毫秒数：达到该值后耗时改用「x分y秒」展示。 */
+    /** 一分钟对应的毫秒数：达到该值后耗时改用「x分y秒」，超过 60 分钟进位小时、超过 24 小时进位天。 */
     private static final long MINUTE_MILLIS = 60_000L;
 
     private static final Set<String> ATTRIBUTE_ORDER = new LinkedHashSet<>();

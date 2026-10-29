@@ -65,11 +65,34 @@ public final class DefaultToolExecutor implements IToolExecutor {
 
         IScriptExecutor executor = executors.resolve(method.getType());
         ScriptExecutionSpec spec = new ScriptExecutionSpec(method.getType(), method.getScript(),
-                argumentsJson, defaultTimeoutMillis, currentCancellationToken());
+                argumentsJson, timeoutMillis(method), currentCancellationToken());
         String output = executor.execute(spec);
 
         schemaValidator.validateOutput(method, output);
         return output;
+    }
+
+    /**
+     * 单次调用的硬超时：工具在 {@code --describe} 的 metadata 里声明了
+     * {@code timeoutMillis} 就用它，否则用全局默认值。
+     *
+     * <p>用于「一次调用里要等很久」的工具，例如 ComfyUI 视频生成需要阻塞轮询几分钟，
+     * 不该把全局默认值一起调大，否则所有脚本卡死都要等那么久。
+     *
+     * @param method 工具定义，非 null
+     * @return 正数毫秒
+     */
+    private long timeoutMillis(ToolMethod method) {
+        String declared = method.getMetadata().get("timeoutMillis");
+        if (declared == null || declared.trim().isEmpty()) {
+            return defaultTimeoutMillis;
+        }
+        try {
+            long parsed = Long.parseLong(declared.trim());
+            return parsed > 0L ? parsed : defaultTimeoutMillis;
+        } catch (NumberFormatException ignored) {
+            return defaultTimeoutMillis;
+        }
     }
 
     /**
