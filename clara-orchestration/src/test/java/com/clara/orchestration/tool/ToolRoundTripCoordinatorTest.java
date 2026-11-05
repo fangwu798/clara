@@ -8,6 +8,7 @@ import com.clara.enums.ErrorCategoryEnum;
 import com.clara.exception.ErrorCodes;
 import com.clara.kernel.http.HttpResponse;
 import com.clara.kernel.message.delta.ToolContent;
+import com.clara.kernel.message.delta.UserVisionContent;
 import com.clara.core.tool.IToolInvocation;
 import com.clara.dto.tool.ResponsesToolCall;
 import com.clara.dto.tool.ToolCall;
@@ -20,6 +21,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -188,6 +191,48 @@ public class ToolRoundTripCoordinatorTest {
         assertTrue(content.getContent().contains("入参不是合法 JSON"));
     }
 
+    @Test
+    public void performDesktopObserveInjectsScreenshotAsVisionMessage() throws Exception {
+        Path image = Files.createTempFile("clara-desktop-", ".png");
+        Files.write(image, new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47});
+        try {
+            IToolInvoker invoker = invocation -> new ToolResult(invocation.callId(),
+                    "{\"ok\":true,\"visionImages\":[\"" + jsonPath(image)
+                            + "\"],\"visionText\":\"屏幕观察\"}");
+            ToolRoundTripCoordinator coordinator = new ToolRoundTripCoordinator(invoker);
+            HttpResponse response = new HttpResponse();
+            response.setToolCalls(Collections.singletonList(
+                    chatCall("call-screen", "desktop_observe", "{\"purpose\":\"查看按钮位置\"}")));
+
+            List<IContent> messages = coordinator.perform(response);
+
+            assertEquals(3, messages.size());
+            assertTrue(messages.get(1) instanceof ToolContent);
+            assertTrue(messages.get(2) instanceof UserVisionContent);
+            UserVisionContent vision = (UserVisionContent) messages.get(2);
+            assertEquals("屏幕观察", vision.getText());
+            assertEquals(1, vision.getImages().size());
+            assertTrue(vision.getImages().get(0).startsWith("data:image/png;base64,"));
+        } finally {
+            Files.deleteIfExists(image);
+        }
+    }
+
+    @Test
+    public void performDoesNotInjectVisionForOtherTools() {
+        IToolInvoker invoker = invocation -> new ToolResult(invocation.callId(),
+                "{\"ok\":true,\"visionImages\":[\"not-used.png\"]}");
+        ToolRoundTripCoordinator coordinator = new ToolRoundTripCoordinator(invoker);
+        HttpResponse response = new HttpResponse();
+        response.setToolCalls(Collections.singletonList(
+                chatCall("call-file", "file_ops", "{\"op\":\"read\"}")));
+
+        List<IContent> messages = coordinator.perform(response);
+
+        assertEquals(2, messages.size());
+        assertTrue(messages.get(1) instanceof ToolContent);
+    }
+
     // ---- helpers -----------------------------------------------------------
 
     private static ToolCall chatCall(String id, String name, String arguments) {
@@ -207,6 +252,10 @@ public class ToolRoundTripCoordinatorTest {
         call.setName(name);
         call.setArguments(arguments);
         return call;
+    }
+
+    private static String jsonPath(Path path) {
+        return path.toAbsolutePath().toString().replace("\\", "\\\\");
     }
 
     private static final class RecordingInvoker implements IToolInvoker {

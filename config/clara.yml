@@ -89,10 +89,11 @@ intentPlanning:
 # 语义记忆（可选）。配了 milvus 且 enabled 不为 false 时：
 #   1) 所有对话记录都会写入 Milvus（来源 CONVERSATION，按会话隔离，用于长程/跨窗口关联）；
 #   2) 每轮按输入从 Milvus 召回历史上下文，注入到提示词。
-# 未配置该节点、或 enabled: false 时保持原样：语义记忆用进程内实现，不写对话记录。
+# 未配置该节点、enabled: false 或连接失败时：历史消息自动写入本地缓存
+#   （<工作目录>/.clara/state/semantic），重启后仍可按输入召回；不依赖 Milvus。
 # 服务端可用 deploy/docker-compose.yml 起（etcd + MinIO + milvus standalone，gRPC 端口 19530）。
 milvus:
-  # 当前关闭：语义记忆退回进程内实现，不写 Milvus、也不做召回。要用改回 true（并确认 Milvus 已起）。
+  # 开启时优先用 Milvus；本机未安装 / 未启动 Milvus 会自动回退到本地持久化缓存，对话不受影响。
   enabled: true
   host: 127.0.0.1
   port: 19530

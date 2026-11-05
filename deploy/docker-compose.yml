@@ -1,6 +1,7 @@
 # Clara 的本地依赖栈：Milvus（语义记忆）+ codebase-memory-mcp（代码知识图谱）。
 #
-# 一次 up 起全套：docker compose up -d
+# 一次 up 起全套：deploy\deploy.bat up（Windows）或 ./deploy.sh up（Linux / macOS）
+# 等价命令：docker compose up -d
 # 只起图谱：    docker compose up -d codebase-memory-mcp
 # 图谱的部署脚本 deploy\codebase-memory-mcp\install-docker.ps1 用的就是这个文件（只操作图谱那一个服务）。
 #

@@ -5,8 +5,11 @@ import com.clara.dto.memory.MemoryMatch;
 import com.clara.dto.memory.SemanticMemoryQuery;
 import com.clara.enums.memory.MemorySourceTypeEnum;
 import org.junit.Test;
+import org.junit.Rule;
+import org.junit.rules.TemporaryFolder;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -27,6 +30,9 @@ import static org.junit.Assert.assertTrue;
 public class LocalSemanticMemoryStoreTest {
 
     private static final long NOW = 1_000_000L;
+
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
 
     private static MemoryEntry entry(String id, MemorySourceTypeEnum type, String conversationId,
             float[] vector, long createdAt) {
@@ -212,5 +218,59 @@ public class LocalSemanticMemoryStoreTest {
         assertThrows(IllegalStateException.class, () -> store.search(query(new float[] {1, 0}, 1, 0.0)));
         assertThrows(IllegalStateException.class, () -> store.deleteById("a"));
         assertThrows(IllegalStateException.class, () -> store.deleteByConversation("conv"));
+    }
+
+    /**
+     * 未安装 Milvus 时的核心诉求：对话记录落盘，重启后仍能按文本召回。
+     */
+    @Test
+    public void persistsConversationHistoryAndRecallsByText() {
+        Path root = tempFolder.getRoot().toPath();
+        LocalSemanticMemoryStore first = new LocalSemanticMemoryStore(3, root);
+        assertTrue(first.isPersistent());
+        first.upsert(Collections.singletonList(entryWithContent("m1",
+                "user: 部署脚本放在 deploy 目录，使用 docker compose 启动 Milvus",
+                new float[] {1, 0, 0}, 100L)));
+        first.close();
+
+        LocalSemanticMemoryStore second = new LocalSemanticMemoryStore(3, root);
+        List<MemoryMatch> matches = second.search(SemanticMemoryQuery.builder(
+                        new float[] {1, 0, 0}, 5, 0.0, NOW)
+                .sourceType(MemorySourceTypeEnum.CONVERSATION)
+                .conversationId("conv")
+                .queryText("部署脚本 deploy")
+                .build());
+        assertEquals(1, matches.size());
+        assertEquals("m1", matches.get(0).getEntry().getId());
+        assertTrue("文本召回应达到默认 0.70 阈值", matches.get(0).getScore() >= 0.7);
+        second.close();
+    }
+
+    /**
+     * 清空会话历史时，本地缓存文件也要一起删除，避免重启后又被召回。
+     */
+    @Test
+    public void deleteByConversationRemovesPersistedHistory() {
+        Path root = tempFolder.getRoot().toPath();
+        LocalSemanticMemoryStore first = new LocalSemanticMemoryStore(3, root);
+        first.upsert(Collections.singletonList(entryWithContent("m1", "user: 历史消息",
+                new float[] {1, 0, 0}, 100L)));
+        first.deleteByConversation("conv");
+        first.close();
+
+        LocalSemanticMemoryStore second = new LocalSemanticMemoryStore(3, root);
+        assertTrue(second.search(SemanticMemoryQuery.builder(new float[] {1, 0, 0}, 5, 0.0, NOW)
+                .sourceType(MemorySourceTypeEnum.CONVERSATION)
+                .conversationId("conv")
+                .queryText("历史消息")
+                .build()).isEmpty());
+        second.close();
+    }
+
+    private static MemoryEntry entryWithContent(String id, String content, float[] vector, long createdAt) {
+        return MemoryEntry.builder(id, MemorySourceTypeEnum.CONVERSATION, "s", content, sha256(content), vector)
+                .conversationId("conv")
+                .createdAtEpochMillis(createdAt)
+                .build();
     }
 }

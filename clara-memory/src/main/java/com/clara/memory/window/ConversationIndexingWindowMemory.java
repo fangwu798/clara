@@ -21,10 +21,10 @@ import java.util.List;
  * 对话索引窗口记忆：在既有窗口记忆之上，把每条追加的对话记录向量化后写入语义记忆存储。
  *
  * <p>是什么、在哪一层：{@code clara-memory} 的 {@link IWindowMemory} 装饰器（{@code com.clara.memory.window}），
- * 由装配层在「启用外部向量库（Milvus）」时包一层；未启用时不包装，行为与原来完全一致。
+ * 由装配层始终包一层：Milvus 可用时写 Milvus，未安装 / 不可用时写本地持久化缓存。
  *
- * <p>为什么需要：窗口记忆只保留「当前会话最近的历史」，关掉进程就只剩落盘的历史文件；跨会话/长程关联要靠语义
- * 记忆。本装饰器把每条消息按会话写入语义库（来源 {@code CONVERSATION}），配合
+ * <p>为什么需要：窗口记忆只保留「当前会话最近的历史」，跨会话/长程关联要靠语义记忆。
+ * 本装饰器把每条消息按会话写入语义库（来源 {@code CONVERSATION}），配合
  * {@code SemanticRecallCoordinator} 的按会话检索，即构成「每轮召回被淘汰的历史」。
  *
  * <p>条目标识：{@code CONVERSATION:<会话>:<序号>}，序号取「本批消息在完整历史中的位置」，因此同一会话重启后
@@ -97,25 +97,24 @@ public final class ConversationIndexingWindowMemory implements IWindowMemory {
      * 把一批消息写入语义记忆；失败的条目跳过，整体失败只提示不抛出。
      */
     private void index(List<IContent> messages, int offset) {
-        List<MemoryEntry> entries = new ArrayList<>(messages.size());
-        long now = System.currentTimeMillis();
-        for (int position = 0; position < messages.size(); position++) {
-            IContent message = messages.get(position);
-            String content = ConversationMemoryText.of(message);
-            if (content == null) {
-                continue;
-            }
-            entries.add(MemoryEntry.builder(entryId(offset + position), MemorySourceTypeEnum.CONVERSATION,
-                    conversationId(), content, sha256(content), embeddingClient.embed(content))
-                    .conversationId(conversationId())
-                    .createdAtEpochMillis(now)
-                    .build());
-        }
-        if (entries.isEmpty()) {
-            return;
-        }
         try {
-            memoryStore.upsert(entries);
+            List<MemoryEntry> entries = new ArrayList<>(messages.size());
+            long now = System.currentTimeMillis();
+            for (int position = 0; position < messages.size(); position++) {
+                IContent message = messages.get(position);
+                String content = ConversationMemoryText.of(message);
+                if (content == null) {
+                    continue;
+                }
+                entries.add(MemoryEntry.builder(entryId(offset + position), MemorySourceTypeEnum.CONVERSATION,
+                        conversationId(), content, sha256(content), embeddingClient.embed(content))
+                        .conversationId(conversationId())
+                        .createdAtEpochMillis(now)
+                        .build());
+            }
+            if (!entries.isEmpty()) {
+                memoryStore.upsert(entries);
+            }
         } catch (RuntimeException failure) {
             warn(failure);
         }

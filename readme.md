@@ -27,7 +27,7 @@ Clara 是一套面向 Java 8 的可嵌入 AI Agent 客户端库，附带一个�
 - 工作流：顺序、条件、并行、循环、人工确认、多角色评审等节点；支持运行期生成并发布自定义工作流。
 - 代码知识图谱：优先查图谱、未覆盖时回退本地文件，降低大仓库阅读成本。
 - 媒体能力：文生图、图片编辑、图片理解、视频生成；高成本视频任务必须人工确认。
-- 本地记忆：会话历史落盘、历史查看与按范围清理、Milvus / 本地语义记忆。
+- 本地记忆：会话历史落盘、历史查看与按范围清理、Milvus / 本地持久化语义记忆。
 - 可观测：链路 Span、JSONL 落盘、`/trace`、Prometheus 指标与 OTLP 导出。
 - 终端体验：命令补全提示、历史输入召回、多行输入、ESC 取消、彩色输出、精简 / 全量日志。
 
@@ -41,7 +41,7 @@ Clara 是一套面向 Java 8 的可嵌入 AI Agent 客户端库，附带一个�
 | `clara-model` | Provider 配置、协议编解码、流式模型、Embedding、Token 估算与媒体模型 |
 | `clara-mcp` | MCP 客户端、stdio / Streamable HTTP 传输、服务注册与能力目录（可选，未配置时不启用） |
 | `clara-workflow` | 工作流定义、DAG 执行、任务规划、预算台账与人工交互网关 |
-| `clara-memory` | 窗口记忆、会话持久化、语义记忆（本地实现） |
+| `clara-memory` | 窗口记忆、会话持久化、语义记忆（本地持久化实现） |
 | `clara-memory-milvus` | 可选语义记忆后端：Milvus 向量 / BM25 检索 |
 | `clara-skill` | 技能注册、Schema 校验、权限控制与工具执行 |
 | `clara-orchestration` | 对话主循环、上下文组装、工具往返、意图计划与技能匹配 |
@@ -588,6 +588,13 @@ python my_tool.py             # stdin 读 JSON 入参，stdout 写 JSON 结果
 - 脚本声明按“绝对路径 + 修改时间 + 文件大小”缓存，文件改动后自动重新发现。
 - 脚本执行时设置 `PYTHONUTF8=1`、`PYTHONIOENCODING=utf-8`、`PYTHONDONTWRITEBYTECODE=1`，不要提交 `__pycache__`。
 
+桌面 Computer Use（`skill/scripts/desktop/`）：
+
+- `desktop_observe` 截取屏幕并把图片作为多模态附件回灌模型，附坐标网格、鼠标位置和窗口信息。
+- `desktop_control` 执行鼠标、键盘、窗口聚焦等动作，完整闭环是“观察 → 动作 → 再观察验证”。
+- 默认关闭；启动前设置 `CLARA_DESKTOP_CONTROL_ENABLED=1` 才启用。它只依赖 Windows 标准 API，不要求额外 Python 包。
+- 配置项、敏感窗口保护和已知限制见 `config/skill/scripts/desktop/README.md`。
+
 ### 工作流 `workflow/`
 
 内置流程位于 `config/workflow/*.yml`，自定义流程位于 `config/workflow/custom/*.yml`。两者使用同一套协议；自定义流程写入后按文件签名热加载，下一轮即可调用。
@@ -724,7 +731,7 @@ MCP 服务注册在 `config/mcp/mcp.json`。该文件可能包含本机密钥，
 
 ## 语义记忆
 
-`config/clara.yml` 的 `milvus.enabled: true` 时：
+`config/clara.yml` 的 `milvus.enabled: true` 时优先使用 Milvus：
 
 - 对话记录写入 Milvus，按会话隔离；
 - 每轮按输入召回相关历史并注入上下文；
@@ -732,11 +739,24 @@ MCP 服务注册在 `config/mcp/mcp.json`。该文件可能包含本机密钥，
 - `mode: vector` 需要可用的 Embedding 端点；
 - 模式、分词器或向量维度变化时，需开启 `recreateOnSchemaMismatch` 重建集合，重建会清空旧记录。
 
-本地运行 Milvus：
+本机未安装 / 未启动 Milvus 时自动回退到本地持久化缓存，不会丢上下文：
 
-```powershell
-docker compose -f deploy/docker-compose.yml up -d etcd minio standalone
+- 对话记录写入 `<工作目录>/.clara/state/semantic`，重启后仍可按文本召回；
+- 召回采用轻量词项重合度，不依赖 Embedding 服务，适合离线运行；
+- 清理会话时（`/history clear`）同步删除对应缓存；`/new` 会保留旧会话缓存。
+
+本地依赖栈（Milvus + 代码知识图谱）一键部署：
+
+```bat
+deploy\deploy.bat up
 ```
+
+```sh
+./deploy/deploy.sh up
+```
+
+常用操作：`down`（停止并删除容器，保留数据）、`stop` / `start` / `restart`、
+`status`、`logs`、`pull`、`milvus`（只起 Milvus）、`graph`（只起图谱）。
 
 ## 可观测
 
